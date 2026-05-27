@@ -42,8 +42,11 @@ python3 main.py
 **改原型后请同步再推送**（Pages 读的是 `docs/index.html`）：
 
 ```bash
-cp prototype/index.html docs/index.html
-git add docs/index.html && git commit -m "sync prototype to pages" && git push
+# 仅复制到 docs/
+./scripts/sync-pages.sh
+
+# 同步 + 提交 + 推送（推荐）
+./scripts/sync-pages.sh -c -p -m "更新原型：说明本次改动"
 ```
 
 其他可选方式：公司内网静态站（Nginx/OSS）、Netlify / Vercel、临时 ngrok（见下文 §4）。
