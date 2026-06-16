@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import errno
 import http.server
 import os
+import socket
 import socketserver
+import subprocess
+import urllib.error
+import urllib.request
 import webbrowser
 from pathlib import Path
 
@@ -45,6 +50,51 @@ def main() -> None:
             super().end_headers()
 
     handler = DevHandler
+
+    def port_in_use() -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind((HOST, PORT))
+            except OSError as e:
+                if e.errno in (errno.EADDRINUSE, 48, 98):
+                    return True
+                raise
+            return False
+
+    def port_owner_pid() -> str | None:
+        try:
+            out = subprocess.check_output(
+                ["lsof", "-ti", f":{PORT}"],
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+        return out.splitlines()[0] if out else None
+
+    def existing_server_url() -> str | None:
+        for path in ("/prototype/index.html", "/index.html"):
+            url = f"http://{HOST}:{PORT}{path}"
+            try:
+                with urllib.request.urlopen(url, timeout=1) as resp:
+                    if resp.status == 200:
+                        return url
+            except (urllib.error.URLError, TimeoutError):
+                continue
+        return None
+
+    if port_in_use():
+        pid = port_owner_pid()
+        live_url = existing_server_url()
+        print(f"端口 {PORT} 已被占用" + (f"（PID {pid}）" if pid else "") + "。")
+        if live_url:
+            print(f"本地原型可能已在运行，直接打开：{live_url}")
+        else:
+            print("占用该端口的进程可能不是本原型服务。")
+        print(f"若要重启，先结束旧进程：lsof -ti :{PORT} | xargs kill")
+        print("然后重新执行：python3 main.py")
+        raise SystemExit(1)
 
     with socketserver.TCPServer((HOST, PORT), handler) as httpd:
         httpd.allow_reuse_address = True

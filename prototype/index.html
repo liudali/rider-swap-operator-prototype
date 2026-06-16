@@ -71,12 +71,12 @@
     .tag.warn { background: #fff4df; color: #b8860b; }
     .tag.risk { background: #ffecec; color: var(--red); }
     .tag.neutral { background: #eef2f6; color: var(--muted); }
-    .note-mask { position: fixed; inset: 0; background: rgba(15,23,42,.42); z-index: 40; display: none; }
+    .note-mask { position: fixed; inset: 0; background: rgba(15,23,42,.42); z-index: 60; display: none; }
     .note-mask.open { display: block; }
     .note-modal {
       position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
       width: min(520px, calc(100vw - 32px)); background: var(--surface); border-radius: var(--radius);
-      box-shadow: var(--shadow); z-index: 41; display: none;
+      box-shadow: var(--shadow); z-index: 61; display: none;
     }
     .note-modal.open { display: block; }
     .note-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
@@ -208,7 +208,7 @@
         <p class="tree-hint" id="treeHint">运营商 · 换电运营与定价</p>
         <p class="tree-hint" style="margin-top:6px">
           <a href="mobile/index.html" style="color:#5eead4;font-size:12px">→ 骑手端原型</a><br>
-          <a id="navDocsLink" href="docs/index.html" target="_blank" rel="noopener" style="color:#5eead4;font-size:12px">→ 产品文档</a>
+          <a href="docs/index.html" target="_blank" rel="noopener" style="color:#5eead4;font-size:12px">→ 产品文档</a>
         </p>
       </div>
       <nav class="nav" id="nav"></nav>
@@ -317,6 +317,76 @@
       <div class="form-actions">
         <button class="btn" type="button" id="cancelPoolForm">取消</button>
         <button class="btn primary" type="button" id="savePoolForm">保存</button>
+      </div>
+    </div>
+  </div>
+  <div class="note-mask" id="leaseMask"></div>
+  <div class="note-modal" id="leaseModal" role="dialog" aria-modal="true" style="width:min(560px,calc(100vw - 32px))">
+    <div class="note-head">
+      <h3 id="leaseFormTitle">租赁协议</h3>
+      <button class="btn" type="button" id="closeLeaseForm">关闭</button>
+    </div>
+    <div class="note-body">
+      <form id="leaseForm" class="form-grid"></form>
+      <div class="form-actions">
+        <button class="btn" type="button" id="cancelLeaseForm">取消</button>
+        <button class="btn primary" type="button" id="saveLeaseForm">提交</button>
+      </div>
+    </div>
+  </div>
+  <div class="note-mask" id="followMask"></div>
+  <div class="note-modal" id="followModal" role="dialog" aria-modal="true" style="width:min(440px,calc(100vw - 32px))">
+    <div class="note-head">
+      <h3 id="followFormTitle">登记跟进</h3>
+      <button class="btn" type="button" id="closeFollowForm">关闭</button>
+    </div>
+    <div class="note-body">
+      <form id="followForm" class="form-grid"></form>
+      <div class="form-actions">
+        <button class="btn" type="button" id="cancelFollowForm">取消</button>
+        <button class="btn primary" type="button" id="saveFollowForm">保存</button>
+      </div>
+    </div>
+  </div>
+  <div class="note-mask" id="deviceListMask"></div>
+  <div class="note-modal" id="deviceListModal" role="dialog" aria-modal="true" style="width:min(560px,calc(100vw - 32px))">
+    <div class="note-head">
+      <h3 id="deviceListFormTitle">设备清单</h3>
+      <button class="btn" type="button" id="closeDeviceListForm">关闭</button>
+    </div>
+    <div class="note-body">
+      <form id="deviceListForm" class="form-grid"></form>
+      <div class="form-actions">
+        <button class="btn" type="button" id="cancelDeviceListForm">取消</button>
+        <button class="btn primary" type="button" id="saveDeviceListForm">保存</button>
+      </div>
+    </div>
+  </div>
+  <div class="note-mask" id="deviceReplaceMask"></div>
+  <div class="note-modal" id="deviceReplaceModal" role="dialog" aria-modal="true" style="width:min(480px,calc(100vw - 32px))">
+    <div class="note-head">
+      <h3 id="deviceReplaceFormTitle">设备替换</h3>
+      <button class="btn" type="button" id="closeDeviceReplaceForm">关闭</button>
+    </div>
+    <div class="note-body">
+      <form id="deviceReplaceForm" class="form-grid"></form>
+      <div class="form-actions">
+        <button class="btn" type="button" id="cancelDeviceReplaceForm">取消</button>
+        <button class="btn primary" type="button" id="saveDeviceReplaceForm">确认替换</button>
+      </div>
+    </div>
+  </div>
+  <div class="note-mask" id="rentPayMask"></div>
+  <div class="note-modal" id="rentPayModal" role="dialog" aria-modal="true" style="width:min(520px,calc(100vw - 32px))">
+    <div class="note-head">
+      <h3 id="rentPayFormTitle">补缴租金</h3>
+      <button class="btn" type="button" id="closeRentPayForm">关闭</button>
+    </div>
+    <div class="note-body">
+      <form id="rentPayForm" class="form-grid"></form>
+      <div class="form-actions">
+        <button class="btn" type="button" id="cancelRentPayForm">取消</button>
+        <button class="btn primary" type="button" id="saveRentPayForm">确认提交</button>
       </div>
     </div>
   </div>
@@ -461,13 +531,13 @@
       devices: ["我的设备", "仅展示与维护本人（本主体）拥有的换电柜、电池。"],
       orders: ["我的订单", "套餐/换电/服务变更（中途完结、冻结解冻）。"],
       flows: ["我的流水", "仅关联本人设备订单的资金实收、应分台账、分账批次。"],
-      employees: ["员工", "运营员工与合作伙伴统一维护；员工可配置功能权限，合作伙伴供分润模块选用。"],
+      employees: ["员工", "运营员工维护与功能权限配置；合作伙伴分润仅运营商主体具备。"],
       partnerProfit: ["合作伙伴分润", "分润设置从「员工」中的合作伙伴选取；查看关联站点订单明细（不脱敏）。"],
       partnerAccount: ["个人账户", "合作伙伴查看分润余额、绑定银行卡、发起提现及提现记录。"],
       users: ["用户", "购买本站换电服务的骑手。"],
-      leaseAgreements: ["协议与设备", "租赁协议及绑定设备清单；出租方可维护协议与设备关联。"],
+      leaseAgreements: ["协议与设备", "租赁协议关联设备清单；清单单独维护，支持导入与设备替换；一运营商可有多份协议。"],
       leaseCollect: ["租金收缴", "按账期跟踪各承租方租金收缴进度、方式与逾期。"],
-      leaseRent: ["月租金", "按月查看设备租金、站点收入覆盖情况；支持自动扣款或手动缴纳。"],
+      leaseRent: ["月租金", "到期代扣至资方对公账户；代扣失败可微信/支付宝在线补缴，或对公打款提交工单由资方确认。"],
       accounts: ["收款账户管理", "本主体进件商户：骑手收款、分账、租金收付等用途。"],
       dayPool: ["人天额度池", "渠道商向签约运营商购买人天额度，登记骑手并分配/收回；换电时按日预占与确认消耗。"],
       pricing: ["定价管理", "运营商维护 C 端个人套餐零售价与渠道商人天批发价。"],
@@ -508,12 +578,7 @@
       overview_orders: { title: "订单数", content: "筛选期内支付成功或退款中的包月/次卡订单笔数。" },
       overview_net: { title: "可分配经营收入", content: "确认收入扣支付通道手续费后，为本站可分配经营净收入；平台不参与骑手套餐/换电运营分成（演示平台运营分成 " + PLATFORM_OPS_SHARE + "%）。" },
       platform_no_share: { title: "平台运营分成", content: "骑手套餐/换电应分台账记录运营商本站经营应得；合作伙伴场地分润另表。平台收取 1% 技术服务费（C 端支付分账 + B 端确认消耗计提），见「平台服务费」。" },
-      pricing_pkg: { title: "个人套餐定价", content: "五层结构：<strong>通用</strong> / <strong>通用新人</strong> / <strong>默认（渠道应急）</strong> / <strong>站点覆盖</strong> / <strong>站点新人</strong>。新人套餐仅用户在该运营商<strong>首次个人套餐购买</strong>时展示，每用户每运营商<strong>仅一次</strong>（用过不退还资格）。" },
-      pricing_pkg_general: { title: "通用套餐", content: "运营商级默认定价。<strong>方案 B</strong>：按天含 7天、30天畅换、90天季卡；按次含 10次卡(30天)、30次卡(60天)。站点未覆盖时继承此价格。" },
-      pricing_pkg_newcomer_general: { title: "通用新人套餐", content: "运营商级新人专享价；用户在该运营商<strong>无任何历史支付成功个人套餐</strong>时，C 端展示并可购。<strong>每用户每运营商仅生效一次</strong>，购买后永久失去新人资格（退款不恢复）。" },
-      pricing_pkg_newcomer_site: { title: "站点新人套餐", content: "按站点配置新人专享价；用户在对应站点<strong>首购</strong>时优先于通用新人价。未配置站点新人价的站点，首购回退<strong>通用新人套餐</strong>（若有）。" },
-      pricing_pkg_fallback: { title: "默认套餐（渠道应急）", content: "面向渠道成员<strong>无预占人天</strong>时的在线自费兜底。<strong>必须</strong>保持 <strong>1天畅换 + 单次</strong> 各至少一款上架；不可删除，仅可调价/停用需有替代 SKU。不参与合伙人分润。" },
-      pricing_pkg_site: { title: "站点套餐", content: "按站点覆盖通用套餐零售价；<strong>默认套餐始终继承运营商默认价</strong>（一般不做站点级兜底拆分）。骑手购买价锁定在下单站点/套餐快照，跨站换电不改变已购价格。" },
+      pricing_pkg: { title: "个人套餐定价", content: "运营商按城市+站点+SKU 维护 C 端零售价。SKU：包月、7天、<strong>1天</strong>（购后24h）、<strong>单次</strong>（购后24h）。<strong>渠道兜底</strong>：须强制保留 1天+单次 各至少一款上架，供渠道成员无预占时在线支付。" },
       channel_sales: { title: "渠道销售", content: "运营商维护签约渠道、批发订单。<strong>已售额度池</strong>：每个渠道在本运营商下<strong>仅一个</strong>额度池实例；多次采购/续费/调账只产生<strong>额度变动记录</strong>（`DayPoolLedger`），不新建第二池。" },
       day_pool_one_per_operator: { title: "一运营商一池", content: "渠道商 × 运营商 = <strong>唯一</strong> `DayPool`。向第二家运营商签约才新增池；增购、赠送、退款、分配、预占/确认等均写入<strong>额度变动记录</strong>，不新建第二池。" },
       day_pool_b2b_settlement: { title: "B2B 资金与平台计提", content: "渠道<strong>采购/到账时</strong>批发款已是运营商收入（在线 T+0/T+1 或线下确认）。骑手<strong>确认消耗</strong>仅扣池余额，<strong>不向运营商二次打款</strong>；平台按标准人天价 × 1% 向额度售卖方计提（见「平台服务费」）。" },
@@ -551,7 +616,6 @@
       orders_deposit_waiver: { title: "信用免押", content: "满足门槛可使用芝麻信用或微信支付分免押（无需实付押金，仍须遵守还电规则）。" },
       orders_swap: { title: "换电订单", content: "以表格列出换电单；须区分权益来源：**个人套餐**与**渠道人天**。每笔记录三元组：用户归属运营商 U、柜机归属运营商 C、电池归属运营商 B。U 向 C 付柜机服务费、向 B 付电池服务费（C/B 与 U 相同时不产生该项费用）。" },
       orders_swap_triplet: { title: "运营商三元组与 跨网设备服务费", content: "换电成功时 IoT 上报 userOwner/cabinetOwner/batteryOwner。应付方恒为 userOwner：C≠U 时代付柜机费 ¥0.5/次；B≠U 时代付电池费 ¥0.1/次；经平台保证金/信用额度日清。运营商往来账只见平台代收/代付。" },
-      orders_swap_soh: { title: "SOH（State of Health）", content: "换电时 BMS 上报的电池健康度（%），含归还电池与换出电池。用于平台侧资产衰减监管与故障追溯。<strong>仅平台管理员换电订单详情可见</strong>（列表不展示），运营商/渠道/资金方不展示。" },
       orders_swap_entitlement: { title: "权益来源", content: "个人套餐：骑手自费购买的包月/次卡，换电计入套餐使用次数，产生套餐应分。渠道人天：骑手为渠道商登记成员，换电消耗渠道额度池人天（预占→确认），不产生个人套餐应分，可能触发平台 1% 消耗计提。" },
       orders_swap_log: { title: "换电过程日志", content: "按时间记录：① 用户操作（扫码、确认）② 请求（App→平台 API）③ 设备动作（平台→柜机指令）④ 设备反馈（传感器/门态/BMS）。用于客诉与故障追溯。" },
       orders_usage: { title: "有效期内使用情况", content: "在套餐 valid_from～valid_to 内汇总：已换电次数、涉及站点、换电明细列表。次卡展示剩余次数；包月展示剩余天数与期内换电次数。" },
@@ -562,15 +626,24 @@
       flows_payout: { title: "打款批次", content: "套餐周期完结后，本站经营应得由待分账账户结转留存；合作伙伴场地分润另按周期结算。平台不参与运营分成。" },
       orders_pkg_pay: { title: "收款主体", content: "架构 B 下 C 端套餐支付进入<strong>运营商</strong>进件商户（演示：闪送驿站联营）。渠道商无收款账户；B 端采购款付至运营商。" },
       users_panel: { title: "用户", content: "在己方站点购买或主绑定站点的骑手；展示服务状态（服务中/已冻结/中途完结）、人天池权益、押金或免押、最近换电。" },
-      lease_agreements: { title: "协议与设备", content: "一份协议绑定多台柜机/电池；出租方在此维护协议与设备清单，承租方只读查看。" },
-      lease_collect: { title: "租金收缴", content: "出租方专用：按账期查看应收/已收/待收、收缴方式（自动扣款、对公、手动）及跟进状态。" },
-      lease_rent_monthly: { title: "月租金", content: "承租方按月查看各设备分摊租金、站点经营收入是否覆盖；可开通自动扣款或手动缴纳。" },
-      lease_cover_gap: { title: "收益不足覆盖租金", content: "当月站点可分配收入 < 应付租金时，自动扣款可能失败，须人工补缴差额或调整扣款账户后手动处理。" },
-      lease_auto_deduct: { title: "自动扣款", content: "绑定「租金支付」用途的收款账户，到期日从该账户扣划月租金至出租方；失败则转待手动处理。" },
-      lease_devices: { title: "租赁设备", content: "登记在租赁协议下的柜机/电池；运营订单仍按 device_owner_id 归属承租渠道商统计。" },
-      lease_contracts: { title: "租赁协议", content: "约定租期、租金总额、押金、设备清单；关联还款计划。" },
+      lease_agreements: { title: "协议与设备", content: "资方维护<strong>租赁协议</strong>（承租运营商 + 关联设备清单 + 租金条款）；<strong>设备清单单独维护</strong>，一清单可对应一协议；同一运营商可有<strong>多份协议/多份清单</strong>。不含站点。变更须运营商确认，次月 1 日生效。" },
+      lease_device_lists: { title: "设备清单", content: "资方独立维护的设备组合（柜机/电池 SN）；可<strong>导入</strong>、清单内设备允许<strong>替换</strong>（如电池 A 无法维修换为电池 B），保留替换记录。新建协议时选择待绑定清单。" },
+      lease_device_replace: { title: "设备替换", content: "在设备清单中将故障设备标记为「已替换」，登记新 SN 与原因；替换记录可追溯。若清单已绑定履约中协议，替换后须运营商确认（次月 1 日生效，与协议变更规则一致）。" },
+      lease_confirm: { title: "运营商确认", content: "新签或变更协议提交后状态为「待确认」/「变更待确认」。运营商确认前<strong>不出账、不自动扣款</strong>。确认后按生效日执行；变更统一<strong>次月 1 日</strong>生效。" },
+      lease_term_fixed: { title: "固定租期", content: "须填写起止日期；到期自动进入「待续签/已到期」；续签须运营商重新确认。" },
+      lease_term_rolling: { title: "滚动租期", content: "仅填起始日，无固定截止日；任一方终止须<strong>提前 N 天通知</strong>（协议约定，如 30 天）；终止结算单须运营商确认。" },
+      lease_collect: { title: "租金收缴", content: "出租方专用：按账期跟踪代扣/在线支付/对公工单收缴进度；审核运营商提交的对公打款工单。" },
+      lease_rent_monthly: { title: "月租金", content: "承租方按月查看各设备分摊租金、站点经营收入是否覆盖；还款日系统<strong>代扣</strong>至资方对公账户；代扣失败可在线补缴。" },
+      lease_cover_gap: { title: "收益不足覆盖租金", content: "当月站点可分配收入 < 应付租金时，代扣可能失败，须通过<strong>微信/支付宝在线支付</strong>或<strong>对公打款工单</strong>补齐。" },
+      lease_auto_deduct: { title: "租金代扣", content: "协议开通代扣后，还款日从运营商绑定账户<strong>定期代扣</strong>，资金<strong>打款至资方对公账户</strong>。代扣失败则账单进入「待补缴」，不重复扣款直至补缴成功。" },
+      lease_manual_pay: { title: "在线补缴", content: "代扣失败后，运营商在「月租金」选择<strong>微信支付</strong>或<strong>支付宝</strong>在线支付，成功后即时核销账单并打款至资方收款商户。" },
+      lease_offline_ticket: { title: "对公打款工单", content: "运营商对公转账至资方对公账户后，在「月租金」提交工单（金额、流水号、转账日、凭证说明）；<strong>资方在「租金收缴」审核确认</strong>后账单核销。驳回须重新提交。" },
+      lease_devices: { title: "清单内设备", content: "来自关联设备清单的在租 SN；清单由资方单独维护，支持导入与设备替换。" },
+      lease_contracts: { title: "租赁协议", content: "资方维护：承租方、设备清单、月租金、押金、租期类型（固定/滚动）、还款日。变更后须运营商重新确认，次月 1 日生效。" },
       lease_repay: { title: "还款计划", content: "按期应还/已还金额与状态；逾期标红。" },
+      lease_panel: { title: "资金方后台", content: "资金方（出租方）登录后管理出租协议、设备清单与租金收缴；协议变更须运营商确认，次月 1 日生效。" },
       accounts_panel: { title: "收款账户管理", content: "本主体名下微信/支付宝/对公进件账户及用途（骑手套餐收款、合作伙伴结算、租金支付/收取）。" },
+      accounts: { title: "进件账户摘要", content: "运营商/资金方在微信、支付宝的进件子商户号摘要；用于骑手套餐收款、租金收付等。完整账户在「收款账户」菜单维护。" },
       device_ownership: { title: "设备权属", content: "自有：产权归本渠道商。租赁：产权归出租方，本主体为承租运营方，须履约租金计划。" },
       day_pool_panel: { title: "人天额度池", content: "渠道商向签约运营商批发换电人天额度。00:00 预占；<strong>换电或持电池</strong>确认消耗；换电实时同步渠道商。" },
       day_pool_reserve: { title: "预占与确认消耗", content: "天级模式：每日 00:00 预占 1 人天。当日<strong>有换电或持有电池</strong>→确认消耗 1 人天（每骑手每日 1 条记录）；<strong>无换电且未持电池</strong>→日终释放。同一骑手同一天只扣 1 人天，但记录当日换电次数。" },
@@ -583,7 +656,7 @@
       entitlement_api: { title: "权益准入 API", content: "换电前调用 <code>POST /api/v1/entitlement/check</code>：入参 user_id、cabinet_sn、site_id；返回 allowed、entitlement_type（day_pool/personal_pkg）、pool_id、seller_operator_id（userOwner）、today_status（reserved/confirmed/failed/pending_first_swap）、fail_reason、fallback（推荐 1天/单次兜底 SKU）。预占失败时 allowed=false，骑手端引导在线自费，<strong>不扣渠道池</strong>。详设见文档「权益准入API.md」。" },
       day_pool_team: { title: "骑手团队", content: "渠道商创建<strong>骑手团队</strong>并<strong>绑定消耗额度池</strong>（必选）。一运营商一池时默认团队自动绑定；向多家运营商签约时各团队须指定对应池。登记/分配/预占/消耗均从团队绑定池扣减。" },
       day_pool_org: { title: "团队与额度池", content: "编排单元为<strong>团队</strong>（非组织/站点）。团队 <code>pool_id</code> 决定从哪个额度池扣减；额度使用规则为团队配置周期额度上限。" },
-      day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护；渠道商只读。渠道成员<strong>无预占人天</strong>时引导在线支付，默认推荐<strong>1天畅换/单次</strong>兜底 SKU（购后24h有效）；<strong>不参与合伙人分润</strong>；平台 C 端 1% 在支付成功时收取。" },
+      day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护；渠道商只读。渠道成员<strong>无预占人天</strong>时引导在线支付，默认推荐<strong>1天/单次</strong>兜底 SKU（购后24h有效）；<strong>不参与合伙人分润</strong>；平台 C 端 1% 在支付成功时收取。" },
       day_pool_allocate: { title: "分配与收回", content: "分配：从团队绑定池可用余额划出 N 人天给骑手（分配即开通，按池统一口径预占/确认）。收回/退出团队：剩余未用人天自动退回池余额。" },
       day_pool_contract: { title: "额度池规则", content: "平台统一（只读）：<strong>分配即开通</strong>；每日预占后<strong>换电或持电池</strong>确认消耗；池过期<strong>不退</strong>。B 端结算节奏由渠道商与运营商线下协商，不在此展示。" },
       day_pool_identity: { title: "个人与渠道互斥", content: "同一骑手<strong>不可同时</strong>拥有生效中个人套餐与渠道团队成员身份。加入团队前须<strong>退订或冻结</strong>个人套餐。退出团队（主动/被移除）时<strong>未用人天自动回池</strong>。" },
@@ -599,16 +672,15 @@
       platform_day_standard: { title: "人天标准日值", content: "平台统一设置 B 端 1% 计提基数，并向运营商展示；亦为运营商默认批发价，运营商可改。" },
       platform_stats: { title: "业务汇总", content: "统计全平台运营商、渠道商、站点、设备、订单与业务流水；平台营收 = C 端 1% 支付分账 + B 端人天确认消耗计提。" },
       platform_operator_device_gate: { title: "设备绑定前置", content: "运营商「我的设备」仅展示平台已绑定的柜机/电池；未绑定设备不会出现在运营商后台。" },
-      platform_orders: { title: "全平台订单", content: "套餐购买订单按售卖运营商过滤；换电订单展示全平台三元组与 跨网设备服务费；渠道商订单为人天批发采购单（PO-），<strong>平台仅只读查询</strong>，不可确认到账或操作支付。" },
-      platform_channel_po: { title: "渠道商采购支付", content: "渠道商下单时可选择<strong>线下支付</strong>或<strong>在线支付</strong>。在线：微信/支付宝扫码，支付回调<strong>自动更新</strong>订单状态（无需人工确认）。线下：状态为「待确认到账」，须<strong>售卖运营商</strong>在「渠道销售 → 批发订单」确认到账后入账。<strong>平台管理员本页仅监管查询</strong>，不参与确认。" },
+      platform_orders: { title: "全平台订单", content: "套餐购买订单按售卖运营商过滤；换电订单展示全平台三元组与 跨网设备服务费；渠道商订单为人天批发采购单（PO-）。" },
+      platform_channel_po: { title: "渠道商采购支付", content: "渠道商下单时可选择<strong>线下支付</strong>或<strong>在线支付</strong>。在线：微信扫码、支付宝扫码，支付状态回调<strong>实时更新</strong>订单状态。线下：渠道商提交订单后状态为「待确认到账」，须<strong>售卖运营商</strong>在「渠道销售-批发订单」手动确认到账后，订单才变为已完成、额度池入账。" },
       platform_users: { title: "用户服务运营商", content: "用户当前所属运营商取决于<strong>购买服务的提供方</strong>：个人套餐=套餐售卖运营商；渠道成员=人天额度售卖运营商（签约批发合同的 sellerOperator）。与换电三元组 userOwner 一致。" },
       platform_users_battery: { title: "持有电池", content: "仅<strong>服务中且已换电</strong>的用户展示持有电池（IoT 上报，只读）。<strong>已冻结</strong>：冻结前须还电，冻结期间不持有电池。<strong>中途完结</strong>：退款前提为已还电，该状态不持有电池。<strong>待首换开通</strong>：尚未使用换电服务，不持有电池。" },
       platform_users_freeze: { title: "申请冻结校验", content: "骑手申请冻结时，系统校验是否仍持有电池：若持有则拒绝并提示「请先归还电池后再申请冻结」。冻结生效后用户状态为已冻结，持有电池列显示「未持有」。" },
       platform_devices_import: { title: "批量导入", content: "支持 CSV/Excel 模板批量导入物联网入库设备列表（SN、类型、城市、规格）；导入后进入「待绑定」队列，须绑定运营商后运营商方可使用。" },
       platform_channels: { title: "渠道商监管查询", content: "渠道商主体由<strong>签约运营商</strong>在「渠道销售 → 签约渠道」添加与管理；平台管理员本页<strong>只读</strong>查看全平台渠道列表、签约运营商与人员明细，不可新增或编辑。渠道商不向骑手收款，采购人天时向运营商付款。" },
       channel_no_receipt: { title: "渠道商无收款账户", content: "渠道商仅作为 B 端采购方，向运营商购买人天额度；款项付至运营商收款账户。渠道商后台不提供进件/收款账户管理。" },
-      platform_flows: { title: "平台流水视角", content: "用户支付：C 端套餐/自费流水及 1% 平台分账。运营商之间：跨网柜机/电池费经平台代收代付的日清流水，含<strong>净额前/后保证金</strong>（负值表示占用信用额度）。平台提成：B 端确认消耗计提 + C 端支付分账汇总。" },
-      platform_flows_inter_deposit: { title: "净额前/后保证金", content: "日清账单轧差净额计入运营商清分账户前后的<strong>保证金余额</strong>。净额 &lt; 0 为代付划出、&gt; 0 为代收入账。保证金用尽后继续划出时，余额记为<strong>负值</strong>，表示占用<strong>信用额度</strong>（允许欠费记账）。<strong>仅平台「流水管理 → 运营商之间」展示</strong>。" },
+      platform_flows: { title: "平台流水视角", content: "用户支付：C 端套餐/自费流水及 1% 平台分账。运营商之间：跨网柜机/电池费经平台代收代付的日清流水。平台提成：B 端确认消耗计提 + C 端支付分账汇总。" },
       platform_account: { title: "平台收款账户", content: "智格平台 1% 技术服务费统一进入平台商户（微信/支付宝分账 + B 端代扣）；本页展示平台商户余额与营收，非运营商经营账户。" }
     };
 
@@ -616,7 +688,7 @@
     const sites = [
       { id: "ST-SH-01", name: "浦东骑手驿站", city: "上海", type: "配送站", cabinets: 3, batteries: 36, status: "在营", partnerId: "EMP-SX-P01", operatorId: "OP-SX" },
       { id: "ST-SH-02", name: "世博换电服务点", city: "上海", type: "配送站", cabinets: 1, batteries: 12, status: "在营", partnerId: "EMP-SX-P02", operatorId: "OP-SX" },
-      { id: "ST-SH-04", name: "陆家嘴分站", city: "上海", type: "写字楼", cabinets: 2, batteries: 24, status: "在营" },
+      { id: "ST-SH-04", name: "陆家嘴分站", city: "上海", type: "写字楼", cabinets: 2, batteries: 24, status: "在营", operatorId: "OP-LJZ" },
       { id: "ST-SH-05", name: "张江筹备站", city: "上海", type: "配送站", cabinets: 0, batteries: 0, status: "建设中" }
     ];
 
@@ -668,11 +740,11 @@
     };
 
     const partnerProfitOrders = [
-      { operatorId: "OP-SX", partnerId: "EMP-SX-P01", partnerName: "浦东驿站物业合作方", orderType: "套餐", orderId: "SUB260524001", site: "浦东骑手驿站", cabinet: "CAB-22018", pkg: "30天畅换", pay: 299, shareBase: 245, rate: 30, payout: "待结转", userId: "U1028", phone: "138****1028", payTime: "2026-05-01 09:12", userType: "个人" },
-      { operatorId: "OP-SX", partnerId: "EMP-SX-P01", partnerName: "浦东驿站物业合作方", orderType: "套餐", orderId: "SUB260524002", site: "浦东骑手驿站", cabinet: "CAB-22018", pkg: "30天畅换", pay: 299, shareBase: 245, rate: 30, payout: "待结转", userId: "U1041", phone: "139****1041", payTime: "2026-05-10 14:20", userType: "个人" },
-      { operatorId: "OP-SX", partnerId: "EMP-SX-P01", partnerName: "浦东驿站物业合作方", orderType: "套餐", orderId: "SUB260401099", site: "浦东骑手驿站", cabinet: "CAB-22018", pkg: "30天畅换", pay: 299, shareBase: 245, rate: 30, payout: "可打款", userId: "U9001", phone: "135****9001", payTime: "2026-04-01 08:00", userType: "个人" },
+      { operatorId: "OP-SX", partnerId: "EMP-SX-P01", partnerName: "浦东驿站物业合作方", orderType: "套餐", orderId: "SUB260524001", site: "浦东骑手驿站", cabinet: "CAB-22018", pkg: "包月30天", pay: 299, shareBase: 245, rate: 30, payout: "待结转", userId: "U1028", phone: "138****1028", payTime: "2026-05-01 09:12", userType: "个人" },
+      { operatorId: "OP-SX", partnerId: "EMP-SX-P01", partnerName: "浦东驿站物业合作方", orderType: "套餐", orderId: "SUB260524002", site: "浦东骑手驿站", cabinet: "CAB-22018", pkg: "包月30天", pay: 299, shareBase: 245, rate: 30, payout: "待结转", userId: "U1041", phone: "139****1041", payTime: "2026-05-10 14:20", userType: "个人" },
+      { operatorId: "OP-SX", partnerId: "EMP-SX-P01", partnerName: "浦东驿站物业合作方", orderType: "套餐", orderId: "SUB260401099", site: "浦东骑手驿站", cabinet: "CAB-22018", pkg: "包月30天", pay: 299, shareBase: 245, rate: 30, payout: "可打款", userId: "U9001", phone: "135****9001", payTime: "2026-04-01 08:00", userType: "个人" },
       { operatorId: "OP-SX", partnerId: "EMP-SX-P01", partnerName: "浦东驿站物业合作方", orderType: "换电", orderId: "SW2605241201", site: "浦东骑手驿站", cabinet: "CAB-22018", pkg: "关联 SUB260524001", pay: 0, shareBase: 9.96, rate: 30, payout: "待结转", userId: "U1028", phone: "138****1028", payTime: "2026-05-24 12:05", userType: "个人" },
-      { operatorId: "OP-SX", partnerId: "EMP-SX-P02", partnerName: "世博场地合伙人", orderType: "套餐", orderId: "SUB260525001", site: "世博换电服务点", cabinet: "CAB-22021", pkg: "30天畅换", pay: 299, shareBase: 245, rate: 12, payout: "待结转", userId: "U1055", phone: "136****1055", payTime: "2026-05-15 10:30", userType: "个人" }
+      { operatorId: "OP-SX", partnerId: "EMP-SX-P02", partnerName: "世博场地合伙人", orderType: "套餐", orderId: "SUB260525001", site: "世博换电服务点", cabinet: "CAB-22021", pkg: "包月30天", pay: 299, shareBase: 245, rate: 12, payout: "待结转", userId: "U1055", phone: "136****1055", payTime: "2026-05-15 10:30", userType: "个人" }
     ];
 
     const partnerRulePending = [
@@ -686,6 +758,12 @@
       d.setHours(0, 0, 0, 0);
       const pad = n => String(n).padStart(2, "0");
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} 00:00:00`;
+    }
+
+    function nextMonthFirstStr(from = new Date()) {
+      const d = new Date(from.getFullYear(), from.getMonth() + 1, 1);
+      const pad = n => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     }
 
     function pendingRulesForOperator() {
@@ -766,6 +844,7 @@
       { sn: "CAB-22018", site: "浦东骑手驿站", city: "上海", slots: 12, online: true, lastSwap: "12:05", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", ownership: "自有" },
       { sn: "CAB-22019", site: "浦东骑手驿站", city: "上海", slots: 12, online: true, lastSwap: "11:40", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", ownership: "自有" },
       { sn: "CAB-22050", site: "浦东骑手驿站", city: "上海", slots: 12, online: true, lastSwap: "07:55", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", ownership: "租赁", lessorId: "LEASE-HD", lessorName: "华东设备租赁公司", leaseContractId: "LC-2501" },
+      { sn: "CAB-33001", site: "陆家嘴分站", city: "上海", slots: 8, online: true, lastSwap: "06-10 18:20", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营", ownership: "租赁", lessorId: "LEASE-HD", lessorName: "华东设备租赁公司", leaseContractId: "LC-2502" },
       { sn: "CAB-22021", site: "世博换电服务点", city: "上海", slots: 12, online: true, lastSwap: "10:30", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", ownership: "自有" },
       { sn: "CAB-22044", site: "陆家嘴分站", city: "上海", slots: 8, online: true, lastSwap: "10:22", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
       { sn: "CAB-22045", site: "陆家嘴分站", city: "上海", slots: 8, online: false, lastSwap: "昨日 21:00", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
@@ -773,25 +852,26 @@
     ];
 
     const batteries = [
-      { sn: "BAT-SH-1001", site: "浦东骑手驿站", city: "上海", soc: 92, soh: 93, health: "正常", inCab: "CAB-22018", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营" },
-      { sn: "BAT-SH-1002", site: "浦东骑手驿站", city: "上海", soc: 45, soh: 91, health: "正常", inCab: "柜外充电", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营" },
-      { sn: "BAT-SH-1044", site: "陆家嘴分站", city: "上海", soc: 78, soh: 88, health: "正常", inCab: "CAB-22044", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
-      { sn: "BAT-SH-1045", site: "陆家嘴分站", city: "上海", soc: 12, soh: 72, health: "低电量预警", inCab: "CAB-22045", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
-      { sn: "BAT-SH-1050", site: "浦东骑手驿站", city: "上海", soc: 90, soh: 96, health: "正常", inCab: "CAB-22050", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", ownership: "租赁", lessorId: "LEASE-HD", lessorName: "华东设备租赁公司", leaseContractId: "LC-2501" },
-      { sn: "BAT-SH-1021", site: "世博换电服务点", city: "上海", soc: 88, soh: 90, health: "正常", inCab: "CAB-22021", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营" },
-      { sn: "BAT-SH-0901", site: "浦东骑手驿站", city: "上海", soc: 96, soh: 95, health: "正常", inCab: "CAB-22018", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
-      { sn: "BAT-BJ-1001", site: "滨江换电站", city: "上海", soc: 94, soh: 92, health: "正常", inCab: "CAB-BJ-01", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" }
+      { sn: "BAT-SH-1001", site: "浦东骑手驿站", city: "上海", soc: 92, health: "正常", inCab: "CAB-22018", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营" },
+      { sn: "BAT-SH-1002", site: "浦东骑手驿站", city: "上海", soc: 45, health: "正常", inCab: "柜外充电", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营" },
+      { sn: "BAT-SH-1044", site: "陆家嘴分站", city: "上海", soc: 78, health: "正常", inCab: "CAB-22044", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
+      { sn: "BAT-SH-1045", site: "陆家嘴分站", city: "上海", soc: 12, health: "低电量预警", inCab: "CAB-22045", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
+      { sn: "BAT-SH-1050", site: "浦东骑手驿站", city: "上海", soc: 90, health: "正常", inCab: "CAB-22050", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", ownership: "租赁", lessorId: "LEASE-HD", lessorName: "华东设备租赁公司", leaseContractId: "LC-2501" },
+      { sn: "BAT-SH-1051", site: "—", city: "上海", soc: 100, health: "正常", inCab: "资方库存", deviceOwnerId: null, lessorId: "LEASE-HD", lessorName: "华东设备租赁公司", ownership: "出租库存" },
+      { sn: "BAT-SH-1021", site: "世博换电服务点", city: "上海", soc: 88, health: "正常", inCab: "CAB-22021", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营" },
+      { sn: "BAT-SH-0901", site: "浦东骑手驿站", city: "上海", soc: 96, health: "正常", inCab: "CAB-22018", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
+      { sn: "BAT-BJ-1001", site: "滨江换电站", city: "上海", soc: 94, health: "正常", inCab: "CAB-BJ-01", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" }
     ];
 
     const packageOrders = [
       {
-        id: "SUB260524001", user: "U1028", phone: "138****1028", site: "浦东骑手驿站", city: "上海", pkg: "30天畅换", pkgType: "monthly",
+        id: "SUB260524001", user: "U1028", phone: "138****1028", site: "浦东骑手驿站", city: "上海", pkg: "包月30天", pkgType: "monthly",
         pay: 299, status: "服务中", serviceState: "服务中", payTime: "2026-05-01 09:12", validFrom: "2026-05-01", validTo: "2026-05-31",
         swapLimit: null, swapUsed: 42, accrued: 208, payout: "待结转", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", cabinet: "CAB-22018",
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null
       },
       {
-        id: "SUB260524002", user: "U1041", phone: "139****1041", site: "浦东骑手驿站", city: "上海", pkg: "30天畅换", pkgType: "monthly",
+        id: "SUB260524002", user: "U1041", phone: "139****1041", site: "浦东骑手驿站", city: "上海", pkg: "包月30天", pkgType: "monthly",
         pay: 299, status: "已冻结", serviceState: "已冻结", payTime: "2026-05-10 14:20", validFrom: "2026-05-10", validTo: "2026-06-09",
         swapLimit: null, swapUsed: 28, accrued: 81, payout: "待结转", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", cabinet: "CAB-22018",
         batteryDeposit: 99, depositPaid: 0,
@@ -799,32 +879,32 @@
         freezeInfo: { applyTime: "2026-05-20 14:00", reason: "短期离岗", frozenDays: 7, maxFreezeDays: 30, resumeNote: "解冻后有效期顺延 7 天" }
       },
       {
-        id: "SUB260525001", user: "U1055", phone: "136****1055", site: "世博换电服务点", city: "上海", pkg: "30天畅换", pkgType: "monthly",
+        id: "SUB260525001", user: "U1055", phone: "136****1055", site: "世博换电服务点", city: "上海", pkg: "包月30天", pkgType: "monthly",
         pay: 299, status: "服务中", serviceState: "服务中", payTime: "2026-05-15 10:30", validFrom: "2026-05-15", validTo: "2026-06-14",
         swapLimit: null, swapUsed: 12, accrued: 58, payout: "待结转", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", cabinet: "CAB-22021",
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null
       },
       {
-        id: "SUB260523088", user: "U2088", phone: "137****2088", site: "陆家嘴分站", city: "上海", pkg: "30天畅换", pkgType: "monthly",
+        id: "SUB260523088", user: "U2088", phone: "137****2088", site: "陆家嘴分站", city: "上海", pkg: "包月30天", pkgType: "monthly",
         pay: 299, status: "中途完结", serviceState: "中途完结", payTime: "2026-05-18 16:35", validFrom: "2026-05-18", validTo: "2026-06-17",
         swapLimit: null, swapUsed: 6, accrued: 32, payout: "冻结", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营", cabinet: "CAB-22044",
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null, endTime: "2026-05-22 09:00",
         refundInfo: {
           unusedService: 179, depositRefund: 99, totalRefund: 278, refunded: 120, pending: 158,
-          unusedFormula: "30天畅换剩余 24 天 × 日单价",
+          unusedFormula: "包月剩余 24 天 × 日单价",
           depositStatus: "待退押（已还电）", refundStatus: "部分退款中"
         }
       },
       {
-        id: "SUB260401099", user: "U9001", phone: "135****9001", site: "浦东骑手驿站", city: "上海", pkg: "30天畅换", pkgType: "monthly",
+        id: "SUB260401099", user: "U9001", phone: "135****9001", site: "浦东骑手驿站", city: "上海", pkg: "包月30天", pkgType: "monthly",
         pay: 299, status: "已完结", serviceState: "已完结", payTime: "2026-04-01 08:00", validFrom: "2026-04-01", validTo: "2026-04-30",
         swapLimit: null, swapUsed: 55, accrued: 220, payout: "可打款", deviceOwnerId: "OP-SX", deviceOwnerName: "闪送驿站联营", cabinet: "CAB-22018",
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null
       },
       {
-        id: "SUB260524015", user: "U3321", phone: "136****3321", site: "陆家嘴分站", city: "上海", pkg: "10次卡", pkgType: "times",
-        pay: 79, status: "服务中", serviceState: "服务中", payTime: "2026-05-23 09:40", validFrom: "2026-05-23", validTo: "2026-06-21",
-        swapLimit: 10, swapUsed: 3, accrued: 24, payout: "待结转", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营", cabinet: "CAB-22044",
+        id: "SUB260524015", user: "U3321", phone: "136****3321", site: "陆家嘴分站", city: "上海", pkg: "次卡10次", pkgType: "times",
+        pay: 89, status: "服务中", serviceState: "服务中", payTime: "2026-05-23 09:40", validFrom: "2026-05-23", validTo: "2026-08-23",
+        swapLimit: 10, swapUsed: 3, accrued: 27, payout: "待结转", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营", cabinet: "CAB-22044",
         batteryDeposit: 99, depositPaid: 0,
         depositWaiver: { type: "芝麻信用", score: 652, waivedAmount: 99 }
       },
@@ -989,16 +1069,16 @@
     };
 
     const fundReceipts = [
-      { id: "RC260524001", type: "套餐支付", order: "SUB260524001", site: "浦东骑手驿站", city: "上海", user: "U1028", pkg: "30天畅换", payee: "闪送驿站联营", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-05-01 09:12", status: "成功" },
-      { id: "RC260524002", type: "套餐支付", order: "SUB260524002", site: "浦东骑手驿站", city: "上海", user: "U1041", pkg: "30天畅换", payee: "闪送驿站联营", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-05-10 14:20", status: "成功" },
-      { id: "RC260525001", type: "套餐支付", order: "SUB260525001", site: "世博换电服务点", city: "上海", user: "U1055", pkg: "30天畅换", payee: "闪送驿站联营", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-05-15 10:30", status: "成功" },
-      { id: "RC260523088", type: "套餐支付", order: "SUB260523088", site: "陆家嘴分站", city: "上海", user: "U2088", pkg: "30天畅换", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: 299, fee: 5.38, net: 293.62, channel: "支付宝", time: "2026-05-18 16:35", status: "成功" },
-      { id: "RC260523088R", type: "退款出款", order: "SUB260523088", site: "陆家嘴分站", city: "上海", user: "U2088", pkg: "30天畅换", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: -120, fee: 0, net: -120, channel: "原路退回", time: "2026-05-22 10:00", status: "处理中", note: "未使用套餐部分" },
-      { id: "RC260523088D", type: "押金退还", order: "SUB260523088", site: "陆家嘴分站", city: "上海", user: "U2088", pkg: "30天畅换", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: -99, fee: 0, net: -99, channel: "原路退回", time: "—", status: "待还电确认", note: "中途完结·电池已还后退押" },
-      { id: "RC260401099", type: "套餐支付", order: "SUB260401099", site: "浦东骑手驿站", city: "上海", user: "U9001", pkg: "30天畅换", payee: "闪送驿站联营", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-04-01 08:00", status: "成功" },
-      { id: "RC260524015", type: "套餐支付", order: "SUB260524015", site: "陆家嘴分站", city: "上海", user: "U3321", pkg: "10次卡", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: 79, fee: 1.42, net: 77.58, channel: "微信支付", time: "2026-05-23 09:40", status: "成功" },
+      { id: "RC260524001", type: "套餐支付", order: "SUB260524001", site: "浦东骑手驿站", city: "上海", user: "U1028", pkg: "包月30天", payee: "闪送驿站联营", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-05-01 09:12", status: "成功" },
+      { id: "RC260524002", type: "套餐支付", order: "SUB260524002", site: "浦东骑手驿站", city: "上海", user: "U1041", pkg: "包月30天", payee: "闪送驿站联营", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-05-10 14:20", status: "成功" },
+      { id: "RC260525001", type: "套餐支付", order: "SUB260525001", site: "世博换电服务点", city: "上海", user: "U1055", pkg: "包月30天", payee: "闪送驿站联营", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-05-15 10:30", status: "成功" },
+      { id: "RC260523088", type: "套餐支付", order: "SUB260523088", site: "陆家嘴分站", city: "上海", user: "U2088", pkg: "包月30天", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: 299, fee: 5.38, net: 293.62, channel: "支付宝", time: "2026-05-18 16:35", status: "成功" },
+      { id: "RC260523088R", type: "退款出款", order: "SUB260523088", site: "陆家嘴分站", city: "上海", user: "U2088", pkg: "包月30天", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: -120, fee: 0, net: -120, channel: "原路退回", time: "2026-05-22 10:00", status: "处理中", note: "未使用套餐部分" },
+      { id: "RC260523088D", type: "押金退还", order: "SUB260523088", site: "陆家嘴分站", city: "上海", user: "U2088", pkg: "包月30天", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: -99, fee: 0, net: -99, channel: "原路退回", time: "—", status: "待还电确认", note: "中途完结·电池已还后退押" },
+      { id: "RC260401099", type: "套餐支付", order: "SUB260401099", site: "浦东骑手驿站", city: "上海", user: "U9001", pkg: "包月30天", payee: "闪送驿站联营", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-04-01 08:00", status: "成功" },
+      { id: "RC260524015", type: "套餐支付", order: "SUB260524015", site: "陆家嘴分站", city: "上海", user: "U3321", pkg: "次卡10次", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: 89, fee: 1.6, net: 87.4, channel: "微信支付", time: "2026-05-23 09:40", status: "成功" },
       { id: "RC-POOL-001", type: "额度池采购", order: "QP-2601", site: "—", city: "上海", user: "—", pkg: "人天池 10000天", payee: PAYEE_OPERATOR, deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 85000, fee: 0, net: 85000, channel: "对公转账", time: "2026-01-05 10:00", status: "成功", note: "批发 ¥8.5/人天" },
-      { id: "RC-POOL-088", type: "额度池零售", order: "PAY-POOL-088", site: "浦东骑手驿站", city: "上海", user: "U2103", pkg: "1天畅换·渠道兜底", payee: PAYEE_OPERATOR, deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 29, fee: 0.29, net: 28.71, channel: "微信支付", time: "2026-06-09 07:50", status: "成功", note: "无预占人天·在线支付兜底；不参与合伙人分润" }
+      { id: "RC-POOL-088", type: "额度池零售", order: "PAY-POOL-088", site: "浦东骑手驿站", city: "上海", user: "U2103", pkg: "1天套餐·渠道兜底", payee: PAYEE_OPERATOR, deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 29, fee: 0.29, net: 28.71, channel: "微信支付", time: "2026-06-09 07:50", status: "成功", note: "无预占人天·在线支付兜底；不参与合伙人分润" }
     ];
 
     const accrualLedger = [
@@ -1013,33 +1093,127 @@
       { id: "PAY2605W", pkg: "—", op: PAYEE_OPERATOR, period: "2026-05 进行中", opNet: 0, status: "待结转", sub: "周期未完结不发起结算", route: "—" }
     ];
 
+    const leaseDeviceLists = [
+      {
+        id: "LDL-2501", lessorId: "LEASE-HD", name: "闪送驿站 · 柜电套装",
+        lesseeId: "OP-SX", lesseeName: ENT.operator.name, contractId: "LC-2501",
+        status: "已绑定",
+        devices: [
+          { sn: "CAB-22050", type: "换电柜", status: "在租" },
+          { sn: "BAT-SH-1050", type: "电池", status: "在租" }
+        ],
+        replacements: [
+          { at: "2025-08-15", fromSn: "BAT-SH-1048", toSn: "BAT-SH-1050", reason: "原电池无法维修" }
+        ],
+        updatedAt: "2026-06-01"
+      },
+      {
+        id: "LDL-2502", lessorId: "LEASE-HD", name: "陆家嘴 · 单柜",
+        lesseeId: "OP-LJZ", lesseeName: "陆家嘴联营", contractId: "LC-2502",
+        status: "已绑定",
+        devices: [{ sn: "CAB-33001", type: "换电柜", status: "在租" }],
+        replacements: [],
+        updatedAt: "2025-06-01"
+      },
+      {
+        id: "LDL-STBY-01", lessorId: "LEASE-HD", name: "备用电池池",
+        lesseeId: null, lesseeName: null, contractId: null,
+        status: "待绑定",
+        devices: [
+          { sn: "BAT-SH-1051", type: "电池", status: "待用" },
+          { sn: "BAT-NEW-001", type: "电池", status: "待用" }
+        ],
+        replacements: [],
+        updatedAt: "2026-05-20"
+      },
+      {
+        id: "LDL-2601", lessorId: "LEASE-HD", name: "闪送 · 世博扩租柜",
+        lesseeId: "OP-SX", lesseeName: ENT.operator.name, contractId: "LC-2603",
+        status: "已绑定",
+        devices: [{ sn: "CAB-22021", type: "换电柜", status: "在租" }],
+        replacements: [],
+        updatedAt: "2026-03-01"
+      }
+    ];
+
     const leaseContracts = [
       {
         id: "LC-2501", lessorId: "LEASE-HD", lessorName: ENT.leasing.name,
         lesseeId: "OP-SX", lesseeName: ENT.operator.name,
-        devices: ["CAB-22050", "BAT-SH-1050"], site: "浦东骑手驿站", city: "上海",
-        start: "2025-01-01", end: "2027-12-31", monthlyRent: 4200, periods: 36,
-        totalRent: 151200, deposit: 25000, paidRent: 21000, paidPeriods: 5,
-        status: "履约中", repayDay: "每月10日",
-        autoDeduct: true, autoDeductAccountId: "PA-OP-RENT"
+        deviceListId: "LDL-2501",
+        termType: "固定租期", start: "2025-01-01", end: "2027-12-31", noticeDays: null,
+        monthlyRent: 4200, periods: 36, totalRent: 151200, deposit: 25000,
+        paidRent: 21000, paidPeriods: 5, status: "变更待确认",
+        repayDay: "每月10日", autoDeduct: true, autoDeductAccountId: "PA-OP-RENT",
+        confirmedAt: "2025-01-05", confirmedBy: "闪送驿站联营",
+        pendingChange: {
+          submittedAt: "2026-06-10 14:00", submittedBy: "华东设备租赁公司",
+          effectiveDate: "2026-07-01",
+          deviceListId: "LDL-2501", monthlyRent: 4500,
+          addDevices: [{ sn: "BAT-SH-1051", type: "电池" }],
+          reason: "增配 1 块电池，月租金调整",
+          changes: [
+            { field: "月租金", from: "¥4,200", to: "¥4,500" },
+            { field: "设备清单", from: "LDL-2501：CAB-22050、BAT-SH-1050", to: "LDL-2501：CAB-22050、BAT-SH-1050、BAT-SH-1051" }
+          ]
+        }
+      },
+      {
+        id: "LC-2502", lessorId: "LEASE-HD", lessorName: ENT.leasing.name,
+        lesseeId: "OP-LJZ", lesseeName: "陆家嘴联营",
+        deviceListId: "LDL-2502",
+        termType: "滚动租期", start: "2025-06-01", end: null, noticeDays: 30,
+        monthlyRent: 2800, periods: null, totalRent: null, deposit: 8000,
+        paidRent: 33600, paidPeriods: 12, status: "待确认",
+        repayDay: "每月15日", autoDeduct: false, autoDeductAccountId: null,
+        confirmedAt: null, confirmedBy: null, pendingChange: null
+      },
+      {
+        id: "LC-2603", lessorId: "LEASE-HD", lessorName: ENT.leasing.name,
+        lesseeId: "OP-SX", lesseeName: ENT.operator.name,
+        deviceListId: "LDL-2601",
+        termType: "固定租期", start: "2026-03-01", end: "2028-02-28", noticeDays: null,
+        monthlyRent: 1800, periods: 24, totalRent: 43200, deposit: 10000,
+        paidRent: 3600, paidPeriods: 2, status: "履约中",
+        repayDay: "每月10日", autoDeduct: true, autoDeductAccountId: "PA-OP-RENT",
+        confirmedAt: "2026-03-05", confirmedBy: "闪送驿站联营", pendingChange: null
       }
     ];
+
+    const lessorRentReceiveAccount = {
+      entityId: "LEASE-HD",
+      bankName: "中国工商银行上海分行",
+      accountName: "华东设备租赁有限公司",
+      accountNo: "1219 0666 0000 3366",
+      transferRemark: "附言请填写：协议编号 + 账期（例：LC-2501 2026-06）"
+    };
 
     const leaseRentBills = [
       {
         id: "BILL-OP-2506", contractId: "LC-2501", lesseeId: "OP-SX", month: "2026-06",
         dueDate: "2026-06-10", rentAmount: 4200, siteRevenue: 3200, coverGap: 1000,
-        status: "不足需处理", payMode: "auto", autoStatus: "自动扣款失败（收入不足）",
+        status: "代扣失败待补缴", payMode: "auto", payChannel: null,
+        autoStatus: "2026-06-10 代扣失败（经营账户余额不足）",
         paidDate: null, paidAmount: 0, manualRequired: true,
         deviceBreakdown: [{ sn: "CAB-22050", amount: 2520 }, { sn: "BAT-SH-1050", amount: 1680 }]
       },
       {
         id: "BILL-OP-2505", contractId: "LC-2501", lesseeId: "OP-SX", month: "2026-05",
         dueDate: "2026-05-10", rentAmount: 4200, siteRevenue: 4500, coverGap: 0,
-        status: "已还清", payMode: "manual", autoStatus: "—",
-        paidDate: "2026-05-09", paidAmount: 4200, manualRequired: false,
+        status: "已还清", payMode: "auto", payChannel: "代扣",
+        autoStatus: "2026-05-10 代扣成功 → 资方对公 1219****3366",
+        paidDate: "2026-05-10", paidAmount: 4200, manualRequired: false,
         deviceBreakdown: [{ sn: "CAB-22050", amount: 2520 }, { sn: "BAT-SH-1050", amount: 1680 }]
       },
+    ];
+
+    let leaseRentOfflineTickets = [
+      {
+        id: "LR-OFF-001", billId: "BILL-OP-2504", contractId: "LC-2501", lesseeId: "OP-SX", lesseeName: "闪送驿站联营",
+        lessorId: "LEASE-HD", month: "2026-04", amount: 4200, transferRef: "20260408123456", transferDate: "2026-04-08",
+        voucherNote: "4月租金对公", status: "已确认", submitTime: "2026-04-08 11:20",
+        confirmTime: "2026-04-08 16:00", confirmedBy: "华东设备租赁公司", rejectReason: null
+      }
     ];
 
     const leaseRepayments = [,
@@ -1055,12 +1229,12 @@
     const paymentAccounts = [
       { id: "PA-OP-WX", entityId: "OP-SX", channel: "微信支付", mchName: PAYEE_OPERATOR, mchNo: PAYEE_MCH.wx, purpose: "骑手套餐收款", status: "已开通", default: true },
       { id: "PA-OP-ALI", entityId: "OP-SX", channel: "支付宝", mchName: PAYEE_OPERATOR, mchNo: PAYEE_MCH.ali, purpose: "骑手套餐收款", status: "已开通", default: false },
-      { id: "PA-OP-RENT", entityId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8821", purpose: "租金支付（付租赁公司）", status: "已绑定", default: false },
+      { id: "PA-OP-RENT", entityId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8821", purpose: "租金代扣（源账户）", status: "已绑定", default: false },
       { id: "PA-OP-FEE", entityId: "OP-SX", channel: "预存户", mchName: PAYEE_OPERATOR, mchNo: "FEE-PREPAY-001", purpose: "平台服务费预存", status: "已开通", default: false },
       { id: "PA-OP-B2B", entityId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8822", purpose: "渠道批发收款", status: "已开通", default: false },
       { id: "PA-LJZ-WX", entityId: "OP-LJZ", channel: "微信支付", mchName: "陆家嘴联营", mchNo: "2088999***", purpose: "骑手套餐收款", status: "已开通", default: true },
       { id: "PA-LEASE-WX", entityId: "LEASE-HD", channel: "微信支付", mchName: ENT.leasing.name, mchNo: "1900000999***", purpose: "租金收款", status: "已开通", default: true },
-      { id: "PA-LEASE-CORP", entityId: "LEASE-HD", channel: "对公账户", mchName: ENT.leasing.name, mchNo: "1219****3366", purpose: "租金收款（承租方对公）", status: "已开通", default: false }
+      { id: "PA-LEASE-CORP", entityId: "LEASE-HD", channel: "对公账户", mchName: ENT.leasing.name, mchNo: "1219****3366", purpose: "租金收款（代扣/对公入账）", status: "已开通", default: true }
     ];
 
     const users = [
@@ -1139,10 +1313,10 @@
     ];
 
     const dayPoolRetailPrices = [
-      { id: "RP-01", poolId: "QP-2601", city: "上海", site: "浦东骑手驿站", pkg: "30天畅换", retailPrice: 299, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-05-01" },
-      { id: "RP-02", poolId: "QP-2601", city: "上海", site: "世博换电服务点", pkg: "30天畅换", retailPrice: 289, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-05-01" },
-      { id: "RP-03", poolId: "QP-2601", city: "上海", site: "浦东骑手驿站", pkg: "10次卡", retailPrice: 79, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-04-15" },
-      { id: "RP-04", poolId: "QP-2601", city: "上海", site: "（运营商默认）", pkg: "1天畅换", retailPrice: 29, wholesalePrice: 8.5, channelFallback: true, validityHours: 24, status: "生效", updatedAt: "2026-06-01" },
+      { id: "RP-01", poolId: "QP-2601", city: "上海", site: "浦东骑手驿站", pkg: "包月30天", retailPrice: 299, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-05-01" },
+      { id: "RP-02", poolId: "QP-2601", city: "上海", site: "世博换电服务点", pkg: "包月30天", retailPrice: 289, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-05-01" },
+      { id: "RP-03", poolId: "QP-2601", city: "上海", site: "浦东骑手驿站", pkg: "次卡10次", retailPrice: 89, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-04-15" },
+      { id: "RP-04", poolId: "QP-2601", city: "上海", site: "（运营商默认）", pkg: "1天套餐", retailPrice: 29, wholesalePrice: 8.5, channelFallback: true, validityHours: 24, status: "生效", updatedAt: "2026-06-01" },
       { id: "RP-05", poolId: "QP-2601", city: "上海", site: "（运营商默认）", pkg: "单次换电", retailPrice: 9.9, wholesalePrice: 8.5, channelFallback: true, validityHours: 24, status: "生效", updatedAt: "2026-06-01" }
     ];
 
@@ -1169,19 +1343,12 @@
     ];
 
     const operatorPkgPrices = [
-      { id: "OP-P-G01", operatorId: "OP-SX", city: "上海", site: "", priceScope: "general", pkg: "7天套餐", pkgType: "weekly", billingMode: "按天", validityDays: 7, swapLimit: null, validityHours: null, channelFallback: false, retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
-      { id: "OP-P-G02", operatorId: "OP-SX", city: "上海", site: "", priceScope: "general", pkg: "30天畅换", pkgType: "monthly", billingMode: "按天", validityDays: 30, swapLimit: null, validityHours: null, channelFallback: false, retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
-      { id: "OP-P-G03", operatorId: "OP-SX", city: "上海", site: "", priceScope: "general", pkg: "90天季卡", pkgType: "quarterly", billingMode: "按天", validityDays: 90, swapLimit: null, validityHours: null, channelFallback: false, retailPrice: 799, status: "生效", updatedAt: "2026-05-15" },
-      { id: "OP-P-G04", operatorId: "OP-SX", city: "上海", site: "", priceScope: "general", pkg: "10次卡", pkgType: "times", billingMode: "按次", validityDays: 30, swapLimit: 10, validityHours: null, channelFallback: false, retailPrice: 79, status: "生效", updatedAt: "2026-04-15" },
-      { id: "OP-P-G05", operatorId: "OP-SX", city: "上海", site: "", priceScope: "general", pkg: "30次卡", pkgType: "times", billingMode: "按次", validityDays: 60, swapLimit: 30, validityHours: null, channelFallback: false, retailPrice: 199, status: "生效", updatedAt: "2026-04-20" },
-      { id: "OP-P-F01", operatorId: "OP-SX", city: "上海", site: "", priceScope: "fallback", pkg: "1天畅换", pkgType: "daily", billingMode: "按天", validityDays: 1, swapLimit: null, validityHours: 24, channelFallback: true, retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-F02", operatorId: "OP-SX", city: "上海", site: "", priceScope: "fallback", pkg: "单次换电", pkgType: "single", billingMode: "按次", validityDays: null, swapLimit: 1, validityHours: 24, channelFallback: true, retailPrice: 9.9, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-S01", operatorId: "OP-SX", city: "上海", site: "浦东骑手驿站", priceScope: "site", pkg: "30天畅换", pkgType: "monthly", billingMode: "按天", validityDays: 30, swapLimit: null, validityHours: null, channelFallback: false, retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
-      { id: "OP-P-S02", operatorId: "OP-SX", city: "上海", site: "世博换电服务点", priceScope: "site", pkg: "30天畅换", pkgType: "monthly", billingMode: "按天", validityDays: 30, swapLimit: null, validityHours: null, channelFallback: false, retailPrice: 289, status: "生效", updatedAt: "2026-05-01" },
-      { id: "OP-P-S03", operatorId: "OP-SX", city: "上海", site: "浦东骑手驿站", priceScope: "site", pkg: "7天套餐", pkgType: "weekly", billingMode: "按天", validityDays: 7, swapLimit: null, validityHours: null, channelFallback: false, retailPrice: 85, status: "生效", updatedAt: "2026-05-10" },
-      { id: "OP-P-NG01", operatorId: "OP-SX", city: "上海", site: "", priceScope: "newcomer_general", pkg: "7天新人专享", pkgType: "weekly", billingMode: "按天", validityDays: 7, swapLimit: null, validityHours: null, channelFallback: false, newcomerEligible: true, retailPrice: 59, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-NG02", operatorId: "OP-SX", city: "上海", site: "", priceScope: "newcomer_general", pkg: "10次新人卡", pkgType: "times", billingMode: "按次", validityDays: 30, swapLimit: 10, validityHours: null, channelFallback: false, newcomerEligible: true, retailPrice: 49, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-NS01", operatorId: "OP-SX", city: "上海", site: "世博换电服务点", priceScope: "newcomer_site", pkg: "30天新人畅换", pkgType: "monthly", billingMode: "按天", validityDays: 30, swapLimit: null, validityHours: null, channelFallback: false, newcomerEligible: true, retailPrice: 199, status: "生效", updatedAt: "2026-06-05" }
+      { id: "OP-P-01", operatorId: "OP-SX", city: "上海", site: "浦东骑手驿站", pkg: "包月30天", pkgType: "monthly", validityHours: null, channelFallback: false, retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
+      { id: "OP-P-02", operatorId: "OP-SX", city: "上海", site: "世博换电服务点", pkg: "包月30天", pkgType: "monthly", validityHours: null, channelFallback: false, retailPrice: 289, status: "生效", updatedAt: "2026-05-01" },
+      { id: "OP-P-03", operatorId: "OP-SX", city: "上海", site: "浦东骑手驿站", pkg: "7天套餐", pkgType: "weekly", validityHours: null, channelFallback: false, retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
+      { id: "OP-P-04", operatorId: "OP-SX", city: "上海", site: "", pkg: "1天套餐", pkgType: "daily", validityHours: 24, channelFallback: true, retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
+      { id: "OP-P-05", operatorId: "OP-SX", city: "上海", site: "", pkg: "单次换电", pkgType: "single", validityHours: 24, channelFallback: true, retailPrice: 9.9, status: "生效", updatedAt: "2026-06-01" },
+      { id: "OP-P-06", operatorId: "OP-SX", city: "上海", site: "浦东骑手驿站", pkg: "次卡10次", pkgType: "times", validityHours: null, channelFallback: false, retailPrice: 89, status: "生效", updatedAt: "2026-04-15" }
     ];
 
     const operatorDayQuotaPrices = [
@@ -1339,12 +1506,10 @@
     ];
 
     const interOpDailyBills = [
-      { id: "IOB-2026-06-09", date: "2026-06-09", operatorId: "OP-SX", platformPayOut: 1.2, platformPayIn: 0, net: -1.2, swapCount: 2, deductSource: "保证金", depositBefore: 12500, depositAfter: 12498.8, clearedAt: "2026-06-09 " + INTER_OP_CLEAR_TIME, status: "待日清" },
-      { id: "IOB-2026-06-08", date: "2026-06-08", operatorId: "OP-SX", platformPayOut: 1.2, platformPayIn: 0.3, net: -0.9, swapCount: 3, deductSource: "保证金", depositBefore: 13000, depositAfter: 12999.1, clearedAt: "2026-06-08 " + INTER_OP_CLEAR_TIME, status: "已清分" },
-      { id: "IOB-2026-06-09-BJ", date: "2026-06-09", operatorId: "OP-BJ", platformPayOut: 0, platformPayIn: 0.5, net: 0.5, swapCount: 1, deductSource: "保证金", depositBefore: 0, depositAfter: 0.5, clearedAt: "2026-06-09 " + INTER_OP_CLEAR_TIME, status: "待日清" },
-      { id: "IOB-2026-06-09-LJZ", date: "2026-06-09", operatorId: "OP-LJZ", platformPayOut: 0, platformPayIn: 0.1, net: 0.1, swapCount: 1, deductSource: "保证金", depositBefore: 0, depositAfter: 0.1, clearedAt: "2026-06-09 " + INTER_OP_CLEAR_TIME, status: "待日清" },
-      { id: "IOB-2026-06-08-LJZ", date: "2026-06-08", operatorId: "OP-LJZ", platformPayOut: 1.5, platformPayIn: 0, net: -1.5, swapCount: 3, deductSource: "信用额度", depositBefore: 0, depositAfter: -1.5, clearedAt: "2026-06-08 " + INTER_OP_CLEAR_TIME, status: "已清分" },
-      { id: "IOB-2026-06-07-BJ", date: "2026-06-07", operatorId: "OP-BJ", platformPayOut: 3.2, platformPayIn: 0.2, net: -3.0, swapCount: 5, deductSource: "信用额度", depositBefore: -2800, depositAfter: -3100, clearedAt: "2026-06-07 " + INTER_OP_CLEAR_TIME, status: "已清分" }
+      { id: "IOB-2026-06-09", date: "2026-06-09", operatorId: "OP-SX", platformPayOut: 1.2, platformPayIn: 0, net: -1.2, swapCount: 2, deductSource: "保证金", clearedAt: "2026-06-09 " + INTER_OP_CLEAR_TIME, status: "待日清" },
+      { id: "IOB-2026-06-08", date: "2026-06-08", operatorId: "OP-SX", platformPayOut: 1.2, platformPayIn: 0.3, net: -0.9, swapCount: 3, deductSource: "保证金", clearedAt: "2026-06-08 " + INTER_OP_CLEAR_TIME, status: "已清分" },
+      { id: "IOB-2026-06-09-BJ", date: "2026-06-09", operatorId: "OP-BJ", platformPayOut: 0, platformPayIn: 0.5, net: 0.5, swapCount: 1, deductSource: "保证金", clearedAt: "2026-06-09 " + INTER_OP_CLEAR_TIME, status: "待日清" },
+      { id: "IOB-2026-06-09-LJZ", date: "2026-06-09", operatorId: "OP-LJZ", platformPayOut: 0, platformPayIn: 0.1, net: 0.1, swapCount: 1, deductSource: "保证金", clearedAt: "2026-06-09 " + INTER_OP_CLEAR_TIME, status: "待日清" }
     ];
 
     const interOpPeriodBills = [
@@ -1422,6 +1587,8 @@
       partnerProfitSub: "全部", employeeTab: "staff", pf: {},
       employeeForm: null, poolForm: null, pricingEditId: null,
       operatorFormId: null, channelPartnerContractId: null, bindInventorySn: null,
+      leaseFormId: null, leaseFormMode: null, followBillId: null, rentPayBillId: null,
+      leaseAgreementsTab: "contracts", deviceListFormId: null, deviceReplaceListId: null,
       detailSubId: null, detailSwapId: null, detailLeaseId: null, detailOperatorId: null
     };
 
@@ -1551,25 +1718,6 @@
     function ownerFromBatterySn(sn) {
       const b = batteries.find(x => x.sn === sn);
       return b ? { id: b.deviceOwnerId, name: b.deviceOwnerName } : null;
-    }
-
-    function batterySohPercent(bat) {
-      if (!bat) return null;
-      if (bat.soh != null) return bat.soh;
-      const rec = batteries.find(x => x.sn === bat.sn);
-      if (rec?.soh != null) return rec.soh;
-      if (bat.health?.includes("预警") || bat.health?.includes("故障")) return 75;
-      return 94;
-    }
-
-    function swapBatDetailLine(bat) {
-      if (!bat) return "—";
-      let txt = `${bat.sn} · SOC ${bat.soc}% · ${bat.health}`;
-      if (isPlatformRole()) {
-        const soh = batterySohPercent(bat);
-        txt += ` · SOH ${soh}%`;
-      }
-      return txt;
     }
 
     /** 换电单三元组 + 跨网设备服务费（U≠C/B 时产生） */
@@ -1718,6 +1866,7 @@
       if (kind === "entity") {
         state.role = id;
         state.loginEmployeeId = null;
+        if (!supportsPartnerModule()) state.employeeTab = "staff";
         return;
       }
       const emp = findEmployeeGlobal(id);
@@ -1839,6 +1988,9 @@
       if (role === "operator" && o.orderStatus === "待确认到账" && o.operatorId === currentEntity().id) {
         return `<button type="button" class="link-btn" data-confirm-channel-po="${o.id}">确认到账</button>`;
       }
+      if (role === "platform" && o.payChannel === "online" && ["待支付", "支付中"].includes(o.orderStatus)) {
+        return `<button type="button" class="link-btn" data-simulate-online-pay="${o.id}">模拟支付成功</button>`;
+      }
       if (o.orderStatus === "已完成" && o.confirmedBy) {
         return `<small style="color:var(--muted)">${o.confirmedBy} 确认</small>`;
       }
@@ -1905,15 +2057,7 @@
     function isChannelRole() { return state.role === "channel"; }
     function isOperatorRole() { return state.role === "operator"; }
     function isPlatformRole() { return state.role === "platform"; }
-
-    function depositBalanceCell(amount) {
-      if (amount == null || amount === undefined) return "—";
-      const n = Math.round(amount * 1000) / 1000;
-      if (n < 0) {
-        return `<strong style="color:var(--red)">¥${n.toLocaleString("zh-CN")}</strong><br><small style="color:var(--muted)">信用额度</small>`;
-      }
-      return `<strong>¥${n.toLocaleString("zh-CN")}</strong>`;
-    }
+    function supportsPartnerModule() { return isOperatorRole(); }
 
     function creditForOperator(operatorId) {
       return operatorCreditAccounts.find(a => a.operatorId === operatorId) || null;
@@ -2334,12 +2478,12 @@
       leaseAgreements: [
         { key: "contractId", label: "协议编号", placeholder: "LC-" },
         { key: "party", label: "对方主体", placeholder: "承租/出租方名称" },
-        { key: "status", label: "协议状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "履约中", t: "履约中" }] }
+        { key: "status", label: "协议状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待确认", t: "待确认" }, { v: "变更待确认", t: "变更待确认" }, { v: "履约中", t: "履约中" }, { v: "已驳回", t: "已驳回" }] }
       ],
       leaseCollect: [
         { key: "month", label: "账期", placeholder: "2026-06" },
         { key: "lessee", label: "承租方", placeholder: "" },
-        { key: "collectStatus", label: "收缴状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "已收缴", t: "已收缴" }, { v: "待收缴", t: "待收缴" }, { v: "待人工跟进", t: "待人工跟进" }] }
+        { key: "collectStatus", label: "收缴状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "已收缴", t: "已收缴" }, { v: "待收缴", t: "待收缴" }, { v: "待补缴", t: "待补缴" }, { v: "对公待确认", t: "对公待确认" }] }
       ],
       leaseRent: [
         { key: "month", label: "账单月", placeholder: "2026-06" },
@@ -2553,12 +2697,13 @@
     function myLeasedDevices() {
       const eid = currentEntity().id;
       if (isLeasingRole()) {
-        const sns = new Set(leaseContracts.filter(c => c.lessorId === eid).flatMap(c => c.devices));
+        const sns = new Set(leaseContracts.filter(c => c.lessorId === eid).flatMap(c => contractDevices(c)));
         return [...cabinets.filter(c => sns.has(c.sn)), ...batteries.filter(b => sns.has(b.sn))].map(d => ({
           sn: d.sn, type: d.slots != null ? "换电柜" : "电池", site: d.site, city: d.city,
-          lesseeId: leaseContracts.find(c => c.devices.includes(d.sn))?.lesseeId,
-          lesseeName: leaseContracts.find(c => c.devices.includes(d.sn))?.lesseeName,
-          contractId: d.leaseContractId || leaseContracts.find(c => c.devices.includes(d.sn))?.id,
+          lesseeId: findContractBySn(d.sn)?.lesseeId,
+          lesseeName: findContractBySn(d.sn)?.lesseeName,
+          contractId: d.leaseContractId || findContractBySn(d.sn)?.id,
+          listId: findContractBySn(d.sn)?.deviceListId,
           status: "在租"
         }));
       }
@@ -2570,17 +2715,191 @@
     }
 
     function repayProgress(contract) {
+      if (contract.termType === "滚动租期" || !contract.periods) {
+        return { pct: Math.min(100, contract.paidPeriods * 8), label: `滚动租期 · 已付 ${contract.paidPeriods} 期 · ¥${contract.paidRent.toLocaleString("zh-CN")}` };
+      }
       const pct = contract.periods ? Math.round(contract.paidPeriods / contract.periods * 100) : 0;
       return { pct, label: `已还 ${contract.paidPeriods}/${contract.periods} 期 · ¥${contract.paidRent.toLocaleString("zh-CN")} / ¥${contract.totalRent.toLocaleString("zh-CN")}` };
+    }
+
+    function leaseTermLabel(c) {
+      if (c.termType === "滚动租期") {
+        return `滚动 · ${c.start} 起 · 提前 ${c.noticeDays || 30} 天通知终止`;
+      }
+      return `${c.start} 至 ${c.end}`;
+    }
+
+    function pendingLeaseConfirmCount() {
+      if (!isOperatorRole()) return 0;
+      return leaseContracts.filter(c => c.lesseeId === currentEntity().id && (c.status === "待确认" || c.status === "变更待确认")).length;
+    }
+
+    function confirmLeaseContract(contractId) {
+      const c = leaseContracts.find(x => x.id === contractId);
+      if (!c || c.lesseeId !== currentEntity().id) return false;
+      if (c.status === "待确认") {
+        c.status = "履约中";
+        c.confirmedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+        c.confirmedBy = currentEntity().name;
+        const dl = getLeaseDeviceList(c.deviceListId);
+        if (dl) activeListDevices(dl).forEach(d => { d.status = "在租"; });
+        return true;
+      }
+      if (c.status === "变更待确认" && c.pendingChange) {
+        const ch = c.pendingChange;
+        c.monthlyRent = ch.monthlyRent;
+        if (ch.deviceListId) c.deviceListId = ch.deviceListId;
+        const dl = getLeaseDeviceList(c.deviceListId);
+        if (dl && ch.addDevices?.length) {
+          ch.addDevices.forEach(dev => {
+            const standby = dl.devices.find(x => x.sn === dev.sn);
+            if (standby) standby.status = "在租";
+            else dl.devices.push({ sn: dev.sn, type: dev.type || "电池", status: "在租" });
+            const stbyList = getLeaseDeviceList("LDL-STBY-01");
+            if (stbyList) {
+              const idx = stbyList.devices.findIndex(x => x.sn === dev.sn);
+              if (idx >= 0) stbyList.devices.splice(idx, 1);
+            }
+          });
+          dl.updatedAt = new Date().toISOString().slice(0, 10);
+        }
+        if (c.termType === "固定租期" && c.periods) {
+          c.totalRent = c.monthlyRent * c.periods;
+        }
+        c.pendingChange = null;
+        c.status = "履约中";
+        c.confirmedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+        c.confirmedBy = currentEntity().name + "（变更确认）";
+        return true;
+      }
+      return false;
+    }
+
+    function rejectLeaseContract(contractId, reason) {
+      const c = leaseContracts.find(x => x.id === contractId);
+      if (!c || c.lesseeId !== currentEntity().id) return false;
+      if (c.status === "待确认") {
+        c.status = "已驳回";
+        c.rejectReason = reason || "运营商拒绝";
+        return true;
+      }
+      if (c.status === "变更待确认") {
+        c.pendingChange = null;
+        c.status = "履约中";
+        c.rejectReason = reason || "运营商拒绝变更";
+        return true;
+      }
+      return false;
     }
 
     function deviceChips(list) {
       return `<span class="device-chips">${list.map(sn => `<span class="device-chip">${sn}</span>`).join("")}</span>`;
     }
 
+    function getLeaseDeviceList(id) {
+      return leaseDeviceLists.find(x => x.id === id);
+    }
+
+    function activeListDevices(dl) {
+      if (!dl) return [];
+      return (dl.devices || []).filter(d => d.status !== "已替换");
+    }
+
+    function deviceListSnSummary(dl) {
+      return activeListDevices(dl).map(d => d.sn);
+    }
+
+    function contractDevices(c) {
+      if (!c) return [];
+      const dl = c.deviceListId ? getLeaseDeviceList(c.deviceListId) : null;
+      if (dl) return deviceListSnSummary(dl);
+      return c.devices || [];
+    }
+
+    function contractDeviceList(c) {
+      return c?.deviceListId ? getLeaseDeviceList(c.deviceListId) : null;
+    }
+
+    function contractByDeviceListId(listId) {
+      return leaseContracts.find(c => c.deviceListId === listId);
+    }
+
+    function myLeaseDeviceLists() {
+      if (isLeasingRole()) return leaseDeviceLists.filter(d => d.lessorId === currentEntity().id);
+      const ids = new Set(myLeaseContracts().map(c => c.deviceListId).filter(Boolean));
+      return leaseDeviceLists.filter(d => ids.has(d.id));
+    }
+
+    function availableDeviceListsForLessee(lesseeId) {
+      return leaseDeviceLists.filter(dl =>
+        dl.lessorId === currentEntity().id && !dl.contractId && (dl.lesseeId === lesseeId || !dl.lesseeId)
+      );
+    }
+
+    function lessorUnassignedFleet() {
+      const used = new Set(leaseDeviceLists.flatMap(dl => activeListDevices(dl).map(d => d.sn)));
+      const fleet = [...cabinets, ...batteries].filter(d => d.lessorId === currentEntity().id && !used.has(d.sn));
+      const inv = platformDeviceInventory.map(d => ({
+        sn: d.sn, type: d.type === "cabinet" ? "换电柜" : "电池"
+      })).filter(d => !used.has(d.sn));
+      const map = new Map();
+      fleet.forEach(d => map.set(d.sn, { sn: d.sn, type: d.slots != null ? "换电柜" : "电池" }));
+      inv.forEach(d => { if (!map.has(d.sn)) map.set(d.sn, d); });
+      return [...map.values()];
+    }
+
+    function findContractBySn(sn) {
+      return leaseContracts.find(c => contractDevices(c).includes(sn));
+    }
+
+    function removeSnFromStandbyLists(sn, exceptListId) {
+      leaseDeviceLists.forEach(dl => {
+        if (dl.id === exceptListId || dl.contractId) return;
+        const idx = dl.devices.findIndex(d => d.sn === sn && d.status !== "已替换");
+        if (idx >= 0) dl.devices.splice(idx, 1);
+      });
+    }
+
+    function lessorReplaceCandidates(excludeListId) {
+      const usedElsewhere = new Set();
+      leaseDeviceLists.forEach(dl => {
+        if (dl.id === excludeListId) return;
+        activeListDevices(dl).forEach(d => usedElsewhere.add(d.sn));
+      });
+      const map = new Map();
+      lessorUnassignedFleet().forEach(d => { if (!usedElsewhere.has(d.sn)) map.set(d.sn, d); });
+      leaseDeviceLists.filter(dl => dl.lessorId === currentEntity().id && !dl.contractId && dl.id !== excludeListId)
+        .flatMap(dl => activeListDevices(dl).filter(d => d.status === "待用"))
+        .forEach(d => { if (!usedElsewhere.has(d.sn)) map.set(d.sn, { sn: d.sn, type: d.type }); });
+      return [...map.values()];
+    }
+
     function myLeaseRentBills() {
       const eid = currentEntity().id;
       return leaseRentBills.filter(b => b.lesseeId === eid).sort((a, b) => b.month.localeCompare(a.month));
+    }
+
+    function leasePayChannelLabel(b) {
+      if (b.status === "已还清") {
+        if (b.payChannel === "代扣") return "代扣 → 资方对公";
+        if (b.payChannel === "微信支付") return "微信支付";
+        if (b.payChannel === "支付宝") return "支付宝";
+        if (b.payChannel === "对公打款") return "对公打款（已确认）";
+        return b.payMode === "auto" ? "代扣" : "—";
+      }
+      if (b.status === "待资方确认") return "对公打款（待确认）";
+      if (b.status === "代扣失败待补缴") return "代扣失败 · 待补缴";
+      return "—";
+    }
+
+    function myLeaseOfflineTickets() {
+      const eid = currentEntity().id;
+      if (isLeasingRole()) return leaseRentOfflineTickets.filter(t => t.lessorId === eid);
+      return leaseRentOfflineTickets.filter(t => t.lesseeId === eid);
+    }
+
+    function pendingLeaseOfflineCount() {
+      return myLeaseOfflineTickets().filter(t => t.status === "待资方确认").length;
     }
 
     function lessorCollectionRows() {
@@ -2590,11 +2909,12 @@
         const pending = Math.max(0, b.rentAmount - received);
         let collectStatus = "待收缴";
         if (b.status === "已还清") collectStatus = "已收缴";
-        else if (b.status === "不足需处理") collectStatus = "待人工跟进";
+        else if (b.status === "代扣失败待补缴") collectStatus = "待补缴";
+        else if (b.status === "待资方确认") collectStatus = "对公待确认";
         else if (b.status === "待还") collectStatus = "待收缴";
-        const payLabel = b.payMode === "auto" ? "自动扣款" : b.payMode === "manual" ? "手动缴纳" : "—";
+        const payLabel = leasePayChannelLabel(b);
         return {
-          ...b, lesseeName: c ? c.lesseeName : "—", devices: c ? c.devices : [],
+          ...b, lesseeName: c ? c.lesseeName : "—", devices: c ? contractDevices(c) : [],
           received, pending, collectStatus, payLabel
         };
       }).sort((a, b) => b.month.localeCompare(a.month));
@@ -2606,12 +2926,12 @@
     }
 
     function rentGapBanner(bills) {
-      const gaps = bills.filter(b => b.manualRequired && b.status !== "已还清");
+      const gaps = bills.filter(b => b.manualRequired && b.status !== "已还清" && b.status !== "待资方确认");
       if (!gaps.length) return "";
-      const totalGap = gaps.reduce((s, b) => s + b.coverGap, 0);
-      return `<div class="rent-gap-banner">${noteBtn("lease_cover_gap")}
-        <strong>${gaps.length} 笔账单收益无法覆盖租金</strong>，自动扣款未成功，差额合计 <strong>¥${totalGap.toLocaleString("zh-CN")}</strong>。
-        请手动缴纳或补足运营收入后，在对应账单点击「处理缺口」。</div>`;
+      const totalGap = gaps.reduce((s, b) => s + Math.max(b.rentAmount - (b.paidAmount || 0), b.coverGap || 0), 0);
+      return `<div class="rent-gap-banner">${noteBtn("lease_cover_gap")}${noteBtn("lease_manual_pay")}
+        <strong>${gaps.length} 笔账单代扣未成功</strong>，待补缴合计 <strong>¥${totalGap.toLocaleString("zh-CN")}</strong>。
+        请选择<strong>微信支付 / 支付宝</strong>在线补缴，或<strong>对公打款</strong>后提交工单（资方确认后核销）。</div>`;
     }
 
     function employeeLoginBanner() {
@@ -2662,6 +2982,7 @@
         const badge = k === "partnerProfit" ? " ★"
           : k === "dayPool" && myDayPools().some(p => p.balancePct < 20) ? " !"
           : k === "depositManage" && pendingDepositRechargeCount() > 0 ? " !"
+          : k === "leaseAgreements" && pendingLeaseConfirmCount() > 0 ? " !"
           : "";
         return `<button type="button" class="${cls}" data-view="${k}">${NAV_LABEL[k]}${badge}</button>`;
       }).join("");
@@ -2818,31 +3139,53 @@
       const prog = repayProgress(c);
       const partyLabel = isLeasingRole() ? "承租方" : "出租方";
       const partyName = isLeasingRole() ? c.lesseeName : c.lessorName;
+      const canConfirm = isOperatorRole() && c.lesseeId === currentEntity().id && (c.status === "待确认" || c.status === "变更待确认");
+      const pendingHtml = c.pendingChange ? `<section class="panel" style="margin:0 0 16px;border-color:var(--warn)">
+          ${panelHead("待确认变更", `生效日 ${c.pendingChange.effectiveDate}（次月 1 日）`, "lease_confirm")}
+          <div class="panel-body" style="padding-top:0">
+            <p style="font-size:13px;margin:0 0 10px">资方 ${c.pendingChange.submittedBy} 于 ${c.pendingChange.submittedAt} 提交 · ${c.pendingChange.reason || "—"}</p>
+            <table class="sub-table"><thead><tr><th>字段</th><th>当前</th><th>变更后</th></tr></thead>
+            <tbody>${(c.pendingChange.changes || []).map(ch => `<tr><td>${ch.field}</td><td>${ch.from}</td><td><strong>${ch.to}</strong></td></tr>`).join("")}</tbody></table>
+          </div>
+        </section>` : "";
+      const confirmBtns = canConfirm ? `<div style="margin-top:16px;display:flex;gap:8px">
+          <button type="button" class="btn primary" data-confirm-lease="${c.id}">确认${c.status === "变更待确认" ? "变更" : "承租"}</button>
+          <button type="button" class="btn" data-reject-lease="${c.id}">拒绝</button>
+        </div>` : "";
+      const lessorBtns = isLeasingRole() ? `<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+          ${c.status === "待确认" || c.status === "已驳回" ? `<button type="button" class="btn primary" data-edit-lease="${c.id}">编辑协议</button>` : ""}
+          ${c.status === "履约中" ? `<button type="button" class="btn primary" data-edit-lease="${c.id}" data-lease-change="1">提交变更</button>` : ""}
+          ${c.status === "变更待确认" ? `<span style="font-size:12px;color:var(--muted);align-self:center">等待运营商确认变更（生效 ${c.pendingChange?.effectiveDate || nextMonthFirstStr()}）</span>` : ""}
+        </div>` : "";
+      const dl = contractDeviceList(c);
+      const devSns = contractDevices(c);
       state.detailLeaseId = contractId;
       state.detailSubId = null;
       state.detailSwapId = null;
       document.querySelector("#drawerTitle").textContent = "租赁协议 · " + c.id;
-      document.querySelector("#drawerSub").textContent = `${partyLabel} ${partyName} · ${c.site} · ${tag(c.status)}`;
+      document.querySelector("#drawerSub").textContent = `${partyLabel} ${partyName} · ${tag(c.status)} · ${c.termType}`;
       document.querySelector("#drawerBody").innerHTML = `
+        ${pendingHtml}
         <div class="detail-grid">
           <div class="detail-item"><span>${partyLabel}</span><strong>${partyName}</strong></div>
-          <div class="detail-item"><span>站点</span><strong>${c.site} · ${c.city}</strong></div>
-          <div class="detail-item"><span>租期</span><strong>${c.start}<br><small style="font-weight:400;color:var(--muted)">至 ${c.end}</small></strong></div>
+          <div class="detail-item"><span>租期类型</span><strong>${c.termType}${noteBtn(c.termType === "滚动租期" ? "lease_term_rolling" : "lease_term_fixed")}</strong></div>
+          <div class="detail-item"><span>租期</span><strong>${leaseTermLabel(c)}</strong></div>
           <div class="detail-item"><span>月租金</span><strong>¥${c.monthlyRent.toLocaleString("zh-CN")}</strong></div>
-          <div class="detail-item"><span>租金总额</span><strong>¥${c.totalRent.toLocaleString("zh-CN")}</strong></div>
+          <div class="detail-item"><span>租金总额</span><strong>${c.totalRent != null ? "¥" + c.totalRent.toLocaleString("zh-CN") : "滚动 · 按实际期数累计"}</strong></div>
           <div class="detail-item"><span>押金</span><strong>¥${c.deposit.toLocaleString("zh-CN")}</strong></div>
           <div class="detail-item"><span>还款日</span><strong>${c.repayDay}</strong></div>
-          <div class="detail-item"><span>自动扣款</span><strong>${c.autoDeduct ? "已开通 · " + (paymentAccounts.find(a => a.id === c.autoDeductAccountId)?.mchNo || "—") : "未开通"}</strong></div>
+          <div class="detail-item"><span>确认信息</span><strong>${c.confirmedAt ? c.confirmedBy + " · " + c.confirmedAt : "待运营商确认"}</strong></div>
+          <div class="detail-item"><span>设备清单</span><strong>${dl ? `<button type="button" class="link-btn" data-open-device-list="${dl.id}">${dl.id}</button> · ${dl.name}` : "—"}</strong></div>
+          <div class="detail-item"><span>租金代扣</span><strong>${c.autoDeduct ? "已开通 · 打款至资方对公 " + (paymentAccounts.find(a => a.entityId === c.lessorId && a.purpose.includes("租金收款"))?.mchNo || "—") : "未开通"}</strong></div>
         </div>
         <section class="panel" style="margin:0 0 16px">
-          ${panelHead("绑定设备", `${c.devices.length} 台`, "lease_devices")}
+          ${panelHead("清单内设备", `${devSns.length} 台`, "lease_devices")}
           <div class="panel-body orders-table-wrap" style="padding-top:0">
             <table class="sub-table"><thead><tr><th>资产编号</th><th>类型</th><th>月租金分摊</th></tr></thead>
-            <tbody>${c.devices.map(sn => {
+            <tbody>${devSns.map(sn => {
               const cab = cabinets.find(x => x.sn === sn);
-              const bat = batteries.find(x => x.sn === sn);
               const type = cab ? "换电柜" : "电池";
-              const share = Math.round(c.monthlyRent / c.devices.length);
+              const share = Math.round(c.monthlyRent / devSns.length);
               return `<tr><td>${sn}</td><td>${type}</td><td>¥${share.toLocaleString("zh-CN")}</td></tr>`;
             }).join("")}</tbody></table>
           </div>
@@ -2860,14 +3203,66 @@
               </tr>`).join("")}</tbody>
             </table>
           </div>
-        </section>`;
+        </section>
+        ${confirmBtns}${lessorBtns}`;
       document.querySelector("#drawerMask").classList.add("open");
       document.querySelector("#orderDrawer").classList.add("open");
       document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindNotes();
+      bindDrawerActions();
+    }
+
+    function renderLeaseDeviceListsPanel() {
+      const lessor = isLeasingRole();
+      const lists = myLeaseDeviceLists();
+      const addBtns = lessor
+        ? `<button type="button" class="btn" data-import-device-list>导入清单</button>
+           <button type="button" class="btn primary" data-new-device-list>+ 新建设备清单</button>`
+        : "";
+      const rows = lists.length ? lists.map(dl => {
+        const sns = deviceListSnSummary(dl);
+        const contract = dl.contractId ? leaseContracts.find(c => c.id === dl.contractId) : null;
+        const ops = lessor
+          ? `<button type="button" class="link-btn" data-open-device-list="${dl.id}">查看</button>
+             ${!dl.contractId ? `<button type="button" class="link-btn" data-edit-device-list="${dl.id}">编辑</button>` : ""}`
+          : `<button type="button" class="link-btn" data-open-device-list="${dl.id}">查看</button>`;
+        return `<tr>
+          <td><button type="button" class="link-btn" data-open-device-list="${dl.id}">${dl.id}</button></td>
+          <td>${dl.name}</td>
+          <td>${dl.lesseeName || "—"}</td>
+          <td>${dl.contractId ? `<button type="button" class="link-btn" data-open-lease="${dl.contractId}">${dl.contractId}</button>` : "—"}</td>
+          <td>${deviceChips(sns)}</td>
+          <td>${sns.length}</td>
+          <td>${tag(dl.status)}</td>
+          <td><small>${dl.updatedAt}</small></td>
+          <td class="row-actions">${ops}</td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="9">${lessor ? "暂无设备清单，请新建或导入" : "暂无关联设备清单"}</td></tr>`;
+      return `
+        <section class="panel">
+          ${panelHead("设备清单库", lessor ? "独立维护设备组合；支持导入与清单内设备替换；新建协议时关联待绑定清单" : "查看本主体租赁协议关联的设备清单", "lease_device_lists", addBtns)}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr>
+                <th>清单编号</th><th>清单名称</th><th>意向承租方</th><th>绑定协议</th>
+                <th>设备 SN</th><th>台数</th><th>状态</th><th>更新日</th><th>操作</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </section>`;
     }
 
     function renderLeaseAgreements() {
       const lessor = isLeasingRole();
+      const tab = state.leaseAgreementsTab || "contracts";
+      const tabs = [["contracts", "租赁协议"], ["deviceLists", "设备清单"]];
+      const tabHtml = `<div class="tabs">${tabs.map(([k, label]) =>
+        `<button type="button" class="${tab === k ? "active" : ""}" data-lease-agreements-tab="${k}">${label}</button>`
+      ).join("")}</div>`;
+      if (tab === "deviceLists") {
+        return `${ownScopeBanner()}${tabHtml}${renderLeaseDeviceListsPanel()}`;
+      }
       const f = getPf();
       const contracts = myLeaseContracts().filter(c => {
         if (!matchKw(c.id, f.contractId)) return false;
@@ -2877,34 +3272,42 @@
         return true;
       });
       const addBtn = lessor
-        ? `<button type="button" class="btn primary" data-mock-action="新增协议（演示）">新增协议</button>`
+        ? `<button type="button" class="btn primary" data-new-lease>+ 新增协议</button>`
         : "";
       const partyCol = lessor ? "<th>承租方</th>" : "<th>出租方</th>";
+      const pendingBanner = !lessor && pendingLeaseConfirmCount() > 0
+        ? `<div class="pool-warn-banner" style="margin-bottom:14px">${noteBtn("lease_confirm")} 有 <strong>${pendingLeaseConfirmCount()}</strong> 份协议待确认，确认前不出账、不自动扣款；变更<strong>次月 1 日</strong>生效。</div>`
+        : "";
       const rows = contracts.length ? contracts.map(c => {
         const prog = repayProgress(c);
+        const dl = contractDeviceList(c);
         const autoTxt = c.autoDeduct
-          ? `<span class="pay-mode">自动扣款 · ${paymentAccounts.find(a => a.id === c.autoDeductAccountId)?.mchNo || "—"}</span>`
-          : "<span class=\"pay-mode\">未开通自动扣款</span>";
+          ? `<span class="pay-mode">代扣 · ${paymentAccounts.find(a => a.id === c.autoDeductAccountId)?.mchNo || "—"}</span>`
+          : "<span class=\"pay-mode\">未开通代扣</span>";
+        const actionLabel = !lessor && (c.status === "待确认" || c.status === "变更待确认") ? "确认" : (lessor ? "管理" : "查看");
         return `<tr>
           <td><button type="button" class="link-btn" data-open-lease="${c.id}">${c.id}</button></td>
           <td>${lessor ? c.lesseeName : c.lessorName}</td>
-          <td>${c.site}</td>
-          <td>${deviceChips(c.devices)}</td>
-          <td>${c.start}<br><small style="color:var(--muted)">至 ${c.end}</small></td>
+          <td>${c.termType || "固定租期"}</td>
+          <td>${dl ? `<button type="button" class="link-btn" data-open-device-list="${dl.id}">${dl.id}</button><br><small>${dl.name}</small>` : "—"}</td>
+          <td>${deviceChips(contractDevices(c))}</td>
+          <td><small>${leaseTermLabel(c)}</small></td>
           <td>¥${c.monthlyRent.toLocaleString("zh-CN")}<br>${autoTxt}</td>
           <td style="min-width:130px"><div class="usage-bar"><i style="width:${prog.pct}%"></i></div><small>${prog.label}</small></td>
-          <td>${tag(c.status)}</td>
-          <td><button type="button" class="link-btn" data-open-lease="${c.id}">${lessor ? "管理" : "查看"}</button></td>
+          <td>${tag(c.status)}${c.pendingChange ? `<br><small>生效 ${c.pendingChange.effectiveDate}</small>` : ""}</td>
+          <td><button type="button" class="link-btn" data-open-lease="${c.id}">${actionLabel}</button></td>
         </tr>`;
-      }).join("") : `<tr><td colspan="9">${lessor ? "暂无出租协议" : "当前无租赁协议（设备均为自有）"}</td></tr>`;
+      }).join("") : `<tr><td colspan="10">${lessor ? "暂无出租协议" : "当前无租赁协议（设备均为自有）"}</td></tr>`;
       return `
         ${ownScopeBanner()}
+        ${tabHtml}
+        ${pendingBanner}
         <section class="panel">
-          ${panelHead("租赁协议与设备", lessor ? "维护协议及绑定设备清单" : "查看租用协议与设备", "lease_agreements", addBtn)}
+          ${panelHead("租赁协议", lessor ? "关联设备清单 + 租金条款；一运营商可有多份协议" : "查看租用协议；待确认项须确认后生效", "lease_agreements", addBtn)}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr>
-                <th>协议编号</th>${partyCol}<th>站点</th><th>绑定设备</th>
+                <th>协议编号</th>${partyCol}<th>租期类型</th><th>设备清单</th><th>清单内设备</th>
                 <th>租期</th><th>月租金</th><th>履约进度</th><th>状态</th><th>操作</th>
               </tr></thead>
               <tbody>${rows}</tbody>
@@ -2923,7 +3326,43 @@
       });
       const totalDue = rows.filter(r => r.month === "2026-06").reduce((s, r) => s + r.rentAmount, 0);
       const totalRecv = rows.filter(r => r.month === "2026-06").reduce((s, r) => s + r.received, 0);
-      const followUp = rows.filter(r => r.collectStatus === "待人工跟进").length;
+      const followUp = rows.filter(r => r.collectStatus === "待补缴" || r.collectStatus === "对公待确认").length;
+      const offlinePending = myLeaseOfflineTickets().filter(t => t.status === "待资方确认");
+      const offlinePanel = offlinePending.length ? `
+        <section class="panel" style="margin-bottom:14px">
+          ${panelHead("对公打款工单", `${offlinePending.length} 笔待审核`, "lease_offline_ticket")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr>
+                <th>工单号</th><th>承租方</th><th>账期</th><th>协议</th><th>金额</th><th>流水号</th><th>转账日</th><th>提交时间</th><th>操作</th>
+              </tr></thead>
+              <tbody>${offlinePending.map(t => `<tr>
+                <td>${t.id}</td><td>${t.lesseeName}</td><td>${t.month}</td>
+                <td><button type="button" class="link-btn" data-open-lease="${t.contractId}">${t.contractId}</button></td>
+                <td>¥${t.amount.toLocaleString("zh-CN")}</td><td>${t.transferRef}</td><td>${t.transferDate}</td><td>${t.submitTime}</td>
+                <td class="row-actions">
+                  <button type="button" class="link-btn" data-confirm-rent-offline="${t.id}">确认到账</button>
+                  <button type="button" class="link-btn" data-reject-rent-offline="${t.id}">驳回</button>
+                </td>
+              </tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </section>` : "";
+      const offlineHistory = myLeaseOfflineTickets().filter(t => t.status !== "待资方确认").slice(0, 5);
+      const offlineHistoryPanel = offlineHistory.length ? `
+        <section class="panel" style="margin-bottom:14px">
+          ${panelHead("对公工单记录", "近期已处理", "lease_offline_ticket")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>工单号</th><th>承租方</th><th>账期</th><th>金额</th><th>状态</th><th>处理人</th><th>处理时间</th></tr></thead>
+              <tbody>${offlineHistory.map(t => `<tr>
+                <td>${t.id}</td><td>${t.lesseeName}</td><td>${t.month}</td>
+                <td>¥${t.amount.toLocaleString("zh-CN")}</td><td>${tag(t.status)}</td>
+                <td>${t.confirmedBy || "—"}</td><td>${t.confirmTime || "—"}</td>
+              </tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </section>` : "";
       const body = rows.length ? rows.map(r => `<tr>
         <td>${r.month}</td>
         <td>${r.lesseeName}</td>
@@ -2935,20 +3374,22 @@
         <td>${r.payLabel}<br><small style="color:var(--muted)">${r.autoStatus || "—"}</small></td>
         <td>${tag(r.collectStatus)}</td>
         <td>${r.dueDate}</td>
-        <td>${r.collectStatus === "待人工跟进"
+        <td>${r.collectStatus === "待补缴"
           ? `<button type="button" class="link-btn" data-collect-follow="${r.id}">登记跟进</button>`
-          : "—"}</td>
+          : r.collectStatus === "对公待确认" ? `<small>工单审核中</small>` : "—"}</td>
       </tr>`).join("") : "<tr><td colspan='11'>暂无收缴记录</td></tr>";
       return `
         ${ownScopeBanner()}
+        ${offlinePanel}
         <div class="kpi-grid">
           ${kpi("本月应收", "¥" + totalDue.toLocaleString("zh-CN"), "2026-06", "收", "lease_collect")}
-          ${kpi("本月已收", "¥" + totalRecv.toLocaleString("zh-CN"), "含自动/手动", "到", "lease_collect")}
-          ${kpi("待跟进", followUp, "收益不足等", "跟", "lease_cover_gap")}
+          ${kpi("本月已收", "¥" + totalRecv.toLocaleString("zh-CN"), "含代扣/在线/对公", "到", "lease_collect")}
+          ${kpi("待跟进", followUp, "待补缴/对公待确认", "跟", "lease_cover_gap")}
+          ${kpi("对公待审", offlinePending.length, "工单", "审", "lease_offline_ticket")}
           ${kpi("收缴率", totalDue ? Math.round(totalRecv / totalDue * 100) + "%" : "—", "本月", "率", "lease_collect")}
         </div>
         <section class="panel">
-          ${panelHead("租金收缴进度", "按账期跟踪应收、已收、待收与收缴方式", "lease_collect")}
+          ${panelHead("租金收缴进度", "按账期跟踪代扣、在线支付、对公工单收缴进度", "lease_collect")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr>
@@ -2958,7 +3399,8 @@
               <tbody>${body}</tbody>
             </table>
           </div>
-        </section>`;
+        </section>
+        ${offlineHistoryPanel}`;
     }
 
     function renderLeaseRent() {
@@ -2981,24 +3423,28 @@
         });
       });
       const contracts = myLeaseContracts();
+      const corp = lessorRentReceiveAccount;
       const autoPanel = contracts.length ? contracts.map(c => {
         const acc = paymentAccounts.find(a => a.id === c.autoDeductAccountId);
         return `<div class="detail-item" style="grid-column:span 2">
-          <span>${c.id} · 自动扣款</span>
-          <strong>${c.autoDeduct ? "已开通 → " + (acc ? acc.channel + " " + acc.mchNo : "—") : "未开通"}
+          <span>${c.id} · 租金代扣</span>
+          <strong>${c.autoDeduct ? "已开通 · 源账户 " + (acc ? acc.channel + " " + acc.mchNo : "—") : "未开通"}
           ${c.autoDeduct
             ? ` <button type="button" class="link-btn" data-toggle-auto="${c.id}">关闭</button>`
             : ` <button type="button" class="link-btn" data-toggle-auto="${c.id}">开通</button>`}
           </strong>
         </div>`;
       }).join("") : "";
+      const offlineTickets = myLeaseOfflineTickets();
+      const billIdsWithAction = new Set();
       const tableBody = deviceRows.length ? deviceRows.map(r => {
         const actions = [];
-        if (r.status !== "已还清") {
-          actions.push(`<button type="button" class="link-btn" data-pay-manual="${r.id}">手动缴纳</button>`);
-        }
-        if (r.manualRequired) {
-          actions.push(`<button type="button" class="link-btn" data-handle-gap="${r.id}">处理缺口</button>`);
+        if (r.status !== "已还清" && r.status !== "待资方确认" && !billIdsWithAction.has(r.id)) {
+          billIdsWithAction.add(r.id);
+          actions.push(`<button type="button" class="link-btn" data-pay-rent="${r.id}">补缴租金</button>`);
+        } else if (r.status === "待资方确认" && !billIdsWithAction.has(r.id)) {
+          billIdsWithAction.add(r.id);
+          actions.push(`<small>对公工单审核中</small>`);
         }
         return `<tr>
           <td>${r.month}</td>
@@ -3007,23 +3453,31 @@
           <td>¥${r.deviceRent.toLocaleString("zh-CN")}</td>
           <td>¥${r.siteRevenue.toLocaleString("zh-CN")}</td>
           <td>${coverTag(r)}${r.coverGap > 0 ? `<br><small>缺口 ¥${r.coverGap}</small>` : ""}</td>
-          <td>${r.payMode === "auto" ? "自动扣款" : r.payMode === "manual" ? "手动" : "—"}<br><small>${r.autoStatus || ""}</small></td>
+          <td>${leasePayChannelLabel(r)}<br><small>${r.autoStatus || ""}</small></td>
           <td>${tag(r.status)}</td>
           <td class="row-actions">${actions.join(" ") || "—"}</td>
         </tr>`;
       }).join("") : "<tr><td colspan='9'>暂无租赁账单</td></tr>";
+      const offlineRows = offlineTickets.length ? offlineTickets.map(t => `<tr>
+        <td>${t.id}</td><td>${t.month}</td><td>${t.contractId}</td>
+        <td>¥${t.amount.toLocaleString("zh-CN")}</td><td>${t.transferRef}</td><td>${t.transferDate}</td>
+        <td>${tag(t.status)}</td><td>${t.confirmTime || t.submitTime}</td>
+      </tr>`).join("") : "<tr><td colspan='8'>暂无对公打款工单</td></tr>";
       return `
         ${ownScopeBanner()}
         ${rentGapBanner(bills)}
         <div class="kpi-grid">
           ${kpi("本月应付租金", "¥" + dueTotal.toLocaleString("zh-CN"), current.length + " 份协议", "付", "lease_rent_monthly")}
           ${kpi("本月站点收入", "¥" + revTotal.toLocaleString("zh-CN"), "可分配经营", "入", "overview_net")}
-          ${kpi("收入缺口", gapTotal > 0 ? "¥" + gapTotal.toLocaleString("zh-CN") : "无", gapTotal > 0 ? "需手动处理" : "可覆盖租金", "缺", "lease_cover_gap")}
-          ${kpi("缴纳方式", current.some(b => b.payMode === "auto") ? "自动+手动" : "手动", "见下方设置", "式", "lease_auto_deduct")}
+          ${kpi("收入缺口", gapTotal > 0 ? "¥" + gapTotal.toLocaleString("zh-CN") : "无", gapTotal > 0 ? "代扣可能失败" : "可覆盖租金", "缺", "lease_cover_gap")}
+          ${kpi("代扣状态", current.some(b => b.status === "代扣失败待补缴") ? "有待补缴" : "正常", "还款日代扣至资方对公", "式", "lease_auto_deduct")}
         </div>
         <section class="panel">
-          ${panelHead("自动扣款设置", "绑定租金支付账户，到期自动扣划", "lease_auto_deduct")}
-          <div class="panel-body"><div class="detail-grid">${autoPanel || "<p style=\"margin:0;color:var(--muted)\">无租赁协议</p>"}</div></div>
+          ${panelHead("租金代扣设置", "还款日从绑定账户代扣，打款至资方对公账户", "lease_auto_deduct")}
+          <div class="panel-body">
+            <div class="detail-grid">${autoPanel || "<p style=\"margin:0;color:var(--muted)\">无租赁协议</p>"}</div>
+            <p style="font-size:12px;color:var(--muted);margin:12px 0 0">${noteBtn("lease_offline_ticket")} 资方收款对公账户：<strong>${corp.bankName}</strong> · ${corp.accountName} · ${corp.accountNo}<br>${corp.transferRemark}</p>
+          </div>
         </section>
         <section class="panel">
           ${panelHead("本月设备租金", "按设备分摊月租金 · " + monthKey, "lease_rent_monthly")}
@@ -3038,6 +3492,15 @@
           </div>
         </section>
         <section class="panel">
+          ${panelHead("对公打款工单", "线下转账后提交，资方审核确认", "lease_offline_ticket")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>工单号</th><th>账期</th><th>协议</th><th>金额</th><th>流水号</th><th>转账日</th><th>状态</th><th>时间</th></tr></thead>
+              <tbody>${offlineRows}</tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
           ${panelHead("历史账单", "按月汇总", "lease_rent_monthly")}
           <div class="panel-body orders-table-wrap">
             <table>
@@ -3048,7 +3511,7 @@
                 <td>¥${b.rentAmount.toLocaleString("zh-CN")}</td>
                 <td>¥${b.siteRevenue.toLocaleString("zh-CN")}</td>
                 <td>${b.coverGap > 0 ? "¥" + b.coverGap : "—"}</td>
-                <td>${b.payMode === "auto" ? "自动扣款" : "手动"}</td>
+                <td>${leasePayChannelLabel(b)}</td>
                 <td>${tag(b.status)}</td>
                 <td>${b.paidDate || "—"}</td>
               </tr>`).join("")}</tbody>
@@ -3057,30 +3520,136 @@
         </section>`;
     }
 
-    function handlePayManual(billId) {
-      const b = leaseRentBills.find(x => x.id === billId);
-      if (!b || b.status === "已还清") return;
+    function markBillPaid(b, channel, paidDate) {
+      if (b.status === "已还清") return;
       b.status = "已还清";
-      b.payMode = "manual";
-      b.paidDate = "2026-05-24";
+      b.payChannel = channel;
+      b.paidDate = paidDate;
       b.paidAmount = b.rentAmount;
       b.manualRequired = false;
       b.coverGap = 0;
-      b.autoStatus = "已改手动缴纳";
+      b.autoStatus = channel + " · 已核销";
       const rep = leaseRepayments.find(r => r.contractId === b.contractId && r.status === "待还");
-      if (rep) { rep.status = "已还"; rep.paidDate = b.paidDate; }
+      if (rep) { rep.status = "已还"; rep.paidDate = paidDate; }
       const c = leaseContracts.find(x => x.id === b.contractId);
       if (c) { c.paidPeriods += 1; c.paidRent += b.rentAmount; }
+    }
+
+    function openRentPayForm(billId) {
+      const b = leaseRentBills.find(x => x.id === billId);
+      if (!b || b.status === "已还清" || b.status === "待资方确认") return;
+      const c = leaseContracts.find(x => x.id === b.contractId);
+      const corp = lessorRentReceiveAccount;
+      const pending = Math.max(0, b.rentAmount - (b.paidAmount || 0));
+      state.rentPayBillId = billId;
+      document.querySelector("#rentPayFormTitle").textContent = "补缴租金 · " + (c?.id || billId) + " · " + b.month;
+      document.querySelector("#rentPayForm").innerHTML = `
+        <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("lease_manual_pay")}${noteBtn("lease_offline_ticket")} 代扣失败后可选以下方式补齐，资金均入账资方。</p>
+        <label>账期<input value="${b.month}" readonly></label>
+        <label>待缴金额<input value="¥${pending.toLocaleString("zh-CN")}" readonly></label>
+        <label style="grid-column:1/-1">补缴方式<select name="payMethod" id="rentPayMethod">
+          <option value="wx">微信支付（在线）</option>
+          <option value="alipay">支付宝（在线）</option>
+          <option value="offline">线下对公打款（提交工单）</option>
+        </select></label>
+        <div id="rentPayOfflineFields" style="display:none;grid-column:1/-1">
+          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">请先转账至资方对公账户，再填写回单信息：<br><strong>${corp.bankName}</strong> · ${corp.accountName} · ${corp.accountNo}<br>${corp.transferRemark}</p>
+          <label>转账日期<input name="transferDate" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
+          <label>银行流水号 *<input name="transferRef" placeholder="对公回单流水号" required></label>
+          <label style="grid-column:1/-1">凭证说明<textarea name="voucherNote" rows="2" placeholder="例：6月租金对公"></textarea></label>
+        </div>`;
+      const methodSel = document.querySelector("#rentPayMethod");
+      const offlineWrap = document.querySelector("#rentPayOfflineFields");
+      const toggleOffline = () => {
+        offlineWrap.style.display = methodSel.value === "offline" ? "grid" : "none";
+        offlineWrap.style.gridColumn = "1 / -1";
+        offlineWrap.style.gridTemplateColumns = "repeat(2, 1fr)";
+        offlineWrap.style.gap = "12px";
+      };
+      methodSel.onchange = toggleOffline;
+      toggleOffline();
+      document.querySelector("#rentPayModal").classList.add("open");
+      document.querySelector("#rentPayMask").classList.add("open");
+    }
+
+    function closeRentPayForm() {
+      state.rentPayBillId = null;
+      document.querySelector("#rentPayModal").classList.remove("open");
+      document.querySelector("#rentPayMask").classList.remove("open");
+    }
+
+    function saveRentPayForm() {
+      const b = leaseRentBills.find(x => x.id === state.rentPayBillId);
+      if (!b) return;
+      const form = document.querySelector("#rentPayForm");
+      const data = Object.fromEntries(new FormData(form).entries());
+      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+      const c = leaseContracts.find(x => x.id === b.contractId);
+      if (data.payMethod === "wx") {
+        markBillPaid(b, "微信支付", today);
+        b.autoStatus = "微信在线支付成功 · 已打款至资方商户";
+        window.alert("演示：微信支付成功，租金 ¥" + b.rentAmount.toLocaleString("zh-CN") + " 已打款至资方。");
+      } else if (data.payMethod === "alipay") {
+        markBillPaid(b, "支付宝", today);
+        b.autoStatus = "支付宝在线支付成功 · 已打款至资方商户";
+        window.alert("演示：支付宝支付成功，租金 ¥" + b.rentAmount.toLocaleString("zh-CN") + " 已打款至资方。");
+      } else {
+        if (!data.transferRef?.trim()) { window.alert("请填写银行流水号"); return; }
+        const ticketId = "LR-OFF-" + String(leaseRentOfflineTickets.length + 1).padStart(3, "0");
+        leaseRentOfflineTickets.unshift({
+          id: ticketId, billId: b.id, contractId: b.contractId,
+          lesseeId: b.lesseeId, lesseeName: c?.lesseeName || "—", lessorId: c?.lessorId || "LEASE-HD",
+          month: b.month, amount: b.rentAmount - (b.paidAmount || 0),
+          transferRef: data.transferRef.trim(), transferDate: data.transferDate || today,
+          voucherNote: data.voucherNote?.trim() || "", status: "待资方确认", submitTime: now,
+          confirmTime: null, confirmedBy: null, rejectReason: null
+        });
+        b.status = "待资方确认";
+        b.payChannel = "对公打款";
+        b.autoStatus = "对公工单 " + ticketId + " 待资方确认";
+        b.manualRequired = false;
+        window.alert("对公打款工单已提交（" + ticketId + "），资方确认到账后账单核销。");
+      }
+      closeRentPayForm();
       render();
     }
 
-    function handleGap(billId) {
-      const b = leaseRentBills.find(x => x.id === billId);
-      if (!b) return;
-      b.manualRequired = false;
-      b.status = "处理中";
-      b.autoStatus = "已登记人工处理，待补缴";
-      render();
+    function confirmLeaseOfflineTicket(ticketId) {
+      const t = leaseRentOfflineTickets.find(x => x.id === ticketId);
+      if (!t || t.status !== "待资方确认") return false;
+      const b = leaseRentBills.find(x => x.id === t.billId);
+      const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+      t.status = "已确认";
+      t.confirmTime = now;
+      t.confirmedBy = currentEntity().name;
+      if (b) {
+        markBillPaid(b, "对公打款", t.transferDate);
+        b.autoStatus = "对公打款已确认 · " + ticketId;
+      }
+      return true;
+    }
+
+    function rejectLeaseOfflineTicket(ticketId, reason) {
+      const t = leaseRentOfflineTickets.find(x => x.id === ticketId);
+      if (!t || t.status !== "待资方确认") return false;
+      const b = leaseRentBills.find(x => x.id === t.billId);
+      const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+      t.status = "已驳回";
+      t.confirmTime = now;
+      t.confirmedBy = currentEntity().name;
+      t.rejectReason = reason || "信息不符";
+      if (b) {
+        b.status = "代扣失败待补缴";
+        b.payChannel = null;
+        b.autoStatus = "对公工单驳回：" + t.rejectReason;
+        b.manualRequired = true;
+      }
+      return true;
+    }
+
+    function handlePayManual(billId) {
+      openRentPayForm(billId);
     }
 
     function toggleAutoDeduct(contractId) {
@@ -3091,9 +3660,396 @@
     }
 
     function handleCollectFollow(billId) {
+      openFollowForm(billId);
+    }
+
+    function lessorLeasableDevices() {
+      const eid = currentEntity().id;
+      const fleet = [...cabinets, ...batteries].filter(d => d.lessorId === eid);
+      const inv = platformDeviceInventory.map(d => ({
+        sn: d.sn, type: d.type === "cabinet" ? "换电柜" : "电池", site: "待绑定", city: d.city
+      }));
+      const map = new Map();
+      fleet.forEach(d => map.set(d.sn, { sn: d.sn, type: d.slots != null ? "换电柜" : "电池", site: d.site, city: d.city }));
+      inv.forEach(d => { if (!map.has(d.sn)) map.set(d.sn, d); });
+      return [...map.values()];
+    }
+
+    function leaseChangeDiff(before, after) {
+      const changes = [];
+      if (before.monthlyRent !== after.monthlyRent) {
+        changes.push({ field: "月租金", from: "¥" + before.monthlyRent.toLocaleString("zh-CN"), to: "¥" + after.monthlyRent.toLocaleString("zh-CN") });
+      }
+      const bDev = (before.deviceListId ? `${before.deviceListId}：${contractDevices(before).join("、")}` : contractDevices(before).join("、"));
+      const afterDl = after.deviceListId ? getLeaseDeviceList(after.deviceListId) : null;
+      const aDev = afterDl ? `${after.deviceListId}：${deviceListSnSummary(afterDl).join("、")}` : (after.devices || []).join("、");
+      if (bDev !== aDev) changes.push({ field: "设备清单", from: bDev || "—", to: aDev || "—" });
+      if (before.termType !== after.termType) changes.push({ field: "租期类型", from: before.termType, to: after.termType });
+      if (before.end !== after.end) changes.push({ field: "截止日", from: before.end || "—", to: after.end || "—" });
+      if (before.noticeDays !== after.noticeDays) changes.push({ field: "提前通知天数", from: String(before.noticeDays || "—"), to: String(after.noticeDays || "—") });
+      return changes;
+    }
+
+    function bindLeaseFormToggles() {
+      const form = document.querySelector("#leaseForm");
+      if (!form) return;
+      const termSel = form.querySelector('[name="termType"]');
+      const fixed = form.querySelector(".lease-fixed-fields");
+      const rolling = form.querySelector(".lease-rolling-fields");
+      const toggle = () => {
+        const fixedOn = termSel.value === "固定租期";
+        if (fixed) fixed.style.display = fixedOn ? "contents" : "none";
+        if (rolling) rolling.style.display = fixedOn ? "none" : "contents";
+      };
+      termSel.onchange = toggle;
+      toggle();
+    }
+
+    function openDeviceListDetail(listId) {
+      const dl = getLeaseDeviceList(listId);
+      if (!dl) return;
+      const contract = dl.contractId ? leaseContracts.find(c => c.id === dl.contractId) : null;
+      const active = activeListDevices(dl);
+      const replaceBtn = isLeasingRole() && active.length
+        ? `<button type="button" class="btn" data-replace-device-list="${dl.id}">替换设备</button>` : "";
+      const editBtn = isLeasingRole() && !dl.contractId
+        ? `<button type="button" class="btn primary" data-edit-device-list="${dl.id}">编辑清单</button>` : "";
+      state.detailLeaseId = null;
+      document.querySelector("#drawerTitle").textContent = "设备清单 · " + dl.id;
+      document.querySelector("#drawerSub").textContent = `${dl.name} · ${tag(dl.status)} · ${active.length} 台`;
+      document.querySelector("#drawerBody").innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-item"><span>清单名称</span><strong>${dl.name}</strong></div>
+          <div class="detail-item"><span>意向承租方</span><strong>${dl.lesseeName || "—"}</strong></div>
+          <div class="detail-item"><span>绑定协议</span><strong>${contract ? `<button type="button" class="link-btn" data-open-lease="${contract.id}">${contract.id}</button>` : "未绑定"}</strong></div>
+          <div class="detail-item"><span>最近更新</span><strong>${dl.updatedAt}</strong></div>
+        </div>
+        <section class="panel" style="margin:0 0 16px">
+          ${panelHead("在册设备", `${active.length} 台`, "lease_device_lists")}
+          <div class="panel-body orders-table-wrap" style="padding-top:0">
+            <table class="sub-table"><thead><tr><th>SN</th><th>类型</th><th>状态</th></tr></thead>
+            <tbody>${active.map(d => `<tr><td>${d.sn}</td><td>${d.type}</td><td>${tag(d.status)}</td></tr>`).join("") || "<tr><td colspan='3'>暂无设备</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>
+        ${(dl.replacements || []).length ? `<section class="panel" style="margin:0 0 16px">
+          ${panelHead("替换记录", (dl.replacements || []).length + " 条", "lease_device_replace")}
+          <div class="panel-body orders-table-wrap" style="padding-top:0">
+            <table class="sub-table"><thead><tr><th>日期</th><th>原设备</th><th>新设备</th><th>原因</th></tr></thead>
+            <tbody>${dl.replacements.map(r => `<tr><td>${r.at}</td><td>${r.fromSn}</td><td>${r.toSn}</td><td>${r.reason}</td></tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </section>` : ""}
+        <div style="margin-top:16px;display:flex;gap:8px">${editBtn}${replaceBtn}</div>`;
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindNotes();
+      bindDrawerActions();
+    }
+
+    function parseDeviceListCsv(text) {
+      const lines = (text || "").trim().split(/\n/).map(l => l.trim()).filter(Boolean);
+      const out = [];
+      lines.forEach((line, i) => {
+        if (i === 0 && /sn|编号/i.test(line)) return;
+        const parts = line.split(/[,，\t]/).map(s => s.trim());
+        if (!parts[0]) return;
+        const type = (parts[1] || "").includes("柜") ? "换电柜" : "电池";
+        out.push({ sn: parts[0], type });
+      });
+      return out;
+    }
+
+    function openDeviceListForm(listId, importMode) {
+      if (!isLeasingRole()) return;
+      const dl = listId ? getLeaseDeviceList(listId) : null;
+      state.deviceListFormId = listId || "new";
+      const fleet = lessorUnassignedFleet();
+      const active = dl ? activeListDevices(dl) : [];
+      const selected = new Set(active.map(d => d.sn));
+      const deviceChecks = fleet.map(d =>
+        `<label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" name="listDevices" value="${d.sn}" data-type="${d.type}" ${selected.has(d.sn) ? "checked" : ""}> ${d.sn} · ${d.type}</label>`
+      ).join("") || "<p style=\"font-size:12px;color:var(--muted);margin:0\">资方库存暂无可用设备，请先在平台入库。</p>";
+      const opOptions = `<option value="">（暂不指定）</option>` + platformOperators.filter(o => o.status === "在营").map(o =>
+        `<option value="${o.id}" ${dl?.lesseeId === o.id ? "selected" : ""}>${o.name}</option>`
+      ).join("");
+      document.querySelector("#deviceListFormTitle").textContent = importMode ? "导入设备清单" : (dl ? "编辑设备清单" : "新建设备清单");
+      document.querySelector("#deviceListForm").innerHTML = `
+        <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("lease_device_lists")} 清单独立维护，创建协议时选择「待绑定」清单关联。</p>
+        <label>清单名称<input name="name" value="${dl?.name || ""}" required placeholder="如：闪送驿站 · 柜电套装"></label>
+        <label>意向承租方<select name="lesseeId">${opOptions}</select></label>
+        ${importMode ? `<label style="grid-column:1/-1">CSV 导入<textarea name="importCsv" rows="5" placeholder="SN,类型&#10;BAT-SH-1060,电池&#10;CAB-NEW-001,换电柜"></textarea><small style="color:var(--muted)">每行：SN,类型（柜/电池）；首行可为表头</small></label>` : ""}
+        <fieldset style="border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin:0;grid-column:1/-1">
+          <legend style="font-size:13px;color:var(--muted)">勾选设备（资方库存未入其他清单）</legend>
+          <div style="display:grid;gap:6px;margin-top:6px;max-height:200px;overflow:auto">${deviceChecks}</div>
+        </fieldset>`;
+      document.querySelector("#deviceListModal").classList.add("open");
+      document.querySelector("#deviceListMask").classList.add("open");
+    }
+
+    function closeDeviceListForm() {
+      state.deviceListFormId = null;
+      document.querySelector("#deviceListModal").classList.remove("open");
+      document.querySelector("#deviceListMask").classList.remove("open");
+    }
+
+    function saveDeviceListForm() {
+      const form = document.querySelector("#deviceListForm");
+      const data = Object.fromEntries(new FormData(form).entries());
+      const checked = [...form.querySelectorAll('[name="listDevices"]:checked')].map(el => ({
+        sn: el.value, type: el.dataset.type || "电池", status: "待用"
+      }));
+      const imported = parseDeviceListCsv(data.importCsv);
+      imported.forEach(d => {
+        if (!checked.some(x => x.sn === d.sn)) checked.push({ ...d, status: "待用" });
+      });
+      if (!data.name?.trim()) { window.alert("请填写清单名称"); return; }
+      if (!checked.length) { window.alert("请至少选择或导入一台设备"); return; }
+      const lessee = data.lesseeId ? platformOperators.find(o => o.id === data.lesseeId) : null;
+      const today = new Date().toISOString().slice(0, 10);
+      if (state.deviceListFormId === "new") {
+        const id = "LDL-" + new Date().toISOString().slice(0, 10).replace(/-/g, "").slice(2) + "-" + String(leaseDeviceLists.length + 1).padStart(2, "0");
+        leaseDeviceLists.unshift({
+          id, lessorId: currentEntity().id, name: data.name.trim(),
+          lesseeId: lessee?.id || null, lesseeName: lessee?.name || null,
+          contractId: null, status: "待绑定",
+          devices: checked, replacements: [], updatedAt: today
+        });
+      } else {
+        const dl = getLeaseDeviceList(state.deviceListFormId);
+        if (!dl || dl.contractId) { window.alert("已绑定协议的清单不可编辑设备"); return; }
+        dl.name = data.name.trim();
+        dl.lesseeId = lessee?.id || null;
+        dl.lesseeName = lessee?.name || null;
+        dl.devices = checked;
+        dl.updatedAt = today;
+      }
+      closeDeviceListForm();
+      state.leaseAgreementsTab = "deviceLists";
+      render();
+    }
+
+    function openDeviceReplaceForm(listId) {
+      if (!isLeasingRole()) return;
+      const dl = getLeaseDeviceList(listId);
+      if (!dl) return;
+      const active = activeListDevices(dl);
+      const spare = lessorReplaceCandidates(listId);
+      state.deviceReplaceListId = listId;
+      document.querySelector("#deviceReplaceFormTitle").textContent = "替换设备 · " + dl.id;
+      document.querySelector("#deviceReplaceForm").innerHTML = `
+        <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("lease_device_replace")} 故障设备退出清单，登记新 SN；保留替换记录。</p>
+        <label>原设备<select name="fromSn" required>${active.map(d => `<option value="${d.sn}">${d.sn} · ${d.type}</option>`).join("")}</select></label>
+        <label>新设备<select name="toSn" required>${spare.map(d => `<option value="${d.sn}">${d.sn} · ${d.type}</option>`).join("") || "<option>— 无可用库存 —</option>"}</select></label>
+        <label style="grid-column:1/-1">替换原因<textarea name="reason" rows="2" placeholder="如：电池 A 无法维修"></textarea></label>`;
+      document.querySelector("#deviceReplaceModal").classList.add("open");
+      document.querySelector("#deviceReplaceMask").classList.add("open");
+    }
+
+    function closeDeviceReplaceForm() {
+      state.deviceReplaceListId = null;
+      document.querySelector("#deviceReplaceModal").classList.remove("open");
+      document.querySelector("#deviceReplaceMask").classList.remove("open");
+    }
+
+    function saveDeviceReplaceForm() {
+      const dl = getLeaseDeviceList(state.deviceReplaceListId);
+      if (!dl) return;
+      const form = document.querySelector("#deviceReplaceForm");
+      const data = Object.fromEntries(new FormData(form).entries());
+      if (!data.fromSn || !data.toSn || data.toSn.includes("无可用")) {
+        window.alert("请选择原设备与新设备"); return;
+      }
+      const idx = dl.devices.findIndex(d => d.sn === data.fromSn && d.status !== "已替换");
+      if (idx < 0) return;
+      const type = dl.devices[idx].type;
+      dl.devices[idx].status = "已替换";
+      dl.devices.push({ sn: data.toSn, type, status: "在租" });
+      if (!dl.replacements) dl.replacements = [];
+      dl.replacements.unshift({
+        at: new Date().toISOString().slice(0, 10),
+        fromSn: data.fromSn, toSn: data.toSn,
+        reason: data.reason?.trim() || "设备替换"
+      });
+      dl.updatedAt = new Date().toISOString().slice(0, 10);
+      removeSnFromStandbyLists(data.toSn, dl.id);
+      closeDeviceReplaceForm();
+      closeDrawer();
+      openDeviceListDetail(dl.id);
+      render();
+    }
+
+    function openLeaseForm(contractId, mode) {
+      const lessor = currentEntity();
+      const c = contractId ? leaseContracts.find(x => x.id === contractId) : null;
+      const formMode = mode || (c ? (c.status === "履约中" ? "change" : "edit") : "new");
+      state.leaseFormId = contractId || "new";
+      state.leaseFormMode = formMode;
+      const lesseeId = c?.lesseeId || "";
+      const listOptions = (formMode === "new" || formMode === "edit"
+        ? [...availableDeviceListsForLessee(lesseeId), ...(c?.deviceListId ? [getLeaseDeviceList(c.deviceListId)] : [])].filter(Boolean)
+        : c?.deviceListId ? [getLeaseDeviceList(c.deviceListId)] : []
+      ).filter((dl, i, arr) => dl && arr.findIndex(x => x.id === dl.id) === i);
+      const listSelect = listOptions.map(dl =>
+        `<option value="${dl.id}" ${c?.deviceListId === dl.id ? "selected" : ""}>${dl.id} · ${dl.name}（${deviceListSnSummary(dl).length} 台）</option>`
+      ).join("") || "<option value=\"\">— 请先新建设备清单 —</option>";
+      const opOptions = platformOperators.filter(o => o.status === "在营").map(o =>
+        `<option value="${o.id}" ${c?.lesseeId === o.id ? "selected" : ""}>${o.name}（${o.id}）</option>`
+      ).join("");
+      const titles = { new: "新增租赁协议", edit: "编辑租赁协议", change: "提交协议变更" };
+      document.querySelector("#leaseFormTitle").textContent = titles[formMode] || "租赁协议";
+      const changeHint = formMode === "change"
+        ? `<p style="font-size:12px;color:var(--muted);margin:0 0 8px;grid-column:1/-1">${noteBtn("lease_confirm")} 变更提交后须<strong>运营商确认</strong>，生效日 <strong>${nextMonthFirstStr()}</strong>（次月 1 日）。设备清单变更请在「设备清单」Tab 维护后在此调整关联或租金。</p>`
+        : `<p style="font-size:12px;color:var(--muted);margin:0 0 8px;grid-column:1/-1">${noteBtn("lease_agreements")} 新签须选择<strong>待绑定</strong>设备清单；清单在「设备清单」Tab 单独维护。</p>`;
+      document.querySelector("#leaseForm").innerHTML = `
+        ${changeHint}
+        <label>承租运营商<select name="lesseeId" id="leaseFormLessee" required ${formMode === "change" ? "disabled" : ""}>${opOptions}</select></label>
+        <label>关联设备清单<select name="deviceListId" required ${formMode === "change" ? "disabled" : ""}>${listSelect}</select></label>
+        ${formMode !== "change" ? `<p style="font-size:12px;margin:0;grid-column:1/-1"><button type="button" class="link-btn" data-jump-device-lists>前往新建设备清单</button></p>` : ""}
+        <label>租期类型<select name="termType"><option ${(!c || c.termType === "固定租期") ? "selected" : ""}>固定租期</option><option ${c?.termType === "滚动租期" ? "selected" : ""}>滚动租期</option></select></label>
+        <label>起始日<input name="start" type="date" value="${c?.start || new Date().toISOString().slice(0, 10)}" required></label>
+        <div class="lease-fixed-fields" style="display:contents">
+          <label>截止日<input name="end" type="date" value="${c?.end || ""}"></label>
+          <label>租期（月，可选）<input name="periods" type="number" min="1" value="${c?.periods || ""}" placeholder="如 36"></label>
+        </div>
+        <div class="lease-rolling-fields" style="display:contents">
+          <label>提前通知（天）<input name="noticeDays" type="number" min="1" value="${c?.noticeDays || 30}"></label>
+        </div>
+        <label>月租金（元）<input name="monthlyRent" type="number" min="1" step="0.01" value="${c?.monthlyRent || ""}" required></label>
+        <label>押金（元）<input name="deposit" type="number" min="0" value="${c?.deposit || ""}" required></label>
+        <label>还款日<select name="repayDayNum">${Array.from({ length: 28 }, (_, i) => {
+          const day = i + 1;
+          const label = "每月" + day + "日";
+          return `<option value="${day}" ${c?.repayDay === label ? "selected" : ""}>${label}</option>`;
+        }).join("")}</select></label>
+        ${formMode === "change" ? `<label style="grid-column:1/-1">变更原因<textarea name="changeReason" rows="2" required placeholder="如：调整租金、更换关联清单"></textarea></label>` : ""}`;
+      bindLeaseFormToggles();
+      document.querySelector("#leaseModal").classList.add("open");
+      document.querySelector("#leaseMask").classList.add("open");
+    }
+
+    function closeLeaseForm() {
+      state.leaseFormId = null;
+      state.leaseFormMode = null;
+      document.querySelector("#leaseModal").classList.remove("open");
+      document.querySelector("#leaseMask").classList.remove("open");
+    }
+
+    function saveLeaseForm() {
+      const form = document.querySelector("#leaseForm");
+      const data = Object.fromEntries(new FormData(form).entries());
+      if (!data.lesseeId && state.leaseFormMode !== "change") {
+        window.alert("请选择承租运营商");
+        return;
+      }
+      if (!data.deviceListId && state.leaseFormMode !== "change") {
+        window.alert("请选择关联设备清单");
+        return;
+      }
+      const lessee = platformOperators.find(o => o.id === (data.lesseeId || leaseContracts.find(c => c.id === state.leaseFormId)?.lesseeId));
+      if (!lessee) { window.alert("承租运营商无效"); return; }
+      const dl = data.deviceListId ? getLeaseDeviceList(data.deviceListId) : null;
+      if (state.leaseFormMode !== "change" && (!dl || dl.contractId)) {
+        window.alert("请选择未绑定的设备清单");
+        return;
+      }
+      const monthlyRent = Number(data.monthlyRent);
+      const deposit = Number(data.deposit);
+      const termType = data.termType;
+      const payload = {
+        lesseeId: lessee.id, lesseeName: lessee.name,
+        deviceListId: data.deviceListId || leaseContracts.find(c => c.id === state.leaseFormId)?.deviceListId,
+        termType,
+        start: data.start, end: termType === "固定租期" ? data.end : null,
+        noticeDays: termType === "滚动租期" ? Number(data.noticeDays) || 30 : null,
+        monthlyRent, deposit,
+        repayDay: "每月" + data.repayDayNum + "日",
+        periods: termType === "固定租期" && data.periods ? Number(data.periods) : null,
+        totalRent: termType === "固定租期" && data.periods ? monthlyRent * Number(data.periods) : null,
+        autoDeduct: false, autoDeductAccountId: null
+      };
+      const lessor = currentEntity();
+      const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+      if (state.leaseFormId === "new") {
+        const id = "LC-" + new Date().toISOString().slice(0, 10).replace(/-/g, "").slice(2) + "-" + String(leaseContracts.length + 1).padStart(3, "0");
+        leaseContracts.unshift({
+          id, lessorId: lessor.id, lessorName: lessor.name,
+          ...payload, paidRent: 0, paidPeriods: 0,
+          status: "待确认", confirmedAt: null, confirmedBy: null, pendingChange: null
+        });
+        if (dl) {
+          dl.contractId = id;
+          dl.lesseeId = lessee.id;
+          dl.lesseeName = lessee.name;
+          dl.status = "已绑定";
+          activeListDevices(dl).forEach(d => { d.status = "在租"; });
+        }
+      } else {
+        const c = leaseContracts.find(x => x.id === state.leaseFormId);
+        if (!c) return;
+        if (state.leaseFormMode === "change") {
+          if (!data.changeReason?.trim()) { window.alert("请填写变更原因"); return; }
+          const after = { ...payload, deviceListId: c.deviceListId };
+          c.pendingChange = {
+            submittedAt: now, submittedBy: lessor.name,
+            effectiveDate: nextMonthFirstStr(),
+            ...after,
+            reason: data.changeReason.trim(),
+            changes: leaseChangeDiff(c, after)
+          };
+          c.status = "变更待确认";
+        } else {
+          const oldDl = c.deviceListId ? getLeaseDeviceList(c.deviceListId) : null;
+          if (oldDl && oldDl.id !== data.deviceListId) {
+            oldDl.contractId = null;
+            oldDl.status = "待绑定";
+          }
+          Object.assign(c, payload);
+          if (dl && dl.id === data.deviceListId) {
+            dl.contractId = c.id;
+            dl.lesseeId = lessee.id;
+            dl.lesseeName = lessee.name;
+            dl.status = "已绑定";
+          }
+          if (c.status === "已驳回") c.status = "待确认";
+        }
+      }
+      closeLeaseForm();
+      closeDrawer();
+      state.view = "leaseAgreements";
+      render();
+    }
+
+    function openFollowForm(billId) {
       const b = leaseRentBills.find(x => x.id === billId);
       if (!b) return;
-      b.autoStatus = "已电话催收 " + new Date().toISOString().slice(0, 10);
+      const c = leaseContracts.find(x => x.id === b.contractId);
+      state.followBillId = billId;
+      document.querySelector("#followFormTitle").textContent = "租金跟进 · " + (c?.lesseeName || billId);
+      document.querySelector("#followForm").innerHTML = `
+        <label>账期<input value="${b.month}" readonly></label>
+        <label>待收金额<input value="¥${Math.max(0, b.rentAmount - (b.paidAmount || 0)).toLocaleString("zh-CN")}" readonly></label>
+        <label>跟进方式<select name="method"><option>电话催收</option><option>对公提醒</option><option>上门沟通</option><option>其他</option></select></label>
+        <label style="grid-column:1/-1">跟进记录<textarea name="note" rows="3" placeholder="记录沟通内容与承诺还款时间"></textarea></label>`;
+      document.querySelector("#followModal").classList.add("open");
+      document.querySelector("#followMask").classList.add("open");
+    }
+
+    function closeFollowForm() {
+      state.followBillId = null;
+      document.querySelector("#followModal").classList.remove("open");
+      document.querySelector("#followMask").classList.remove("open");
+    }
+
+    function saveFollowForm() {
+      const b = leaseRentBills.find(x => x.id === state.followBillId);
+      if (!b) return;
+      const form = document.querySelector("#followForm");
+      const data = Object.fromEntries(new FormData(form).entries());
+      const today = new Date().toISOString().slice(0, 10);
+      b.autoStatus = (data.method || "电话催收") + " · " + today + (data.note ? "：" + data.note.slice(0, 40) : "");
+      closeFollowForm();
       render();
     }
 
@@ -3184,6 +4140,7 @@
       document.querySelector("#orderDrawer").classList.add("open");
       document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
       bindNotes();
+      bindDrawerActions();
     }
 
     function openOperatorForm(opId) {
@@ -3820,9 +4777,9 @@
         return `
           ${ownScopeBanner()}
           <section class="panel">
-            ${panelHead("渠道商批发订单", `共 ${rows.length} 笔人天采购 · 平台只读`, "platform_channel_po", tabs)}
+            ${panelHead("渠道商批发订单", `共 ${rows.length} 笔人天采购`, "platform_channel_po", tabs)}
             <div class="panel-body orders-table-wrap">
-              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_channel_po")} 线下到账由<strong>售卖运营商</strong>在「渠道销售 → 批发订单」确认；平台不参与确认。</p>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_channel_po")}</p>
               <table>
                 <thead><tr>
                   <th>批发单号</th><th>渠道商</th><th>售卖运营商</th><th>人天/金额</th>
@@ -3861,7 +4818,6 @@
           <section class="panel">
             ${panelHead("全平台换电订单", `共 ${rows.length} 条`, "orders_swap_triplet", tabs)}
             <div class="panel-body orders-table-wrap">
-              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_swap_triplet")}</p>
               <table>
                 <thead><tr><th>换电单</th><th>用户</th><th>用户运营商</th><th>柜机运营商</th><th>电池运营商</th><th>跨网服务费</th><th>站点</th><th>权益</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
                 <tbody>${rows.map(s => {
@@ -4080,21 +5036,18 @@
         return `
           ${ownScopeBanner()}
           <section class="panel">
-            ${panelHead("运营商间 跨网设备服务费清分流水", `日账单 ${rows.length} 条`, "platform_flows_inter_deposit", tabs)}
+            ${panelHead("运营商间 跨网设备服务费清分流水", `日账单 ${rows.length} 条`, "platform_flows", tabs)}
             <div class="panel-body orders-table-wrap">
-              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("inter_op")}${noteBtn("inter_op_privacy")}${noteBtn("platform_flows_inter_deposit")} 平台视角可见双方运营商 ID；净额后保证金为负表示占用信用额度。</p>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("inter_op")}${noteBtn("inter_op_privacy")} 平台视角可见双方运营商 ID，运营商后台只见代收/代付。</p>
               <table>
-                <thead><tr><th>日账单</th><th>运营商</th><th>平台代付</th><th>平台代收</th><th>净额</th><th>净额前保证金</th><th>净额后保证金</th><th>换电笔数</th><th>扣款来源</th><th>状态</th></tr></thead>
+                <thead><tr><th>日账单</th><th>运营商</th><th>平台代付</th><th>平台代收</th><th>净额</th><th>换电笔数</th><th>扣款来源</th><th>状态</th></tr></thead>
                 <tbody>${rows.map(b => `<tr>
                   <td>${b.id}<br><small>${b.date}</small></td>
                   <td>${operatorLabel(b.operatorId)}</td>
                   <td>¥${b.platformPayOut}</td><td>¥${b.platformPayIn}</td>
-                  <td><strong>¥${b.net}</strong></td>
-                  <td>${depositBalanceCell(b.depositBefore)}</td>
-                  <td>${depositBalanceCell(b.depositAfter)}</td>
-                  <td>${b.swapCount}</td>
+                  <td><strong>¥${b.net}</strong></td><td>${b.swapCount}</td>
                   <td>${b.deductSource}</td><td>${tag(b.status)}</td>
-                </tr>`).join("") || "<tr><td colspan='10'>暂无</td></tr>"}</tbody>
+                </tr>`).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
               </table>
             </div>
           </section>`;
@@ -4221,11 +5174,12 @@
             ${panelHead("承租方概览", "快捷进入「租金收缴」查看本月进度", "lease_collect")}
             <div class="panel-body orders-table-wrap">
               <table>
-                <thead><tr><th>承租方</th><th>站点</th><th>协议</th><th>月租金</th><th>还款进度</th><th>状态</th><th>操作</th></tr></thead>
+                <thead><tr><th>承租方</th><th>绑定设备</th><th>协议</th><th>月租金</th><th>还款进度</th><th>状态</th><th>操作</th></tr></thead>
                 <tbody>${contracts.map(c => {
                   const prog = repayProgress(c);
                   return `<tr>
-                    <td>${c.lesseeName}</td><td>${c.site}</td>
+                    <td>${c.lesseeName}</td>
+                    <td>${deviceChips(contractDevices(c))}</td>
                     <td><button type="button" class="link-btn" data-open-lease="${c.id}">${c.id}</button></td>
                     <td>¥${c.monthlyRent.toLocaleString("zh-CN")}</td>
                     <td><div class="usage-bar"><i style="width:${prog.pct}%"></i></div><small>${prog.label}</small></td>
@@ -4611,9 +5565,9 @@
           <div class="detail-item"><span>站点</span><strong>${s.site}<br><small style="font-weight:400;color:var(--muted)">${s.siteId || ""} · ${s.city}</small></strong></div>
           <div class="detail-item"><span>换电柜</span><strong>${cab.sn || "—"} · ${cab.slots || "—"}仓<br><small style="font-weight:400">${cab.online === false ? "离线" : "在线"}</small></strong></div>
           <div class="detail-item"><span>还电格口</span><strong>${s.slotIn != null ? "#" + s.slotIn : "—"}</strong></div>
-          <div class="detail-item"><span>归还电池</span><strong>${swapBatDetailLine(s.batIn)}</strong></div>
+          <div class="detail-item"><span>归还电池</span><strong>${s.batIn ? `${s.batIn.sn} · SOC ${s.batIn.soc}% · ${s.batIn.health}` : "—"}</strong></div>
           <div class="detail-item"><span>换电格口</span><strong>${s.slotOut != null ? "#" + s.slotOut : "—"}</strong></div>
-          <div class="detail-item"><span>换出电池</span><strong>${swapBatDetailLine(s.batOut)}</strong></div>
+          <div class="detail-item"><span>换出电池</span><strong>${s.batOut ? `${s.batOut.sn} · SOC ${s.batOut.soc}% · ${s.batOut.health}` : "—"}</strong></div>
           <div class="detail-item"><span>订单状态</span><strong>${tag(s.status)}</strong></div>
         </div>
         ${swapTripletDetailHtml(s)}
@@ -4623,9 +5577,7 @@
       document.querySelector("#orderDrawer").classList.add("open");
       document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
       bindNotes();
-      document.querySelectorAll("[data-open-sub]").forEach(btn => {
-        btn.onclick = () => openPackageDetail(btn.dataset.openSub);
-      });
+      bindDrawerActions();
     }
 
     function openPackageDetail(subId) {
@@ -4640,7 +5592,7 @@
         usagePct = Math.min(100, Math.round(p.swapUsed / p.swapLimit * 100));
         usageLabel = `次数已用 ${usagePct}%（${p.swapUsed}/${p.swapLimit}）`;
       } else {
-        usageLabel = `期内换电 ${p.swapUsed} 次 · 按天套餐不限次`;
+        usageLabel = `期内换电 ${p.swapUsed} 次 · 包月不限次`;
       }
 
       document.querySelector("#drawerTitle").textContent = "套餐订单 · " + p.id;
@@ -4708,6 +5660,7 @@
       document.querySelector("#orderDrawer").classList.add("open");
       document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
       bindNotes();
+      bindDrawerActions();
     }
 
     function closeDrawer() {
@@ -4920,8 +5873,11 @@
 
     function permCheckboxes(selected) {
       const sel = selected || [];
+      const perms = supportsPartnerModule()
+        ? EMP_PERMISSIONS
+        : EMP_PERMISSIONS.filter(p => !p.id.startsWith("partner_"));
       return `<div class="perm-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
-        ${EMP_PERMISSIONS.map(p => `<label style="display:flex;align-items:center;gap:6px;font-size:13px">
+        ${perms.map(p => `<label style="display:flex;align-items:center;gap:6px;font-size:13px">
           <input type="checkbox" name="perm" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""}> ${p.label}
         </label>`).join("")}
       </div>`;
@@ -4930,7 +5886,8 @@
     function openEmployeeForm(mode, roleType, id) {
       const isEdit = mode === "edit";
       const entity = isEdit ? employeeById(id) : {};
-      const rt = roleType || entity.roleType || "staff";
+      let rt = roleType || entity.roleType || "staff";
+      if (!supportsPartnerModule()) rt = "staff";
       state.employeeForm = { mode, roleType: rt, id: id || null };
       const siteOpts = ownSiteNameList().map(n => {
         const pend = entity.id ? sitePartnerPending(n) : null;
@@ -5123,11 +6080,11 @@
       }
       const canEdit = isEntityLogin() || employeeHasPerm("employees.edit");
       const f = getPf();
-      const tab = state.employeeTab;
-      const tabs = `<div class="tabs">
+      const tab = supportsPartnerModule() ? state.employeeTab : "staff";
+      const tabs = supportsPartnerModule() ? `<div class="tabs">
         <button type="button" class="${tab === "staff" ? "active" : ""}" data-emptab="staff">运营员工</button>
         <button type="button" class="${tab === "partner" ? "active" : ""}" data-emptab="partner">合作伙伴</button>
-      </div>`;
+      </div>` : "";
       const filterRow = (e) => {
         if (!matchKw(e.name, f.keyword) && !matchKw(e.phone || e.contact, f.keyword)) return false;
         if (f.roleType !== "全部" && e.roleType !== f.roleType) return false;
@@ -5140,7 +6097,7 @@
       const staffCount = myStaff().length;
       const partnerCount = myPartners().length;
 
-      if (tab === "partner") {
+      if (tab === "partner" && supportsPartnerModule()) {
         return `
           ${ownScopeBanner()}
           <div class="sub-profit-hero" style="margin-bottom:16px">
@@ -5177,10 +6134,10 @@
         ${ownScopeBanner()}
         <div class="kpi-grid">
           ${kpi("运营员工", staffCount, "已配置权限", "员", "employees_panel")}
-          ${kpi("合作伙伴", partnerCount, "见「合作伙伴」Tab", "伙", "employees_partner")}
+          ${supportsPartnerModule() ? kpi("合作伙伴", partnerCount, "见「合作伙伴」Tab", "伙", "employees_partner") : ""}
         </div>
         <section class="panel">
-          ${panelHead("员工列表", "辅助日常运营 · 可配置功能权限 · 可登录后台", "employees_panel", tabs + (canEdit ? `<button type="button" class="btn primary" data-employee-add-staff>新增员工</button>` : ""))}
+          ${panelHead("员工列表", isLeasingRole() ? "租金催收等运营岗位 · 可配置功能权限" : "辅助日常运营 · 可配置功能权限 · 可登录后台", "employees_panel", tabs + (canEdit ? `<button type="button" class="btn primary" data-employee-add-staff>新增员工</button>` : ""))}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>姓名</th><th>手机</th><th>岗位</th><th>权限范围</th><th>状态</th><th>操作</th></tr></thead>
@@ -5778,10 +6735,8 @@
       const row = operatorPkgPrices.find(r => r.id === id);
       if (!row) return;
       state.pricingEditId = id;
-      document.querySelector("#pricingFormTitle").textContent = "编辑零售价 · " + row.pkg + (row.newcomerEligible ? "（新人套餐）" : "");
-      const newcomerNote = row.newcomerEligible ? `<p style="font-size:12px;color:var(--muted);margin:0 0 12px;grid-column:1/-1">新人套餐：用户在该运营商首次个人套餐购买时可享，每用户仅一次。</p>` : "";
+      document.querySelector("#pricingFormTitle").textContent = "编辑零售价 · " + row.pkg;
       document.querySelector("#pricingForm").innerHTML = `
-        ${newcomerNote}
         <label>城市<input name="city" value="${row.city}" readonly /></label>
         <label>站点<input name="site" value="${row.site}" readonly /></label>
         <label>套餐<input name="pkg" value="${row.pkg}" readonly /></label>
@@ -5809,106 +6764,6 @@
       window.alert("演示：零售价已更新（仅本地 Mock）");
     }
 
-    function pkgValidityLabel(r) {
-      if (r.validityHours) return "购后 " + r.validityHours + "h";
-      if (r.billingMode === "按次" && r.swapLimit) {
-        const days = r.validityDays ? r.validityDays + " 天内" : "";
-        return r.swapLimit + " 次" + (days ? " · " + days : "");
-      }
-      if (r.validityDays) return r.validityDays + " 自然日";
-      return "按 SKU";
-    }
-
-    function pricingScopeTag(r) {
-      if (r.priceScope === "general") return tag("通用");
-      if (r.priceScope === "fallback") return '<span class="tag warn">默认</span>';
-      if (r.priceScope === "site") return '<span class="tag">站点</span>';
-      if (r.priceScope === "newcomer_general") return '<span class="tag" style="background:#e8f4fd;color:#1677ff">通用新人</span>';
-      if (r.priceScope === "newcomer_site") return '<span class="tag" style="background:#e8f4fd;color:#1677ff">站点新人</span>';
-      return "—";
-    }
-
-    function renderPricingPkgTable(rows, opts = {}) {
-      const { showScope = false, readonlyScope = false, showNewcomer = false } = opts;
-      return `<table>
-        <thead><tr>
-          ${showScope ? "<th>层级</th>" : ""}
-          <th>城市</th>${!showScope || rows.some(r => r.site) ? "<th>站点</th>" : ""}
-          <th>套餐</th><th>计费</th><th>权益</th>${showNewcomer ? "<th>新人</th>" : "<th>渠道应急</th>"}<th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th>
-        </tr></thead>
-        <tbody>${rows.map(r => `<tr>
-          ${showScope ? `<td>${pricingScopeTag(r)}</td>` : ""}
-          <td>${r.city}</td>${(!showScope || r.site || rows.some(x => x.site)) ? `<td>${r.site || "全站点默认"}</td>` : ""}
-          <td>${r.pkg}</td>
-          <td>${r.billingMode || "—"}</td>
-          <td>${pkgValidityLabel(r)}</td>
-          <td>${showNewcomer || r.newcomerEligible ? tag("首购一次") : r.channelFallback ? tag("必选") : "—"}</td>
-          <td>¥${r.retailPrice}</td><td>${tag(r.status)}</td><td>${r.updatedAt}</td>
-          <td>${readonlyScope && r.priceScope === "fallback" ? `<button type="button" class="link-btn" data-edit-pricing="${r.id}">调价</button>` : `<button type="button" class="link-btn" data-edit-pricing="${r.id}">编辑</button>`}</td>
-        </tr>`).join("") || "<tr><td colspan='10'>暂无</td></tr>"}</tbody>
-      </table>`;
-    }
-
-    function renderPricingNewcomerSiteTable(allRows, siteNames) {
-      const generalNew = allRows.filter(r => r.priceScope === "newcomer_general");
-      const siteNew = allRows.filter(r => r.priceScope === "newcomer_site");
-      const rows = [];
-      siteNames.forEach(site => {
-        const siteRows = siteNew.filter(r => r.site === site);
-        if (siteRows.length) {
-          siteRows.forEach(r => rows.push({ site, pkg: r.pkg, billingMode: r.billingMode, source: "站点新人", retailPrice: r.retailPrice, editId: r.id }));
-        } else if (generalNew.length) {
-          generalNew.forEach(g => rows.push({ site, pkg: g.pkg, billingMode: g.billingMode, source: "继承通用新人", retailPrice: g.retailPrice, editId: null, inheritedId: g.id }));
-        } else {
-          rows.push({ site, pkg: "—", billingMode: "—", source: "未配置", retailPrice: "—", editId: null });
-        }
-      });
-      return `<table>
-        <thead><tr><th>站点</th><th>新人套餐</th><th>计费</th><th>来源</th><th>首购价</th><th>操作</th></tr></thead>
-        <tbody>${rows.map(r => `<tr>
-          <td>${r.site}</td><td>${r.pkg}</td><td>${r.billingMode}</td>
-          <td>${r.source === "站点新人" ? '<span class="tag" style="background:#e8f4fd;color:#1677ff">站点新人</span>' : r.source === "继承通用新人" ? `<span style="color:var(--muted)">${r.source}</span>` : `<span style="color:var(--muted)">${r.source}</span>`}</td>
-          <td>${typeof r.retailPrice === "number" ? "¥" + r.retailPrice : r.retailPrice}</td>
-          <td>${r.editId ? `<button type="button" class="link-btn" data-edit-pricing="${r.editId}">编辑</button>` : r.inheritedId ? `<button type="button" class="link-btn" data-add-site-newcomer="${r.site}">设站点新人价</button>` : "—"}</td>
-        </tr>`).join("")}</tbody>
-      </table>`;
-    }
-
-    function renderPricingSiteInheritTable(allRows, siteNames) {
-      const general = allRows.filter(r => r.priceScope === "general");
-      const fallback = allRows.filter(r => r.priceScope === "fallback");
-      const siteOverrides = allRows.filter(r => r.priceScope === "site");
-      const rows = [];
-      siteNames.forEach(site => {
-        general.forEach(g => {
-          const ov = siteOverrides.find(s => s.site === site && s.pkg === g.pkg);
-          rows.push({
-            site, pkg: g.pkg, billingMode: g.billingMode,
-            source: ov ? "站点覆盖" : "继承通用",
-            retailPrice: ov ? ov.retailPrice : g.retailPrice,
-            editId: ov ? ov.id : null, inheritedId: ov ? null : g.id
-          });
-        });
-        fallback.forEach(f => {
-          rows.push({
-            site, pkg: f.pkg, billingMode: f.billingMode,
-            source: "继承默认",
-            retailPrice: f.retailPrice,
-            editId: null, inheritedId: f.id
-          });
-        });
-      });
-      return `<table>
-        <thead><tr><th>站点</th><th>套餐</th><th>计费</th><th>来源</th><th>生效零售价</th><th>操作</th></tr></thead>
-        <tbody>${rows.map(r => `<tr>
-          <td>${r.site}</td><td>${r.pkg}</td><td>${r.billingMode}</td>
-          <td>${r.source === "站点覆盖" ? '<span class="tag">站点覆盖</span>' : `<span style="color:var(--muted)">${r.source}</span>`}</td>
-          <td>¥${r.retailPrice}</td>
-          <td>${r.editId ? `<button type="button" class="link-btn" data-edit-pricing="${r.editId}">编辑</button>` : r.source === "站点覆盖" ? "—" : `<button type="button" class="link-btn" data-add-site-price="${r.site}|${r.pkg}">设站点价</button>`}</td>
-        </tr>`).join("")}</tbody>
-      </table>`;
-    }
-
     function renderPricing() {
       const tab = state.pricingTab;
       const tabs = [["pkg", "个人套餐价"], ["quota", "人天批发价"]];
@@ -5917,50 +6772,20 @@
       ).join("")}</div>`;
       let body = "";
       if (tab === "pkg") {
-        const allRows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id);
-        const generalRows = allRows.filter(r => r.priceScope === "general");
-        const newcomerGeneralRows = allRows.filter(r => r.priceScope === "newcomer_general");
-        const fallbackRows = allRows.filter(r => r.priceScope === "fallback");
-        const siteOverrideRows = allRows.filter(r => r.priceScope === "site");
-        const newcomerSiteRows = allRows.filter(r => r.priceScope === "newcomer_site");
-        const siteNames = [...new Set(sites.filter(s => s.operatorId === currentEntity().id).map(s => s.name))];
-        const fallbackOk = fallbackRows.filter(r => r.status === "生效" && r.pkgType === "daily").length >= 1
-          && fallbackRows.filter(r => r.status === "生效" && r.pkgType === "single").length >= 1;
-        body = `
-        <section class="panel">
-          ${panelHead("通用套餐", "运营商默认定价；未单独配置的站点自动继承", "pricing_pkg_general", `<button type="button" class="btn" disabled title="演示">+ 新增通用 SKU</button>`)}
+        const rows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id);
+        body = `<section class="panel">
+          ${panelHead("个人套餐零售价", "城市+站点+SKU；须保留<strong>1天+单次</strong>渠道兜底 SKU", "pricing_pkg")}
           <div class="panel-body orders-table-wrap">
-            ${renderPricingPkgTable(generalRows)}
-          </div>
-        </section>
-        <section class="panel">
-          ${panelHead("通用新人套餐", "用户在该运营商首次个人套餐购买时可享；每用户仅一次", "pricing_pkg_newcomer_general", `<button type="button" class="btn" disabled title="演示">+ 新增新人 SKU</button>`)}
-          <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg_newcomer_general")} 不适用于渠道应急兜底；历史上任意支付成功个人套餐后不再展示。</p>
-            ${renderPricingPkgTable(newcomerGeneralRows, { showNewcomer: true })}
-          </div>
-        </section>
-        <section class="panel">
-          ${panelHead("默认套餐（渠道应急）", "渠道成员无预占人天时引导在线支付；须保持 1天畅换+单次 上架", "pricing_pkg_fallback")}
-          <div class="panel-body orders-table-wrap">
-            ${!fallbackOk ? `<p style="color:var(--red);font-size:13px;margin:0 0 12px">⚠ 缺少生效中的渠道应急 SKU（1天 + 单次），渠道自费兜底路径将不可用。</p>` : ""}
-            ${renderPricingPkgTable(fallbackRows, { readonlyScope: true })}
-          </div>
-        </section>
-        <section class="panel">
-          ${panelHead("站点套餐", "覆盖通用套餐价；默认套餐继承运营商默认价", "pricing_pkg_site", `<button type="button" class="btn" disabled title="演示">+ 站点覆盖</button>`)}
-          <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg")}${noteBtn("pricing_pkg_site")} 下表展示各站点<strong>生效价</strong>及来源；仅「站点覆盖」行可编辑，其余继承通用/默认。</p>
-            ${siteNames.length ? renderPricingSiteInheritTable(allRows, siteNames) : "<p>暂无站点</p>"}
-            ${siteOverrideRows.length ? `<details style="margin-top:16px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">已配置站点覆盖 (${siteOverrideRows.length})</summary><div style="margin-top:8px">${renderPricingPkgTable(siteOverrideRows)}</div></details>` : ""}
-          </div>
-        </section>
-        <section class="panel">
-          ${panelHead("站点新人套餐", "按站点覆盖新人价；未配置则首购继承通用新人套餐", "pricing_pkg_newcomer_site", `<button type="button" class="btn" disabled title="演示">+ 站点新人价</button>`)}
-          <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg_newcomer_site")} 首购解析顺序：<strong>站点新人</strong> &gt; <strong>通用新人</strong> &gt; 常规套餐价。</p>
-            ${siteNames.length ? renderPricingNewcomerSiteTable(allRows, siteNames) : "<p>暂无站点</p>"}
-            ${newcomerSiteRows.length ? `<details style="margin-top:16px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">已配置站点新人 (${newcomerSiteRows.length})</summary><div style="margin-top:8px">${renderPricingPkgTable(newcomerSiteRows, { showNewcomer: true })}</div></details>` : ""}
+            <table>
+              <thead><tr><th>城市</th><th>站点</th><th>套餐</th><th>有效期</th><th>渠道兜底</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+              <tbody>${rows.map(r => `<tr>
+                <td>${r.city}</td><td>${r.site || "（运营商默认）"}</td><td>${r.pkg}</td>
+                <td>${r.validityHours ? r.validityHours + "h" : "按 SKU"}</td>
+                <td>${r.channelFallback ? tag("必选") : "—"}</td>
+                <td>¥${r.retailPrice}</td><td>${tag(r.status)}</td><td>${r.updatedAt}</td>
+                <td><button type="button" class="link-btn" data-edit-pricing="${r.id}">编辑</button></td>
+              </tr>`).join("")}</tbody>
+            </table>
           </div>
         </section>`;
       } else {
@@ -6558,7 +7383,6 @@
         const siteSet = contract?.sites?.length ? new Set(contract.sites) : null;
         const wholesale = contract ? contract.wholesalePrice : platformAccrualDayPrice();
         const rows = operatorPkgPrices.filter(r => {
-          if (r.priceScope === "newcomer_general" || r.priceScope === "newcomer_site") return false;
           if (r.channelFallback) return f.city === "全部" || r.city === f.city;
           if (siteSet && r.site && !siteSet.has(r.site)) return false;
           if (f.city !== "全部" && r.city !== f.city) return false;
@@ -6566,7 +7390,7 @@
           return true;
         });
         body = `<section class="panel">
-          ${panelHead("骑手零售价（只读）", "无预占人天时默认推荐<strong>1天畅换/单次</strong>兜底 SKU（购后24h）", "day_pool_retail")}
+          ${panelHead("骑手零售价（只读）", "无预占人天时默认推荐<strong>1天/单次</strong>兜底 SKU（购后24h）", "day_pool_retail")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>城市</th><th>站点</th><th>套餐</th><th>有效期</th><th>渠道兜底</th><th>零售价</th><th>合同批发价</th><th>状态</th></tr></thead>
@@ -6675,16 +7499,78 @@
         </section>`;
     }
 
+    function openNoteModal(noteId) {
+      const n = MODULE_NOTES[noteId];
+      if (!n) return;
+      document.querySelector("#noteTitle").textContent = n.title;
+      document.querySelector("#noteBody").innerHTML = n.content;
+      document.querySelector("#noteModal").classList.add("open");
+      document.querySelector("#noteMask").classList.add("open");
+    }
+
     function bindNotes() {
-      document.querySelectorAll("[data-note]").forEach(btn => {
-        btn.onclick = e => {
-          e.stopPropagation();
-          const n = MODULE_NOTES[btn.dataset.note];
-          if (!n) return;
-          document.querySelector("#noteTitle").textContent = n.title;
-          document.querySelector("#noteBody").textContent = n.content;
-          document.querySelector("#noteModal").classList.add("open");
-          document.querySelector("#noteMask").classList.add("open");
+      /* 说明按钮使用 document 级事件委托，见文末 init */
+    }
+
+    function bindDrawerActions() {
+      const root = document.querySelector("#drawerBody");
+      if (!root) return;
+      root.querySelectorAll("[data-open-lease]").forEach(btn => {
+        btn.onclick = () => openLeaseDetail(btn.dataset.openLease);
+      });
+      root.querySelectorAll("[data-confirm-lease]").forEach(btn => {
+        btn.onclick = () => {
+          if (confirmLeaseContract(btn.dataset.confirmLease)) {
+            window.alert("已确认，变更将于次月 1 日生效（新签立即进入履约）。");
+            closeDrawer();
+            render();
+          }
+        };
+      });
+      root.querySelectorAll("[data-reject-lease]").forEach(btn => {
+        btn.onclick = () => {
+          const reason = window.prompt("拒绝原因", "条款不接受");
+          if (reason === null) return;
+          if (rejectLeaseContract(btn.dataset.rejectLease, reason)) {
+            closeDrawer();
+            render();
+          }
+        };
+      });
+      root.querySelectorAll("[data-edit-lease]").forEach(btn => {
+        btn.onclick = () => openLeaseForm(btn.dataset.editLease, btn.dataset.leaseChange ? "change" : "edit");
+      });
+      root.querySelectorAll("[data-open-device-list]").forEach(btn => {
+        btn.onclick = () => openDeviceListDetail(btn.dataset.openDeviceList);
+      });
+      root.querySelectorAll("[data-edit-device-list]").forEach(btn => {
+        btn.onclick = () => { closeDrawer(); openDeviceListForm(btn.dataset.editDeviceList, false); };
+      });
+      root.querySelectorAll("[data-replace-device-list]").forEach(btn => {
+        btn.onclick = () => openDeviceReplaceForm(btn.dataset.replaceDeviceList);
+      });
+      root.querySelectorAll("[data-edit-operator]").forEach(btn => {
+        btn.onclick = () => { closeDrawer(); openOperatorForm(btn.dataset.editOperator); };
+      });
+      root.querySelectorAll("[data-view-jump]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.dataset.empTab) state.employeeTab = btn.dataset.empTab;
+          if (btn.dataset.depstabJump) state.depositTab = btn.dataset.depstabJump;
+          state.view = btn.dataset.viewJump;
+          closeDrawer();
+          render();
+        };
+      });
+      root.querySelectorAll("[data-open-sub]").forEach(btn => {
+        btn.onclick = () => openPackageDetail(btn.dataset.openSub);
+      });
+      root.querySelectorAll("[data-goto-swap]").forEach(btn => {
+        btn.onclick = () => {
+          state.view = "orders";
+          state.orderTab = "swap";
+          state.detailSwapId = btn.dataset.gotoSwap;
+          state.detailSubId = null;
+          render();
         };
       });
     }
@@ -6813,14 +7699,6 @@
       document.querySelectorAll("[data-edit-pricing]").forEach(btn => {
         btn.onclick = () => openPricingForm(btn.dataset.editPricing);
       });
-      document.querySelectorAll("[data-add-site-price]").forEach(btn => {
-        const [site, pkg] = (btn.dataset.addSitePrice || "").split("|");
-        btn.onclick = () => window.alert(`演示：为站点「${site}」的「${pkg}」设置覆盖价（Mock 未实现表单）`);
-      });
-      document.querySelectorAll("[data-add-site-newcomer]").forEach(btn => {
-        const site = btn.dataset.addSiteNewcomer || "";
-        btn.onclick = () => window.alert(`演示：为站点「${site}」配置站点新人套餐（Mock 未实现表单）`);
-      });
       document.querySelectorAll("[data-pool-form]").forEach(btn => {
         btn.onclick = e => {
           e.stopPropagation();
@@ -6860,11 +7738,42 @@
       document.querySelectorAll("[data-open-lease]").forEach(btn => {
         btn.onclick = () => openLeaseDetail(btn.dataset.openLease);
       });
-      document.querySelectorAll("[data-pay-manual]").forEach(btn => {
-        btn.onclick = () => handlePayManual(btn.dataset.payManual);
+      document.querySelectorAll("[data-confirm-lease]").forEach(btn => {
+        btn.onclick = () => {
+          if (confirmLeaseContract(btn.dataset.confirmLease)) {
+            window.alert("已确认，变更将于次月 1 日生效（新签立即进入履约）。");
+            closeDrawer();
+            render();
+          }
+        };
       });
-      document.querySelectorAll("[data-handle-gap]").forEach(btn => {
-        btn.onclick = () => handleGap(btn.dataset.handleGap);
+      document.querySelectorAll("[data-reject-lease]").forEach(btn => {
+        btn.onclick = () => {
+          const reason = window.prompt("拒绝原因", "条款不接受");
+          if (reason === null) return;
+          if (rejectLeaseContract(btn.dataset.rejectLease, reason)) {
+            closeDrawer();
+            render();
+          }
+        };
+      });
+      document.querySelectorAll("[data-pay-rent]").forEach(btn => {
+        btn.onclick = () => openRentPayForm(btn.dataset.payRent);
+      });
+      document.querySelectorAll("[data-pay-manual]").forEach(btn => {
+        btn.onclick = () => openRentPayForm(btn.dataset.payManual);
+      });
+      document.querySelectorAll("[data-confirm-rent-offline]").forEach(btn => {
+        btn.onclick = () => {
+          if (confirmLeaseOfflineTicket(btn.dataset.confirmRentOffline)) render();
+        };
+      });
+      document.querySelectorAll("[data-reject-rent-offline]").forEach(btn => {
+        btn.onclick = () => {
+          const reason = window.prompt("驳回原因", "转账金额或流水号不符");
+          if (reason === null) return;
+          if (rejectLeaseOfflineTicket(btn.dataset.rejectRentOffline, reason)) render();
+        };
       });
       document.querySelectorAll("[data-toggle-auto]").forEach(btn => {
         btn.onclick = () => toggleAutoDeduct(btn.dataset.toggleAuto);
@@ -6879,6 +7788,33 @@
       });
       document.querySelectorAll("[data-collect-follow]").forEach(btn => {
         btn.onclick = () => handleCollectFollow(btn.dataset.collectFollow);
+      });
+      document.querySelectorAll("[data-new-lease]").forEach(btn => {
+        btn.onclick = () => openLeaseForm(null, "new");
+      });
+      document.querySelectorAll("[data-lease-agreements-tab]").forEach(btn => {
+        btn.onclick = () => { state.leaseAgreementsTab = btn.dataset.leaseAgreementsTab; render(); };
+      });
+      document.querySelectorAll("[data-open-device-list]").forEach(btn => {
+        btn.onclick = () => openDeviceListDetail(btn.dataset.openDeviceList);
+      });
+      document.querySelectorAll("[data-new-device-list]").forEach(btn => {
+        btn.onclick = () => openDeviceListForm(null, false);
+      });
+      document.querySelectorAll("[data-import-device-list]").forEach(btn => {
+        btn.onclick = () => openDeviceListForm(null, true);
+      });
+      document.querySelectorAll("[data-edit-device-list]").forEach(btn => {
+        btn.onclick = () => { closeDrawer(); openDeviceListForm(btn.dataset.editDeviceList, false); };
+      });
+      document.querySelectorAll("[data-replace-device-list]").forEach(btn => {
+        btn.onclick = () => openDeviceReplaceForm(btn.dataset.replaceDeviceList);
+      });
+      document.querySelectorAll("[data-jump-device-lists]").forEach(btn => {
+        btn.onclick = () => { closeLeaseForm(); state.leaseAgreementsTab = "deviceLists"; render(); };
+      });
+      document.querySelectorAll("[data-edit-lease]").forEach(btn => {
+        btn.onclick = () => openLeaseForm(btn.dataset.editLease, btn.dataset.leaseChange ? "change" : "edit");
       });
       document.querySelectorAll("[data-mock-action]").forEach(btn => {
         btn.onclick = () => window.alert("演示环境：" + btn.dataset.mockAction);
@@ -6903,6 +7839,19 @@
       });
       document.querySelectorAll("[data-confirm-channel-po]").forEach(btn => {
         btn.onclick = () => { if (confirmChannelSalesOrder(btn.dataset.confirmChannelPo)) render(); };
+      });
+      document.querySelectorAll("[data-simulate-online-pay]").forEach(btn => {
+        btn.onclick = () => {
+          const o = channelSalesOrders.find(x => x.id === btn.dataset.simulateOnlinePay);
+          if (!o || o.payChannel !== "online" || o.orderStatus === "已完成") return;
+          o.orderStatus = "已完成";
+          o.payStatus = "已付款";
+          o.payTime = new Date().toISOString().slice(0, 19).replace("T", " ");
+          if (!o.paymentNo) o.paymentNo = (o.payMethod.includes("微信") ? "WX" : "ALI") + Date.now();
+          creditPoolFromChannelOrder(o);
+          window.alert("演示：支付回调成功，订单 " + o.id + " 已实时更新为已完成");
+          render();
+        };
       });
       document.querySelectorAll("[data-depstab]").forEach(btn => {
         btn.onclick = () => { state.depositTab = btn.dataset.depstab; render(); };
@@ -7036,6 +7985,13 @@
       document.querySelector("#noteModal").classList.remove("open");
       document.querySelector("#noteMask").classList.remove("open");
     }
+    document.addEventListener("click", e => {
+      const btn = e.target.closest("[data-note]");
+      if (!btn) return;
+      e.stopPropagation();
+      e.preventDefault();
+      openNoteModal(btn.dataset.note);
+    });
     document.querySelector("#closeNote").addEventListener("click", closeNote);
     document.querySelector("#noteMask").addEventListener("click", closeNote);
     document.querySelector("#closeDrawer").addEventListener("click", closeDrawer);
@@ -7070,15 +8026,33 @@
     document.querySelector("#bindMask").addEventListener("click", closeBindForm);
     document.querySelector("#saveBindForm").addEventListener("click", saveBindForm);
     document.querySelector("#bindForm").addEventListener("submit", e => { e.preventDefault(); saveBindForm(); });
+    document.querySelector("#closeLeaseForm").addEventListener("click", closeLeaseForm);
+    document.querySelector("#cancelLeaseForm").addEventListener("click", closeLeaseForm);
+    document.querySelector("#leaseMask").addEventListener("click", closeLeaseForm);
+    document.querySelector("#saveLeaseForm").addEventListener("click", saveLeaseForm);
+    document.querySelector("#leaseForm").addEventListener("submit", e => { e.preventDefault(); saveLeaseForm(); });
+    document.querySelector("#closeFollowForm").addEventListener("click", closeFollowForm);
+    document.querySelector("#cancelFollowForm").addEventListener("click", closeFollowForm);
+    document.querySelector("#followMask").addEventListener("click", closeFollowForm);
+    document.querySelector("#saveFollowForm").addEventListener("click", saveFollowForm);
+    document.querySelector("#followForm").addEventListener("submit", e => { e.preventDefault(); saveFollowForm(); });
+    document.querySelector("#closeRentPayForm").addEventListener("click", closeRentPayForm);
+    document.querySelector("#cancelRentPayForm").addEventListener("click", closeRentPayForm);
+    document.querySelector("#rentPayMask").addEventListener("click", closeRentPayForm);
+    document.querySelector("#saveRentPayForm").addEventListener("click", saveRentPayForm);
+    document.querySelector("#rentPayForm").addEventListener("submit", e => { e.preventDefault(); saveRentPayForm(); });
+    document.querySelector("#closeDeviceListForm").addEventListener("click", closeDeviceListForm);
+    document.querySelector("#cancelDeviceListForm").addEventListener("click", closeDeviceListForm);
+    document.querySelector("#deviceListMask").addEventListener("click", closeDeviceListForm);
+    document.querySelector("#saveDeviceListForm").addEventListener("click", saveDeviceListForm);
+    document.querySelector("#deviceListForm").addEventListener("submit", e => { e.preventDefault(); saveDeviceListForm(); });
+    document.querySelector("#closeDeviceReplaceForm").addEventListener("click", closeDeviceReplaceForm);
+    document.querySelector("#cancelDeviceReplaceForm").addEventListener("click", closeDeviceReplaceForm);
+    document.querySelector("#deviceReplaceMask").addEventListener("click", closeDeviceReplaceForm);
+    document.querySelector("#saveDeviceReplaceForm").addEventListener("click", saveDeviceReplaceForm);
+    document.querySelector("#deviceReplaceForm").addEventListener("submit", e => { e.preventDefault(); saveDeviceReplaceForm(); });
 
     render();
-
-    (function () {
-      var link = document.getElementById("navDocsLink");
-      if (link && !/\/prototype(\/|$)/.test(location.pathname)) {
-        link.href = "documentation/index.html";
-      }
-    })();
   </script>
 </body>
 </html>
