@@ -51,9 +51,29 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! -f "$SRC" ]]; then
-  echo "错误: 找不到 $SRC" >&2
+if [[ ! -f "$SRC" ]] || [[ ! -s "$SRC" ]]; then
+  echo "错误: prototype/index.html 缺失或为空" >&2
   exit 1
+fi
+
+if [[ ! -f "$DOC_VIEWER_SRC" ]] || [[ ! -s "$DOC_VIEWER_SRC" ]]; then
+  echo "错误: prototype/docs/index.html 缺失或为空，文档页无法使用" >&2
+  exit 1
+fi
+
+# 空 docs/*.md 从 documentation/md 备份恢复
+DOC_BACKUP="$ROOT/docs/documentation/md"
+if [[ -d "$DOC_BACKUP" ]]; then
+  for md in "$ROOT/docs"/*.md; do
+    [[ -f "$md" ]] || continue
+    base="$(basename "$md")"
+    if [[ ! -s "$md" ]] || [[ $(wc -c < "$md") -lt 50 ]]; then
+      if [[ -f "$DOC_BACKUP/$base" ]] && [[ $(wc -c < "$DOC_BACKUP/$base") -gt 50 ]]; then
+        cp "$DOC_BACKUP/$base" "$md"
+        echo "已修复空文档: docs/$base"
+      fi
+    fi
+  done
 fi
 
 # 真源 docs/*.md → prototype/docs/md（先于 Pages 镜像）
@@ -61,8 +81,14 @@ DOC_SRC_DIR="$ROOT/docs"
 DOC_DST_DIR="$ROOT/prototype/docs/md"
 if [[ -d "$DOC_SRC_DIR" ]]; then
   mkdir -p "$DOC_DST_DIR"
-  cp "$DOC_SRC_DIR"/*.md "$DOC_DST_DIR/" 2>/dev/null || true
-  echo "已同步: docs/*.md → prototype/docs/md"
+  n=0
+  for md in "$DOC_SRC_DIR"/*.md; do
+    [[ -f "$md" ]] || continue
+    [[ $(wc -c < "$md") -gt 50 ]] || continue
+    cp "$md" "$DOC_DST_DIR/"
+    n=$((n + 1))
+  done
+  echo "已同步: docs/*.md → prototype/docs/md（${n} 个文件）"
 fi
 
 mkdir -p "$(dirname "$DST")"
@@ -78,6 +104,11 @@ if [[ -f "$DOC_VIEWER_SRC" ]]; then
     cp -R "$ROOT/prototype/docs/md" "$ROOT/docs/documentation/md"
     echo "已同步: prototype/docs/md → docs/documentation/md"
   fi
+  if [[ -d "$ROOT/prototype/docs/vendor" ]]; then
+    rm -rf "$ROOT/docs/documentation/vendor"
+    cp -R "$ROOT/prototype/docs/vendor" "$ROOT/docs/documentation/vendor"
+    echo "已同步: prototype/docs/vendor → docs/documentation/vendor"
+  fi
 fi
 
 if [[ -d "$MOBILE_SRC" ]]; then
@@ -89,6 +120,7 @@ fi
 if ! $do_commit; then
   echo "下一步: git add docs/ prototype/ && git commit && git push"
   echo "线上预览: $PAGES_URL"
+  echo "是否同步至在线版本？可执行: $(basename "$0") -c -p -m \"说明本次改动\""
   exit 0
 fi
 

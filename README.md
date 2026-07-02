@@ -17,14 +17,19 @@
 | [docs/骑手端PRD.md](docs/骑手端PRD.md) | 骑手小程序 PRD |
 | [docs/user-stories.md](docs/user-stories.md) | 用户故事 |
 | [docs/acceptance-criteria.md](docs/acceptance-criteria.md) | 原型验收标准 |
+| [docs/竞品功能清单.md](docs/竞品功能清单.md) | IOT Platform 竞品菜单与差异对照 |
+| [docs/竞品借鉴决策记录.md](docs/竞品借鉴决策记录.md) | 竞品借鉴五项拍板 |
+| [docs/任务-订单变更审计.md](docs/任务-订单变更审计.md) | 变更记录 · 已拍板 Mock 已上线 |
 
 ## 演示
 
-| 端 | 路径 | 说明 |
-|----|------|------|
-| **运营商后台** | `prototype/index.html` | 运营商 / 渠道商 / 资金方 |
-| **骑手端（移动）** | `prototype/mobile/index.html` | 参考鲸浪出行布局；三 Tab + 扫码换电 |
-| **产品文档** | `prototype/docs/index.html` | 全部 PRD / 业务规则 / 验收标准 |
+| 端 | 本地（须先 `python3 main.py`） | 在线（GitHub Pages） |
+|----|-------------------------------|----------------------|
+| **运营商后台** | http://127.0.0.1:8766/prototype/index.html | https://lihuoxiu555.github.io/rider-swap-operator-prototype/ |
+| **骑手端** | http://127.0.0.1:8766/prototype/mobile/index.html | https://lihuoxiu555.github.io/rider-swap-operator-prototype/mobile/index.html |
+| **产品文档** | http://127.0.0.1:8766/prototype/docs/index.html | https://lihuoxiu555.github.io/rider-swap-operator-prototype/documentation/ |
+
+> **注意**：本地根目录有 `prototype/` 前缀；GitHub Pages 发布的是 `docs/` 目录，**线上没有** `/prototype/` 路径（勿访问 `…/prototype/index.html`，会 404）。
 
 - **端口**：`8766`（`python3 main.py`）
 - **登录身份**（侧栏下拉）：经营主体（运营商 / 渠道商 / 资金方）/ **员工登录** / **合作伙伴登录**
@@ -37,7 +42,16 @@ cd 原型/外卖
 python3 main.py
 ```
 
-访问：http://127.0.0.1:8766/prototype/index.html（根路径 `/` 自动跳转）
+**须先启动服务**（`main.py` 会持续运行，关闭终端或 Ctrl+C 会停止服务）。
+
+| 环境 | 正确地址 | 错误示例 |
+|------|----------|----------|
+| **本地** | http://127.0.0.1:8766/prototype/index.html | 未执行 `python3 main.py` 会无法连接 |
+| **本地** | http://127.0.0.1:8766/ | 根路径自动跳转 |
+| **在线** | https://lihuoxiu555.github.io/rider-swap-operator-prototype/ | `/prototype/index.html` 会 404（已加重定向） |
+
+骑手端本地：http://127.0.0.1:8766/prototype/mobile/index.html  
+骑手端在线：https://lihuoxiu555.github.io/rider-swap-operator-prototype/mobile/index.html
 
 ## 在线预览（团队直接点链接）
 

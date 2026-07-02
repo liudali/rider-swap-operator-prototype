@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>数据面板 · 原型</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-soft: #f1f5f9;
+      --ink: #17212b;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --brand: #0d9488;
+      --brand-dark: #0f766e;
+      --brand-soft: #ecfdf5;
+      --green: #168a5b;
+      --yellow: #c78318;
+      --red: #c84545;
+      --shadow: 0 8px 28px rgba(22, 33, 43, .06);
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 20px 14px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .brand {
+      padding: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, .1);
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+
+    .brand span {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .nav { display: grid; gap: 4px; }
+
+    .nav button {
+      height: 40px;
+      border: 0;
+      border-radius: var(--radius);
+      background: transparent;
+      color: #cbd5e1;
+      text-align: left;
+      padding: 0 12px;
+    }
+
+    .nav button.active {
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .sidebar-foot {
+      margin-top: auto;
+      padding: 12px;
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, .06);
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+
+    .app.embed {
+      grid-template-columns: 1fr;
+    }
+
+    .app.embed .sidebar {
+      display: none;
+    }
+
+    .app.embed .main {
+      padding: 0;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .app.embed .topbar {
+      margin: 0;
+      padding: 10px 20px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .app.embed .topbar h1 { display: none; }
+
+    .app.embed .view.active {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 16px 20px 20px;
+    }
+
+    .app.embed .chart-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      margin: 0;
+      border-radius: 14px;
+    }
+
+    .app.embed .chart-surface { min-height: 340px; flex: 1; }
+
+    .main {
+      min-width: 0;
+      padding: 18px 22px 34px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filters select,
+    .filters button {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 0 12px;
+    }
+
+    .filters button.primary {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(13, 148, 136, .25);
+    }
+
+    .filters button.primary:hover { background: var(--brand-dark); }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 16px;
+    }
+
+    .chart-panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .chart-panel-head h2 { margin: 0 0 4px; font-size: 16px; }
+
+    .chart-sub { margin: 0; font-size: 12px; color: var(--muted); }
+
+    .chart-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .chart-stat {
+      flex: 1;
+      min-width: 100px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      border: 1px solid var(--line);
+    }
+
+    .chart-stat label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .chart-stat strong { font-size: 18px; color: var(--brand-dark); }
+
+    .chart-surface {
+      position: relative;
+      width: 100%;
+      min-height: 220px;
+      padding: 8px 4px 0;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
+      border: 1px solid #eef2f6;
+    }
+
+    .chart-surface svg { display: block; width: 100%; height: 100%; min-height: inherit; }
+
+    .chart-surface .axis { fill: #94a3b8; font-size: 10px; font-family: inherit; }
+
+    .chart-surface .grid { stroke: #e2e8f0; stroke-width: 1; stroke-dasharray: 4 5; }
+
+    .panel h2 {
+      margin: 0 0 14px;
+      font-size: 16px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi {
+      background: var(--surface-soft);
+      border-radius: var(--radius);
+      padding: 14px;
+      border: 1px solid var(--line);
+    }
+
+    .kpi label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .kpi strong {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .kpi small {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--green);
+    }
+
+    .kpi small.down { color: var(--red); }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar input {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 0 12px;
+      min-width: 200px;
+    }
+
+    .toolbar button {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 0 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 8px;
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      background: var(--surface-soft);
+    }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: var(--brand-soft);
+      color: var(--brand-dark);
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: #0f172a;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>数据面板</strong>
+        <span>运营数据可视化原型</span>
+      </div>
+      <nav class="nav" id="nav">
+        <button type="button" class="active" data-view="overview">总览</button>
+        <button type="button" data-view="trends">趋势分析</button>
+        <button type="button" data-view="details">明细数据</button>
+      </nav>
+      <div class="sidebar-foot">
+        原型阶段使用 Mock 数据。<br>
+        时间范围变更后各视图联动刷新。
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <h1 id="pageTitle">总览</h1>
+        <div class="filters">
+          <select id="rangeSelect" aria-label="时间范围">
+            <option value="7">近 7 日</option>
+            <option value="30">近 30 日</option>
+            <option value="month">本月</option>
+          </select>
+          <button type="button" class="primary" id="refreshBtn">刷新数据</button>
+        </div>
+      </div>
+
+      <section class="view active" id="view-overview">
+        <div class="kpi-grid" id="kpiGrid"></div>
+        <div class="panel" style="margin-top:16px">
+          <h2>近 7 日趋势</h2>
+          <div class="chart-surface" id="miniChart" style="min-height:160px"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-trends">
+        <div class="panel chart-panel">
+          <div class="chart-panel-head">
+            <div>
+              <h2 id="trendTitle">指标趋势</h2>
+              <p class="chart-sub" id="trendSub">活跃量走势</p>
+            </div>
+            <div class="toolbar" style="margin:0">
+              <select id="granularity">
+                <option value="day">按日</option>
+                <option value="week">按周</option>
+                <option value="month">按月</option>
+              </select>
+            </div>
+          </div>
+          <div class="chart-stats" id="trendStats"></div>
+          <div class="chart-surface" id="trendChart"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-details">
+        <div class="panel">
+          <div class="toolbar">
+            <input type="search" id="searchInput" placeholder="搜索站点、类型…">
+            <button type="button" id="exportBtn">导出 CSV</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>站点</th>
+                <th>类型</th>
+                <th>数量</th>
+                <th>收入（元）</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="detailBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const state = {
+      range: "7",
+      view: "overview",
+      granularity: "day",
+      search: ""
+    };
+
+    const titles = {
+      overview: "总览",
+      trends: "趋势分析",
+      details: "明细数据"
+    };
+
+    function seed(n) {
+      return Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1;
+    }
+
+    function getRangeDays() {
+      if (state.range === "month") return new Date().getDate();
+      return Number(state.range);
+    }
+
+    function buildSeries(days, base) {
+      return Array.from({ length: days }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (days - 1 - i));
+        const label = `${d.getMonth() + 1}/${d.getDate()}`;
+        const value = Math.round(base * (0.7 + seed(i + base) * 0.6));
+        return { label, value };
+      });
+    }
+
+    function buildKpis() {
+      const days = getRangeDays();
+      const factor = state.range === "7" ? 1 : state.range === "30" ? 3.8 : 2.2;
+      const total = Math.round(1200 * factor + seed(days) * 200);
+      const active = Math.round(total * (0.55 + seed(days + 1) * 0.15));
+      const swaps = Math.round(total * 0.85);
+      const pkgOrders = Math.round(total * 0.12);
+      const revenue = Math.round(active * (18 + seed(days + 2) * 12));
+      return [
+        { label: "换电次数", value: swaps.toLocaleString(), delta: "+5.1%" },
+        { label: "活跃骑手", value: active.toLocaleString(), delta: "+2.8%" },
+        { label: "套餐订单", value: pkgOrders.toLocaleString(), delta: "+1.2%" },
+        { label: "确认收入", value: "¥" + revenue.toLocaleString(), delta: "+6.1%" }
+      ];
+    }
+
+    function renderKpis() {
+      const grid = document.getElementById("kpiGrid");
+      grid.innerHTML = buildKpis().map(k => `
+        <div class="kpi">
+          <label>${k.label}</label>
+          <strong>${k.value}</strong>
+          <small class="${k.down ? "down" : ""}">${k.delta} 较上期</small>
+        </div>
+      `).join("");
+    }
+
+    function smoothPath(points) {
+      if (!points.length) return "";
+      if (points.length === 1) return `M${points[0].x},${points[0].y}`;
+      let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i], p1 = points[i + 1];
+        const mx = (p0.x + p1.x) / 2;
+        d += ` C${mx.toFixed(1)},${p0.y.toFixed(1)} ${mx.toFixed(1)},${p1.y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`;
+      }
+      return d;
+    }
+
+    function renderSvgChart(containerId, series, opts) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      opts = opts || {};
+      const color = opts.color || "#0d9488";
+      const H = opts.height || (document.documentElement.classList.contains("embed") ? 360 : 240);
+      const W = 920;
+      const pl = 48, pr = 16, pt = 20, pb = 32;
+      const values = series.map(s => s.value);
+      const pad = Math.max(1, Math.round((Math.max(...values) - Math.min(...values)) * 0.1));
+      const max = Math.max(...values) + pad;
+      const min = Math.max(0, Math.min(...values) - pad);
+      const span = max - min || 1;
+      const iw = W - pl - pr, ih = H - pt - pb;
+      const uid = "cg" + Math.random().toString(36).slice(2, 9);
+      const coords = series.map((s, i) => {
+        const x = pl + (series.length <= 1 ? iw / 2 : (i / (series.length - 1)) * iw);
+        const y = pt + ih - ((s.value - min) / span) * ih;
+        return { x, y, v: s.value, label: s.label };
+      });
+      const linePath = smoothPath(coords);
+      const baseY = (pt + ih).toFixed(1);
+      const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(1)},${baseY} L${coords[0].x.toFixed(1)},${baseY} Z`;
+      const gridY = [0, 0.25, 0.5, 0.75, 1].map(t => {
+        const val = Math.round(min + span * (1 - t));
+        const y = pt + ih * t;
+        return `<line class="grid" x1="${pl}" y1="${y}" x2="${W - pr}" y2="${y}"/>
+          <text class="axis" x="${pl - 8}" y="${y + 3.5}" text-anchor="end">${val}</text>`;
+      }).join("");
+      const labelStep = series.length > 20 ? Math.ceil(series.length / 10) : series.length > 12 ? 2 : 1;
+      const last = coords.length - 1;
+      el.style.minHeight = H + "px";
+      el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <defs>
+          <linearGradient id="${uid}-a" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${color}" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="${uid}-l" x1="${pl}" y1="0" x2="${W - pr}" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="${color}" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="${color}"/>
+          </linearGradient>
+        </defs>
+        ${gridY}
+        <path d="${areaPath}" fill="url(#${uid}-a)"/>
+        <path d="${linePath}" fill="none" stroke="url(#${uid}-l)" stroke-width="2.5" stroke-linecap="round"/>
+        ${coords.map((p, i) => (i % labelStep === 0 || i === last)
+          ? `<text class="axis" x="${p.x}" y="${H - 8}" text-anchor="middle" font-weight="${i === last ? "600" : "400"}" fill="${i === last ? color : "#94a3b8"}">${p.label}</text>`
+          : "").join("")}
+        ${coords.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="${i === last ? 4.5 : 3}" fill="#fff" stroke="${color}" stroke-width="${i === last ? 2.5 : 1.5}" opacity="${i === last || series.length <= 12 ? 1 : 0}"><title>${p.label}：${p.v}</title></circle>`).join("")}
+      </svg>`;
+    }
+
+    function renderChartStats(containerId, series) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      const vals = series.map(s => s.value);
+      const sum = vals.reduce((a, b) => a + b, 0);
+      const avg = Math.round(sum / vals.length);
+      el.innerHTML = [
+        { label: "合计", value: sum.toLocaleString() },
+        { label: "日均", value: avg.toLocaleString() },
+        { label: "最高", value: Math.max(...vals).toLocaleString() },
+        { label: "最低", value: Math.min(...vals).toLocaleString() }
+      ].map(s => `<div class="chart-stat"><label>${s.label}</label><strong>${s.value}</strong></div>`).join("");
+    }
+
+    function renderBars(containerId, series, maxHeight) {
+      renderSvgChart(containerId, series, { height: maxHeight || 180, color: "#0d9488" });
+    }
+
+    function renderTrends() {
+      const days = state.granularity === "month" ? 6 : state.granularity === "week" ? 8 : getRangeDays();
+      const base = state.granularity === "month" ? 800 : 120;
+      const series = buildSeries(days, base);
+      const prefix = { day: "按日", week: "按周", month: "按月" }[state.granularity];
+      const rangeLabel = { 7: "近 7 日", 30: "近 30 日", month: "本月" }[state.range] || "";
+      document.getElementById("trendTitle").textContent = `${prefix} · 活跃量趋势`;
+      const sub = document.getElementById("trendSub");
+      if (sub) sub.textContent = `${rangeLabel} · 换电与活跃骑手汇总（Mock）`;
+      renderChartStats("trendStats", series);
+      const chartH = document.querySelector(".app.embed") ? 380 : 260;
+      renderSvgChart("trendChart", series, { height: chartH, color: "#0d9488" });
+    }
+
+    function buildDetails() {
+      const sites = ["浦东骑手驿站", "世博换电服务点", "陆家嘴分站", "张江筹备站"];
+      const rows = [];
+      for (let i = 0; i < 24; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - (i % getRangeDays()));
+        rows.push({
+          date: d.toISOString().slice(0, 10),
+          name: sites[i % sites.length],
+          region: i % 3 === 0 ? "换电" : "套餐",
+          qty: Math.round(20 + seed(i) * 80),
+          revenue: Math.round(500 + seed(i + 3) * 4500),
+          status: i % 5 === 0 ? "异常" : "正常"
+        });
+      }
+      return rows;
+    }
+
+    function renderDetails() {
+      const q = state.search.trim().toLowerCase();
+      const rows = buildDetails().filter(r =>
+        !q || r.name.toLowerCase().includes(q) || r.region.toLowerCase().includes(q)
+      );
+      document.getElementById("detailBody").innerHTML = rows.map(r => `
+        <tr>
+          <td>${r.date}</td>
+          <td>${r.name}</td>
+          <td>${r.region}</td>
+          <td>${r.qty}</td>
+          <td>${r.revenue.toLocaleString()}</td>
+          <td><span class="tag">${r.status}</span></td>
+        </tr>
+      `).join("");
+      return rows;
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 2200);
+    }
+
+    function refreshAll() {
+      renderKpis();
+      renderBars("miniChart", buildSeries(7, 100), 120);
+      renderTrends();
+      renderDetails();
+    }
+
+    function switchView(view) {
+      state.view = view;
+      document.querySelectorAll(".nav button").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.view === view);
+      });
+      document.querySelectorAll(".view").forEach(el => {
+        el.classList.toggle("active", el.id === `view-${view}`);
+      });
+      document.getElementById("pageTitle").textContent = titles[view];
+    }
+
+    document.getElementById("nav").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-view]");
+      if (btn) switchView(btn.dataset.view);
+    });
+
+    document.getElementById("rangeSelect").addEventListener("change", (e) => {
+      state.range = e.target.value;
+      refreshAll();
+    });
+
+    document.getElementById("granularity").addEventListener("change", (e) => {
+      state.granularity = e.target.value;
+      renderTrends();
+    });
+
+    document.getElementById("searchInput").addEventListener("input", (e) => {
+      state.search = e.target.value;
+      renderDetails();
+    });
+
+    document.getElementById("exportBtn").addEventListener("click", () => {
+      const rows = renderDetails();
+      const header = ["日期", "名称", "区域", "数量", "收入", "状态"];
+      const csv = [header.join(",")].concat(rows.map(r =>
+        [r.date, r.name, r.region, r.qty, r.revenue, r.status].join(",")
+      )).join("\n");
+      const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "明细数据.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast("已导出 CSV");
+    });
+
+    document.getElementById("refreshBtn").addEventListener("click", () => {
+      refreshAll();
+      showToast("数据已刷新");
+    });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromRole = urlParams.get("role");
+    const fromView = urlParams.get("view");
+    const isEmbed = urlParams.get("embed") === "1";
+    const roleLabels = { platform: "平台管理员", operator: "运营商", channel: "渠道商" };
+    if (isEmbed) {
+      document.querySelector(".app").classList.add("embed");
+      document.documentElement.classList.add("embed");
+    } else if (fromRole && roleLabels[fromRole]) {
+      document.querySelector(".brand span").textContent = "骑手换电 · " + roleLabels[fromRole] + "（来自外卖后台）";
+    }
+    if (fromView && titles[fromView]) switchView(fromView);
+
+    refreshAll();
+  </script>
+</body>
+</html>

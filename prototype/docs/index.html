@@ -70,6 +70,11 @@
       font-size: 12px; color: #c84545; padding: 10px 12px; background: #fff5f5;
       border-radius: 6px; margin-top: 8px;
     }
+    .md .anchor-flash { animation: anchorFlash 1.2s ease; border-radius: 4px; }
+    @keyframes anchorFlash {
+      0%, 100% { background: transparent; }
+      30% { background: #ecfdf5; box-shadow: inset 3px 0 0 #0d9488; }
+    }
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
       .sidebar { position: relative; height: auto; }
@@ -98,18 +103,23 @@
     </main>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/mermaid.min.js"></script>
   <script>
     const DOC_GROUPS = [
       {
         title: "产品需求",
         items: [
+          { file: "待考虑内容.md", label: "待考虑内容" },
           { file: "PRD.md", label: "后台 PRD" },
+          { file: "站点经营分析-Mock字段清单.md", label: "站点经营分析 · Mock 字段" },
           { file: "骑手端PRD.md", label: "骑手端 PRD" },
           { file: "user-stories.md", label: "用户故事" },
           { file: "acceptance-criteria.md", label: "验收标准" },
-          { file: "设计评审报告.md", label: "设计评审报告" }
+          { file: "设计评审报告.md", label: "设计评审报告" },
+          { file: "2026-06-16会议对齐决议.md", label: "会议对齐决议" },
+          { file: "需求评审决策记录.md", label: "需求评审决策记录" },
+          { file: "税筹与分账结构参考方案.md", label: "税筹参考方案" }
         ]
       },
       {
@@ -117,24 +127,37 @@
         items: [
           { file: "换电场景与运营商结算.md", label: "换电场景与运营商结算" },
           { file: "合作模式与分账.md", label: "合作模式与分账" },
-          { file: "合伙人站点分佣.md", label: "合伙人站点分佣" },
           { file: "换电范围策略.md", label: "换电范围策略" },
           { file: "天数池.md", label: "人天额度池" },
-          { file: "权益准入API.md", label: "权益准入 API" },
+          { file: "渠道结算模式规则.md", label: "渠道结算模式规则" },
+          { file: "渠道信用评估方案.md", label: "渠道信用评估方案" },
+          { file: "渠道骑手可换电校验.md", label: "渠道骑手可换电校验" },
           { file: "额度池PRD差异清单.md", label: "额度池 PRD 差异清单" },
           { file: "个人套餐定价与退款.md", label: "个人套餐定价与退款" }
+        ]
+      },
+      {
+        title: "竞品与任务",
+        items: [
+          { file: "站点合伙人-待定.md", label: "站点合伙人 · 待定" },
+          { file: "合伙人站点分佣.md", label: "合伙人站点分佣（归档）" },
+          { file: "竞品功能清单.md", label: "竞品功能清单" },
+          { file: "竞品借鉴决策记录.md", label: "竞品借鉴决策" },
+          { file: "竞品借鉴-待评审拍板.md", label: "竞品借鉴 · 拍板决议" },
+          { file: "任务-订单变更审计.md", label: "任务 · 订单变更审计" },
+          { file: "任务-设备告警与ICCID.md", label: "任务 · 设备告警与 ICCID" }
         ]
       },
       {
         title: "结构与清单",
         items: [
           { file: "功能结构与业务流程.md", label: "功能结构与业务流程" },
-          { file: "角色与功能清单.md", label: "角色与功能清单" }
+          { file: "角色与功能清单.md", label: "角色与功能清单" },
+          { file: "业务整体预览图.md", label: "业务整体预览图" }
         ]
       }
     ];
 
-    /** 与文档浏览器同目录下的 md/ 文件夹，不依赖服务根路径 */
     function docFileUrl(file) {
       const parts = file.split("/").map(encodeURIComponent);
       return new URL("md/" + parts.join("/"), location.href).href;
@@ -142,6 +165,87 @@
 
     function allDocs() {
       return DOC_GROUPS.flatMap(g => g.items);
+    }
+
+    let currentDocFile = "";
+
+    function slugifyHeading(text) {
+      return text.trim()
+        .replace(/\./g, "")
+        .replace(/\s*·\s*/g, "--")
+        .replace(/[（(][^）)]*[）)]/g, m => m.replace(/[（()）]/g, ""))
+        .replace(/[：:、「」【】]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase();
+    }
+
+    function addHeadingIds(root) {
+      root.querySelectorAll("h1,h2,h3,h4,h5").forEach(h => {
+        if (!h.id) h.id = slugifyHeading(h.textContent);
+      });
+    }
+
+    function scrollToAnchor(root, anchor) {
+      if (!anchor) return;
+      const id = decodeURIComponent(anchor);
+      let el = document.getElementById(id);
+      if (!el) {
+        el = Array.from(root.querySelectorAll("h1,h2,h3,h4,h5")).find(h =>
+          slugifyHeading(h.textContent) === id
+        );
+      }
+      if (el) {
+        requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" }));
+        el.classList.add("anchor-flash");
+        setTimeout(() => el.classList.remove("anchor-flash"), 1500);
+      }
+    }
+
+    function parseLocationHash() {
+      const raw = decodeURIComponent(location.hash.slice(1) || "");
+      if (!raw) return { file: "PRD.md", anchor: "" };
+      const match = raw.match(/^(.+?\.md)(?:#(.*))?$/);
+      if (match) return { file: match[1], anchor: match[2] || "" };
+      return { file: raw.endsWith(".md") ? raw : "PRD.md", anchor: "" };
+    }
+
+    function resolveDocLink(href, baseFile) {
+      if (!href) return null;
+      if (/^https?:\/\//i.test(href) || href.startsWith("mailto:")) return null;
+      if (href.startsWith("file://") || href.startsWith("/Users/")) return { broken: true };
+
+      let pathPart = href;
+      let anchor = "";
+      if (href.startsWith("#")) {
+        anchor = decodeURIComponent(href.slice(1));
+        return anchor ? { file: baseFile, anchor } : null;
+      }
+      const hashIdx = href.indexOf("#");
+      if (hashIdx >= 0) {
+        anchor = decodeURIComponent(href.slice(hashIdx + 1));
+        pathPart = href.slice(0, hashIdx);
+      }
+      if (pathPart.startsWith("./")) pathPart = pathPart.slice(2);
+      if (!pathPart) return { file: baseFile, anchor };
+
+      if (!pathPart.endsWith(".md")) return null;
+
+      const baseDir = baseFile.includes("/") ? baseFile.replace(/[^/]+$/, "") : "";
+      const stack = [];
+      for (const seg of (baseDir + pathPart).split("/")) {
+        if (!seg || seg === ".") continue;
+        if (seg === "..") stack.pop();
+        else stack.push(seg);
+      }
+      return { file: stack.join("/"), anchor };
+    }
+
+    function setDocHash(file, anchor, push) {
+      const h = anchor ? `${file}#${anchor}` : file;
+      if (push) location.hash = h;
+      else history.replaceState(null, "", "#" + h);
     }
 
     function prepareMermaidBlocks(root) {
@@ -210,43 +314,81 @@
       });
     }
 
-    async function loadDoc(file, pushHash) {
+    async function loadDoc(file, pushHash, anchor) {
       const content = document.getElementById("content");
       const status = document.getElementById("loadStatus");
+      currentDocFile = file;
       const label = allDocs().find(d => d.file === file)?.label || file;
       document.getElementById("currentFile").textContent = label;
       content.className = "md loading";
       content.textContent = "加载中…";
       status.textContent = "";
       renderNav(file);
-      if (pushHash) location.hash = file;
+      if (pushHash) setDocHash(file, anchor || "", true);
+      else if (anchor) setDocHash(file, anchor, false);
+
+      if (location.protocol === "file:") {
+        content.className = "md error";
+        content.innerHTML = `<p><strong>无法通过本地文件路径打开文档。</strong></p>
+          <p>请在项目目录执行 <code>python3 main.py</code>，然后访问：</p>
+          <ul>
+            <li><a href="http://127.0.0.1:8766/prototype/docs/index.html">http://127.0.0.1:8766/prototype/docs/index.html</a>（推荐）</li>
+          </ul>`;
+        return;
+      }
+      if (typeof marked === "undefined") {
+        content.className = "md error";
+        content.innerHTML = `<p>Markdown 渲染库未加载，请确认 <code>vendor/marked.min.js</code> 存在，并通过 <code>python3 main.py</code> 访问。</p>`;
+        return;
+      }
 
       try {
         const url = docFileUrl(file);
         const res = await fetch(url);
         if (!res.ok) throw new Error("HTTP " + res.status + " · " + url);
         const md = await res.text();
+        if (!md.trim()) throw new Error("文档为空，请执行 ./scripts/sync-pages.sh 或重启 python3 main.py");
         if (md.trim().startsWith("<!") || md.includes("<html")) {
-          throw new Error("返回了 HTML 而非 Markdown，请打开 /prototype/docs/index.html");
+          throw new Error("返回了 HTML 而非 Markdown，请通过 http://127.0.0.1:8766/prototype/docs/index.html 打开");
         }
         content.className = "md";
         content.innerHTML = marked.parse(md, { gfm: true, breaks: false });
+        addHeadingIds(content);
         prepareMermaidBlocks(content);
         await renderMermaidDiagrams(content);
+        scrollToAnchor(content, anchor);
         status.textContent = file;
       } catch (e) {
         content.className = "md error";
         content.innerHTML = `<p>无法加载 <code>${file}</code>（${e.message}）。</p>
-          <p>请打开 <a href="index.html">/prototype/docs/index.html</a>，并执行 <code>python3 main.py</code> 重启服务。</p>`;
+          <ol>
+            <li>已执行 <code>cd 原型/外卖 && python3 main.py</code></li>
+            <li>访问 <a href="http://127.0.0.1:8766/prototype/docs/index.html">/prototype/docs/index.html</a>（勿直接双击 html）</li>
+            <li>若文档为空，执行 <code>./scripts/sync-pages.sh</code></li>
+          </ol>`;
       }
     }
 
-    const initial = location.hash.replace("#", "") || "PRD.md";
-    const valid = allDocs().some(d => d.file === initial) ? initial : "PRD.md";
-    loadDoc(valid, false);
+    const contentEl = document.getElementById("content");
+    contentEl.addEventListener("click", e => {
+      const a = e.target.closest("a");
+      if (!a || !contentEl.contains(a)) return;
+      const resolved = resolveDocLink(a.getAttribute("href"), currentDocFile);
+      if (!resolved) return;
+      if (resolved.broken) {
+        e.preventDefault();
+        alert("该链接指向本地/仓库外文件，请查阅仓库内对应 PRD 与差异清单。");
+        return;
+      }
+      e.preventDefault();
+      loadDoc(resolved.file, true, resolved.anchor);
+    });
+
+    const { file: initialFile, anchor: initialAnchor } = parseLocationHash();
+    loadDoc(initialFile.endsWith(".md") ? initialFile : "PRD.md", false, initialAnchor);
     window.addEventListener("hashchange", () => {
-      const f = location.hash.replace("#", "");
-      if (f && allDocs().some(d => d.file === f)) loadDoc(f, false);
+      const { file, anchor } = parseLocationHash();
+      if (file && file.endsWith(".md")) loadDoc(file, false, anchor);
     });
   </script>
 </body>

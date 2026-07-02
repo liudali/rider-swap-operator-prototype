@@ -116,12 +116,15 @@
       border-radius: 50%; transform: translateX(-50%);
       box-shadow: 0 0 0 4px rgba(47,107,255,.25);
     }
+    .map-pin.dedicated::before { background: #1677ff; box-shadow: 0 0 0 4px rgba(22,119,255,.25); }
+    .map-legend { position: absolute; left: 10px; bottom: 72px; font-size: 10px; color: var(--muted); background: rgba(255,255,255,.92); padding: 6px 8px; border-radius: 6px; max-width: 148px; line-height: 1.5; }
     .map-pin::after {
       content: ""; position: absolute; left: 50%; top: 0;
       width: 22px; height: 22px; background: var(--danger);
       border-radius: 50% 50% 50% 0; transform: translateX(-50%) rotate(-45deg);
       border: 2px solid #fff;
     }
+    .map-pin.dedicated::after { background: #1677ff; }
     .map-provider {
       position: absolute; right: 8px; bottom: 100px;
       font-size: 10px; color: var(--muted); background: rgba(255,255,255,.8);
@@ -319,6 +322,14 @@
     .form-row input {
       width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px;
     }
+    .channel-attr-banner {
+      background: linear-gradient(90deg, #fff7e6, #fff);
+      border: 1px solid #ffd666; border-radius: 10px; padding: 10px 12px;
+      font-size: 12px; line-height: 1.6; color: #7a6520; margin-bottom: 12px;
+    }
+    .pkg-card .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .pkg-card .price-official { font-size: 13px; color: var(--muted); text-decoration: line-through; }
+    .pkg-card .price-tag { font-size: 10px; background: #fff1f0; color: #cf1322; padding: 2px 6px; border-radius: 4px; }
     @media (max-width: 720px) {
       .demo-panel { width: 100%; order: 2; }
       .phone-wrap { width: 100%; max-width: var(--phone-w); height: 100vh; max-height: none; border-radius: 0; }
@@ -339,19 +350,28 @@
         <option value="channel">渠道人天 · 孙骑手 U2110（分配即开通·已预占）</option>
         <option value="channel_fail">渠道预占失败 · 赵骑手 U2103（自费兜底）</option>
         <option value="channel_cross3">渠道跨网·案例3 · 王骑手 U2088</option>
+        <option value="lease_whitelist">设备租赁白名单 · 张配送 U4001</option>
+        <option value="lease_suspended">渠道停服·持电池 · 张配送 U4001</option>
+        <option value="lease_suspended_nobat">渠道停服·未持电池 · 王夜配 U4003</option>
+        <option value="lease_blocked">非白名单拦截 · 路人 U9999</option>
+        <option value="card_link_guest">骑士卡链接 · 未登录（刚扫码进入）</option>
+        <option value="card_link_kyc">骑士卡链接 · 已登录未实名（24h 归因中）</option>
+        <option value="card_link_attr">骑士卡链接 · 已实名（24h 渠道专享价）</option>
         <option value="none">已登录 · 未开通服务</option>
         <option value="frozen">个人套餐 · 已冻结</option>
+        <option value="pending_pickup">个人套餐 · 解冻待领电池</option>
       </select>
       <label>扫码站点</label>
       <select id="demoSite">
-        <option value="ST-SH-01">浦东骑手驿站（主绑定站·本站）</option>
-        <option value="ST-SH-02">世博换电服务点（同运营商跨站）</option>
-        <option value="ST-SH-04">陆家嘴分站（跨运营商）</option>
+        <option value="ST-SH-01">浦东骑手驿站（OP-SX）</option>
+        <option value="ST-SH-02">世博换电服务点（OP-SX）</option>
+        <option value="ST-SH-04">陆家嘴分站（跨运营商 · OP-LJZ）</option>
+        <option value="ST-SH-JD">京东物流专属站（设备租赁·OP-SX）</option>
         <option value="ST-BJ-01">滨江换电站（案例3·U/C/B三方·跨网¥0.6）</option>
       </select>
       <label style="margin-top:10px">OP-SX 换电范围（演示开关）</label>
       <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="policyCrossNet" checked /> 允许跨网换电</label>
-      <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="policyCrossSite" checked /> 允许跨站点换电</label>
+      <p style="font-size:11px;color:var(--muted);margin:8px 0 0">设备租赁专属站仅对白名单用户在地图展示（切换身份后看重绘）。</p>
       <button type="button" class="primary" id="applyDemo">应用并重绘</button>
       <p style="margin-top:14px"><a href="../index.html">← 返回运营商后台原型</a></p>
       <p style="margin-top:6px"><a id="navDocsLink" href="../docs/index.html">📄 产品文档（全部）</a></p>
@@ -373,11 +393,13 @@
         <div class="map-area" id="mapArea">
           <span class="map-label" style="left:18%;top:22%">博奥路</span>
           <span class="map-label" style="left:55%;top:38%">机场公路</span>
-          <span class="map-label" style="left:30%;top:55%">闪送驿站</span>
+          <span class="map-label" style="left:30%;top:55%">绿色出行</span>
           <div class="map-pin" style="left:42%;top:48%" data-site="ST-SH-01" title="浦东骑手驿站"></div>
           <div class="map-pin" style="left:52%;top:62%" data-site="ST-SH-02" title="世博换电服务点"></div>
           <div class="map-pin" style="left:68%;top:35%" data-site="ST-SH-04" title="陆家嘴分站"></div>
           <div class="map-pin" style="left:25%;top:70%" data-site="ST-BJ-01" title="滨江换电站"></div>
+          <div id="mapPins"></div>
+          <div class="map-legend" id="mapLegend"></div>
           <span class="map-provider">腾讯地图 · 演示</span>
           <div class="map-fab-row">
             <button type="button" class="fab-circle" id="btnHelp" title="帮助">?</button>
@@ -424,23 +446,8 @@
   <div class="overlay" id="overlayPkg">
     <div class="sheet">
       <div class="sheet-head"><h3>服务购买</h3><button type="button" class="sheet-close" data-close="overlayPkg">×</button></div>
-      <div class="sheet-body">
-        <div class="pkg-card selected" data-pkg="month">
-          <h4>30天畅换 · 不限次</h4>
-          <div class="price">¥299</div>
-          <div class="desc">闪送驿站联营 · 浦东骑手驿站 · 含电池服务</div>
-        </div>
-        <div class="pkg-card" data-pkg="weekly">
-          <h4>7天套餐 · 不限次</h4>
-          <div class="price">¥89</div>
-          <div class="desc">短期试用</div>
-        </div>
-        <div class="pkg-card" data-pkg="times">
-          <h4>10次卡 · 30天有效</h4>
-          <div class="price">¥79</div>
-          <div class="desc">按次计费，换电成功扣次</div>
-        </div>
-        <button type="button" class="btn-block" id="btnPayPkg" style="margin-top:8px">确认支付（Mock）</button>
+      <div class="sheet-body" id="pkgSheetBody">
+        <p style="font-size:12px;color:var(--muted)">加载套餐…</p>
       </div>
     </div>
   </div>
@@ -471,6 +478,13 @@
             <option value="channel">渠道人天</option>
             <option value="channel_fail">渠道预占失败·U2103</option>
             <option value="channel_cross3">渠道跨网·案例3</option>
+            <option value="lease_whitelist">设备租赁白名单</option>
+            <option value="lease_suspended">渠道停服·持电池</option>
+            <option value="lease_suspended_nobat">渠道停服·未持电池</option>
+            <option value="lease_blocked">非白名单拦截</option>
+            <option value="card_link_guest">骑士卡链接·未登录</option>
+            <option value="card_link_kyc">骑士卡链接·未实名</option>
+            <option value="card_link_attr">骑士卡链接·渠道专享价</option>
             <option value="none">未开通</option>
             <option value="frozen">已冻结 · U1041</option>
           </select>
@@ -485,13 +499,14 @@
       "ST-SH-01": { id: "ST-SH-01", name: "浦东骑手驿站", operator: "OP-SX", signed: true },
       "ST-SH-02": { id: "ST-SH-02", name: "世博换电服务点", operator: "OP-SX", signed: true },
       "ST-SH-04": { id: "ST-SH-04", name: "陆家嘴分站", operator: "OP-LJZ", signed: true },
+      "ST-SH-JD": { id: "ST-SH-JD", name: "京东物流专属站", operator: "OP-SX", signed: true, channelDedicated: "CH-RENT", publicOpen: false, visibilityMode: "whitelist_only" },
       "ST-BJ-01": { id: "ST-BJ-01", name: "滨江换电站", operator: "OP-BJ", batteryOperator: "OP-LJZ", signed: false }
     };
 
     const OPERATOR_POLICY = {
-      "OP-SX": { crossNetworkEnabled: true, crossSiteEnabled: true },
-      "OP-LJZ": { crossNetworkEnabled: true, crossSiteEnabled: true },
-      "OP-BJ": { crossNetworkEnabled: true, crossSiteEnabled: true }
+      "OP-SX": { crossNetworkEnabled: true },
+      "OP-LJZ": { crossNetworkEnabled: true },
+      "OP-BJ": { crossNetworkEnabled: true }
     };
 
     const OPERATOR_CREDIT = {
@@ -500,8 +515,22 @@
       "OP-BJ": { crossSwapEnabled: false }
     };
 
+    const CHANNEL_CARD_ATTR = {
+      channelId: "CH-CARD", channelName: "骑士卡渠道", operatorId: "OP-SX",
+      linkCode: "qsk-30d-home", linkPurpose: "App 首页 Banner", expiresLabel: "剩余 18h32m",
+      skus: {
+        month: { key: "month", name: "30天畅换 · 不限次", official: 299, channel: 279, days: 30, desc: "绿色出行 · 浦东骑手驿站 · 含电池服务", channelSku: true },
+        weekly: { key: "weekly", name: "7天套餐 · 不限次", official: 89, channel: 79, days: 7, desc: "短期试用", channelSku: true },
+        times: { key: "times", name: "10次卡 · 30天有效", official: 79, channel: 79, days: 30, desc: "按次计费，换电成功扣次", channelSku: false }
+      }
+    };
+
     const USERS = {
       guest: { loggedIn: false },
+      card_link_guest: {
+        loggedIn: false, channelAttr: CHANNEL_CARD_ATTR,
+        landingNote: "您通过骑士卡推广链接进入绿色出行小程序"
+      },
       personal: {
         loggedIn: true, phone: "138****1028", name: "张骑手", userId: "U1028",
         kyc: false, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 18, swapUsed: 42,
@@ -537,7 +566,49 @@
       frozen: {
         loggedIn: true, phone: "139****1041", name: "赵骑手", userId: "U1041",
         kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 21, swapUsed: 28,
-        status: "已冻结", operator: "OP-SX", homeSite: "ST-SH-01", holdsBattery: false
+        status: "已冻结", operator: "OP-SX", homeSite: "ST-SH-01", holdsBattery: false,
+        frozenDays: 7
+      },
+      pending_pickup: {
+        loggedIn: true, phone: "136****1055", name: "钱骑手", userId: "U1055",
+        kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 26, swapUsed: 12,
+        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-02", holdsBattery: false,
+        pendingPickup: true
+      },
+      lease_whitelist: {
+        loggedIn: true, phone: "139****4001", name: "张配送", userId: "U4001",
+        kyc: true, entitlement: "设备租赁白名单", pkg: "白名单权益", swapUsed: 42,
+        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
+        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, holdsBattery: true
+      },
+      lease_suspended: {
+        loggedIn: true, phone: "139****4001", name: "张配送", userId: "U4001",
+        kyc: true, entitlement: "设备租赁白名单", pkg: "白名单权益", swapUsed: 42,
+        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
+        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true,
+        channelSuspended: true, holdsBattery: true, currentBatterySn: "BAT-JD-050"
+      },
+      lease_suspended_nobat: {
+        loggedIn: true, phone: "137****4003", name: "王夜配", userId: "U4003",
+        kyc: true, entitlement: "设备租赁白名单", pkg: "白名单权益", swapUsed: 28,
+        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
+        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true,
+        channelSuspended: true, holdsBattery: false
+      },
+      lease_blocked: {
+        loggedIn: true, phone: "159****9999", name: "路人骑手", userId: "U9999",
+        kyc: true, entitlement: null, status: "未授权",
+        operator: "OP-SX", leaseBlocked: true, blockReason: "非渠道白名单用户（E_WHITELIST），请联系京东物流租赁渠道管理员"
+      },
+      card_link_kyc: {
+        loggedIn: true, phone: "138****3101", name: "新骑士", userId: "U-L201",
+        kyc: false, entitlement: null, status: "未开通", operator: "OP-SX",
+        channelAttr: CHANNEL_CARD_ATTR
+      },
+      card_link_attr: {
+        loggedIn: true, phone: "138****3101", name: "新骑士", userId: "U-L201",
+        kyc: true, entitlement: null, status: "未开通", operator: "OP-SX",
+        channelAttr: CHANNEL_CARD_ATTR
       }
     };
 
@@ -545,6 +616,7 @@
       role: "personal",
       scanSite: "ST-SH-01",
       orderTab: "swap",
+      selectedPkg: "month",
       swapOrders: [
         { id: "SW2605241201", site: "浦东骑手驿站", time: "2026-05-24 12:05", status: "成功", type: "个人套餐", userId: "U1028" },
         { id: "SW2605241188", site: "浦东骑手驿站", time: "2026-05-24 08:30", status: "成功", type: "个人套餐", userId: "U1028" }
@@ -554,6 +626,41 @@
       ],
       returnOrders: []
     };
+
+    function canSeeDedicatedSite(u, site) {
+      if (!site.channelDedicated) return true;
+      return !!(u.whitelist && u.channelId === site.channelDedicated);
+    }
+
+    const MAP_PIN_LAYOUT = {
+      "ST-SH-JD": { left: "36%", top: "56%", dedicated: true }
+    };
+
+    function renderMapPins() {
+      const u = user();
+      const host = document.getElementById("mapPins");
+      const legend = document.getElementById("mapLegend");
+      if (!host || !legend) return;
+      const dedicatedPins = Object.entries(MAP_PIN_LAYOUT).filter(([id]) => canSeeDedicatedSite(u, SITES[id]));
+      host.innerHTML = dedicatedPins.map(([id, pos]) =>
+        `<div class="map-pin dedicated" style="left:${pos.left};top:${pos.top}" data-site="${id}" title="${SITES[id].name}（渠道专用）"></div>`
+      ).join("");
+      host.querySelectorAll(".map-pin").forEach(p => {
+        p.onclick = () => {
+          state.scanSite = p.dataset.site;
+          document.getElementById("demoSite").value = state.scanSite;
+          toast("已选站点：" + SITES[state.scanSite].name);
+        };
+      });
+      const hiddenDedicated = Object.keys(SITES).filter(id => SITES[id].channelDedicated && !canSeeDedicatedSite(u, SITES[id]));
+      if (u.whitelist && dedicatedPins.length) {
+        legend.textContent = "地图含 1 个渠道专属站（仅白名单可见）";
+      } else if (hiddenDedicated.length) {
+        legend.textContent = "渠道专属站已对当前身份隐藏";
+      } else {
+        legend.textContent = "";
+      }
+    }
 
     function user() { return USERS[state.role] || USERS.guest; }
 
@@ -574,18 +681,93 @@
       document.getElementById("pageTitle").textContent = scr.dataset.title;
       if (tab === "orders") renderOrders();
       if (tab === "mine") renderMine();
+      if (tab === "home") renderMapPins();
+    }
+
+    function channelAttrForUser(u) {
+      return u?.channelAttr || null;
+    }
+
+    function renderPkgOverlay() {
+      const u = user();
+      const attr = channelAttrForUser(u);
+      const body = document.getElementById("pkgSheetBody");
+      const banner = attr ? `<div class="channel-attr-banner">🟡 <strong>${attr.channelName}</strong> 推广 · ${attr.expiresLabel} 内购套餐享渠道专享价<br><small>首触链接：${attr.linkPurpose}（${attr.linkCode}）</small></div>` : "";
+      const cards = Object.values(CHANNEL_CARD_ATTR.skus).map(s => {
+        const useChannel = attr && s.channelSku;
+        const price = useChannel ? s.channel : s.official;
+        const priceHtml = useChannel
+          ? `<div class="price-row"><span class="price-official">¥${s.official}</span><span class="price">¥${price}</span><span class="price-tag">渠道专享</span></div>`
+          : `<div class="price-row"><span class="price">¥${price}</span>${attr ? `<span class="price-tag" style="background:#f5f5f5;color:var(--muted)">非渠道 SKU · 正式价</span>` : ""}</div>`;
+        return `<div class="pkg-card${state.selectedPkg === s.key ? " selected" : ""}" data-pkg="${s.key}">
+          <h4>${s.name}</h4>
+          ${priceHtml}
+          <div class="desc">${s.desc}</div>
+        </div>`;
+      }).join("");
+      const kycBlock = u.loggedIn && !u.kyc
+        ? `<p style="font-size:12px;color:#cf1322;margin:8px 0 0">请先完成实名认证后再购套餐</p>
+           <button type="button" class="btn-block" id="btnGoKycFromPkg" style="margin-top:8px;background:#fff;color:var(--brand);border:1px solid var(--brand)">去实名认证</button>`
+        : `<button type="button" class="btn-block" id="btnPayPkg" style="margin-top:8px">确认支付（Mock）</button>`;
+      body.innerHTML = banner + cards + kycBlock;
+      body.querySelectorAll(".pkg-card").forEach(c => {
+        c.onclick = () => {
+          state.selectedPkg = c.dataset.pkg;
+          renderPkgOverlay();
+        };
+      });
+      const payBtn = document.getElementById("btnPayPkg");
+      if (payBtn) payBtn.onclick = paySelectedPkg;
+      const kycBtn = document.getElementById("btnGoKycFromPkg");
+      if (kycBtn) kycBtn.onclick = () => { closeOverlay("overlayPkg"); openOverlay("overlayKyc"); };
+    }
+
+    function paySelectedPkg() {
+      const u = user();
+      if (!u.loggedIn) { toast("请先登录"); return; }
+      if (!u.kyc) { toast("请先完成实名认证"); openOverlay("overlayKyc"); return; }
+      const attr = channelAttrForUser(u);
+      const sku = CHANNEL_CARD_ATTR.skus[state.selectedPkg] || CHANNEL_CARD_ATTR.skus.month;
+      const useChannel = attr && sku.channelSku;
+      const amount = useChannel ? sku.channel : sku.official;
+      const id = "SUB" + Date.now().toString().slice(-8);
+      const order = {
+        id, pkg: sku.name + (useChannel ? "·渠道专享" : ""), amount,
+        time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId
+      };
+      if (useChannel) {
+        order.channel = attr.channelName;
+        order.linkCode = attr.linkCode;
+      }
+      state.purchaseOrders.unshift(order);
+      u.status = "服务中";
+      u.entitlement = "个人套餐";
+      u.pkg = sku.name;
+      u.daysLeft = sku.days;
+      u.swapUsed = 0;
+      if (useChannel) {
+        u.channelPurchase = attr.channelName;
+        u.channelAttr = null;
+      }
+      closeOverlay("overlayPkg");
+      toast(useChannel ? "支付成功（渠道专享价 ¥" + amount + "）" : "支付成功，服务已开通");
+      renderMine();
     }
 
     function renderMine() {
       const u = user();
       const el = document.getElementById("mineContent");
       if (!u.loggedIn) {
+        const attrBanner = u.channelAttr || u.landingNote
+          ? `<div class="channel-attr-banner" style="margin:0 16px 12px">${u.landingNote || ("来自 " + u.channelAttr.channelName + " 推广 · 登录后 24h 内享渠道专享价")}</div>`
+          : "";
         el.innerHTML = `
+          ${attrBanner}
           <div class="login-hero">
             <div class="logo">智</div>
             <h1>智格换电</h1>
-            <p>安全出行 放心骑行</p>
-            <button type="button" class="btn-login" id="btnLogin">一键登录</button>
+            <p>安全出行 放心骑行 · 绿色出行小程序</p>
+            <button type="button" class="btn-login" id="btnLogin">微信一键登录</button>
             <div class="agree-row">
               <input type="checkbox" id="agreeChk" checked />
               <label for="agreeChk">同意<a href="#">《隐私政策》</a>、<a href="#">《数字证书使用协议》</a>和<a href="#">《智格换电服务协议》</a></label>
@@ -593,21 +775,38 @@
           </div>`;
         document.getElementById("btnLogin").onclick = () => {
           if (!document.getElementById("agreeChk").checked) { toast("请先同意服务协议"); return; }
-          state.role = "none";
-          document.getElementById("demoRole").value = "none";
+          if (state.role === "card_link_guest") {
+            state.role = "card_link_kyc";
+            document.getElementById("demoRole").value = "card_link_kyc";
+          } else {
+            state.role = "none";
+            document.getElementById("demoRole").value = "none";
+          }
           renderMine();
-          toast("登录成功");
+          toast("登录成功，请完成实名认证");
         };
         return;
       }
 
       let card = "";
+      const attrBanner = u.channelAttr && u.status === "未开通"
+        ? `<div class="channel-attr-banner">🟡 ${u.channelAttr.channelName} · ${u.channelAttr.expiresLabel} 内购套餐享渠道专享价</div>`
+        : "";
       if (u.status === "未开通") {
-        card = `<div class="service-card"><div><h3>暂未开通服务</h3><p>开通服务，放心骑行。</p></div><button type="button" class="btn-gold" data-action="buy">服务购买</button></div>`;
+        card = `${attrBanner}<div class="service-card"><div><h3>暂未开通服务</h3><p>${u.kyc ? "选择套餐开通换电服务。" : "请先完成实名认证，再购买套餐。"}</p></div><button type="button" class="btn-gold" data-action="buy">${u.kyc ? "服务购买" : "实名认证"}</button></div>`;
       } else if (u.status === "已冻结") {
-        card = `<div class="service-card warn"><div><h3>服务已冻结</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 解冻后可换电 · 未持有电池</p></div><button type="button" class="btn-gold" data-action="unfreeze">申请解冻</button></div>`;
+        card = `<div class="service-card warn"><div><h3>服务已冻结</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 未持有电池</p><p style="font-size:11px;margin-top:6px;opacity:.85">符合解冻条件可立即解除；解冻后首次须领取电池</p></div><button type="button" class="btn-gold" data-action="unfreeze">解除冻结</button></div>`;
+      } else if (u.pendingPickup && !u.holdsBattery) {
+        card = `<div class="service-card warn"><div><h3>待领取电池</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 解冻后首次服务</p><p style="font-size:11px;margin-top:6px;opacity:.85">请扫码领取电池（非换电），领取后可正常换电</p></div><button type="button" class="btn-gold" data-action="scan">扫码领取</button></div>`;
       } else if (u.preOccupyFail || u.status === "权益不可用") {
         card = `<div class="service-card warn"><div><h3>渠道人天 · 今日不可用</h3><p>${u.channel}<br>${u.failReason || "预占失败"}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">可在线自费购买 1天/单次 兜底套餐换电（不扣渠道池）</p></div><button type="button" class="btn-gold" data-action="fallback">自费换电</button></div>`;
+      } else if (u.entitlement === "设备租赁白名单" && u.channelSuspended) {
+        const batHint = u.holdsBattery ? " · 持有电池，可还电入柜" : " · 未持有电池";
+        card = `<div class="service-card warn"><div><h3>渠道服务已暂停</h3><p>${u.channel}<br>渠道商已停用 · 不可取电/不出电${batHint}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">扫码换电提示：当前站点已到期，请联系管理员续费</p></div></div>`;
+      } else if (u.entitlement === "设备租赁白名单") {
+        card = `<div class="service-card channel"><div><h3>设备租赁 · 白名单</h3><p>${u.channel}<br>免购套餐 · 不限次换电 · 已换电 ${u.swapUsed} 次</p><p style="font-size:11px;margin-top:4px;opacity:.85">专属站：京东物流专属站（地图可见）· 签约 OP-SX</p></div></div>`;
+      } else if (u.leaseBlocked) {
+        card = `<div class="service-card warn"><div><h3>未授权用户</h3><p>${u.blockReason || "非白名单用户"}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">设备租赁渠道不提供在线购套餐入口</p></div></div>`;
       } else if (u.entitlement === "渠道人天") {
         const quotaLine = u.remainingDays != null ? `剩余 ${u.remainingDays} 人天 · ` : "";
         const todayLine = u.todayEligibility === "已预占" ? "今日已预占（分配即开通）"
@@ -616,7 +815,8 @@
         card = `<div class="service-card channel"><div><h3>渠道人天额度</h3><p>${u.channel}${u.team ? " · " + u.team : ""}<br>${quotaLine}${todayLine}</p><p style="font-size:11px;margin-top:4px;opacity:.85">可在全网换电 · 额度售卖方 OP-SX</p></div></div>`;
       } else {
         const batHint = u.holdsBattery ? " · 持有电池" : "";
-        card = `<div class="service-card"><div><h3>${u.pkg}</h3><p>剩余 ${u.daysLeft} 天 · 已换电 ${u.swapUsed} 次 · 服务中${batHint}</p></div><button type="button" class="btn-gold" data-action="buy">续费</button></div>`;
+        const chHint = u.channelPurchase ? ` · ${u.channelPurchase}专享价购入` : "";
+        card = `<div class="service-card"><div><h3>${u.pkg}</h3><p>剩余 ${u.daysLeft} 天 · 已换电 ${u.swapUsed} 次 · 服务中${batHint}${chHint}</p></div><button type="button" class="btn-gold" data-action="buy">续费</button></div>`;
       }
 
       el.innerHTML = `
@@ -662,7 +862,12 @@
       const u = user();
       if (action === "scan") { startScan(); return; }
       if (action === "fallback") { startScan(); return; }
-      if (action === "buy") { openOverlay("overlayPkg"); return; }
+      if (action === "buy") {
+        if (u.loggedIn && !u.kyc && u.channelAttr) { openOverlay("overlayKyc"); return; }
+        renderPkgOverlay();
+        openOverlay("overlayPkg");
+        return;
+      }
       if (action === "coupon") { toast("暂无可用优惠券"); return; }
       if (action === "service") { toast("客服 400-607-2666"); return; }
       if (action === "return") {
@@ -675,14 +880,29 @@
       }
       if (action === "freeze") {
         if (!u.loggedIn || u.status === "未开通") { toast("请先开通服务"); return; }
+        if (u.entitlement !== "个人套餐") { toast("仅个人套餐用户可申请冻结"); return; }
         if (u.status === "已冻结") { toast("服务已冻结"); return; }
-        if (u.preOccupyFail || u.status === "权益不可用") { toast("今日渠道额度不可用"); return; }
+        if (u.status !== "服务中") { toast("仅服务中且套餐有效期内可申请"); return; }
+        if (u.daysLeft != null && u.daysLeft <= 0) { toast("套餐已过期，无法冻结"); return; }
         if (u.holdsBattery) { toast("请先归还电池后再申请冻结"); return; }
-        toast("已提交冻结申请，审核通过后生效");
+        u.status = "已冻结";
+        toast("服务已冻结，解冻后可继续换电");
+        renderMine();
         return;
       }
       if (action === "kyc") { openOverlay("overlayKyc"); return; }
-      if (action === "unfreeze") { toast("已提交解冻申请，请等待审核"); return; }
+      if (action === "unfreeze") {
+        if (u.entitlement !== "个人套餐") { toast("仅个人套餐用户可解除冻结"); return; }
+        if (u.status !== "已冻结") { toast("当前未处于冻结状态"); return; }
+        if (u.holdsBattery) { toast("请先归还电池后再解除冻结"); return; }
+        const frozenDays = u.frozenDays || 1;
+        u.status = "服务中";
+        u.pendingPickup = true;
+        if (u.daysLeft != null) u.daysLeft += frozenDays;
+        toast("已解除冻结，有效期已顺延；请先扫码领取电池");
+        renderMine();
+        return;
+      }
     }
 
     function renderOrders() {
@@ -710,7 +930,7 @@
         list.innerHTML = rows.map(o => `
           <div class="order-card">
             <div class="top"><span class="id">${o.id}</span><span class="status">${o.status}</span></div>
-            <div class="meta">${o.pkg} · ¥${o.amount}<br>${o.time}</div>
+            <div class="meta">${o.pkg} · ¥${o.amount}${o.channel ? "<br>渠道：" + o.channel + " · " + (o.linkCode || "") : ""}<br>${o.time}</div>
           </div>`).join("");
       } else {
         if (!state.returnOrders.length) {
@@ -720,34 +940,53 @@
       }
     }
 
+    const LEASE_SUSPEND_MSG = "当前站点已到期，请联系管理员续费";
+
+    function isLeaseChannelSuspended(u) {
+      return u.entitlement === "设备租赁白名单" && u.whitelist && u.channelSuspended === true;
+    }
+
     function startScan() {
       const u = user();
       if (!u.loggedIn) { toast("请先登录"); switchTab("mine"); return; }
-      if (u.status === "未开通") { toast("请先购买服务"); openOverlay("overlayPkg"); return; }
-      if (u.status === "已冻结") { toast("服务已冻结，无法换电"); return; }
+      if (u.status === "未开通") { toast("请先完成实名认证并购买服务"); if (!u.kyc) openOverlay("overlayKyc"); else { renderPkgOverlay(); openOverlay("overlayPkg"); } return; }
+      if (u.status === "已冻结") { toast("服务已冻结，请先解除冻结"); return; }
+      const pickupMode = u.pendingPickup && !u.holdsBattery;
       const site = SITES[state.scanSite];
+      const suspended = isLeaseChannelSuspended(u);
       const body = document.getElementById("scanBody");
       body.innerHTML = `
         <div class="scan-box">
           <div class="scan-frame"><div class="scan-line"></div></div>
-          <p style="color:var(--muted);font-size:13px">对准换电柜二维码</p>
+          <p style="color:var(--muted);font-size:13px">${pickupMode ? "对准换电柜二维码 · 领取电池" : "对准换电柜二维码"}</p>
           <p style="font-size:12px;margin-top:8px;color:var(--blue)">当前柜机：${site.name}</p>
-          <button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟扫描成功</button>
+          ${pickupMode ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">解冻后首次服务须<strong>领取电池</strong>（出电，非换电）</p>` : ""}
+          ${suspended && u.holdsBattery ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">渠道已停用：可取<strong>还电</strong>，不可<strong>出电</strong></p>` : ""}
+          ${pickupMode
+            ? `<button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟领取电池</button>`
+            : suspended && u.holdsBattery
+            ? `<button type="button" class="btn-block" style="margin-top:16px;background:var(--blue)" id="btnSimReturn">模拟还电入柜</button>
+               <button type="button" class="btn-block" style="margin-top:8px;background:#fff;color:var(--danger);border:1px solid var(--danger)" id="btnSimScan">模拟扫码换电（不出电）</button>`
+            : `<button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟扫描成功</button>`}
         </div>`;
-      body.querySelector("#btnSimScan").onclick = () => runSwap(site);
+      body.querySelector("#btnSimScan").onclick = () => pickupMode ? runPickupBattery(site) : runSwap(site);
+      if (suspended && u.holdsBattery) {
+        body.querySelector("#btnSimReturn").onclick = () => runReturnBattery(site);
+      }
       openOverlay("overlayScan");
     }
 
     function opPolicy(opId) {
-      return OPERATOR_POLICY[opId] || { crossNetworkEnabled: true, crossSiteEnabled: true };
+      return OPERATOR_POLICY[opId] || { crossNetworkEnabled: true };
     }
 
     function checkSwapGate(u, site) {
+      if (site.channelDedicated && !canSeeDedicatedSite(u, site)) {
+        return { ok: false, msg: "该站点为渠道专用站，仅白名单用户可见可用（E_WHITELIST）" };
+      }
       const userOp = u.operator;
       const cabinetOp = site.operator;
       const isCrossNetwork = userOp && cabinetOp && userOp !== cabinetOp;
-      const isCrossSite = userOp && cabinetOp && userOp === cabinetOp
-        && u.homeSite && site.id !== u.homeSite;
 
       if (isCrossNetwork) {
         const userPol = opPolicy(userOp);
@@ -764,19 +1003,56 @@
         }
       }
 
-      if (isCrossSite) {
-        const userPol = opPolicy(userOp);
-        if (!userPol.crossSiteEnabled) {
-          const home = SITES[u.homeSite];
-          return { ok: false, msg: `运营商已关闭跨站点换电，请前往主绑定站点「${home ? home.name : ""}」` };
-        }
-      }
-
       return { ok: true };
+    }
+
+    function runPickupBattery(site) {
+      const u = user();
+      const gate = checkSwapGate(u, site);
+      if (!gate.ok) {
+        showScanResult(false, gate.msg, site);
+        return;
+      }
+      const batSn = "BAT-SH-" + Date.now().toString().slice(-4);
+      u.holdsBattery = true;
+      u.pendingPickup = false;
+      u.currentBatterySn = batSn;
+      const id = "SW" + Date.now().toString().slice(-8);
+      state.swapOrders.unshift({
+        id, site: site.name, time: new Date().toLocaleString("zh-CN"), status: "成功",
+        type: "个人套餐 · 领取电池", userId: u.userId
+      });
+      document.getElementById("scanBody").innerHTML = `
+        <div class="result-ok">
+          <div class="big">✓</div>
+          <h3 style="margin-bottom:8px">领取电池成功</h3>
+          <p style="font-size:13px;color:var(--muted);line-height:1.7">
+            单号 ${id}<br>${site.name}<br>已领取 ${batSn} · 格口已关闭<br>
+            <small>解冻后首次服务已完成，后续可正常换电</small>
+          </p>
+          <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
+        </div>`;
+      document.getElementById("scanBody").querySelector("[data-close-scan]").onclick = () => {
+        closeOverlay("overlayScan");
+        renderMine();
+        renderHome();
+      };
     }
 
     function runSwap(site) {
       const u = user();
+      if (u.pendingPickup && !u.holdsBattery) {
+        runPickupBattery(site);
+        return;
+      }
+      if (u.leaseBlocked) {
+        showScanResult(false, u.blockReason || "非授权用户，请联系渠道管理员", site);
+        return;
+      }
+      if (isLeaseChannelSuspended(u)) {
+        showScanResult(false, LEASE_SUSPEND_MSG + "（E_LEASE_CHANNEL_SUSPENDED）", site);
+        return;
+      }
       if (u.preOccupyFail) {
         showPreOccupyFailResult(site, u.failReason || "渠道人天今日不可用");
         return;
@@ -798,8 +1074,43 @@
         userOwner: userOp, cabinetOwner: cabOp, batteryOwner: batOp, l1Fee: cabFee + batFee
       });
       if (u.entitlement === "渠道人天") u.swapUsed = (u.swapUsed || 0) + 1;
+      else if (u.entitlement === "设备租赁白名单") u.swapUsed = (u.swapUsed || 0) + 1;
       else u.swapUsed = (u.swapUsed || 0) + 1;
       showScanResult(true, "换电成功", site, id, { userOp, cabOp, batOp, l1Fee: cabFee + batFee });
+    }
+
+    function runReturnBattery(site) {
+      const u = user();
+      if (!isLeaseChannelSuspended(u) || !u.holdsBattery) {
+        showScanResult(false, "当前无法还电", site);
+        return;
+      }
+      const id = "RT" + Date.now().toString().slice(-8);
+      const batSn = u.currentBatterySn || "BAT-JD-050";
+      u.holdsBattery = false;
+      u.currentBatterySn = null;
+      state.returnOrders.unshift({
+        id, site: site.name, battery: batSn, time: new Date().toLocaleString("zh-CN"),
+        status: "已归还", userId: u.userId, note: "渠道停服期间还电入柜"
+      });
+      showReturnResult(site, id, batSn);
+    }
+
+    function showReturnResult(site, returnId, batSn) {
+      document.getElementById("scanBody").innerHTML = `
+        <div class="result-ok">
+          <div class="big">✓</div>
+          <h3 style="margin-bottom:8px">还电成功</h3>
+          <p style="font-size:13px;color:var(--muted);line-height:1.7">
+            单号 ${returnId}<br>${site.name}<br>已归还 ${batSn} · 格口已关闭<br>
+            <small>渠道停服期间仅支持还电，暂不可取新电池</small>
+          </p>
+          <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
+        </div>`;
+      document.getElementById("scanBody").querySelector("[data-close-scan]").onclick = () => {
+        closeOverlay("overlayScan");
+        renderHome();
+      };
     }
 
     function payFallbackAndSwap(site, sku) {
@@ -839,7 +1150,7 @@
           <div class="big" style="color:var(--danger)">!</div>
           <h3 style="margin-bottom:8px">渠道人天不可用</h3>
           <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px">${reason}<br><small>今日未预占成功，无法消耗渠道额度池</small></p>
-          <p style="font-size:12px;color:var(--blue);margin-bottom:12px">可选运营商兜底 SKU（购后 24h 有效，不参与合伙人分润）：</p>
+          <p style="font-size:12px;color:var(--blue);margin-bottom:12px">可选运营商兜底 SKU（购后 24h 有效）：</p>
           <button type="button" class="btn-block" data-fallback="day1" style="margin-bottom:8px">1天畅换 · ¥29</button>
           <button type="button" class="btn-block" data-fallback="single" style="margin-bottom:8px;background:#fff;color:var(--blue);border:1px solid var(--blue)">单次换电 · ¥9.9</button>
           <button type="button" class="btn-block" style="margin-top:8px;background:var(--bg);color:var(--muted)" data-close-scan>取消</button>
@@ -894,28 +1205,18 @@
       ov.onclick = e => { if (e.target === ov) ov.classList.remove("open"); };
     });
 
-    document.getElementById("btnPayPkg").onclick = () => {
-      const u = user();
-      if (!u.loggedIn) { toast("请先登录"); return; }
-      const id = "SUB" + Date.now().toString().slice(-8);
-      state.purchaseOrders.unshift({ id, pkg: "30天畅换", amount: 299, time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId });
-      u.status = "服务中";
-      u.entitlement = "个人套餐";
-      u.pkg = "30天畅换";
-      u.daysLeft = 30;
-      u.swapUsed = 0;
-      closeOverlay("overlayPkg");
-      toast("支付成功，服务已开通");
-      renderMine();
-    };
-
     document.getElementById("btnKycSubmit").onclick = () => {
       const name = document.getElementById("kycName").value.trim();
       const id = document.getElementById("kycId").value.trim();
       if (!name || id.length < 15) { toast("请填写正确的身份信息"); return; }
-      user().kyc = true;
+      const u = user();
+      u.kyc = true;
+      if (state.role === "card_link_kyc") {
+        state.role = "card_link_attr";
+        document.getElementById("demoRole").value = "card_link_attr";
+      }
       closeOverlay("overlayKyc");
-      toast("实名认证成功");
+      toast("实名认证成功，可享渠道专享价购套餐");
       renderMine();
     };
 
@@ -932,6 +1233,7 @@
       closeOverlay("overlaySettings");
       renderMine();
       renderOrders();
+      renderMapPins();
     };
 
     document.getElementById("applyDemo").onclick = () => {
@@ -939,21 +1241,15 @@
       state.scanSite = state.role === "personal_cross3" ? "ST-BJ-01" : document.getElementById("demoSite").value;
       if (state.role === "personal_cross3") document.getElementById("demoSite").value = "ST-BJ-01";
       OPERATOR_POLICY["OP-SX"].crossNetworkEnabled = document.getElementById("policyCrossNet").checked;
-      OPERATOR_POLICY["OP-SX"].crossSiteEnabled = document.getElementById("policyCrossSite").checked;
       renderMine();
       renderOrders();
+      renderMapPins();
       toast("已切换演示身份与换电策略");
     };
 
-    document.querySelectorAll(".pkg-card").forEach(c => {
-      c.onclick = () => {
-        document.querySelectorAll(".pkg-card").forEach(x => x.classList.remove("selected"));
-        c.classList.add("selected");
-      };
-    });
-
     switchTab("home");
     renderMine();
+    renderMapPins();
 
     (function () {
       var link = document.getElementById("navDocsLink");

@@ -1,31 +1,40 @@
 from __future__ import annotations
 
-import errno
-import http.server
-import os
-import socket
-import socketserver
-import subprocess
-import urllib.error
-import urllib.request
-import webbrowser
+import shutil
+import sys
 from pathlib import Path
 
-HOST = "127.0.0.1"
-PORT = 8766
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from _serve import run_static_server  # noqa: E402
 
 
 def sync_docs_to_viewer(app_root: Path) -> None:
-    """把 docs/*.md 复制到文档浏览器旁的 md/ 目录，避免 fetch 404。"""
-    import shutil
-
+    """把 docs/*.md 复制到文档浏览器 md/ 目录；跳过空文件，并镜像到 documentation/md。"""
     src = app_root / "docs"
     dst = app_root / "prototype" / "docs" / "md"
+    pages_md = app_root / "docs" / "documentation" / "md"
+    backup = pages_md if pages_md.is_dir() else None
+
     if not src.is_dir():
         return
+
     dst.mkdir(parents=True, exist_ok=True)
+    pages_md.mkdir(parents=True, exist_ok=True)
+
     for md in src.glob("*.md"):
+        size = md.stat().st_size
+        if size < 50 and backup:
+            backup_file = backup / md.name
+            if backup_file.is_file() and backup_file.stat().st_size > size:
+                shutil.copy2(backup_file, md)
+                print(f"已修复空文档: docs/{md.name} ← documentation/md/")
+                size = md.stat().st_size
+        if size < 50:
+            print(f"跳过空文档: docs/{md.name}")
+            continue
         shutil.copy2(md, dst / md.name)
+        shutil.copy2(md, pages_md / md.name)
 
 
 def main() -> None:
@@ -35,79 +44,17 @@ def main() -> None:
         raise SystemExit(f"Prototype directory not found: {proto_root}")
 
     sync_docs_to_viewer(app_root)
-
-    class DevHandler(http.server.SimpleHTTPRequestHandler):
-        extensions_map = {
-            **http.server.SimpleHTTPRequestHandler.extensions_map,
-            ".md": "text/plain; charset=utf-8",
-        }
-
-        def end_headers(self) -> None:
-            # 原型开发：避免浏览器 304 缓存导致看不到最新改动
-            if self.path.endswith((".html", ".js", ".css", ".md")):
-                self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
-                self.send_header("Pragma", "no-cache")
-            super().end_headers()
-
-    handler = DevHandler
-
-    def port_in_use() -> bool:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                s.bind((HOST, PORT))
-            except OSError as e:
-                if e.errno in (errno.EADDRINUSE, 48, 98):
-                    return True
-                raise
-            return False
-
-    def port_owner_pid() -> str | None:
-        try:
-            out = subprocess.check_output(
-                ["lsof", "-ti", f":{PORT}"],
-                stderr=subprocess.DEVNULL,
-                text=True,
-            ).strip()
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return None
-        return out.splitlines()[0] if out else None
-
-    def existing_server_url() -> str | None:
-        for path in ("/prototype/index.html", "/index.html"):
-            url = f"http://{HOST}:{PORT}{path}"
-            try:
-                with urllib.request.urlopen(url, timeout=1) as resp:
-                    if resp.status == 200:
-                        return url
-            except (urllib.error.URLError, TimeoutError):
-                continue
-        return None
-
-    if port_in_use():
-        pid = port_owner_pid()
-        live_url = existing_server_url()
-        print(f"端口 {PORT} 已被占用" + (f"（PID {pid}）" if pid else "") + "。")
-        if live_url:
-            print(f"本地原型可能已在运行，直接打开：{live_url}")
-        else:
-            print("占用该端口的进程可能不是本原型服务。")
-        print(f"若要重启，先结束旧进程：lsof -ti :{PORT} | xargs kill")
-        print("然后重新执行：python3 main.py")
-        raise SystemExit(1)
-
-    with socketserver.TCPServer((HOST, PORT), handler) as httpd:
-        httpd.allow_reuse_address = True
-        os.chdir(app_root)
-        url = f"http://{HOST}:{PORT}/prototype/index.html"
-        print(f"Serving 外卖 at http://{HOST}:{PORT}/")
-        print("后台:   /prototype/index.html")
-        print("骑手端: /prototype/mobile/index.html")
-        print("文档:   /prototype/docs/index.html")
-        print("Markdown: /docs/*.md")
-        print("Press Ctrl+C to stop.")
-        webbrowser.open(url)
-        httpd.serve_forever()
+    run_static_server(
+        project_id="外卖",
+        app_root=app_root,
+        no_cache=True,
+        extra_lines=[
+            "后台:   /prototype/index.html",
+            "骑手端: /prototype/mobile/index.html",
+            "文档:   /prototype/docs/index.html",
+            "数据面板: /prototype/data-panel/index.html",
+        ],
+    )
 
 
 if __name__ == "__main__":
