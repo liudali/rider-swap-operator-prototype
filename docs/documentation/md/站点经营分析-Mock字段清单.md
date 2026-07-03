@@ -1,8 +1,8 @@
-# 站点繁忙度分析 · Mock 计算字段清单（开发落地）
+# 站点经营分析 · Mock 字段清单（开发落地）
 
-> **PRD 业务口径**：[PRD.md §5.8](./PRD.md#58-运营商总览--站点繁忙度分析)  
-> **原型参考**：`prototype/index.html` → `siteBusinessStats()`、`renderOverviewSiteStats()`  
-> **验收**：`acceptance-criteria.md` 运营商总览 · 站点繁忙度分析
+> **PRD 业务口径**：[PRD.md §5.8](./PRD.md#58-运营商总览--站点繁忙度分析)（含 §5.8.3 用电量统计）  
+> **原型参考**：`prototype/index.html` → `siteBusinessStats()` / `overviewPowerStats()`  
+> **验收**：`acceptance-criteria.md` 运营商总览 · 站点繁忙度分析 / 用电量统计
 
 **评估原则**：站点经营状况用**繁忙度**（格口、电池、等待），**不用收入**归因或金额列。
 
@@ -126,3 +126,63 @@ else busyLevel = '低'
 - [ ] 等待中为实时或近实时快照
 - [ ] 繁忙度与格口/等待阈值联动
 - [ ] 筛选单站点后仅一行且字段可复核
+
+---
+
+## 8. 用电量统计（§5.8.3）
+
+### 8.1 API 建议
+
+```
+GET /api/v1/operators/{operatorId}/cabinet-power-stats
+  ?date_from=YYYY-MM-DD
+  &date_to=YYYY-MM-DD
+  &site_id=optional
+```
+
+**响应**：`{ from, to, total_kwh, cabinet_count, daily_trend[], site_rows[], cabinet_rows[] }`
+
+### 8.2 筛选与状态
+
+| 筛选项 | 存储键 | 说明 |
+|--------|--------|------|
+| 统计日起 | `state.pf.overviewPower.dateFrom` | 模块内独立；与顶栏 KPI「统计范围」**解耦** |
+| 统计日止 | `state.pf.overviewPower.dateTo` | 自定义日期须点「查询」 |
+| 快捷范围 | `state.pf.overviewPower.range` | `today` / `7` / `30`；切换时同步起止并即时刷新 |
+| 站点 | `state.pf.overview.site` | 随总览顶栏联动 |
+
+### 8.3 Mock 数据源
+
+| Mock 变量 | 字段 | 用途 |
+|-----------|------|------|
+| `cabinetPowerDaily[]` | `sn`, `site`, `date`, `kwh`, `deviceOwnerId` | 按日增量汇总 |
+| `cabinets[]` | `deviceId`, `deviceName`, `usedPowerKwh` | 单柜明细、当前累计读数 |
+
+### 8.4 计算伪代码
+
+```javascript
+rows = cabinetPowerDaily.filter(r =>
+  r.deviceOwnerId === operatorId &&
+  r.date >= dateFrom && r.date <= dateTo &&
+  (site === '全部' || r.site === site)
+)
+totalKwh = sum(rows.kwh)
+cabinetCount = distinct(rows.sn).length
+dailyTrend = groupBy(rows, 'date').sum('kwh')
+```
+
+### 8.5 MODULE_NOTES 键
+
+| 键 | 说明 |
+|----|------|
+| `overview_power_stats` | 模块说明 |
+| `overview_power_kwh` | 总用电量 |
+| `overview_power_site` | 按站点汇总 |
+| `overview_power_cabinet` | 按柜机明细 |
+
+### 8.6 验收要点
+
+- [ ] 模块内有统计日起/止 + 快捷范围 + 查询；**不**依赖顶栏日期
+- [ ] 顶栏切换站点后 KPI / 趋势 / 两表联动刷新
+- [ ] 按柜机明细可跳转换电柜详情页
+- [ ] 空态：筛选无数据时 KPI 为 0、表格提示「暂无数据」

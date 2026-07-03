@@ -330,6 +330,17 @@
     .pkg-card .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
     .pkg-card .price-official { font-size: 13px; color: var(--muted); text-decoration: line-through; }
     .pkg-card .price-tag { font-size: 10px; background: #fff1f0; color: #cf1322; padding: 2px 6px; border-radius: 4px; }
+    .service-scope-banner {
+      margin: 0 12px 10px; padding: 10px 12px; border-radius: 10px; background: #ecfdf5;
+      border: 1px solid #99f6e4; font-size: 12px; color: #0f766e; line-height: 1.5;
+    }
+    .service-scope-banner strong { color: #115e59; }
+    .op-pick-item {
+      display: flex; justify-content: space-between; align-items: center; padding: 14px 12px;
+      border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; cursor: pointer;
+    }
+    .op-pick-item:hover { border-color: var(--brand); background: #f0fdf9; }
+    .op-pick-item small { color: var(--muted); display: block; margin-top: 4px; }
     @media (max-width: 720px) {
       .demo-panel { width: 100%; order: 2; }
       .phone-wrap { width: 100%; max-width: var(--phone-w); height: 100vh; max-height: none; border-radius: 0; }
@@ -358,6 +369,7 @@
         <option value="card_link_kyc">骑士卡链接 · 已登录未实名（24h 归因中）</option>
         <option value="card_link_attr">骑士卡链接 · 已实名（24h 渠道专享价）</option>
         <option value="none">已登录 · 未开通服务</option>
+        <option value="geo_ambiguous">冷启动 · 定位两 OP 接近</option>
         <option value="frozen">个人套餐 · 已冻结</option>
         <option value="pending_pickup">个人套餐 · 解冻待领电池</option>
       </select>
@@ -368,6 +380,13 @@
         <option value="ST-SH-04">陆家嘴分站（跨运营商 · OP-LJZ）</option>
         <option value="ST-SH-JD">京东物流专属站（设备租赁·OP-SX）</option>
         <option value="ST-BJ-01">滨江换电站（案例3·U/C/B三方·跨网¥0.6）</option>
+      </select>
+      <label style="margin-top:10px">定位场景（方案乙）</label>
+      <select id="demoGeo">
+        <option value="auto_unique">自动命中 · 最近 OP-SX（1.2km）</option>
+        <option value="ambiguous">两 OP 接近 · 需手动选择</option>
+        <option value="denied">用户拒绝定位</option>
+        <option value="no_nearby">15km 内无在营站</option>
       </select>
       <label style="margin-top:10px">OP-SX 换电范围（演示开关）</label>
       <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="policyCrossNet" checked /> 允许跨网换电</label>
@@ -452,6 +471,16 @@
     </div>
   </div>
 
+  <!-- 选择服务运营商 -->
+  <div class="overlay" id="overlayOpPick">
+    <div class="sheet">
+      <div class="sheet-head"><h3>选择服务运营商</h3><button type="button" class="sheet-close" data-close="overlayOpPick">×</button></div>
+      <div class="sheet-body" id="opPickBody">
+        <p style="font-size:12px;color:var(--muted);margin:0 0 12px">您附近有多个换电服务提供商，请选择本次购套餐的运营商（支付将进入所选运营商账户）。</p>
+      </div>
+    </div>
+  </div>
+
   <!-- 实名 -->
   <div class="overlay" id="overlayKyc">
     <div class="sheet">
@@ -495,6 +524,12 @@
   </div>
 
   <script>
+    const OPERATORS = {
+      "OP-SX": { id: "OP-SX", name: "绿色出行", subMch: "19000001***" },
+      "OP-LJZ": { id: "OP-LJZ", name: "陆家嘴联营", subMch: "19000002***" },
+      "OP-BJ": { id: "OP-BJ", name: "滨江换电", subMch: "19000003***" }
+    };
+
     const SITES = {
       "ST-SH-01": { id: "ST-SH-01", name: "浦东骑手驿站", operator: "OP-SX", signed: true },
       "ST-SH-02": { id: "ST-SH-02", name: "世博换电服务点", operator: "OP-SX", signed: true },
@@ -563,6 +598,10 @@
         loggedIn: true, phone: "188****1850", name: "新用户", userId: "U0001",
         kyc: false, entitlement: null, status: "未开通"
       },
+      geo_ambiguous: {
+        loggedIn: true, phone: "188****1851", name: "定位用户", userId: "U0002",
+        kyc: true, entitlement: null, status: "未开通", geoAmbiguous: true
+      },
       frozen: {
         loggedIn: true, phone: "139****1041", name: "赵骑手", userId: "U1041",
         kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 21, swapUsed: 28,
@@ -624,7 +663,16 @@
       purchaseOrders: [
         { id: "SUB260524001", pkg: "30天畅换", amount: 299, time: "2026-05-01 09:12", status: "已支付", userId: "U1028" }
       ],
-      returnOrders: []
+      returnOrders: [],
+      geoScenario: "auto_unique",
+      session: {
+        contextOperatorId: null,
+        contextSource: null,
+        nearestSiteId: null,
+        nearestDistanceM: null,
+        launchOp: null,
+        scanCabinetOp: null
+      }
     };
 
     function canSeeDedicatedSite(u, site) {
@@ -664,6 +712,143 @@
 
     function user() { return USERS[state.role] || USERS.guest; }
 
+    function resetSessionContext() {
+      state.session.contextOperatorId = null;
+      state.session.contextSource = null;
+      state.session.nearestSiteId = null;
+      state.session.nearestDistanceM = null;
+      state.session.launchOp = null;
+      state.session.scanCabinetOp = null;
+    }
+
+    function setSessionOperator(opId, source, siteId, distanceM) {
+      state.session.contextOperatorId = opId;
+      state.session.contextSource = source;
+      state.session.nearestSiteId = siteId || null;
+      state.session.nearestDistanceM = distanceM != null ? distanceM : null;
+    }
+
+    function activePackageOperator(u) {
+      if (u.entitlement === "个人套餐" && (u.status === "服务中" || u.status === "已冻结") && u.operator) return u.operator;
+      return null;
+    }
+
+    function geoResolve() {
+      const scenario = state.geoScenario || "auto_unique";
+      if (scenario === "denied") return { blocked: true, reason: "denied" };
+      if (scenario === "no_nearby") return { blocked: true, reason: "no_nearby" };
+      if (scenario === "ambiguous" || user().geoAmbiguous) {
+        return {
+          needPick: true,
+          candidates: [
+            { operatorId: "OP-SX", name: OPERATORS["OP-SX"].name, nearestSiteId: "ST-SH-01", distanceM: 800 },
+            { operatorId: "OP-LJZ", name: OPERATORS["OP-LJZ"].name, nearestSiteId: "ST-SH-04", distanceM: 950 }
+          ]
+        };
+      }
+      return {
+        auto: true,
+        operatorId: "OP-SX",
+        name: OPERATORS["OP-SX"].name,
+        nearestSiteId: "ST-SH-01",
+        distanceM: 1200
+      };
+    }
+
+    function resolveSellerOperator(u) {
+      const pkgOp = activePackageOperator(u);
+      if (pkgOp) return { operatorId: pkgOp, source: "active_pkg" };
+      if (u.channelAttr?.operatorId) return { operatorId: u.channelAttr.operatorId, source: "launch" };
+      if (state.session.launchOp) return { operatorId: state.session.launchOp, source: "launch" };
+      if (state.session.scanCabinetOp) return { operatorId: state.session.scanCabinetOp, source: "scan" };
+      if (state.session.contextOperatorId) {
+        return { operatorId: state.session.contextOperatorId, source: state.session.contextSource || "geo_auto" };
+      }
+      return null;
+    }
+
+    function formatDistance(m) {
+      return m >= 1000 ? (m / 1000).toFixed(1) + "km" : m + "m";
+    }
+
+    function renderServiceScopeBanner() {
+      const u = user();
+      const resolved = resolveSellerOperator(u);
+      if (!resolved) return "";
+      const op = OPERATORS[resolved.operatorId];
+      if (!op) return "";
+      const site = state.session.nearestSiteId ? SITES[state.session.nearestSiteId] : null;
+      const dist = state.session.nearestDistanceM != null ? formatDistance(state.session.nearestDistanceM) : "";
+      const srcLabel = {
+        active_pkg: "续费原运营商",
+        launch: "推广链接",
+        scan: "扫柜进入",
+        geo_auto: "定位自动匹配",
+        geo_manual: "您已选择"
+      }[resolved.source] || "";
+      const siteLine = site && dist ? ` · 距您最近 ${site.name} ${dist}` : "";
+      return `<div class="service-scope-banner">当前服务：<strong>${op.name}</strong>${siteLine}${srcLabel ? `<br><small>${srcLabel} · 支付将进入该运营商账户</small>` : ""}</div>`;
+    }
+
+    function openOperatorPicker(candidates, onReady) {
+      const body = document.getElementById("opPickBody");
+      body.innerHTML = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">您附近有多个换电服务提供商，请选择本次购套餐的运营商。</p>`
+        + candidates.map(c => {
+          const site = SITES[c.nearestSiteId];
+          return `<div class="op-pick-item" data-op-pick="${c.operatorId}" data-site="${c.nearestSiteId}" data-dist="${c.distanceM}">
+            <div><strong>${c.name}</strong><small>最近站点：${site?.name || "—"} · ${formatDistance(c.distanceM)}</small></div>
+            <span style="color:var(--brand)">选择</span>
+          </div>`;
+        }).join("");
+      body.querySelectorAll("[data-op-pick]").forEach(el => {
+        el.onclick = () => {
+          setSessionOperator(el.dataset.opPick, "geo_manual", el.dataset.site, Number(el.dataset.dist));
+          closeOverlay("overlayOpPick");
+          renderMine();
+          if (onReady) onReady();
+        };
+      });
+      openOverlay("overlayOpPick");
+    }
+
+    function ensureContextForPurchase(onReady) {
+      const u = user();
+      if (!u.loggedIn) { toast("请先登录"); switchTab("mine"); return; }
+      const existing = resolveSellerOperator(u);
+      if (existing?.source === "active_pkg") { onReady(); return; }
+      if (existing && state.session.contextOperatorId) { onReady(); return; }
+      if (u.channelAttr?.operatorId) {
+        setSessionOperator(u.channelAttr.operatorId, "launch");
+        onReady();
+        return;
+      }
+      const geo = geoResolve();
+      if (geo.blocked) {
+        toast(geo.reason === "denied" ? "请开启定位，或扫描换电柜二维码后再购套餐" : "附近暂无换电服务，请移步换电柜扫码");
+        return;
+      }
+      if (geo.needPick) {
+        openOperatorPicker(geo.candidates, onReady);
+        return;
+      }
+      if (geo.auto) {
+        setSessionOperator(geo.operatorId, "geo_auto", geo.nearestSiteId, geo.distanceM);
+        renderMine();
+        onReady();
+        return;
+      }
+      toast("无法确定服务运营商，请扫描换电柜二维码");
+    }
+
+    function openPurchaseFlow() {
+      ensureContextForPurchase(() => {
+        const u = user();
+        if (!u.kyc) { openOverlay("overlayKyc"); return; }
+        renderPkgOverlay();
+        openOverlay("overlayPkg");
+      });
+    }
+
     function toast(msg) {
       const el = document.getElementById("toast");
       el.textContent = msg;
@@ -691,7 +876,11 @@
     function renderPkgOverlay() {
       const u = user();
       const attr = channelAttrForUser(u);
+      const seller = resolveSellerOperator(u);
       const body = document.getElementById("pkgSheetBody");
+      const sellerBanner = seller && OPERATORS[seller.operatorId]
+        ? `<div class="service-scope-banner" style="margin-bottom:12px">收款方：<strong>${OPERATORS[seller.operatorId].name}</strong> · 子商户 ${OPERATORS[seller.operatorId].subMch}</div>`
+        : "";
       const banner = attr ? `<div class="channel-attr-banner">🟡 <strong>${attr.channelName}</strong> 推广 · ${attr.expiresLabel} 内购套餐享渠道专享价<br><small>首触链接：${attr.linkPurpose}（${attr.linkCode}）</small></div>` : "";
       const cards = Object.values(CHANNEL_CARD_ATTR.skus).map(s => {
         const useChannel = attr && s.channelSku;
@@ -709,7 +898,7 @@
         ? `<p style="font-size:12px;color:#cf1322;margin:8px 0 0">请先完成实名认证后再购套餐</p>
            <button type="button" class="btn-block" id="btnGoKycFromPkg" style="margin-top:8px;background:#fff;color:var(--brand);border:1px solid var(--brand)">去实名认证</button>`
         : `<button type="button" class="btn-block" id="btnPayPkg" style="margin-top:8px">确认支付（Mock）</button>`;
-      body.innerHTML = banner + cards + kycBlock;
+      body.innerHTML = sellerBanner + banner + cards + kycBlock;
       body.querySelectorAll(".pkg-card").forEach(c => {
         c.onclick = () => {
           state.selectedPkg = c.dataset.pkg;
@@ -726,14 +915,19 @@
       const u = user();
       if (!u.loggedIn) { toast("请先登录"); return; }
       if (!u.kyc) { toast("请先完成实名认证"); openOverlay("overlayKyc"); return; }
+      const seller = resolveSellerOperator(u);
+      if (!seller) { toast("无法确定收款运营商"); return; }
       const attr = channelAttrForUser(u);
       const sku = CHANNEL_CARD_ATTR.skus[state.selectedPkg] || CHANNEL_CARD_ATTR.skus.month;
       const useChannel = attr && sku.channelSku;
       const amount = useChannel ? sku.channel : sku.official;
       const id = "SUB" + Date.now().toString().slice(-8);
+      const op = OPERATORS[seller.operatorId];
       const order = {
         id, pkg: sku.name + (useChannel ? "·渠道专享" : ""), amount,
-        time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId
+        time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId,
+        sellerOperatorId: seller.operatorId, sellerOperatorName: op?.name, subMch: op?.subMch,
+        contextSource: seller.source
       };
       if (useChannel) {
         order.channel = attr.channelName;
@@ -745,12 +939,13 @@
       u.pkg = sku.name;
       u.daysLeft = sku.days;
       u.swapUsed = 0;
+      u.operator = seller.operatorId;
       if (useChannel) {
         u.channelPurchase = attr.channelName;
         u.channelAttr = null;
       }
       closeOverlay("overlayPkg");
-      toast(useChannel ? "支付成功（渠道专享价 ¥" + amount + "）" : "支付成功，服务已开通");
+      toast("支付成功 · ¥" + amount + " → " + (op?.name || seller.operatorId));
       renderMine();
     }
 
@@ -825,6 +1020,7 @@
           <div><span class="phone">${u.phone}</span><span class="tag-sm ${u.kyc ? "ok" : ""}">${u.kyc ? "已认证" : "未认证"}</span></div>
           <button type="button" class="settings-btn" id="btnSettings">⚙</button>
         </div>
+        ${renderServiceScopeBanner()}
         ${card}
         <div class="section-card">
           <div class="section-title">常用功能</div>
@@ -864,8 +1060,7 @@
       if (action === "fallback") { startScan(); return; }
       if (action === "buy") {
         if (u.loggedIn && !u.kyc && u.channelAttr) { openOverlay("overlayKyc"); return; }
-        renderPkgOverlay();
-        openOverlay("overlayPkg");
+        openPurchaseFlow();
         return;
       }
       if (action === "coupon") { toast("暂无可用优惠券"); return; }
@@ -930,7 +1125,7 @@
         list.innerHTML = rows.map(o => `
           <div class="order-card">
             <div class="top"><span class="id">${o.id}</span><span class="status">${o.status}</span></div>
-            <div class="meta">${o.pkg} · ¥${o.amount}${o.channel ? "<br>渠道：" + o.channel + " · " + (o.linkCode || "") : ""}<br>${o.time}</div>
+            <div class="meta">${o.pkg} · ¥${o.amount}${o.sellerOperatorName ? "<br>收款：" + o.sellerOperatorName : ""}${o.channel ? "<br>渠道：" + o.channel + " · " + (o.linkCode || "") : ""}<br>${o.time}</div>
           </div>`).join("");
       } else {
         if (!state.returnOrders.length) {
@@ -948,11 +1143,20 @@
 
     function startScan() {
       const u = user();
+      const site = SITES[state.scanSite];
+      if (site) {
+        state.session.scanCabinetOp = site.operator;
+        if (!activePackageOperator(u)) setSessionOperator(site.operator, "scan", site.id, null);
+      }
       if (!u.loggedIn) { toast("请先登录"); switchTab("mine"); return; }
-      if (u.status === "未开通") { toast("请先完成实名认证并购买服务"); if (!u.kyc) openOverlay("overlayKyc"); else { renderPkgOverlay(); openOverlay("overlayPkg"); } return; }
+      if (u.status === "未开通") {
+        toast("请先购买套餐开通服务");
+        if (!u.kyc) openOverlay("overlayKyc");
+        else openPurchaseFlow();
+        return;
+      }
       if (u.status === "已冻结") { toast("服务已冻结，请先解除冻结"); return; }
       const pickupMode = u.pendingPickup && !u.holdsBattery;
-      const site = SITES[state.scanSite];
       const suspended = isLeaseChannelSuspended(u);
       const body = document.getElementById("scanBody");
       body.innerHTML = `
@@ -1189,9 +1393,30 @@
     document.querySelectorAll(".tab-item").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
     document.getElementById("btnScan").onclick = startScan;
     document.getElementById("btnHelp").onclick = () => toast("帮助中心建设中");
-    document.getElementById("btnLocate").onclick = () => toast("已定位到当前位置");
+    document.getElementById("btnLocate").onclick = () => {
+      const geo = geoResolve();
+      if (geo.blocked) {
+        toast(geo.reason === "denied" ? "演示：用户拒绝定位" : "演示：附近无在营站");
+        return;
+      }
+      if (geo.needPick) {
+        openOperatorPicker(geo.candidates, () => toast("请点「服务购买」继续"));
+        return;
+      }
+      if (geo.auto) {
+        setSessionOperator(geo.operatorId, "geo_auto", geo.nearestSiteId, geo.distanceM);
+        renderMine();
+        toast("已匹配 " + OPERATORS[geo.operatorId].name + " · 最近 " + SITES[geo.nearestSiteId].name);
+      }
+    };
     document.querySelectorAll(".map-pin").forEach(p => {
-      p.onclick = () => { state.scanSite = p.dataset.site; document.getElementById("demoSite").value = state.scanSite; toast("已选站点：" + SITES[state.scanSite].name); };
+      p.onclick = () => {
+        state.scanSite = p.dataset.site;
+        document.getElementById("demoSite").value = state.scanSite;
+        const s = SITES[state.scanSite];
+        if (s) state.session.scanCabinetOp = s.operator;
+        toast("已选站点：" + s.name);
+      };
     });
 
     document.querySelectorAll(".sub-tab").forEach(t => {
@@ -1240,11 +1465,17 @@
       state.role = document.getElementById("demoRole").value;
       state.scanSite = state.role === "personal_cross3" ? "ST-BJ-01" : document.getElementById("demoSite").value;
       if (state.role === "personal_cross3") document.getElementById("demoSite").value = "ST-BJ-01";
+      state.geoScenario = document.getElementById("demoGeo").value;
+      if (state.role === "geo_ambiguous") state.geoScenario = "ambiguous";
+      resetSessionContext();
+      if (state.role === "card_link_guest" || state.role === "card_link_kyc" || state.role === "card_link_attr") {
+        setSessionOperator("OP-SX", "launch");
+      }
       OPERATOR_POLICY["OP-SX"].crossNetworkEnabled = document.getElementById("policyCrossNet").checked;
       renderMine();
       renderOrders();
       renderMapPins();
-      toast("已切换演示身份与换电策略");
+      toast("已切换演示身份 · 定位场景：" + document.getElementById("demoGeo").selectedOptions[0].text);
     };
 
     switchTab("home");

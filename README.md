@@ -17,6 +17,7 @@
 | [docs/骑手端PRD.md](docs/骑手端PRD.md) | 骑手小程序 PRD |
 | [docs/user-stories.md](docs/user-stories.md) | 用户故事 |
 | [docs/acceptance-criteria.md](docs/acceptance-criteria.md) | 原型验收标准 |
+| [docs/原型变更记录.md](docs/原型变更记录.md) | **原型改动日志**（时间 + 说明 + 文档，须每次同步写入） |
 | [docs/竞品功能清单.md](docs/竞品功能清单.md) | IOT Platform 竞品菜单与差异对照 |
 | [docs/竞品借鉴决策记录.md](docs/竞品借鉴决策记录.md) | 竞品借鉴五项拍板 |
 | [docs/任务-订单变更审计.md](docs/任务-订单变更审计.md) | 变更记录 · 已拍板 Mock 已上线 |
@@ -64,12 +65,15 @@ python3 main.py
 
 仓库 **Settings → Pages**：Source 选 **Deploy from a branch**，Branch `main`，Folder **`/docs`**。`git push` 后约 1～2 分钟生效。
 
-**改原型后请同步再推送**（Pages 读的是 `docs/index.html`）：
+**改原型后请同步、写变更记录并推送**（Pages 读的是 `docs/index.html`）：
 
 ```bash
-# 仅复制到 docs/
-./scripts/sync-pages.sh
+# ① 更新 docs/PRD.md、acceptance-criteria.md 等
+# ② 同步 + 写入变更记录（必做）
+./scripts/sync-pages.sh -l "模块名：做了什么"
 
-# 同步 + 提交 + 推送（推荐）
-./scripts/sync-pages.sh -c -p -m "更新原型：说明本次改动"
+# ③ 提交并推送（交付/上线时）
+./scripts/sync-pages.sh -l "同上说明" -c -p -m "更新原型：同上说明"
 ```
+
+变更历史见 [docs/原型变更记录.md](docs/原型变更记录.md)。
