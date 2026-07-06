@@ -1,0 +1,1603 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP 运营看板 · 原型</title>
+  <style>
+    :root {
+      --bg: #f4f5f6; --surface: #fff; --surface-soft: #f8f9fa;
+      --ink: #36414c; --muted: #74808b; --line: #d1d8dd;
+      --brand: #249ef0; --brand-soft: #e8f5fd; --green: #29cd42; --yellow: #f0ad4e; --red: #e03636;
+      --shadow: 0 1px 3px rgba(0,0,0,.08); --radius: 4px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",Arial,sans-serif; font-size: 13px; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .shell { display: grid; grid-template-columns: 220px minmax(0,1fr); grid-template-rows: 48px 1fr; min-height: 100vh; }
+    .global-top { grid-column: 1 / -1; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; gap: 12px; }
+    .global-top .logo { font-weight: 700; color: var(--ink); font-size: 14px; white-space: nowrap; }
+    .global-top .search { flex: 1; max-width: 420px; margin: 0 auto; }
+    .global-top .search input { width: 100%; height: 32px; border: 1px solid var(--line); border-radius: var(--radius); padding: 0 12px; background: var(--surface-soft); color: var(--muted); }
+    .global-top .actions { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-size: 12px; }
+    .sidebar { background: #fff; border-right: 1px solid var(--line); padding: 12px 0; overflow-y: auto; }
+    .menu-group { margin-bottom: 8px; }
+    .menu-group-title { padding: 8px 16px 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; }
+    .menu-item { display: block; width: 100%; border: 0; background: transparent; text-align: left; padding: 8px 16px 8px 28px; color: var(--ink); font-size: 13px; position: relative; }
+    .menu-item.hidden { display: none; }
+    .menu-item.active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+    .menu-item.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); }
+    .menu-parent { padding: 8px 16px; font-size: 13px; color: var(--ink); font-weight: 600; }
+    .main { min-width: 0; padding: 20px 28px 40px; overflow-y: auto; }
+    .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .page-head h1 { margin: 0 0 4px; font-size: 20px; font-weight: 600; color: var(--ink); }
+    .page-head .sub { font-size: 12px; color: var(--muted); }
+    .topbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .filters select, .filters button { height: 32px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 0 10px; font-size: 12px; }
+    .filters button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .filters button.ghost { background: transparent; color: var(--muted); border-color: transparent; }
+    .dash-section { margin-bottom: 28px; }
+    .dash-section > h2 { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--ink); }
+    .overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; align-items: start; }
+    @media (max-width: 900px) { .overview-grid { grid-template-columns: 1fr; } }
+    .module-block { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px 18px; box-shadow: var(--shadow); }
+    .module-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+    .module-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+    .module-enter { color: var(--brand); text-decoration: none; font-size: 12px; white-space: nowrap; }
+    .module-enter:hover { text-decoration: underline; }
+    .module-desc { margin: 0 0 14px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+    .module-split { display: grid; grid-template-columns: 1fr 1px 1fr; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; }
+    .split-item { padding: 18px 20px; position: relative; min-height: 96px; }
+    .split-divider { background: var(--line); }
+    .split-label { font-size: 12px; color: var(--muted); margin-bottom: 10px; line-height: 1.4; }
+    .split-label-link { color: var(--brand); text-decoration: underline; font-size: inherit; font-weight: inherit; }
+    .split-value { font-size: 28px; font-weight: 600; color: var(--ink); line-height: 1.1; }
+    .split-value.empty { color: var(--muted); font-size: 24px; }
+    .split-value.warn { color: var(--yellow); }
+    .split-value.danger { color: var(--red); }
+    .split-sub { margin-top: 10px; font-size: 12px; color: var(--red); line-height: 1.4; }
+    .split-value-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .split-sub.inline { margin-top: 0; font-size: 12px; white-space: nowrap; }
+    .split-sub.inline.muted { color: var(--muted); }
+    .split-sub.muted { color: var(--muted); }
+    .split-more { position: absolute; top: 14px; right: 14px; border: 0; background: transparent; color: var(--muted); padding: 0; font-size: 16px; line-height: 1; }
+    .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 5px; vertical-align: middle; }
+    .user-scope-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; }
+    .user-scope-toggle button { border: 0; background: #fff; padding: 5px 14px; font-size: 12px; color: var(--muted); }
+    .user-scope-toggle button.active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+    .scope-tag { font-size: 11px; font-weight: 500; color: var(--brand); margin-left: 6px; }
+    .user-metric-row { display: grid; grid-template-columns: 1fr 1px 1fr; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; }
+    .user-metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; margin-top: 12px; }
+    .user-metric-grid .split-item { border-right: 1px solid var(--line); }
+    .user-metric-grid .split-item:last-child { border-right: 0; }
+    .module-block.user-module { padding: 12px 14px 14px; }
+    .module-block.user-module .module-head { margin-bottom: 4px; }
+    .module-block.user-module .split-value { font-size: 18px; }
+    .module-block.user-module .split-item { padding: 8px 10px; min-height: 0; }
+    .module-block.user-module .split-label { margin-bottom: 4px; font-size: 11px; }
+    .module-block.user-module .split-sub { margin-top: 4px; font-size: 11px; }
+    .module-block.user-module .split-sub.inline { margin-top: 0; font-size: 11px; }
+    .module-block.user-module .split-value-row { gap: 6px; }
+    .module-block.order-module { padding: 12px 14px 14px; }
+    .module-block.order-module .module-head { margin-bottom: 4px; }
+    .module-block.order-module .split-value { font-size: 18px; }
+    .module-block.order-module .split-item { padding: 8px 10px; min-height: 0; }
+    .module-block.order-module .split-label { margin-bottom: 4px; font-size: 11px; }
+    .module-block.order-module .split-sub { margin-top: 4px; font-size: 11px; }
+    .module-block.order-module .split-sub.inline { margin-top: 0; font-size: 11px; }
+    .module-block.order-module .split-value-row { gap: 6px; }
+    .module-block.order-module .user-module-footer { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .module-block.order-module .module-head { align-items: center; margin-bottom: 8px; }
+    .module-block.order-module .module-head .order-range-toggle { margin-bottom: 0; flex-shrink: 0; }
+    .module-block.order-module .module-head .order-range-toggle button { padding: 3px 8px; font-size: 11px; }
+    .order-columns { margin-top: 0; }
+    .order-sub-module .order-col-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface-soft); border-bottom: 1px solid var(--line); }
+    .order-sub-module .order-col-head a { color: var(--brand); font-weight: 400; text-decoration: none; white-space: nowrap; }
+    .order-sub-module .order-col-head a:hover { text-decoration: underline; }
+    .module-block.order-module .order-sub-module .user-metric-row { border: 0; border-radius: 0; border-bottom: 1px solid var(--line); }
+    .order-income-channels { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 6px; }
+    .order-income-channels .breakdown-item { padding: 5px 6px; flex-wrap: wrap; }
+    .order-income-channels .breakdown-item strong { font-size: 13px; }
+    .order-income-channels .breakdown-dual { font-size: 11px; }
+    .order-income-channels .breakdown-dual .val-rev { color: var(--ink); }
+    .order-expenditure-table { padding: 6px; }
+    .order-exp-table-head,
+    .order-exp-table-row { display: grid; grid-template-columns: 32px 1fr 1fr; gap: 4px; align-items: stretch; }
+    .order-exp-table-head { margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--ink); text-align: center; }
+    .order-exp-table-head span:not(.order-exp-corner) { padding: 2px 0; }
+    .order-exp-table-row + .order-exp-table-row { margin-top: 4px; }
+    .order-exp-row-label { display: flex; align-items: center; font-size: 10px; color: var(--muted); }
+    .order-exp-cell { display: flex; align-items: center; justify-content: center; background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 6px; font-size: 11px; min-height: 28px; }
+    .order-exp-cell .breakdown-dual { font-size: 11px; }
+    .order-exp-cell.danger .val-real,
+    .order-exp-cell.danger .val-rev { color: var(--red); }
+    .module-block.order-module .order-sub-module .user-metric-grid { grid-template-columns: repeat(3, 1fr); border: 0; border-radius: 0; margin: 0; border-top: 1px solid var(--line); }
+    .module-block.fault-module { padding: 12px 14px 14px; }
+    .module-block.fault-module .module-head { margin-bottom: 4px; }
+    .module-block.fault-module .split-value { font-size: 18px; }
+    .module-block.fault-module .split-item { padding: 8px 10px; min-height: 0; }
+    .module-block.fault-module .split-label { margin-bottom: 4px; font-size: 11px; }
+    .module-block.fault-module .user-metric-row { border: 0; border-radius: 0; border-bottom: 1px solid var(--line); }
+    .user-sub-module { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; }
+    .user-sub-module + .user-sub-module { margin-top: 8px; }
+    .user-sub-head { display: flex; justify-content: flex-end; padding: 4px 8px; background: var(--surface-soft); border-bottom: 1px solid var(--line); }
+    .user-sub-head a { color: var(--brand); text-decoration: none; font-size: 11px; white-space: nowrap; }
+    .user-sub-head a:hover { text-decoration: underline; }
+    .user-sub-module .user-metric-row + .user-metric-row { border-top: 1px solid var(--line); }
+    .user-sub-module .user-metric-row { border: 0; border-radius: 0; margin-top: 0; }
+    .user-sub-module .user-metric-grid { border: 0; border-radius: 0; margin-top: 0; }
+    .user-module-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); flex-wrap: wrap; font-size: 11px; }
+    .user-module-footer > a { color: var(--brand); text-decoration: none; }
+    .user-module-footer > a:hover { text-decoration: underline; }
+    .user-external { color: var(--muted); }
+    .user-external a { color: var(--brand); text-decoration: none; margin-left: 6px; }
+    .user-external a:hover { text-decoration: underline; }
+    .module-block.asset-module { padding: 12px 14px 14px; }
+    .module-block.asset-module .module-head { margin-bottom: 4px; }
+    .module-block.asset-module .split-value { font-size: 18px; }
+    .module-block.asset-module .split-item { padding: 8px 10px; min-height: 0; }
+    .module-block.asset-module .split-label { margin-bottom: 4px; font-size: 11px; }
+    .module-block.asset-module .split-sub { margin-top: 4px; font-size: 11px; }
+    .module-block.asset-module .split-sub.inline { margin-top: 0; font-size: 11px; }
+    .module-block.asset-module .split-value-row { gap: 6px; }
+    .asset-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .asset-sub-module { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #fff; display: flex; flex-direction: column; min-height: 0; }
+    .asset-sub-module .split-item { border: 0; border-radius: 0; border-bottom: 1px solid var(--line); }
+    .asset-sub-module .breakdown-grid { gap: 4px; padding: 6px 6px 4px; }
+    .asset-sub-module .breakdown-grid.cabinet { grid-template-columns: repeat(2, 1fr); }
+    .asset-sub-module .breakdown-grid.battery { grid-template-columns: repeat(2, 1fr); }
+    .asset-sub-module .breakdown-item { padding: 4px 6px; }
+    .asset-sub-module .breakdown-item strong { font-size: 12px; }
+    .asset-sub-module .breakdown-item span { font-size: 10px; }
+    .asset-sub-module .asset-col-links { margin-top: auto; padding: 4px 8px 6px; border-top: 1px solid var(--line); background: var(--surface-soft); font-size: 10px; line-height: 1.55; }
+    .asset-sub-module .asset-col-links a { color: var(--brand); text-decoration: none; margin-right: 8px; white-space: nowrap; }
+    .asset-sub-module .asset-col-links a:hover { text-decoration: underline; }
+    .asset-body { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .asset-erp-links { display: grid; gap: 6px; font-size: 11px; line-height: 1.55; }
+    .asset-link-row { display: flex; flex-wrap: wrap; align-items: baseline; }
+    .asset-link-row > span { color: var(--muted); margin-right: 4px; }
+    .asset-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+    .asset-external-links { flex: 1 1 200px; text-align: right; font-size: 10px; line-height: 1.55; }
+    .asset-external-links a { margin-left: 5px; white-space: nowrap; }
+    .asset-pressure-inline { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+    .asset-pressure-inline .pressure-label { font-size: 11px; color: var(--muted); }
+    .asset-pressure-inline a.pressure-label { color: var(--brand); text-decoration: underline; }
+    .asset-pressure-inline .pressure-val { font-size: 18px; font-weight: 600; color: var(--ink); line-height: 1; }
+    .asset-pressure-inline .pressure-val.danger { color: var(--red); }
+    .asset-pressure-inline .pressure-sub { font-size: 10px; color: var(--red); }
+    .module-block.asset-module .section-links { margin-top: 0; gap: 4px 12px; }
+    .asset-breakdown { margin-top: 10px; }
+    .asset-breakdown + .asset-breakdown { margin-top: 8px; }
+    .breakdown-head { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    .breakdown-grid { display: grid; gap: 6px; }
+    .breakdown-grid.cabinet { grid-template-columns: repeat(4, 1fr); }
+    .breakdown-grid.battery { grid-template-columns: repeat(3, 1fr); }
+    .breakdown-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--radius); padding: 7px 8px; text-align: left; }
+    .breakdown-item strong { font-size: 14px; font-weight: 600; line-height: 1.2; flex-shrink: 0; }
+    .breakdown-item span { font-size: 10px; color: var(--muted); line-height: 1.3; min-width: 0; }
+    .breakdown-item.danger strong { color: var(--red); }
+    .breakdown-dual { display: flex; align-items: baseline; gap: 0; flex-shrink: 0; font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+    .breakdown-dual .val-real { color: var(--ink); }
+    .breakdown-dual .val-virt { color: var(--red); }
+    .breakdown-dual .val-sep { color: var(--muted); font-weight: 400; font-size: 11px; }
+    .asset-pressure { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .asset-pressure .split-item { min-height: 78px; }
+    .map-mock { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; min-height: 180px; padding: 12px; background: linear-gradient(180deg,#e8f5fd 0%,#f8fafc 100%); border-radius: var(--radius); border: 1px solid var(--line); }
+    .map-dot { width: 100%; aspect-ratio: 1; border-radius: 50%; background: var(--brand); opacity: .75; justify-self: center; align-self: center; max-width: 14px; }
+    .map-dot.warn { background: var(--yellow); }
+    .map-dot.err { background: var(--red); }
+    .version-bars { display: grid; gap: 10px; }
+    .version-row { display: grid; grid-template-columns: 72px 1fr 56px; gap: 10px; align-items: center; font-size: 12px; }
+    .version-row .bar-track { height: 8px; background: var(--surface-soft); border-radius: 999px; overflow: hidden; }
+    .version-row .bar-fill { height: 100%; background: linear-gradient(90deg,#5eead4,var(--brand)); border-radius: 999px; }
+    .accept-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+    .accept-summary .kpi { text-align: center; }
+    .asset-section { display: none; }
+    .asset-section.active { display: block; }
+    .user-section { display: none; }
+    .user-section.active { display: block; }
+    .drill-back { margin-bottom: 14px; }
+    .drill-back button { border: 0; background: transparent; color: var(--brand); padding: 0; font-size: 13px; }
+    .drill-back button:hover { text-decoration: underline; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    .metric-grid.compact { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .metric-grid.detail { margin-bottom: 16px; }
+    @media (max-width: 1100px) { .metric-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 640px) { .metric-grid { grid-template-columns: 1fr; } }
+    .metric-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 16px; min-height: 88px; position: relative; box-shadow: var(--shadow); transition: box-shadow .15s; }
+    .metric-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+    .metric-card .label { font-size: 12px; color: var(--muted); margin-bottom: 10px; padding-right: 20px; line-height: 1.4; }
+    .metric-card .value { font-size: 26px; font-weight: 600; color: var(--ink); line-height: 1; }
+    .metric-card .value.empty { color: var(--muted); font-size: 22px; }
+    .metric-card .more { position: absolute; top: 10px; right: 10px; border: 0; background: transparent; color: var(--muted); padding: 0 4px; font-size: 16px; line-height: 1; }
+    .metric-card .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 4px; vertical-align: middle; }
+    .metric-card.warn .value { color: var(--yellow); }
+    .metric-card.danger .value { color: var(--red); }
+    .section-links { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+    .section-links a { color: var(--brand); text-decoration: none; font-size: 12px; border-bottom: 1px solid transparent; }
+    .section-links a:hover { border-bottom-color: var(--brand); }
+    .section-links span { color: var(--muted); font-size: 12px; }
+    .hint { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; padding: 10px 12px; background: #ecfdf5; border-radius: var(--radius); border: 1px solid #a7f3d0; }
+    .error-banner { display: none; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; margin-bottom: 14px; border-radius: var(--radius); background: #fef2f2; border: 1px solid #fecaca; color: var(--red); }
+    .error-banner.show { display: flex; }
+    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 14px; }
+    .panel h2 { margin: 0 0 12px; font-size: 15px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); gap: 10px; }
+    .kpi { background: var(--surface-soft); border-radius: var(--radius); padding: 12px; position: relative; }
+    .kpi label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .kpi strong { font-size: 20px; font-weight: 700; }
+    .kpi small { display: block; margin-top: 4px; font-size: 11px; color: var(--green); }
+    .kpi small.down { color: var(--red); }
+    .live { position: absolute; top: 8px; right: 8px; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: #dcfce7; color: var(--green); }
+    .chart { display: flex; align-items: flex-end; gap: 8px; height: 150px; padding-top: 6px; }
+    .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+    .bar { width: 100%; max-width: 32px; background: linear-gradient(180deg,#5eead4,var(--brand)); border-radius: 3px 3px 0 0; min-height: 4px; }
+    .bar-wrap span { font-size: 10px; color: var(--muted); text-align: center; }
+    .channel-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 10px; }
+    .channel-card { padding: 12px; border-radius: var(--radius); background: var(--surface-soft); border: 1px solid var(--line); }
+    .channel-card strong { display: block; font-size: 18px; margin: 4px 0; }
+    .channel-card span { font-size: 11px; color: var(--muted); }
+    .alert-list { display: grid; gap: 8px; }
+    .alert-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-soft); border: 1px solid var(--line); font-size: 13px; }
+    .alert-item button { border: 0; background: transparent; color: var(--brand); padding: 0; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .toolbar input { height: 36px; border: 1px solid var(--line); border-radius: var(--radius); padding: 0 12px; min-width: 200px; }
+    .toolbar button, .tab-bar button { height: 36px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 0 12px; font-size: 13px; }
+    .tab-bar { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tab-bar button.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .view-with-tabs { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 16px; align-items: start; }
+    .view-with-tabs > .tab-bar { flex-direction: column; flex-wrap: nowrap; margin-bottom: 0; gap: 2px; padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); position: sticky; top: 20px; }
+    .view-with-tabs > .tab-bar button { width: 100%; text-align: left; }
+    .view-tab-body { min-width: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; }
+    th { color: var(--muted); font-weight: 600; background: var(--surface-soft); }
+    tr.overdue { background: #fef2f2; }
+    tr.critical { background: #fff1f2; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .tag { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 11px; background: #ccfbf1; color: #0f766e; }
+    .tag.warn { background: #fef3c7; color: #b45309; }
+    .tag.err { background: #fee2e2; color: #b91c1c; }
+    .tag.info { background: #dbeafe; color: #1d4ed8; }
+    .empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+    .empty strong { display: block; color: var(--ink); margin-bottom: 6px; }
+    .loc-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 8px; }
+    .loc-item { padding: 10px; border-radius: var(--radius); background: var(--surface-soft); text-align: center; }
+    .loc-item strong { display: block; font-size: 16px; }
+    .loc-item span { font-size: 11px; color: var(--muted); }
+    .staff-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 8px; }
+    .staff-card { padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-soft); }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,.45); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 100; }
+    .modal-backdrop.show { display: flex; }
+    .modal { width: min(520px,100%); background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); padding: 20px; }
+    .modal h3 { margin: 0 0 10px; }
+    .modal p { margin: 0 0 14px; color: var(--muted); line-height: 1.6; font-size: 13px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .toast { position: fixed; right: 20px; bottom: 20px; background: #111827; color: #fff; padding: 10px 16px; border-radius: var(--radius); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 200; font-size: 13px; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="global-top">
+      <div class="logo">ERP</div>
+      <div class="search"><input type="search" placeholder="搜索或输入命令 ⌘+G" readonly></div>
+      <div class="actions"><span>🔔</span><span>帮助 ▾</span><span class="avatar">刘</span></div>
+    </header>
+
+    <aside class="sidebar">
+      <div class="menu-group">
+        <div class="menu-group-title">公共</div>
+      </div>
+      <div class="menu-group">
+        <div class="menu-parent">▾ 监控看板</div>
+        <nav id="nav">
+          <button type="button" class="menu-item active" data-view="overview">运营总览</button>
+          <button type="button" class="menu-item" data-view="users">用户维度</button>
+          <button type="button" class="menu-item" data-view="assets">资产维度</button>
+          <button type="button" class="menu-item" data-view="orders">订单维度</button>
+          <button type="button" class="menu-item" data-view="faults">故障运维</button>
+          <button type="button" class="menu-item" data-view="battery">电池异常</button>
+          <button type="button" class="menu-item" data-view="ledger">明细台账</button>
+        </nav>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page-head">
+        <div>
+          <h1 id="pageTitle">运营看板</h1>
+          <div class="sub" id="pageSub">用户 · 资产 · 订单 · 故障运维</div>
+        </div>
+        <div class="filters topbar">
+          <select id="channelSelect" aria-label="渠道">
+            <option value="all">全部渠道</option>
+            <option value="sf">顺丰</option>
+            <option value="jd">京东</option>
+            <option value="wm">外卖</option>
+            <option value="other">其他</option>
+          </select>
+          <button type="button" class="primary" id="refreshBtn">刷新</button>
+        </div>
+      </div>
+
+      <div class="error-banner" id="errorBanner">
+        <span>数据加载失败，请稍后重试（移动端已知卡顿问题已记录行动项）</span>
+        <button type="button" class="primary" id="retryBtn">重试</button>
+      </div>
+
+      <div class="drill-back" id="drillBack" hidden>
+        <button type="button" id="backOverview">← 返回运营看板</button>
+      </div>
+
+      <div id="hintBox" class="hint" hidden></div>
+
+      <div id="contentRoot">
+        <section class="view active" id="view-overview">
+          <div id="overviewDash"></div>
+        </section>
+
+        <section class="view" id="view-users">
+          <div class="view-with-tabs">
+          <div class="tab-bar" id="userTabs">
+            <button type="button" class="active" data-user-tab="overview">用户一览明细</button>
+            <button type="button" data-user-tab="retention">新增及留存看板</button>
+            <button type="button" data-user-tab="sf">顺丰用户一览表</button>
+          </div>
+          <div class="view-tab-body">
+          <div class="user-section active" data-user-section="overview">
+            <div class="hint" id="userHint">活跃用户：持有有效电池卡、未过期且未逾期。留存口径由季利兵团队 ERP 流程定义。</div>
+            <div class="user-scope-toggle" id="userScopeToggle">
+              <button type="button" data-user-scope="all" class="active">所有用户</button>
+              <button type="button" data-user-scope="sf">顺丰用户</button>
+            </div>
+            <div class="metric-grid detail" id="userMetrics"></div>
+            <div class="panel">
+              <h2>组织明细（后台须保留细粒度）</h2>
+              <div class="toolbar"><input type="search" id="userSearch" placeholder="搜索组织、区域…"></div>
+              <div id="userTableWrap"></div>
+            </div>
+          </div>
+          <div class="user-section" data-user-section="retention">
+            <div class="hint">新增及留存看板：按月统计新增、留存、流失用户，支持渠道对比。</div>
+            <div class="metric-grid detail" id="retentionMetrics"></div>
+            <div class="panel"><h2>近 6 月趋势</h2><div class="chart" id="retentionChart"></div></div>
+          </div>
+          <div class="user-section" data-user-section="sf">
+            <div class="hint">顺丰用户一览表：仅展示顺丰渠道组织与用户汇总。</div>
+            <div class="panel">
+              <h2>顺丰组织明细</h2>
+              <div class="toolbar"><input type="search" id="sfUserSearch" placeholder="搜索顺丰组织…"></div>
+              <div id="sfUserTableWrap"></div>
+            </div>
+          </div>
+          </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-assets">
+          <div class="view-with-tabs">
+          <div class="tab-bar" id="assetTabs">
+            <button type="button" class="active" data-asset-tab="overview">概览</button>
+            <button type="button" data-asset-tab="version">电池版本</button>
+            <button type="button" data-asset-tab="map">地图</button>
+            <button type="button" data-asset-tab="accept">电柜批量验收</button>
+          </div>
+          <div class="view-tab-body">
+          <div class="asset-section active" data-asset-section="overview">
+            <div class="asset-erp-links" id="assetDetailErpLinks" style="margin-bottom:14px;border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px"></div>
+            <div class="metric-grid detail" id="assetMetrics"></div>
+            <div class="panel">
+              <h2>资产归属位置</h2>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 10px">运营域含用户侧、隔口、备件/维修中、成品仓/制革仓等全节点，≠ 仅用户+隔口</p>
+              <div class="loc-grid" id="locGrid"></div>
+            </div>
+            <div class="panel">
+              <h2>换电压力 · 高压力站点（标准 1.5:1）</h2>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 10px">参考 3494/224 站点编码；低于标准提示调拨或新增设备</p>
+              <div id="ratioTableWrap"></div>
+            </div>
+          </div>
+          <div class="asset-section" data-asset-section="version">
+            <div class="panel">
+              <h2>电池版本</h2>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 10px">跳转智格 ERP 查看按版本筛选的电池列表与分布</p>
+              <div class="section-links"><a href="https://erp.smart-grid.cn/app/battery?id_organization=1710818536650336660&amp;software_version=%5B%22like%22%2C%22%25ZZ20S15%25%22%5D" target="_blank" rel="noopener noreferrer">打开电池版本 →</a></div>
+              <div class="version-bars" id="batteryVersionBars" style="margin-top:14px"></div>
+            </div>
+            <div class="panel">
+              <h2>电柜版本</h2>
+              <div class="section-links">
+                <a href="https://erp.smart-grid.cn/app/query-report/%E6%8D%A2%E7%94%B5%E6%9F%9C%E7%89%88%E6%9C%AC%E4%B8%80%E8%A7%88%E8%A1%A8" target="_blank" rel="noopener noreferrer">换电柜版本一览 →</a>
+                <a href="https://erp.smart-grid.cn/app/query-report/%E5%85%85%E7%94%B5%E6%9F%9C%E7%89%88%E6%9C%AC%E4%B8%80%E8%A7%88%E8%A1%A8" target="_blank" rel="noopener noreferrer">充电柜版本一览 →</a>
+              </div>
+              <div id="batteryVersionTableWrap" style="margin-top:12px"></div>
+            </div>
+          </div>
+          <div class="asset-section" data-asset-section="map">
+            <div class="panel">
+              <h2>电柜地图</h2>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">原型示意；完整地图请跳转 ERP</p>
+              <div class="section-links" style="margin-bottom:12px"><a href="https://erp.smart-grid.cn/app/smartgrid_cabinet_map" target="_blank" rel="noopener noreferrer">打开电柜地图 →</a></div>
+              <div class="map-mock" id="assetMapMock"></div>
+              <div class="loc-grid" style="margin-top:12px" id="mapLegend"></div>
+            </div>
+          </div>
+          <div class="asset-section" data-asset-section="accept">
+            <div class="panel">
+              <h2>电柜批量验收</h2>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">新投电柜批量扫码验收进度；未完成项需运维现场确认</p>
+              <div class="section-links" style="margin-bottom:12px"><a href="https://erp.smart-grid.cn/app/cabinetbatchqc" target="_blank" rel="noopener noreferrer">打开批量验收 →</a></div>
+              <div class="accept-summary" id="acceptSummary"></div>
+              <div class="toolbar">
+                <input type="search" id="acceptSearch" placeholder="搜索批次号、站点…">
+                <button type="button" id="acceptNewBtn">新建验收批次</button>
+              </div>
+              <div id="acceptTableWrap"></div>
+            </div>
+          </div>
+          </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-orders">
+          <div class="hint">统计口径：按所选周期统计换电订单数与预计收入；支付按月统一（宁波手动调整）。</div>
+          <div class="user-scope-toggle order-range-toggle" id="orderRangeToggleDrill">
+            <button type="button" data-order-range="today" class="active">今日</button>
+            <button type="button" data-order-range="7d">近7日</button>
+            <button type="button" data-order-range="30d">近30日</button>
+          </div>
+          <div class="asset-erp-links" id="orderDetailLinks" style="margin-bottom:14px;border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px"></div>
+          <div class="metric-grid detail" id="orderMetrics"></div>
+          <div class="panel"><h2 id="orderChartTitle">各渠道 · 今日换电订单数</h2><div class="chart" id="orderChart"></div></div>
+        </section>
+
+        <section class="view" id="view-faults">
+          <div class="asset-erp-links" id="faultDetailLinks" style="margin-bottom:14px;border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px"></div>
+          <div class="metric-grid detail" id="faultMetrics"></div>
+          <div class="panel">
+            <h2>运维个人挂载</h2>
+            <div class="staff-grid" id="staffGrid"></div>
+          </div>
+          <div class="panel">
+            <h2>故障工单（超时置顶）</h2>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px">电柜离线 &gt; 30 分钟未自恢复 → 需人工介入</p>
+            <div id="faultTableWrap"></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-battery">
+          <div class="hint">售后运维不可独立判定电池异常，须技术人员（如朱伟）评估后更新处理状态。18/19 串高温存在燃烧隐患，须立即断电回收。</div>
+          <div class="kpi-grid" id="batteryKpis"></div>
+          <div class="panel" style="margin-top:14px"><h2>电池异常列表</h2><div id="batteryTableWrap"></div></div>
+        </section>
+
+        <section class="view" id="view-ledger">
+          <div class="view-with-tabs">
+          <div class="tab-bar" id="ledgerTabs">
+            <button type="button" class="active" data-tab="org">组织用户</button>
+            <button type="button" data-tab="ratio">配比站点</button>
+            <button type="button" data-tab="fault">故障工单</button>
+            <button type="button" data-tab="battery">电池异常</button>
+          </div>
+          <div class="view-tab-body">
+          <div class="panel">
+            <div class="toolbar">
+              <input type="search" id="ledgerSearch" placeholder="搜索…">
+              <button type="button" id="exportBtn">导出 CSV</button>
+            </div>
+            <div id="ledgerTableWrap"></div>
+          </div>
+          </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <h3 id="modalTitle">预警详情</h3>
+      <p id="modalBody"></p>
+      <div class="modal-actions">
+        <button type="button" id="modalClose">关闭</button>
+        <button type="button" class="primary" id="modalOk">知道了</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const CHANNELS = [
+      { id: "sf", name: "顺丰" },
+      { id: "jd", name: "京东" },
+      { id: "wm", name: "外卖" },
+      { id: "other", name: "其他" }
+    ];
+    const CHANNEL_LABELS = { sf: "顺丰", jd: "京东", wm: "外卖", other: "其他" };
+    const LOCS = ["工厂内", "用户侧", "隔口", "前置仓", "维修仓", "成品仓", "制革仓", "备件/退回"];
+
+    const EXTERNAL_LINKS = {
+      userOverview: "https://erp.smart-grid.cn/app/query-report/%E7%94%A8%E6%88%B7%E4%B8%80%E8%A7%88%E8%A1%A8",
+      userRetention: "https://erp.smart-grid.cn/app/%E7%94%A8%E6%88%B7%E6%96%B0%E5%A2%9E%E5%8F%8A%E7%95%99%E5%AD%98",
+      sfUserOverview: "https://erp.smart-grid.cn/app/query-report/%E9%A1%BA%E4%B8%B0%E7%94%A8%E6%88%B7%E4%B8%80%E8%A7%88%E8%A1%A8",
+      zhigeOrg: "https://38690000-id.entry.go-grid.com.cn/managePage/unitMgmt",
+      zhigeUser: "https://38690000-id.entry.go-grid.com.cn/managePage/userMgmt",
+      swapPressure: "https://erp.smart-grid.cn/app/query-report/%E6%8D%A2%E7%94%B5%E5%8E%8B%E5%8A%9B%E9%85%8D%E6%AF%94%E8%A1%A8",
+      cabinetOnline: "https://erp.smart-grid.cn/app/cabinet?code_enable_status=1&city=%5B%22like%22%2C%22%25%E6%9D%AD%E5%B7%9E%25%22%5D&domain=SmartGrid",
+      batteryOnline: "https://erp.smart-grid.cn/app/%E7%94%B5%E6%B1%A0%E8%B5%84%E4%BA%A7"
+    };
+
+    const BATTERY_ERP_LINKS = [
+      { label: "入柜统计", href: "https://erp.smart-grid.cn/app/query-report/%E7%94%B5%E6%B1%A0%E5%85%A5%E6%9F%9C%E6%83%85%E5%86%B5%E7%BB%9F%E8%AE%A1" },
+      { label: "电池盘点", href: "https://erp.smart-grid.cn/app/%E7%94%B5%E6%B1%A0%E7%9B%98%E7%82%B9" },
+      { label: "盘点一览", href: "https://erp.smart-grid.cn/app/query-report/%E7%94%B5%E6%B1%A0%E7%9B%98%E7%82%B9%E4%B8%80%E8%A7%88" },
+      { label: "流转记录", href: "https://erp.smart-grid.cn/app/battery-ownership-transfer-record?id_battery=1755767498303666626" },
+      { label: "电池版本", href: "https://erp.smart-grid.cn/app/battery?id_organization=1710818536650336660&software_version=%5B%22like%22%2C%22%25ZZ20S15%25%22%5D" }
+    ];
+
+    const CABINET_ERP_LINKS = [
+      { label: "电柜地图", href: "https://erp.smart-grid.cn/app/smartgrid_cabinet_map" },
+      { label: "批量验收", href: "https://erp.smart-grid.cn/app/cabinetbatchqc" },
+      { label: "电柜盘点", href: "https://erp.smart-grid.cn/app/%E7%94%B5%E6%9F%9C%E7%9B%98%E7%82%B9" },
+      { label: "电柜列表", href: "https://erp.smart-grid.cn/app/cabinet?code_enable_status=1&city=%5B%22like%22%2C%22%25%E6%9D%AD%E5%B7%9E%25%22%5D&domain=SmartGrid" },
+      { label: "换电柜版本", href: "https://erp.smart-grid.cn/app/query-report/%E6%8D%A2%E7%94%B5%E6%9F%9C%E7%89%88%E6%9C%AC%E4%B8%80%E8%A7%88%E8%A1%A8" },
+      { label: "充电柜版本", href: "https://erp.smart-grid.cn/app/query-report/%E5%85%85%E7%94%B5%E6%9F%9C%E7%89%88%E6%9C%AC%E4%B8%80%E8%A7%88%E8%A1%A8" }
+    ];
+
+    const ZHIGE_ASSET_LINKS = [
+      { label: "换电柜管理", href: "https://38690000-id.entry.go-grid.com.cn/managePage/batterySwapMgmt" },
+      { label: "电池管理", href: "https://38690000-id.entry.go-grid.com.cn/managePage/batteryMgmt" },
+      { label: "充电柜管理", href: "https://38690000-id.entry.go-grid.com.cn/managePage/chargeCabinetMgmt" },
+      { label: "格口管理", href: "https://38690000-id.entry.go-grid.com.cn/managePage/chargeCabinetGridPortMgmt" },
+      { label: "预约回收", href: "https://38690000-id.entry.go-grid.com.cn/managePage/batteryRecycling" },
+      { label: "安卓屏幕", href: "https://38690000-id.entry.go-grid.com.cn/managePage/displayScreenMgmt" },
+      { label: "远程升级", href: "https://38690000-id.entry.go-grid.com.cn/managePage/deviceUpgradeTask" },
+      { label: "电柜列表", href: "https://erp.smart-grid.cn/app/cabinet?code_enable_status=1&city=%5B%22like%22%2C%22%25%E6%9D%AD%E5%B7%9E%25%22%5D&domain=SmartGrid" },
+      { label: "电池归属", href: "https://38690000-id.entry.go-grid.com.cn/managePage/batteryBelongRecord" }
+    ];
+
+    const ORDER_ERP_LINKS = [
+      { label: "换电记录", href: "https://erp.smart-grid.cn/app/battery-exchange-record" },
+      { label: "场租电费", href: "https://erp.smart-grid.cn/app/query-report/Periodic%20Payment%20Notice" },
+      { label: "电费余额", href: "https://erp.smart-grid.cn/app/query-report/%E7%94%B5%E8%B4%B9%E4%BD%99%E9%A2%9D%E4%B8%80%E8%A7%88%E8%A1%A8" },
+      { label: "应付电费", href: "https://erp.smart-grid.cn/app/query-report/%E5%BA%94%E4%BB%98%E7%94%B5%E8%B4%B9%E4%B8%80%E8%A7%88%E8%A1%A8" },
+      { label: "周期费用", href: "https://erp.smart-grid.cn/app/periodic-payment" }
+    ];
+
+    const ZHIGE_ORDER_LINKS = [
+      { label: "服务协议", href: "https://38690000-id.entry.go-grid.com.cn/managePage/serviceProtocolManagement" },
+      { label: "协议订单", href: "https://38690000-id.entry.go-grid.com.cn/managePage/serviceOrderManagement" },
+      { label: "冻结记录", href: "https://38690000-id.entry.go-grid.com.cn/managePage/serviceFreezeRecord" },
+      { label: "凭证管理", href: "https://38690000-id.entry.go-grid.com.cn/managePage/voucherMgmt" },
+      { label: "换电订单", href: "https://38690000-id.entry.go-grid.com.cn/managePage/batterySwapOrderMgmt" },
+      { label: "KA用户", href: "https://38690000-id.entry.go-grid.com.cn/managePage/keyAccountUserMgmt" },
+      { label: "服务管理", href: "https://38690000-id.entry.go-grid.com.cn/managePage/serviceManagement" },
+      { label: "优惠券管理", href: "https://38690000-id.entry.go-grid.com.cn/managePage/couponMgmt" },
+      { label: "用户派发", href: "https://38690000-id.entry.go-grid.com.cn/managePage/couponDistribution" },
+      { label: "用户营销", href: "https://38690000-id.entry.go-grid.com.cn/managePage/userMarketingConfiguration" },
+      { label: "充电订单", href: "https://38690000-id.entry.go-grid.com.cn/managePage/chargingOrderMgmt" },
+      { label: "退还订单", href: "https://38690000-id.entry.go-grid.com.cn/managePage/returnOrderMgmt" },
+      { label: "短信管理", href: "https://38690000-id.entry.go-grid.com.cn/managePage/smsQueueMgmt" }
+    ];
+
+    const FAULT_ERP_LINKS = [
+      { label: "断线&11串电芯-派单用", href: "https://erp.smart-grid.cn/app/query-report/%E6%96%AD%E7%BA%BF%2611%E4%B8%B2%E7%94%B5%E8%8A%AF-%E6%B4%BE%E5%8D%95%E7%94%A8" },
+      { label: "电池即将饿死提醒", href: "https://erp.smart-grid.cn/app/query-report/%E7%94%B5%E6%B1%A0%E5%8D%B3%E5%B0%86%E9%A5%BF%E6%AD%BB%E6%8F%90%E9%86%92" },
+      { label: "电池回收运维跟进报表", href: "https://erp.smart-grid.cn/app/query-report/%E7%94%B5%E6%B1%A0%E5%9B%9E%E6%94%B6%E8%BF%90%E7%BB%B4%E8%B7%9F%E8%BF%9B%E6%8A%A5%E8%A1%A8" },
+      { label: "电池回收客服跟进报表-2", href: "https://erp.smart-grid.cn/app/query-report/%E7%94%B5%E6%B1%A0%E5%9B%9E%E6%94%B6%E5%AE%A2%E6%9C%8D%E8%B7%9F%E8%BF%9B%E6%8A%A5%E8%A1%A8-2" },
+      { label: "格口ID读取失败", href: "https://erp.smart-grid.cn/app/query-report/%E6%A0%BC%E5%8F%A3ID%E8%AF%BB%E5%8F%96%E5%A4%B1%E8%B4%A5" },
+      { label: "格口无法读取端口状态", href: "https://erp.smart-grid.cn/app/query-report/%E6%A0%BC%E5%8F%A3%E6%97%A0%E6%B3%95%E8%AF%BB%E5%8F%96%E7%AB%AF%E5%8F%A3%E7%8A%B6%E6%80%81" },
+      { label: "柜内电池流转异常", href: "https://erp.smart-grid.cn/app/query-report/%E6%9F%9C%E5%86%85%E7%94%B5%E6%B1%A0%E6%B5%81%E8%BD%AC%E5%BC%82%E5%B8%B8" },
+      { label: "电池电量跳变", href: "https://erp.smart-grid.cn/app/query-report/%E7%94%B5%E6%B1%A0%E7%94%B5%E9%87%8F%E8%B7%B3%E5%8F%98" },
+      { label: "电柜不充电的格口数", href: "https://erp.smart-grid.cn/app/query-report/%E7%94%B5%E6%9F%9C%E4%B8%8D%E5%85%85%E7%94%B5%E7%9A%84%E6%A0%BC%E5%8F%A3%E6%95%B0" },
+      { label: "被禁用的换电格口", href: "https://erp.smart-grid.cn/app/query-report/%E8%A2%AB%E7%A6%81%E7%94%A8%E7%9A%84%E6%8D%A2%E7%94%B5%E6%A0%BC%E5%8F%A3" },
+      { label: "电柜警告", href: "https://erp.smart-grid.cn/app/cabinet-alarm?is_end=0&reason=%5B%22is%22%2C%22not+set%22%5D&alarm_type=CABINET_DISCONNECT&domain=SmartGrid" },
+      { label: "充电柜实时断网", href: "https://erp.smart-grid.cn/app/query-report/%E5%85%85%E7%94%B5%E6%9F%9C%E5%AE%9E%E6%97%B6%E6%96%AD%E7%BD%91" },
+      { label: "被禁用的充电格口", href: "https://erp.smart-grid.cn/app/query-report/%E8%A2%AB%E7%A6%81%E7%94%A8%E7%9A%84%E5%85%85%E7%94%B5%E6%A0%BC%E5%8F%A3" },
+      { label: "换电柜近一周断网统计", href: "https://erp.smart-grid.cn/app/query-report/%E8%BF%91%E4%B8%80%E5%91%A8%E6%9F%9C%E5%AD%90%E6%96%AD%E7%BD%91%E7%BB%9F%E8%AE%A1%E6%8A%A5%E8%A1%A8" },
+      { label: "充电柜近一周断网统计", href: "https://erp.smart-grid.cn/app/query-report/%E8%BF%91%E4%B8%80%E5%91%A8%E6%96%AD%E7%BD%91%E6%9C%80%E4%B8%A5%E9%87%8D%E7%9A%84%E5%85%85%E7%94%B5%E6%9F%9C" },
+      { label: "换电柜近一月断网统计", href: "https://erp.smart-grid.cn/app/query-report/%E8%BF%91%E4%B8%80%E4%B8%AA%E6%9C%88%E6%96%AD%E7%BD%91%E6%9C%80%E4%B8%A5%E9%87%8D%E7%9A%84%E6%8D%A2%E7%94%B5%E6%9F%9C" },
+      { label: "充电柜近一月断网统计", href: "https://erp.smart-grid.cn/app/query-report/%E8%BF%91%E4%B8%80%E4%B8%AA%E6%9C%88%E6%96%AD%E7%BD%91%E6%9C%80%E4%B8%A5%E9%87%8D%E7%9A%84%E5%85%85%E7%94%B5%E6%9F%9C" }
+    ];
+
+    const FAULT_BATTERY_ERP_LINKS = FAULT_ERP_LINKS.slice(0, 4);
+    const FAULT_CABINET_ERP_LINKS = FAULT_ERP_LINKS.slice(4, 13);
+    const FAULT_DISCONNECT_ERP_LINKS = FAULT_ERP_LINKS.slice(13);
+
+    const ORDER_RANGE_CONFIG = {
+      today: { label: "今日", orderFactor: 1, revFactor: 1, compareLabel: "对比昨日", orderPct: "+5.12%", revPct: "+12.12%" },
+      "7d": { label: "近7日", orderFactor: 6.82, revFactor: 6.55, compareLabel: "对比上周期", orderPct: "+3.24%", revPct: "+8.06%" },
+      "30d": { label: "近30日", orderFactor: 28.4, revFactor: 27.2, compareLabel: "对比上周期", orderPct: "+2.18%", revPct: "+6.42%" }
+    };
+
+    const ORDER_INCOME_CHANNELS = [
+      { id: "sf", name: "顺丰" },
+      { id: "jd", name: "京东" },
+      { id: "yto", name: "圆通" },
+      { id: "cainiao", name: "菜鸟" }
+    ];
+
+    function zhigeLinksHtml(links) {
+      return links.map(l => extLink(l.href, l.label)).join("");
+    }
+
+    function erpColLinks(links) {
+      return `<div class="asset-col-links">${zhigeLinksHtml(links)}</div>`;
+    }
+
+    function erpLinkRow(label, links) {
+      return `<div class="asset-link-row"><span>${label}：</span>${zhigeLinksHtml(links)}</div>`;
+    }
+
+    function extLink(href, label, opts = {}) {
+      const arrow = opts.arrow ? " →" : "";
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}${arrow}</a>`;
+    }
+
+    const state = {
+      role: "admin", channel: "all", range: "today", view: "overview",
+      userScope: "all", orderRange: "today", assetTab: "overview", userTab: "overview",
+      search: { user: "", ledger: "", accept: "", sf: "" }, ledgerTab: "org",
+      empty: false, error: false, tick: 0
+    };
+
+    const titles = {
+      overview: "运营看板", users: "用户维度", assets: "资产维度",
+      orders: "订单维度", faults: "故障运维", battery: "电池异常", ledger: "明细台账"
+    };
+    const subs = {
+      overview: "用户 · 资产 · 订单 · 故障运维（各模块仅展示关键指标，点击「查看详情」下钻）",
+      users: "渠道汇总与组织明细", assets: "设备分布与换电压力配比",
+      orders: "换电用户与收入统计", faults: "工单状态与运维挂载",
+      battery: "电池健康度与高危处理", ledger: "细粒度数据查询与导出"
+    };
+
+    const alerts = [
+      { id: 1, level: "warn", title: "3 个站点换电压力不足", detail: "站点 3494-A：16 组电池服务 36 用户，应为 54 组（1.5:1）。建议调拨或新增设备。" },
+      { id: 2, level: "err", title: "2 台电柜离线超 30 分钟", detail: "柜号 EC-8821、EC-9103 物联网离线未自恢复，已生成待处理工单，需运维人工介入。" },
+      { id: 3, level: "err", title: "1 块 18 串电池高温高危", detail: "电池 BT-18S-0042 触发高温预警，存在燃烧隐患，须立即断电并回收返厂，等待朱伟技术评估。" }
+    ];
+
+    function seed(n) { return Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1; }
+    function showToast(m) { const el = document.getElementById("toast"); el.textContent = m; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 2200); }
+    function fmt(n) { return state.empty ? "—" : Number(n).toLocaleString(); }
+
+    function channelFilter(list, key) {
+      if (state.channel === "all") return list;
+      return list.filter(x => x[key] === state.channel || x.channelId === state.channel);
+    }
+
+    function buildChannelStats() {
+      const base = { sf: 12840, jd: 5620, wm: 2870, other: 980 };
+      const f = state.range === "week" ? 1.2 : state.range === "month" ? 1 : 1;
+      return CHANNELS.map(c => ({
+        ...c,
+        total: state.empty ? 0 : Math.round(base[c.id] * f + seed(state.tick + c.id.charCodeAt(0)) * 20),
+        active: state.empty ? 0 : Math.round(base[c.id] * 0.62 * f),
+        swapToday: state.empty ? 0 : Math.round(base[c.id] * 0.08 * f),
+        revenue: state.empty ? 0 : Math.round(base[c.id] * 0.08 * f * 0.15)
+      }));
+    }
+
+    function buildOrgs() {
+      const orgs = {
+        sf: ["华东网点", "华南网点", "华北网点", "西南网点"],
+        jd: ["京东骑手站 A", "京东骑手站 B"],
+        wm: ["医大外卖站", "附属医院站", "三瑞达运营点"],
+        other: ["其他合作点 A", "其他合作点 B"]
+      };
+      const rows = [];
+      CHANNELS.forEach(ch => {
+        orgs[ch.id].forEach((name, i) => {
+          rows.push({
+            channelId: ch.id, channel: ch.name, region: ["华东", "华南", "华北", "西南"][i % 4],
+            org: name,
+            total: state.empty ? 0 : Math.round(800 + seed(i + ch.id.length) * 3200),
+            active: state.empty ? 0 : Math.round(400 + seed(i + 2) * 1800),
+            retention: state.empty ? "—" : (78 + seed(i) * 12).toFixed(1) + "%"
+          });
+        });
+      });
+      return rows;
+    }
+
+    function buildRatioSites() {
+      return [
+        { code: "3494-A", channel: "顺丰", users: 36, batteries: 16, need: 54, ratio: "0.44:1" },
+        { code: "224-B", channel: "顺丰", users: 48, batteries: 40, need: 72, ratio: "0.83:1" },
+        { code: "JD-12", channel: "京东", users: 22, batteries: 20, need: 33, ratio: "0.91:1" },
+        { code: "WM-01", channel: "外卖", users: 15, batteries: 18, need: 23, ratio: "1.20:1" }
+      ].map(s => ({ ...s, pressure: s.batteries / s.users < 1.5 }));
+    }
+
+    function buildBatteryVersions() {
+      return [
+        { version: "V2.1", count: 6200, note: "主力版本" },
+        { version: "V3.0", count: 4180, note: "新投批次" },
+        { version: "V3.5", count: 2100, note: "试点升级" },
+        { version: "V1.8", count: 186, note: "待召回" }
+      ];
+    }
+
+    function buildAcceptBatches() {
+      return [
+        { batch: "AC-202606-01", site: "3494-A", channel: "顺丰", total: 24, done: 24, status: "已完成", date: "2026-06-12" },
+        { batch: "AC-202606-02", site: "224-B", channel: "顺丰", total: 18, done: 14, status: "验收中", date: "2026-06-15" },
+        { batch: "AC-202606-03", site: "JD-12", channel: "京东", total: 12, done: 0, status: "待验收", date: "2026-06-17" },
+        { batch: "AC-202606-04", site: "WM-01", channel: "外卖", total: 8, done: 8, status: "已完成", date: "2026-06-10" }
+      ];
+    }
+
+    function buildFaults() {
+      return [
+        { id: "FT-001", type: "电柜离线", cabinet: "EC-8821", owner: "张运维", status: "待处理", hours: 5.2, overdue: true },
+        { id: "FT-002", type: "电柜跳闸", cabinet: "EC-7710", owner: "李运维", status: "处理中", hours: 1.5, overdue: false },
+        { id: "FT-003", type: "电柜离线", cabinet: "EC-9103", owner: "张运维", status: "待处理", hours: 3.8, overdue: true },
+        { id: "FT-004", type: "其他", cabinet: "EC-5502", owner: "王运维", status: "已完成", hours: 0.5, overdue: false }
+      ];
+    }
+
+    function buildBattery() {
+      return [
+        { id: "BT-001", type: "电量跳变", sn: "BT-SOC-882", detail: "68% → 20%", level: "warn", status: "待技术评估" },
+        { id: "BT-002", type: "高温预警", sn: "BT-18S-0042", detail: "18串 62°C", level: "err", status: "待技术评估" },
+        { id: "BT-003", type: "单体电压异常", sn: "BT-CELL-331", detail: "第3串 2.1V", level: "warn", status: "待技术评估" },
+        { id: "BT-004", type: "高频报错", sn: "BT-FRQ-119", detail: "24h内8次", level: "warn", status: "继续使用" },
+        { id: "BT-005", type: "高温预警", sn: "BT-19S-0077", detail: "19串 58°C", level: "err", status: "回收返厂" }
+      ];
+    }
+
+    function metricCard(label, value, opts = {}) {
+      const cls = [opts.warn ? "warn" : "", opts.danger ? "danger" : ""].filter(Boolean).join(" ");
+      const live = opts.live ? '<span class="live-dot"></span>' : "";
+      const valCls = state.empty ? "value empty" : "value";
+      const display = state.empty ? "—" : (typeof value === "number" ? value.toLocaleString() : value);
+      return `<div class="metric-card ${cls}"><button type="button" class="more" title="更多">⋯</button><div class="label">${live}${label}</div><div class="${valCls}">${display}</div></div>`;
+    }
+
+    function renderMetricGrid(elId, cards) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.innerHTML = cards.join("");
+    }
+
+    function computeSnapshot() {
+      const ch = buildChannelStats();
+      const filtered = state.channel === "all" ? ch : ch.filter(c => c.id === state.channel);
+      const faults = buildFaults();
+      const pending = faults.filter(f => f.status === "待处理").length;
+      const processing = faults.filter(f => f.status === "处理中").length;
+      const done = faults.filter(f => f.status === "已完成").length;
+      const overdue = faults.filter(f => f.overdue).length;
+      const offline = faults.filter(f => f.type === "电柜离线" && f.status !== "已完成").length;
+      const trip = faults.filter(f => f.type === "电柜跳闸" && f.status !== "已完成").length;
+      return {
+        ch, filtered,
+        totalUsers: filtered.reduce((s, c) => s + c.total, 0),
+        active: filtered.reduce((s, c) => s + c.active, 0),
+        swap: filtered.reduce((s, c) => s + c.swapToday, 0),
+        rev: filtered.reduce((s, c) => s + c.revenue, 0),
+        online: state.empty ? 0 : 1724 + state.tick % 3,
+        deployed: state.empty ? 0 : 1860 + state.tick % 5,
+        batteries: state.empty ? 0 : 12480,
+        batteryOnline: state.empty ? 0 : 11886 + state.tick % 4,
+        cabinetOperating: state.empty ? 0 : 1580,
+        cabinetPreWarehouse: state.empty ? 0 : 86,
+        cabinetFault: state.empty ? 0 : 12,
+        slotFault: state.empty ? 0 : 47,
+        batteryDischarging: state.empty ? 0 : 8420,
+        batteryCharging: state.empty ? 0 : 3180,
+        batteryLost: state.empty ? 0 : 186,
+        batteryTransferringReal: state.empty ? 0 : 58,
+        batteryTransferringVirtual: state.empty ? 0 : 36,
+        pressure: state.empty ? 0 : buildRatioSites().filter(s => s.pressure).length,
+        faults, pending, processing, done, overdue, offline, trip
+      };
+    }
+
+    function buildUserModuleStats() {
+      const ch = buildChannelStats();
+      const isSf = state.userScope === "sf";
+      const pool = isSf ? ch.filter(c => c.id === "sf") : ch;
+      const totalUsers = pool.reduce((s, c) => s + c.total, 0);
+      const active = pool.reduce((s, c) => s + c.active, 0);
+      const mock = isSf
+        ? { todayNew: 18, monthNew: 142, monthRetain: 7920, monthLost: 58, activeSub: "对比昨日 +8.32%" }
+        : { todayNew: 42, monthNew: 234, monthRetain: 11200, monthLost: 186, activeSub: "对比昨日 +10.12%" };
+      return {
+        isSf,
+        scopeLabel: isSf ? "顺丰用户" : "所有用户",
+        totalUsers,
+        active,
+        todayNew: state.empty ? 0 : mock.todayNew,
+        monthNew: state.empty ? 0 : mock.monthNew,
+        monthRetain: state.empty ? 0 : mock.monthRetain,
+        monthLost: state.empty ? 0 : mock.monthLost,
+        activeSub: mock.activeSub
+      };
+    }
+
+    function syncUserScopeToggle() {
+      document.querySelectorAll("#userScopeToggle [data-user-scope]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.userScope === state.userScope);
+      });
+    }
+
+    function renderUserModuleBlock() {
+      const u = buildUserModuleStats();
+      const noMore = { noMore: true };
+      return `<div class="module-block user-module">
+        <div class="module-head"><h2>用户</h2></div>
+        <div class="user-sub-module">
+          <div class="user-sub-head">
+            ${extLink(EXTERNAL_LINKS.userOverview, "用户一览明细", { arrow: true })}
+          </div>
+          <div class="user-metric-row">
+            ${splitMetric("用户总数", u.totalUsers, state.empty ? "" : `今日新增 ${u.todayNew}`, { live: true, inlineSub: true, subMuted: true, ...noMore })}
+            <div class="split-divider"></div>
+            ${splitMetric("活跃换电用户", u.active, u.activeSub, { inlineSub: true, ...noMore })}
+          </div>
+        </div>
+        <div class="user-sub-module">
+          <div class="user-sub-head">
+            ${extLink(EXTERNAL_LINKS.userRetention, "新增及留存看板", { arrow: true })}
+          </div>
+          <div class="user-metric-grid">
+            ${splitMetric("当月新增", u.monthNew, "", noMore)}
+            ${splitMetric("当月留存", u.monthRetain, "", noMore)}
+            ${splitMetric("当月流失", u.monthLost, "", { danger: u.monthLost > 0, ...noMore })}
+          </div>
+        </div>
+        <div class="user-module-footer">
+          ${extLink(EXTERNAL_LINKS.sfUserOverview, "顺丰用户一览表")}
+          <span class="user-external">智格：${extLink(EXTERNAL_LINKS.zhigeOrg, "组织管理")}${extLink(EXTERNAL_LINKS.zhigeUser, "用户管理")}</span>
+        </div>
+      </div>`;
+    }
+
+    function buildAssetModuleStats() {
+      const s = computeSnapshot();
+      const cabinetRate = s.deployed ? ((s.online / s.deployed) * 100).toFixed(2) : "—";
+      const batteryRate = s.batteries ? ((s.batteryOnline / s.batteries) * 100).toFixed(2) : "—";
+      return { ...s, cabinetRate, batteryRate };
+    }
+
+    function breakdownItem(label, value, danger) {
+      const cls = danger ? "breakdown-item danger" : "breakdown-item";
+      return `<div class="${cls}"><span>${label}</span><strong>${fmt(value)}</strong></div>`;
+    }
+
+    function breakdownItemDual(label, realVal, virtualVal) {
+      const dual = state.empty
+        ? `<strong>—</strong>`
+        : `<span class="breakdown-dual"><span class="val-real">${fmt(realVal)}</span><span class="val-sep">|</span><span class="val-virt">${fmt(virtualVal)}(虚)</span></span>`;
+      return `<div class="breakdown-item"><span>${label}</span>${dual}</div>`;
+    }
+
+    function renderAssetModuleBlock() {
+      const a = buildAssetModuleStats();
+      const pressureValCls = a.pressure > 0 ? "pressure-val danger" : "pressure-val";
+      return `<div class="module-block asset-module">
+        <div class="module-head">
+          <h2>资产</h2>
+        </div>
+        <div class="asset-columns">
+          <div class="asset-sub-module">
+            ${splitMetric("电柜在线", a.online, `在线率 ${a.cabinetRate}%`, { live: true, inlineSub: true, subMuted: true, noMore: true, labelHref: EXTERNAL_LINKS.cabinetOnline })}
+            <div class="breakdown-grid cabinet">
+              ${breakdownItem("运营中", a.cabinetOperating)}
+              ${breakdownItem("前置仓", a.cabinetPreWarehouse)}
+              ${breakdownItem("故障电柜", a.cabinetFault, a.cabinetFault > 0)}
+              ${breakdownItem("故障格口", a.slotFault, a.slotFault > 0)}
+            </div>
+            ${erpColLinks(CABINET_ERP_LINKS)}
+          </div>
+          <div class="asset-sub-module">
+            ${splitMetric("电池在线", a.batteryOnline, `在线率 ${a.batteryRate}%`, { live: true, inlineSub: true, subMuted: true, noMore: true, labelHref: EXTERNAL_LINKS.batteryOnline })}
+            <div class="breakdown-grid battery">
+              ${breakdownItem("放电", a.batteryDischarging)}
+              ${breakdownItem("充电", a.batteryCharging)}
+              ${breakdownItem("失联", a.batteryLost, a.batteryLost > 0)}
+              ${breakdownItemDual("调拨中", a.batteryTransferringReal, a.batteryTransferringVirtual)}
+            </div>
+            ${erpColLinks(BATTERY_ERP_LINKS)}
+          </div>
+        </div>
+        <div class="asset-footer">
+          <div class="asset-pressure-inline">
+            <a class="pressure-label" href="${EXTERNAL_LINKS.swapPressure}" target="_blank" rel="noopener noreferrer">高压力站点</a>
+            <strong class="${pressureValCls}">${fmt(a.pressure)}</strong>
+            ${state.empty ? "" : `<span class="pressure-sub">已持续 13 天</span>`}
+          </div>
+          <span class="user-external asset-external-links">智格：${zhigeLinksHtml(ZHIGE_ASSET_LINKS)}</span>
+        </div>
+      </div>`;
+    }
+
+    function buildOrderModuleStats() {
+      const s = computeSnapshot();
+      const cfg = ORDER_RANGE_CONFIG[state.orderRange] || ORDER_RANGE_CONFIG.today;
+      const orderCount = state.empty ? 0 : Math.round(s.swap * cfg.orderFactor);
+      const revenue = state.empty ? 0 : Math.round(s.rev * cfg.revFactor);
+      return {
+        range: state.orderRange,
+        rangeLabel: cfg.label,
+        orderCount,
+        revDisplay: state.empty ? "—" : "¥" + revenue.toLocaleString(),
+        orderCompare: state.empty ? "" : `${cfg.compareLabel} ${cfg.orderPct}`,
+        revCompare: state.empty ? "" : `${cfg.compareLabel} ${cfg.revPct}`,
+        incomeChannels: buildOrderIncomeChannels(),
+        expenditureMatrix: buildOrderExpenditureMatrix()
+      };
+    }
+
+    function buildOrderIncomeChannels() {
+      const cfg = ORDER_RANGE_CONFIG[state.orderRange] || ORDER_RANGE_CONFIG.today;
+      const baseOrders = { sf: 892, jd: 456, yto: 285, cainiao: 152 };
+      const baseRev = { sf: 134, jd: 68, yto: 43, cainiao: 23 };
+      return ORDER_INCOME_CHANNELS.map((ch, i) => ({
+        ...ch,
+        orders: state.empty ? 0 : Math.round(baseOrders[ch.id] * cfg.orderFactor + seed(state.tick + i) * 8),
+        revenue: state.empty ? 0 : Math.round(baseRev[ch.id] * cfg.revFactor + seed(state.tick + i + 10) * 3)
+      }));
+    }
+
+    function breakdownItemIncomeChannel(name, orders, revenue) {
+      const dual = state.empty
+        ? `<strong>—</strong>`
+        : `<span class="breakdown-dual"><span class="val-real">${fmt(orders)}</span><span class="val-sep">|</span><span class="val-rev">¥${revenue.toLocaleString()}</span></span>`;
+      return `<div class="breakdown-item"><span>${name}</span>${dual}</div>`;
+    }
+
+    function orderIncomeChannelsHtml(channels) {
+      return `<div class="order-income-channels">${channels.map(ch =>
+        breakdownItemIncomeChannel(ch.name, ch.orders, ch.revenue)
+      ).join("")}</div>`;
+    }
+
+    function buildOrderExpenditureMatrix() {
+      const count = (n, i) => state.empty ? 0 : Math.round(n + seed(state.tick + i) * 1.2);
+      const amount = (n) => state.empty ? 0 : n;
+      return {
+        columns: ["场租", "电费"],
+        rows: [
+          {
+            label: "临期",
+            cells: [
+              { count: count(6, 1), amount: amount(28000), danger: false },
+              { count: count(8, 3), amount: amount(52000), danger: false }
+            ]
+          },
+          {
+            label: "超期",
+            cells: [
+              { count: count(3, 2), amount: amount(17200), danger: true },
+              { count: count(5, 4), amount: amount(31200), danger: true }
+            ]
+          }
+        ]
+      };
+    }
+
+    function expenditureCellHtml(count, amount, danger) {
+      const cls = danger && count > 0 ? "order-exp-cell danger" : "order-exp-cell";
+      const val = state.empty
+        ? "—"
+        : `<span class="breakdown-dual"><span class="val-real">${fmt(count)}</span><span class="val-sep">|</span><span class="val-rev">¥${amount.toLocaleString()}</span></span>`;
+      return `<div class="${cls}">${val}</div>`;
+    }
+
+    function orderExpenditureItemsHtml(matrix) {
+      return `<div class="order-expenditure-table">
+        <div class="order-exp-table-head">
+          <span class="order-exp-corner"></span>
+          ${matrix.columns.map(col => `<span>${col}</span>`).join("")}
+        </div>
+        ${matrix.rows.map(row => `
+          <div class="order-exp-table-row">
+            <span class="order-exp-row-label">${row.label}</span>
+            ${row.cells.map(cell => expenditureCellHtml(cell.count, cell.amount, cell.danger)).join("")}
+          </div>
+        `).join("")}
+      </div>`;
+    }
+
+    function orderRangeToggleHtml() {
+      return `<div class="user-scope-toggle order-range-toggle">
+        ${Object.entries(ORDER_RANGE_CONFIG).map(([key, cfg]) =>
+          `<button type="button" data-order-range="${key}" class="${state.orderRange === key ? "active" : ""}">${cfg.label}</button>`
+        ).join("")}
+      </div>`;
+    }
+
+    function syncOrderRangeToggle() {
+      document.querySelectorAll("[data-order-range]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.orderRange === state.orderRange);
+      });
+    }
+
+    function renderOrderModuleBlock() {
+      const o = buildOrderModuleStats();
+      const noMore = { noMore: true };
+      return `<div class="module-block order-module">
+        <div class="module-head">
+          <h2>订单</h2>
+          ${orderRangeToggleHtml()}
+        </div>
+        <div class="order-columns asset-columns">
+          <div class="order-sub-module asset-sub-module order-income-scope">
+            <div class="order-col-head">
+              <span>收入</span>
+              ${extLink(ORDER_ERP_LINKS[0].href, "换电记录", { arrow: true })}
+            </div>
+            <div class="user-metric-row">
+              ${splitMetric("换电订单数", o.orderCount, o.orderCompare, { subMuted: true, ...noMore })}
+              <div class="split-divider"></div>
+              ${splitMetric("预计收入", o.revDisplay, o.revCompare, noMore)}
+            </div>
+            ${orderIncomeChannelsHtml(o.incomeChannels)}
+          </div>
+          <div class="order-sub-module asset-sub-module">
+            <div class="order-col-head">
+              <span>支出</span>
+              ${extLink(ORDER_ERP_LINKS[1].href, ORDER_ERP_LINKS[1].label, { arrow: true })}
+            </div>
+            ${orderExpenditureItemsHtml(o.expenditureMatrix)}
+            ${erpColLinks(ORDER_ERP_LINKS.slice(2))}
+          </div>
+        </div>
+        <div class="user-module-footer">
+          <span class="user-external asset-external-links" style="text-align:left">智格：${zhigeLinksHtml(ZHIGE_ORDER_LINKS)}</span>
+        </div>
+      </div>`;
+    }
+
+    function buildFaultModuleStats() {
+      const s = computeSnapshot();
+      return {
+        pending: s.pending,
+        overdue: s.overdue,
+        overdueSub: state.empty ? "" : "已超时 13 天",
+        offline: s.offline,
+        slotIssues: state.empty ? 0 : 23,
+        batteryAlerts: state.empty ? 0 : 7,
+        notCharging: state.empty ? 0 : 15,
+        disabledSwap: state.empty ? 0 : 6
+      };
+    }
+
+    function renderFaultModuleBlock() {
+      const f = buildFaultModuleStats();
+      const noMore = { noMore: true };
+      return `<div class="module-block asset-module fault-module">
+        <div class="module-head"><h2>故障运维</h2></div>
+        <div class="asset-columns">
+          <div class="asset-sub-module">
+            <div class="user-sub-head">
+              ${extLink(FAULT_ERP_LINKS[0].href, "断线&11串电芯-派单用", { arrow: true })}
+            </div>
+            <div class="user-metric-row">
+              ${splitMetric("待处理", f.pending, "", { warn: f.pending > 0, ...noMore })}
+              <div class="split-divider"></div>
+              ${splitMetric("超时工单", f.overdue, f.overdueSub, { danger: f.overdue > 0, ...noMore })}
+            </div>
+            ${erpColLinks(FAULT_BATTERY_ERP_LINKS.slice(1))}
+          </div>
+          <div class="asset-sub-module">
+            ${splitMetric("电柜离线", f.offline, "", { danger: f.offline > 0, noMore: true, labelHref: FAULT_ERP_LINKS[10].href })}
+            <div class="breakdown-grid cabinet">
+              ${breakdownItem("格口异常", f.slotIssues, f.slotIssues > 0)}
+              ${breakdownItem("电池告警", f.batteryAlerts, f.batteryAlerts > 0)}
+              ${breakdownItem("不充电格口", f.notCharging, f.notCharging > 0)}
+              ${breakdownItem("禁用换电格口", f.disabledSwap, f.disabledSwap > 0)}
+            </div>
+            ${erpColLinks(FAULT_CABINET_ERP_LINKS)}
+          </div>
+        </div>
+        <div class="asset-footer">
+          <span class="user-external asset-external-links" style="text-align:left;flex:1">ERP：${zhigeLinksHtml(FAULT_DISCONNECT_ERP_LINKS)}</span>
+        </div>
+      </div>`;
+    }
+
+    function buildUserMetricCards(full) {
+      const u = buildUserModuleStats();
+      const cards = [
+        metricCard("用户总数", u.totalUsers, { live: true }),
+        metricCard("活跃换电用户", u.active),
+        metricCard("当月新增", u.monthNew),
+        metricCard("当月留存", u.monthRetain),
+        metricCard("当月流失", u.monthLost, { danger: u.monthLost > 0 })
+      ];
+      if (full && !u.isSf) {
+        buildChannelStats().forEach(c => {
+          cards.push(metricCard(c.name, c.total));
+          cards.push(metricCard(c.name + " · 活跃", c.active));
+        });
+      }
+      if (full && u.isSf) {
+        cards.push(metricCard("顺丰 · 网点数", 4));
+      }
+      return cards;
+    }
+
+    function buildAssetMetricCards(s, full) {
+      const cabinetRate = s.deployed ? ((s.online / s.deployed) * 100).toFixed(2) + "%" : "—";
+      const batteryRate = s.batteries ? ((s.batteryOnline / s.batteries) * 100).toFixed(2) + "%" : "—";
+      const cards = [
+        metricCard("电柜在线", s.online, { live: true }),
+        metricCard("电柜在线率", cabinetRate, { live: true }),
+        metricCard("电池在线", s.batteryOnline, { live: true }),
+        metricCard("电池在线率", batteryRate, { live: true }),
+        metricCard("高压力站点", s.pressure, { danger: s.pressure > 0 })
+      ];
+      if (full) {
+        cards.push(
+          metricCard("运营中", s.cabinetOperating),
+          metricCard("前置仓", s.cabinetPreWarehouse),
+          metricCard("故障电柜", s.cabinetFault, { danger: s.cabinetFault > 0 }),
+          metricCard("故障格口", s.slotFault, { danger: s.slotFault > 0 }),
+          metricCard("放电", s.batteryDischarging),
+          metricCard("充电", s.batteryCharging),
+          metricCard("失联", s.batteryLost, { danger: s.batteryLost > 0 }),
+          metricCard("调拨中", state.empty ? "—" : `${fmt(s.batteryTransferringReal)}|${fmt(s.batteryTransferringVirtual)}(虚)`),
+          metricCard("电柜投放", s.deployed, { live: true }),
+          metricCard("电池在运营域", s.batteries),
+          metricCard("用户侧", state.empty ? 0 : 4200),
+          metricCard("隔口", state.empty ? 0 : 2860),
+          metricCard("维修仓", state.empty ? 0 : 420),
+          metricCard("成品仓", state.empty ? 0 : 680),
+          metricCard("前置仓库存", state.empty ? 0 : 560),
+          metricCard("备件/退回", state.empty ? 0 : 310)
+        );
+      }
+      return cards;
+    }
+
+    function buildOrderMetricCards(s, full) {
+      const o = buildOrderModuleStats();
+      const cfg = ORDER_RANGE_CONFIG[state.orderRange] || ORDER_RANGE_CONFIG.today;
+      const cards = [
+        metricCard(`${o.rangeLabel} · 换电订单数`, o.orderCount),
+        metricCard(`${o.rangeLabel} · 预计收入`, o.revDisplay)
+      ];
+      if (full) {
+        s.filtered.forEach(c => cards.push(metricCard(c.name + " · 换电订单", state.empty ? 0 : Math.round(c.swapToday * cfg.orderFactor))));
+        cards.push(
+          metricCard("顺丰 · 预计收入", state.empty ? "—" : "¥" + Math.round((s.ch.find(c => c.id === "sf")?.revenue || 0) * cfg.revFactor).toLocaleString()),
+          metricCard("支付模式", state.empty ? "—" : "按月统一"),
+          metricCard("宁波调整", state.empty ? "—" : "手动")
+        );
+      }
+      return cards;
+    }
+
+    function buildFaultMetricCards(s, full) {
+      const cards = [
+        metricCard("待处理", s.pending, { warn: s.pending > 0 }),
+        metricCard("超时工单", s.overdue, { danger: s.overdue > 0 })
+      ];
+      if (full) {
+        cards.push(
+          metricCard("处理中", s.processing),
+          metricCard("已完成", s.done),
+          metricCard("电柜离线", s.offline, { danger: s.offline > 0 }),
+          metricCard("电柜跳闸", s.trip, { warn: s.trip > 0 }),
+          metricCard("离线超30分钟", s.offline, { danger: s.offline > 0 }),
+          metricCard("运维挂载合计", s.pending + s.processing)
+        );
+      }
+      return cards;
+    }
+
+    function splitMetric(label, value, sub, opts = {}) {
+      const live = opts.live ? '<span class="live-dot"></span>' : "";
+      const valCls = ["split-value", state.empty ? "empty" : "", opts.warn ? "warn" : "", opts.danger ? "danger" : ""].filter(Boolean).join(" ");
+      const display = state.empty ? "—" : (typeof value === "number" ? value.toLocaleString() : value);
+      let valueBlock;
+      if (sub && !state.empty) {
+        if (opts.inlineSub) {
+          const subCls = ["split-sub", "inline", opts.subMuted ? "muted" : ""].filter(Boolean).join(" ");
+          valueBlock = `<div class="split-value-row"><div class="${valCls}">${display}</div><span class="${subCls}">${sub}</span></div>`;
+        } else {
+          const subCls = ["split-sub", opts.subMuted ? "muted" : ""].filter(Boolean).join(" ");
+          valueBlock = `<div class="${valCls}">${display}</div><div class="${subCls}">${sub}</div>`;
+        }
+      } else {
+        valueBlock = `<div class="${valCls}">${display}</div>`;
+      }
+      const moreBtn = opts.noMore ? "" : `<button type="button" class="split-more" title="更多">⋯</button>`;
+      const labelText = opts.labelHref
+        ? `<a class="split-label-link" href="${opts.labelHref}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        : label;
+      return `<div class="split-item">${moreBtn}<div class="split-label">${live}${labelText}</div>${valueBlock}</div>`;
+    }
+
+    function moduleBlockSplit(title, view, desc, left, right) {
+      return `<div class="module-block">
+        <div class="module-head"><h2>${title}</h2><a href="#" class="module-enter" data-goto="${view}">查看详情 →</a></div>
+        ${desc ? `<p class="module-desc">${desc}</p>` : ""}
+        <div class="module-split">${left}<div class="split-divider"></div>${right}</div>
+      </div>`;
+    }
+
+    function moduleBlock(title, view, desc, cards) {
+      return `<div class="module-block">
+        <div class="module-head"><h2>${title}</h2><a href="#" class="module-enter" data-goto="${view}">查看详情 →</a></div>
+        ${desc ? `<p class="module-desc">${desc}</p>` : ""}
+        <div class="metric-grid compact">${cards.join("")}</div>
+      </div>`;
+    }
+
+    function renderOverview() {
+      document.getElementById("overviewDash").innerHTML = `<div class="overview-grid">${[
+        renderUserModuleBlock(),
+        renderAssetModuleBlock(),
+        renderOrderModuleBlock(),
+        renderFaultModuleBlock()
+      ].join("")}</div>`;
+    }
+
+    function syncUserTabs() {
+      document.querySelectorAll("#userTabs button[data-user-tab]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.userTab === state.userTab);
+      });
+      document.querySelectorAll("[data-user-section]").forEach(el => {
+        el.classList.toggle("active", el.dataset.userSection === state.userTab);
+      });
+    }
+
+    function renderUsers() {
+      syncUserScopeToggle();
+      syncUserTabs();
+      renderMetricGrid("userMetrics", buildUserMetricCards(true));
+      const q = state.search.user.toLowerCase();
+      let rows = buildOrgs();
+      if (state.userScope === "sf") rows = rows.filter(r => r.channelId === "sf");
+      else if (state.channel !== "all") rows = rows.filter(r => r.channelId === state.channel);
+      rows = rows.filter(r => !q || r.org.toLowerCase().includes(q) || r.region.includes(q) || r.channel.includes(q));
+
+      const wrap = document.getElementById("userTableWrap");
+      if (!rows.length) wrap.innerHTML = '<div class="empty"><strong>暂无组织数据</strong></div>';
+      else wrap.innerHTML = `<table><thead><tr><th>渠道</th><th>区域</th><th>组织</th><th>用户总数</th><th>活跃用户</th><th>留存率</th></tr></thead><tbody>
+        ${rows.map(r => `<tr><td>${r.channel}</td><td>${r.region}</td><td>${r.org}</td><td>${fmt(r.total)}</td><td>${fmt(r.active)}</td><td>${r.retention}</td></tr>`).join("")}
+      </tbody></table>`;
+
+      const u = buildUserModuleStats();
+      renderMetricGrid("retentionMetrics", [
+        metricCard("当月新增", u.monthNew),
+        metricCard("当月留存", u.monthRetain),
+        metricCard("当月流失", u.monthLost, { danger: u.monthLost > 0 }),
+        metricCard("留存率", state.empty ? "—" : "89.2%")
+      ]);
+      const months = ["1月", "2月", "3月", "4月", "5月", "6月"];
+      const newData = [180, 210, 195, 220, 208, u.monthNew || 234];
+      const max = Math.max(...newData, 1);
+      document.getElementById("retentionChart").innerHTML = state.empty ? '<div class="empty"><strong>暂无趋势</strong></div>' :
+        months.map((m, i) => `<div class="bar-wrap"><div class="bar" style="height:${Math.round(newData[i] / max * 120)}px"></div><span>${m}<br>${newData[i]}</span></div>`).join("");
+
+      const sfQ = state.search.sf.toLowerCase();
+      const sfRows = buildOrgs().filter(r => r.channelId === "sf").filter(r => !sfQ || r.org.toLowerCase().includes(sfQ) || r.region.includes(sfQ));
+      const sfWrap = document.getElementById("sfUserTableWrap");
+      if (!sfRows.length) sfWrap.innerHTML = '<div class="empty"><strong>暂无顺丰组织数据</strong></div>';
+      else sfWrap.innerHTML = `<table><thead><tr><th>区域</th><th>组织</th><th>用户总数</th><th>活跃用户</th><th>留存率</th></tr></thead><tbody>
+        ${sfRows.map(r => `<tr><td>${r.region}</td><td>${r.org}</td><td>${fmt(r.total)}</td><td>${fmt(r.active)}</td><td>${r.retention}</td></tr>`).join("")}
+      </tbody></table>`;
+    }
+
+    function syncAssetTabs() {
+      document.querySelectorAll("#assetTabs button[data-asset-tab]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.assetTab === state.assetTab);
+      });
+      document.querySelectorAll("[data-asset-section]").forEach(el => {
+        el.classList.toggle("active", el.dataset.assetSection === state.assetTab);
+      });
+    }
+
+    function renderAssets() {
+      syncAssetTabs();
+      const erpLinksEl = document.getElementById("assetDetailErpLinks");
+      if (erpLinksEl) {
+        erpLinksEl.innerHTML = `${erpLinkRow("电池", BATTERY_ERP_LINKS)}${erpLinkRow("电柜", CABINET_ERP_LINKS)}`;
+      }
+      const s = computeSnapshot();
+      renderMetricGrid("assetMetrics", buildAssetMetricCards(s, true));
+
+      document.getElementById("locGrid").innerHTML = LOCS.map((loc, i) => `
+        <div class="loc-item"><strong>${fmt(state.empty ? 0 : Math.round(200 + seed(i) * 800))}</strong><span>${loc}</span></div>
+      `).join("");
+
+      const sites = buildRatioSites().filter(s => state.channel === "all" || CHANNEL_LABELS[state.channel] === s.channel);
+      const wrap = document.getElementById("ratioTableWrap");
+      if (!sites.length) wrap.innerHTML = '<div class="empty"><strong>暂无站点</strong></div>';
+      else wrap.innerHTML = `<table><thead><tr><th>站点编码</th><th>渠道</th><th>用户数</th><th>电池组数</th><th>应为(1.5:1)</th><th>实际配比</th><th>状态</th></tr></thead><tbody>
+        ${sites.map(s => `<tr class="${s.pressure ? "overdue" : ""}"><td>${s.code}</td><td>${s.channel}</td><td>${s.users}</td><td>${s.batteries}</td><td>${s.need}</td><td>${s.ratio}</td><td><span class="tag ${s.pressure ? "err" : "info"}">${s.pressure ? "电池不足" : "正常"}</span></td></tr>`).join("")}
+      </tbody></table>`;
+
+      const versions = buildBatteryVersions();
+      const maxVer = Math.max(...versions.map(v => v.count), 1);
+      document.getElementById("batteryVersionBars").innerHTML = versions.map(v => `
+        <div class="version-row">
+          <span>${v.version}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v.count / maxVer * 100)}%"></div></div>
+          <strong>${fmt(v.count)}</strong>
+        </div>`).join("");
+      document.getElementById("batteryVersionTableWrap").innerHTML = state.empty ? '<div class="empty"><strong>暂无版本数据</strong></div>' :
+        `<table><thead><tr><th>版本</th><th>数量</th><th>说明</th><th>占比</th></tr></thead><tbody>
+        ${versions.map(v => `<tr><td>${v.version}</td><td>${fmt(v.count)}</td><td>${v.note}</td><td>${((v.count / s.batteries) * 100).toFixed(1)}%</td></tr>`).join("")}
+        </tbody></table>`;
+
+      const mapDots = Array.from({ length: 36 }, (_, i) => {
+        const t = seed(i + state.tick);
+        const cls = t > 0.92 ? "map-dot err" : t > 0.82 ? "map-dot warn" : "map-dot";
+        return `<div class="${cls}" style="opacity:${0.45 + t * 0.55}"></div>`;
+      }).join("");
+      document.getElementById("assetMapMock").innerHTML = state.empty ? '<div class="empty" style="grid-column:1/-1"><strong>暂无地图数据</strong></div>' : mapDots;
+      document.getElementById("mapLegend").innerHTML = [
+        { label: "正常站点", value: state.empty ? 0 : 128 },
+        { label: "高压力站点", value: s.pressure },
+        { label: "故障/离线", value: state.empty ? 0 : s.cabinetFault + s.offline }
+      ].map(x => `<div class="loc-item"><strong>${fmt(x.value)}</strong><span>${x.label}</span></div>`).join("");
+
+      const batches = buildAcceptBatches().filter(b => {
+        const q = state.search.accept.toLowerCase();
+        return !q || b.batch.toLowerCase().includes(q) || b.site.toLowerCase().includes(q) || b.channel.includes(q);
+      });
+      const allBatches = buildAcceptBatches();
+      document.getElementById("acceptSummary").innerHTML = [
+        { label: "待验收批次", value: allBatches.filter(b => b.status === "待验收").length },
+        { label: "验收中", value: allBatches.filter(b => b.status === "验收中").length },
+        { label: "本月已完成", value: allBatches.filter(b => b.status === "已完成").length }
+      ].map(k => `<div class="kpi"><label>${k.label}</label><strong>${fmt(k.value)}</strong></div>`).join("");
+      const acceptWrap = document.getElementById("acceptTableWrap");
+      if (!batches.length) acceptWrap.innerHTML = '<div class="empty"><strong>暂无验收批次</strong></div>';
+      else acceptWrap.innerHTML = `<table><thead><tr><th>批次号</th><th>站点</th><th>渠道</th><th>应验收</th><th>已完成</th><th>进度</th><th>状态</th><th>日期</th></tr></thead><tbody>
+        ${batches.map(b => {
+          const pct = b.total ? Math.round(b.done / b.total * 100) : 0;
+          const tagCls = b.status === "已完成" ? "info" : b.status === "验收中" ? "warn" : "err";
+          return `<tr><td>${b.batch}</td><td>${b.site}</td><td>${b.channel}</td><td>${b.total}</td><td>${b.done}</td><td>${pct}%</td><td><span class="tag ${tagCls}">${b.status}</span></td><td>${b.date}</td></tr>`;
+        }).join("")}
+      </tbody></table>`;
+    }
+
+    function renderOrders() {
+      const linksEl = document.getElementById("orderDetailLinks");
+      if (linksEl) {
+        linksEl.innerHTML = `${erpLinkRow("ERP", ORDER_ERP_LINKS)}${erpLinkRow("智格", ZHIGE_ORDER_LINKS)}`;
+      }
+      syncOrderRangeToggle();
+      const s = computeSnapshot();
+      const o = buildOrderModuleStats();
+      const cfg = ORDER_RANGE_CONFIG[state.orderRange] || ORDER_RANGE_CONFIG.today;
+      renderMetricGrid("orderMetrics", buildOrderMetricCards(s, true));
+      const filtered = s.filtered;
+      const chartTitle = document.getElementById("orderChartTitle");
+      if (chartTitle) chartTitle.textContent = `各渠道 · ${o.rangeLabel}换电订单数`;
+      const max = Math.max(...filtered.map(c => Math.round(c.swapToday * cfg.orderFactor)), 1);
+      document.getElementById("orderChart").innerHTML = state.empty ? '<div class="empty"><strong>暂无趋势</strong></div>' :
+        filtered.map(c => {
+          const val = Math.round(c.swapToday * cfg.orderFactor);
+          return `<div class="bar-wrap"><div class="bar" style="height:${Math.round(val / max * 120)}px"></div><span>${c.name}<br>${val}</span></div>`;
+        }).join("");
+    }
+
+    function renderFaults() {
+      const linksEl = document.getElementById("faultDetailLinks");
+      if (linksEl) {
+        linksEl.innerHTML = erpLinkRow("ERP", FAULT_ERP_LINKS);
+      }
+      const s = computeSnapshot();
+      renderMetricGrid("faultMetrics", buildFaultMetricCards(s, true));
+      const faults = s.faults;
+
+      const staff = {};
+      faults.forEach(f => { staff[f.owner] = (staff[f.owner] || 0) + (f.status !== "已完成" ? 1 : 0); });
+      document.getElementById("staffGrid").innerHTML = Object.entries(staff).map(([n, c]) =>
+        `<div class="staff-card"><strong>${n}</strong><span>挂载 ${c} 单</span></div>`).join("");
+
+      const sorted = [...faults].sort((a, b) => (b.overdue - a.overdue) || (b.hours - a.hours));
+      document.getElementById("faultTableWrap").innerHTML = state.empty ? '<div class="empty"><strong>暂无工单</strong></div>' :
+        `<table><thead><tr><th>工单号</th><th>类型</th><th>电柜</th><th>负责人</th><th>状态</th><th>挂载(h)</th></tr></thead><tbody>
+        ${sorted.map(f => `<tr class="${f.overdue ? "overdue" : ""}"><td>${f.id}</td><td>${f.type}</td><td>${f.cabinet}</td><td>${f.owner}</td><td><span class="tag ${f.status === "待处理" ? "warn" : f.status === "已完成" ? "info" : ""}">${f.status}</span></td><td>${f.hours}${f.overdue ? " ⚠" : ""}</td></tr>`).join("")}
+        </tbody></table>`;
+    }
+
+    function renderBattery() {
+      const rows = buildBattery();
+      document.getElementById("batteryKpis").innerHTML = [
+        { label: "待技术评估", value: fmt(rows.filter(r => r.status === "待技术评估").length) },
+        { label: "高危 18/19串", value: fmt(rows.filter(r => r.type === "高温预警").length), down: true },
+        { label: "回收返厂", value: fmt(rows.filter(r => r.status === "回收返厂").length) },
+        { label: "高频报错", value: fmt(rows.filter(r => r.type === "高频报错").length) }
+      ].map(k => `<div class="kpi"><label>${k.label}</label><strong>${k.value}</strong></div>`).join("");
+
+      document.getElementById("batteryTableWrap").innerHTML = state.empty ? '<div class="empty"><strong>暂无异常</strong></div>' :
+        `<table><thead><tr><th>编号</th><th>类型</th><th>电池SN</th><th>详情</th><th>处理状态</th><th>操作</th></tr></thead><tbody>
+        ${rows.map(r => `<tr class="${r.level === "err" ? "critical" : ""}"><td>${r.id}</td><td><span class="tag ${r.level === "err" ? "err" : "warn"}">${r.type}</span></td><td>${r.sn}</td><td>${r.detail}</td><td>${r.status}</td><td>${state.role === "tech" || state.role === "admin" ? `<button type="button" data-bt="${r.id}">评估</button>` : "—"}</td></tr>`).join("")}
+        </tbody></table>`;
+    }
+
+    function getLedgerRows() {
+      const tab = state.ledgerTab;
+      if (tab === "org") return buildOrgs().map(r => ({ cols: [r.channel, r.region, r.org, r.total, r.active, r.retention], raw: r }));
+      if (tab === "ratio") return buildRatioSites().map(s => ({ cols: [s.code, s.channel, s.users, s.batteries, s.need, s.ratio, s.pressure ? "电池不足" : "正常"], raw: s }));
+      if (tab === "fault") return buildFaults().map(f => ({ cols: [f.id, f.type, f.cabinet, f.owner, f.status, f.hours], raw: f }));
+      return buildBattery().map(b => ({ cols: [b.id, b.type, b.sn, b.detail, b.status], raw: b }));
+    }
+
+    function renderLedger() {
+      const headers = {
+        org: ["渠道", "区域", "组织", "用户总数", "活跃用户", "留存率"],
+        ratio: ["站点编码", "渠道", "用户数", "电池组", "应为", "配比", "状态"],
+        fault: ["工单号", "类型", "电柜", "负责人", "状态", "挂载(h)"],
+        battery: ["编号", "类型", "SN", "详情", "处理状态"]
+      };
+      const q = state.search.ledger.toLowerCase();
+      let rows = getLedgerRows().filter(r => !q || r.cols.some(c => String(c).toLowerCase().includes(q)));
+      const wrap = document.getElementById("ledgerTableWrap");
+      if (!rows.length) { wrap.innerHTML = '<div class="empty"><strong>暂无明细</strong></div>'; return; }
+      wrap.innerHTML = `<table><thead><tr>${headers[state.ledgerTab].map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>
+        ${rows.map(r => `<tr><td>${r.cols.join("</td><td>")}</td></tr>`).join("")}
+      </tbody></table>`;
+      return rows;
+    }
+
+    function canAccessView(view) {
+      const rules = {
+        users: ["admin", "management"],
+        assets: ["admin", "ops"],
+        orders: ["admin", "management"],
+        faults: ["admin", "ops", "tech"],
+        battery: ["admin", "ops", "tech"],
+        ledger: ["admin", "ops", "tech", "management"]
+      };
+      return view === "overview" || (rules[view] || []).includes(state.role);
+    }
+
+    function applyRoleNav() {
+      document.querySelectorAll(".menu-item[data-view]").forEach(btn => {
+        const view = btn.dataset.view;
+        btn.classList.toggle("hidden", !canAccessView(view));
+      });
+      if (state.view !== "overview" && !canAccessView(state.view)) switchView("overview");
+    }
+
+    function refreshAll() {
+      if (state.error) return;
+      renderOverview(); renderUsers(); renderAssets(); renderOrders(); renderFaults(); renderBattery(); renderLedger();
+    }
+
+    function switchView(view) {
+      state.view = view;
+      document.querySelectorAll(".menu-item[data-view]").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+      document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${view}`));
+      document.getElementById("pageTitle").textContent = titles[view];
+      document.getElementById("pageSub").textContent = subs[view] || "";
+      document.getElementById("drillBack").hidden = view === "overview";
+    }
+
+    function gotoView(view, opts) {
+      if (!canAccessView(view)) { showToast("当前角色无权限访问该模块"); return; }
+      const o = typeof opts === "string" ? { assetTab: opts } : (opts || {});
+      if (o.assetTab) state.assetTab = o.assetTab;
+      else if (view !== "assets") state.assetTab = "overview";
+      if (o.userTab) state.userTab = o.userTab;
+      else if (view !== "users") state.userTab = "overview";
+      switchView(view);
+      if (view === "assets") syncAssetTabs();
+      if (view === "users") syncUserTabs();
+    }
+
+    document.getElementById("nav").addEventListener("click", e => {
+      const btn = e.target.closest(".menu-item[data-view]");
+      if (btn) gotoView(btn.dataset.view);
+    });
+
+    document.getElementById("backOverview").addEventListener("click", () => switchView("overview"));
+
+    document.getElementById("overviewDash").addEventListener("click", e => {
+      const rangeBtn = e.target.closest("[data-order-range]");
+      if (rangeBtn) {
+        e.preventDefault();
+        state.orderRange = rangeBtn.dataset.orderRange;
+        renderOverview();
+        renderOrders();
+        showToast(`收入周期：${ORDER_RANGE_CONFIG[state.orderRange].label}`);
+        return;
+      }
+      const link = e.target.closest("[data-goto]");
+      if (!link) return;
+      e.preventDefault();
+      gotoView(link.dataset.goto, { assetTab: link.dataset.assetTab, userTab: link.dataset.userTab });
+    });
+
+    document.getElementById("userTabs").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-user-tab]");
+      if (!btn) return;
+      state.userTab = btn.dataset.userTab;
+      syncUserTabs();
+    });
+
+    document.getElementById("assetTabs").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-asset-tab]");
+      if (!btn) return;
+      state.assetTab = btn.dataset.assetTab;
+      syncAssetTabs();
+    });
+
+    document.getElementById("acceptSearch").addEventListener("input", e => { state.search.accept = e.target.value; renderAssets(); });
+    document.getElementById("acceptNewBtn").addEventListener("click", () => showToast("新建验收批次（原型演示）"));
+
+    document.getElementById("userScopeToggle").addEventListener("click", e => {
+      const scopeBtn = e.target.closest("[data-user-scope]");
+      if (!scopeBtn) return;
+      state.userScope = scopeBtn.dataset.userScope;
+      syncUserScopeToggle();
+      renderOverview();
+      renderUsers();
+      showToast(scopeBtn.dataset.userScope === "sf" ? "已切换：顺丰用户" : "已切换：所有用户");
+    });
+
+    document.getElementById("orderRangeToggleDrill").addEventListener("click", e => {
+      const rangeBtn = e.target.closest("[data-order-range]");
+      if (!rangeBtn) return;
+      state.orderRange = rangeBtn.dataset.orderRange;
+      syncOrderRangeToggle();
+      renderOverview();
+      renderOrders();
+      showToast(`收入周期：${ORDER_RANGE_CONFIG[state.orderRange].label}`);
+    });
+
+    document.getElementById("channelSelect").addEventListener("change", e => {
+      state.channel = e.target.value;
+      refreshAll();
+    });
+
+    document.getElementById("userSearch").addEventListener("input", e => { state.search.user = e.target.value; renderUsers(); });
+    document.getElementById("sfUserSearch").addEventListener("input", e => { state.search.sf = e.target.value; renderUsers(); });
+    document.getElementById("ledgerSearch").addEventListener("input", e => { state.search.ledger = e.target.value; renderLedger(); });
+
+    document.getElementById("ledgerTabs").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-tab]");
+      if (!btn) return;
+      state.ledgerTab = btn.dataset.tab;
+      document.querySelectorAll("#ledgerTabs button").forEach(b => b.classList.toggle("active", b === btn));
+      renderLedger();
+    });
+
+    document.getElementById("exportBtn").addEventListener("click", () => {
+      const rows = getLedgerRows().filter(r => {
+        const q = state.search.ledger.toLowerCase();
+        return !q || r.cols.some(c => String(c).toLowerCase().includes(q));
+      });
+      if (!rows.length) { showToast("无数据可导出"); return; }
+      const csv = rows.map(r => r.cols.join(",")).join("\n");
+      const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = `ERP明细_${state.ledgerTab}.csv`; a.click(); URL.revokeObjectURL(a.href);
+      showToast("已导出 CSV");
+    });
+
+    document.getElementById("refreshBtn").addEventListener("click", () => { state.error = false; document.getElementById("errorBanner").classList.remove("show"); state.tick++; refreshAll(); showToast("数据已刷新"); });
+    document.getElementById("retryBtn").addEventListener("click", () => { state.error = false; document.getElementById("errorBanner").classList.remove("show"); refreshAll(); showToast("已重新加载"); });
+    document.getElementById("batteryTableWrap").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-bt]");
+      if (!btn) return;
+      showToast("已提交技术评估（原型演示）");
+    });
+    document.getElementById("modalClose").addEventListener("click", () => document.getElementById("modal").classList.remove("show"));
+    document.getElementById("modalOk").addEventListener("click", () => { document.getElementById("modal").classList.remove("show"); showToast("已记录"); });
+    document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") document.getElementById("modal").classList.remove("show"); });
+
+    setInterval(() => { if (!state.error && !state.empty) { state.tick++; renderOverview(); } }, 8000);
+
+    applyRoleNav();
+    refreshAll();
+  </script>
+</body>
+</html>
