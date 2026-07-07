@@ -358,10 +358,13 @@
         <option value="guest">未登录</option>
         <option value="personal" selected>个人套餐 · 张骑手 U1028</option>
         <option value="personal_cross3">个人跨网·案例3 · U1028</option>
+        <option value="cooling_refund">冷静期退款 · 李骑手 U2188（开通第3天）</option>
         <option value="channel">渠道人天 · 孙骑手 U2110（分配即开通·已预占）</option>
         <option value="channel_fail">渠道预占失败 · 赵骑手 U2103（自费兜底）</option>
         <option value="channel_cross3">渠道跨网·案例3 · 王骑手 U2088</option>
-        <option value="lease_whitelist">设备租赁白名单 · 张配送 U4001</option>
+        <option value="lease_whitelist">设备租赁白名单 · 付费已购 U4001</option>
+        <option value="lease_whitelist_new">设备租赁白名单 · 付费未购 U4003</option>
+        <option value="lease_whitelist_free">设备租赁白名单 · 免费 U4005</option>
         <option value="lease_suspended">渠道停服·持电池 · 张配送 U4001</option>
         <option value="lease_suspended_nobat">渠道停服·未持电池 · 王夜配 U4003</option>
         <option value="lease_blocked">非白名单拦截 · 路人 U9999</option>
@@ -504,10 +507,13 @@
             <option value="guest">未登录</option>
             <option value="personal">个人套餐</option>
             <option value="personal_cross3">个人跨网·案例3</option>
+            <option value="cooling_refund">冷静期退款·U2188</option>
             <option value="channel">渠道人天</option>
             <option value="channel_fail">渠道预占失败·U2103</option>
             <option value="channel_cross3">渠道跨网·案例3</option>
-            <option value="lease_whitelist">设备租赁白名单</option>
+            <option value="lease_whitelist">设备租赁·付费已购</option>
+            <option value="lease_whitelist_new">设备租赁·付费未购</option>
+            <option value="lease_whitelist_free">设备租赁·白名单免费</option>
             <option value="lease_suspended">渠道停服·持电池</option>
             <option value="lease_suspended_nobat">渠道停服·未持电池</option>
             <option value="lease_blocked">非白名单拦截</option>
@@ -530,12 +536,28 @@
       "OP-BJ": { id: "OP-BJ", name: "滨江换电", subMch: "19000003***" }
     };
 
+    const CHANNELS = {
+      "CH-RENT": { id: "CH-RENT", name: "京东物流租赁渠道", subMch: "1678901234***", operatorId: "OP-SX" }
+    };
+
+    const LEASE_PKG_SKUS = {
+      month: { key: "month", name: "30天畅换 · 白名单专享", price: 299, days: 30, desc: "京东物流专属 · 款入渠道账户" },
+      weekly: { key: "weekly", name: "7天体验套餐", price: 89, days: 7, desc: "短期试用" }
+    };
+
     const SITES = {
       "ST-SH-01": { id: "ST-SH-01", name: "浦东骑手驿站", operator: "OP-SX", signed: true },
       "ST-SH-02": { id: "ST-SH-02", name: "世博换电服务点", operator: "OP-SX", signed: true },
       "ST-SH-04": { id: "ST-SH-04", name: "陆家嘴分站", operator: "OP-LJZ", signed: true },
       "ST-SH-JD": { id: "ST-SH-JD", name: "京东物流专属站", operator: "OP-SX", signed: true, channelDedicated: "CH-RENT", publicOpen: false, visibilityMode: "whitelist_only" },
       "ST-BJ-01": { id: "ST-BJ-01", name: "滨江换电站", operator: "OP-BJ", batteryOperator: "OP-LJZ", signed: false }
+    };
+
+    const CHANNEL_SWAP_POLICY = {
+      "CH-RENT": {
+        crossNetworkEnabled: true, crossNetworkDepositPaid: true, crossNetworkDepositAmount: 20000,
+        depositBalance: 18000, crossSwapEnabled: true, hostOperatorId: "OP-SX"
+      }
     };
 
     const OPERATOR_POLICY = {
@@ -577,6 +599,12 @@
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: null,
         demoCase3: true, holdsBattery: true
       },
+      cooling_refund: {
+        loggedIn: true, phone: "136****2188", name: "李骑手", userId: "U2188",
+        kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 28, swapUsed: 5,
+        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", holdsBattery: false,
+        coolingPeriod: true, coolingDaysLeft: 1, payTime: "2026-06-10", payAmount: 299
+      },
       channel: {
         loggedIn: true, phone: "136****2110", name: "孙骑手", userId: "U2110",
         kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 13, swapUsed: 0,
@@ -616,9 +644,21 @@
       },
       lease_whitelist: {
         loggedIn: true, phone: "139****4001", name: "张配送", userId: "U4001",
-        kyc: true, entitlement: "设备租赁白名单", pkg: "白名单权益", swapUsed: 42,
+        kyc: true, entitlement: "设备租赁白名单", pkg: "30天畅换 · 白名单专享", daysLeft: 22, swapUsed: 42,
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
-        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, holdsBattery: true
+        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "paid", holdsBattery: true
+      },
+      lease_whitelist_new: {
+        loggedIn: true, phone: "137****4003", name: "王夜配", userId: "U4003",
+        kyc: true, entitlement: "设备租赁白名单", pkg: null, swapUsed: 0,
+        status: "未开通", operator: "OP-SX", homeSite: "ST-SH-JD",
+        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "paid", holdsBattery: false
+      },
+      lease_whitelist_free: {
+        loggedIn: true, phone: "135****4005", name: "陈配送", userId: "U4005",
+        kyc: true, entitlement: "设备租赁白名单", pkg: null, swapUsed: 18,
+        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
+        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "free", holdsBattery: true
       },
       lease_suspended: {
         loggedIn: true, phone: "139****4001", name: "张配送", userId: "U4001",
@@ -756,6 +796,10 @@
     }
 
     function resolveSellerOperator(u) {
+      if (u.entitlement === "设备租赁白名单" && u.whitelist) {
+        const chId = u.channelId || "CH-RENT";
+        return { channelId: chId, source: "lease_whitelist" };
+      }
       const pkgOp = activePackageOperator(u);
       if (pkgOp) return { operatorId: pkgOp, source: "active_pkg" };
       if (u.channelAttr?.operatorId) return { operatorId: u.channelAttr.operatorId, source: "launch" };
@@ -775,6 +819,11 @@
       const u = user();
       const resolved = resolveSellerOperator(u);
       if (!resolved) return "";
+      if (resolved.channelId && CHANNELS[resolved.channelId]) {
+        const ch = CHANNELS[resolved.channelId];
+        const accessHint = u.whitelistAccess === "free" ? "白名单免费 · B2B 月租覆盖" : "白名单付费 · 购套餐款入渠道";
+        return `<div class="service-scope-banner">当前服务：<strong>${ch.name}</strong> · ${accessHint}<br><small>子商户 ${ch.subMch}${u.whitelistAccess === "free" ? " · 免购套餐换电" : ""}</small></div>`;
+      }
       const op = OPERATORS[resolved.operatorId];
       if (!op) return "";
       const site = state.session.nearestSiteId ? SITES[state.session.nearestSiteId] : null;
@@ -814,6 +863,7 @@
     function ensureContextForPurchase(onReady) {
       const u = user();
       if (!u.loggedIn) { toast("请先登录"); switchTab("mine"); return; }
+      if (u.entitlement === "设备租赁白名单" && u.whitelist) { onReady(); return; }
       const existing = resolveSellerOperator(u);
       if (existing?.source === "active_pkg") { onReady(); return; }
       if (existing && state.session.contextOperatorId) { onReady(); return; }
@@ -859,6 +909,8 @@
     function openOverlay(id) { document.getElementById(id).classList.add("open"); }
     function closeOverlay(id) { document.getElementById(id).classList.remove("open"); }
 
+    function renderHome() { renderMapPins(); }
+
     function switchTab(tab) {
       document.querySelectorAll(".tab-item").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
       document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === "screen-" + tab));
@@ -875,16 +927,20 @@
 
     function renderPkgOverlay() {
       const u = user();
-      const attr = channelAttrForUser(u);
+      const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist;
+      const attr = isLeaseWl ? null : channelAttrForUser(u);
       const seller = resolveSellerOperator(u);
       const body = document.getElementById("pkgSheetBody");
-      const sellerBanner = seller && OPERATORS[seller.operatorId]
-        ? `<div class="service-scope-banner" style="margin-bottom:12px">收款方：<strong>${OPERATORS[seller.operatorId].name}</strong> · 子商户 ${OPERATORS[seller.operatorId].subMch}</div>`
-        : "";
+      const sellerBanner = isLeaseWl && CHANNELS[seller?.channelId]
+        ? `<div class="service-scope-banner" style="margin-bottom:12px">收款方：<strong>${CHANNELS[seller.channelId].name}</strong> · 子商户 ${CHANNELS[seller.channelId].subMch}<br><small>仅白名单用户可购</small></div>`
+        : (seller && OPERATORS[seller.operatorId]
+          ? `<div class="service-scope-banner" style="margin-bottom:12px">收款方：<strong>${OPERATORS[seller.operatorId].name}</strong> · 子商户 ${OPERATORS[seller.operatorId].subMch}</div>`
+          : "");
       const banner = attr ? `<div class="channel-attr-banner">🟡 <strong>${attr.channelName}</strong> 推广 · ${attr.expiresLabel} 内购套餐享渠道专享价<br><small>首触链接：${attr.linkPurpose}（${attr.linkCode}）</small></div>` : "";
-      const cards = Object.values(CHANNEL_CARD_ATTR.skus).map(s => {
-        const useChannel = attr && s.channelSku;
-        const price = useChannel ? s.channel : s.official;
+      const skuSource = isLeaseWl ? LEASE_PKG_SKUS : CHANNEL_CARD_ATTR.skus;
+      const cards = Object.values(skuSource).map(s => {
+        const useChannel = !isLeaseWl && attr && s.channelSku;
+        const price = isLeaseWl ? s.price : (useChannel ? s.channel : s.official);
         const priceHtml = useChannel
           ? `<div class="price-row"><span class="price-official">¥${s.official}</span><span class="price">¥${price}</span><span class="price-tag">渠道专享</span></div>`
           : `<div class="price-row"><span class="price">¥${price}</span>${attr ? `<span class="price-tag" style="background:#f5f5f5;color:var(--muted)">非渠道 SKU · 正式价</span>` : ""}</div>`;
@@ -916,36 +972,55 @@
       if (!u.loggedIn) { toast("请先登录"); return; }
       if (!u.kyc) { toast("请先完成实名认证"); openOverlay("overlayKyc"); return; }
       const seller = resolveSellerOperator(u);
-      if (!seller) { toast("无法确定收款运营商"); return; }
+      if (!seller) { toast("无法确定收款方"); return; }
+      const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist;
       const attr = channelAttrForUser(u);
-      const sku = CHANNEL_CARD_ATTR.skus[state.selectedPkg] || CHANNEL_CARD_ATTR.skus.month;
-      const useChannel = attr && sku.channelSku;
-      const amount = useChannel ? sku.channel : sku.official;
+      const skuSource = isLeaseWl ? LEASE_PKG_SKUS : CHANNEL_CARD_ATTR.skus;
+      const sku = skuSource[state.selectedPkg] || skuSource.month;
+      const useChannel = !isLeaseWl && attr && sku.channelSku;
+      const amount = isLeaseWl ? sku.price : (useChannel ? sku.channel : sku.official);
       const id = "SUB" + Date.now().toString().slice(-8);
-      const op = OPERATORS[seller.operatorId];
       const order = {
         id, pkg: sku.name + (useChannel ? "·渠道专享" : ""), amount,
         time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId,
-        sellerOperatorId: seller.operatorId, sellerOperatorName: op?.name, subMch: op?.subMch,
         contextSource: seller.source
       };
+      if (isLeaseWl && CHANNELS[seller.channelId]) {
+        const ch = CHANNELS[seller.channelId];
+        order.sellerChannelId = ch.id;
+        order.sellerChannelName = ch.name;
+        order.subMch = ch.subMch;
+      } else {
+        const op = OPERATORS[seller.operatorId];
+        order.sellerOperatorId = seller.operatorId;
+        order.sellerOperatorName = op?.name;
+        order.subMch = op?.subMch;
+      }
       if (useChannel) {
         order.channel = attr.channelName;
         order.linkCode = attr.linkCode;
       }
       state.purchaseOrders.unshift(order);
       u.status = "服务中";
-      u.entitlement = "个人套餐";
-      u.pkg = sku.name;
-      u.daysLeft = sku.days;
-      u.swapUsed = 0;
-      u.operator = seller.operatorId;
+      if (isLeaseWl) {
+        u.entitlement = "设备租赁白名单";
+        u.pkg = sku.name;
+        u.daysLeft = sku.days;
+        u.swapUsed = u.swapUsed || 0;
+      } else {
+        u.entitlement = "个人套餐";
+        u.pkg = sku.name;
+        u.daysLeft = sku.days;
+        u.swapUsed = 0;
+        u.operator = seller.operatorId;
+      }
       if (useChannel) {
         u.channelPurchase = attr.channelName;
         u.channelAttr = null;
       }
       closeOverlay("overlayPkg");
-      toast("支付成功 · ¥" + amount + " → " + (op?.name || seller.operatorId));
+      const payee = isLeaseWl ? CHANNELS[seller.channelId]?.name : OPERATORS[seller.operatorId]?.name;
+      toast("支付成功 · ¥" + amount + " → " + (payee || "—"));
       renderMine();
     }
 
@@ -995,13 +1070,22 @@
         card = `<div class="service-card warn"><div><h3>待领取电池</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 解冻后首次服务</p><p style="font-size:11px;margin-top:6px;opacity:.85">请扫码领取电池（非换电），领取后可正常换电</p></div><button type="button" class="btn-gold" data-action="scan">扫码领取</button></div>`;
       } else if (u.preOccupyFail || u.status === "权益不可用") {
         card = `<div class="service-card warn"><div><h3>渠道人天 · 今日不可用</h3><p>${u.channel}<br>${u.failReason || "预占失败"}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">可在线自费购买 1天/单次 兜底套餐换电（不扣渠道池）</p></div><button type="button" class="btn-gold" data-action="fallback">自费换电</button></div>`;
+      } else if (u.coolingPeriod) {
+        const batHint = u.holdsBattery ? " · 持有电池" : "";
+        const coolLine = u.refundApplied ? "已提交冷静期退款，等待运营商审核"
+          : `冷静期剩余 ${u.coolingDaysLeft ?? "—"} 天 · 可申请退大部分费用（扣已用天数）`;
+        card = `<div class="service-card warn"><div><h3>${u.pkg}</h3><p>剩余 ${u.daysLeft} 天 · 已换电 ${u.swapUsed} 次${batHint}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">${coolLine}</p></div>${u.refundApplied ? "" : `<button type="button" class="btn-gold" data-action="cooling_refund">申请退款</button>`}</div>`;
       } else if (u.entitlement === "设备租赁白名单" && u.channelSuspended) {
         const batHint = u.holdsBattery ? " · 持有电池，可还电入柜" : " · 未持有电池";
         card = `<div class="service-card warn"><div><h3>渠道服务已暂停</h3><p>${u.channel}<br>渠道商已停用 · 不可取电/不出电${batHint}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">扫码换电提示：当前站点已到期，请联系管理员续费</p></div></div>`;
       } else if (u.entitlement === "设备租赁白名单") {
-        card = `<div class="service-card channel"><div><h3>设备租赁 · 白名单</h3><p>${u.channel}<br>免购套餐 · 不限次换电 · 已换电 ${u.swapUsed} 次</p><p style="font-size:11px;margin-top:4px;opacity:.85">专属站：京东物流专属站（地图可见）· 签约 OP-SX</p></div></div>`;
+        const isFree = u.whitelistAccess === "free";
+        const svcLine = isFree
+          ? "白名单免费 · B2B 月租覆盖 · 免购套餐换电"
+          : (u.status === "未开通" ? "白名单付费 · 请购买渠道套餐开通换电" : u.pkg + " · 剩余 " + u.daysLeft + " 天");
+        card = `<div class="service-card channel"><div><h3>设备租赁 · 白名单${isFree ? "免费" : "付费"}</h3><p>${u.channel}<br>${svcLine} · 已换电 ${u.swapUsed || 0} 次</p><p style="font-size:11px;margin-top:4px;opacity:.85">专属站：京东物流专属站${isFree ? "" : " · 款入渠道账户"}</p></div>${!isFree && u.status === "未开通" ? `<button type="button" class="btn-gold" data-action="buy">购买套餐</button>` : ""}</div>`;
       } else if (u.leaseBlocked) {
-        card = `<div class="service-card warn"><div><h3>未授权用户</h3><p>${u.blockReason || "非白名单用户"}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">设备租赁渠道不提供在线购套餐入口</p></div></div>`;
+        card = `<div class="service-card warn"><div><h3>未授权用户</h3><p>${u.blockReason || "非白名单用户"}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">非本渠道白名单，不可购买设备租赁套餐</p></div></div>`;
       } else if (u.entitlement === "渠道人天") {
         const quotaLine = u.remainingDays != null ? `剩余 ${u.remainingDays} 人天 · ` : "";
         const todayLine = u.todayEligibility === "已预占" ? "今日已预占（分配即开通）"
@@ -1031,6 +1115,7 @@
             <button type="button" class="grid-item" data-action="service"><span class="gi">📞</span>客服电话</button>
             <button type="button" class="grid-item" data-action="return"><span class="gi">🔋</span>电池退还</button>
             <button type="button" class="grid-item" data-action="freeze"><span class="gi">❄</span>申请冻结</button>
+            ${u.coolingPeriod && !u.refundApplied ? `<button type="button" class="grid-item" data-action="cooling_refund"><span class="gi">↩</span>冷静期退款</button>` : ""}
             <button type="button" class="grid-item" data-action="kyc"><span class="gi">✓</span>实名认证</button>
           </div>
         </div>
@@ -1070,6 +1155,16 @@
         if (!u.holdsBattery) { toast("当前未持有电池"); return; }
         toast("电池已归还，可继续申请退押或冻结");
         if (u.holdsBattery) u.holdsBattery = false;
+        renderMine();
+        return;
+      }
+      if (action === "cooling_refund") {
+        if (!u.loggedIn || u.entitlement !== "个人套餐") { toast("仅个人套餐用户可申请"); return; }
+        if (!u.coolingPeriod) { toast("已超过 3 天冷静期，不可申请"); return; }
+        if (u.holdsBattery) { toast("请先归还电池后再申请退款"); return; }
+        if (u.refundApplied) { toast("已提交申请，等待运营商审核"); return; }
+        u.refundApplied = true;
+        toast("已提交冷静期退款（建议退套餐 ¥279 + 押金 ¥99），等待运营商审核");
         renderMine();
         return;
       }
@@ -1122,10 +1217,9 @@
           list.innerHTML = `<div class="empty"><div class="icon">🛒</div>暂无购买记录</div>`;
           return;
         }
-        list.innerHTML = rows.map(o => `
-          <div class="order-card">
+        list.innerHTML = rows.map(o => `<div class="order-card">
             <div class="top"><span class="id">${o.id}</span><span class="status">${o.status}</span></div>
-            <div class="meta">${o.pkg} · ¥${o.amount}${o.sellerOperatorName ? "<br>收款：" + o.sellerOperatorName : ""}${o.channel ? "<br>渠道：" + o.channel + " · " + (o.linkCode || "") : ""}<br>${o.time}</div>
+            <div class="meta">${o.pkg} · ¥${o.amount}${o.sellerOperatorName ? "<br>服务：" + o.sellerOperatorName : ""}${o.channel ? "<br>渠道：" + o.channel + " · " + (o.linkCode || "") : ""}<br>${o.time}</div>
           </div>`).join("");
       } else {
         if (!state.returnOrders.length) {
@@ -1180,28 +1274,51 @@
       openOverlay("overlayScan");
     }
 
+    function leaseWhitelistNeedsPkg(u) {
+      return u.entitlement === "设备租赁白名单" && u.whitelist && u.whitelistAccess !== "free" && (u.status === "未开通" || !u.pkg);
+    }
+
     function opPolicy(opId) {
       return OPERATOR_POLICY[opId] || { crossNetworkEnabled: true };
+    }
+
+    function channelSwapPolicy(chId) {
+      return CHANNEL_SWAP_POLICY[chId] || { crossNetworkEnabled: false, crossNetworkDepositPaid: false };
     }
 
     function checkSwapGate(u, site) {
       if (site.channelDedicated && !canSeeDedicatedSite(u, site)) {
         return { ok: false, msg: "该站点为渠道专用站，仅白名单用户可见可用（E_WHITELIST）" };
       }
-      const userOp = u.operator;
       const cabinetOp = site.operator;
+      const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist && u.channelId;
+      const hostOp = isLeaseWl ? (channelSwapPolicy(u.channelId).hostOperatorId || CHANNELS[u.channelId]?.operatorId || "OP-SX") : u.operator;
+      const userOp = hostOp;
       const isCrossNetwork = userOp && cabinetOp && userOp !== cabinetOp;
 
       if (isCrossNetwork) {
-        const userPol = opPolicy(userOp);
+        if (isLeaseWl) {
+          const chPol = channelSwapPolicy(u.channelId);
+          if (!chPol.crossNetworkEnabled) {
+            return { ok: false, msg: "您的渠道未开通跨网换电，仅可在本网站点换电" };
+          }
+          if (!chPol.crossNetworkDepositPaid) {
+            return { ok: false, msg: "渠道跨网保证金未缴纳，跨网换电不可用（E_CHANNEL_CROSSNET_DEPOSIT）" };
+          }
+          if (chPol.crossSwapEnabled === false) {
+            return { ok: false, msg: "渠道信用额度不足，跨网换电已关闭" };
+          }
+        } else {
+          const userCredit = OPERATOR_CREDIT[userOp];
+          if (userCredit && userCredit.crossSwapEnabled === false) {
+            return { ok: false, msg: "您的运营商信用额度不足，跨网换电已关闭" };
+          }
+          const userPol = opPolicy(userOp);
+          if (!userPol.crossNetworkEnabled) {
+            return { ok: false, msg: "您的运营商已关闭跨网换电，仅可在本运营商站点换电" };
+          }
+        }
         const cabPol = opPolicy(cabinetOp);
-        const userCredit = OPERATOR_CREDIT[userOp];
-        if (userCredit && userCredit.crossSwapEnabled === false) {
-          return { ok: false, msg: "您的运营商信用额度不足，跨网换电已关闭" };
-        }
-        if (!userPol.crossNetworkEnabled) {
-          return { ok: false, msg: "您的运营商已关闭跨网换电，仅可在本运营商站点换电" };
-        }
         if (!cabPol.crossNetworkEnabled) {
           return { ok: false, msg: "该站点运营商已关闭跨网换电，外来用户不可换电" };
         }
@@ -1257,6 +1374,10 @@
         showScanResult(false, LEASE_SUSPEND_MSG + "（E_LEASE_CHANNEL_SUSPENDED）", site);
         return;
       }
+      if (leaseWhitelistNeedsPkg(u)) {
+        showScanResult(false, "白名单付费用户须购买白名单套餐后方可换电（E_LEASE_PKG_REQUIRED）", site);
+        return;
+      }
       if (u.preOccupyFail) {
         showPreOccupyFailResult(site, u.failReason || "渠道人天今日不可用");
         return;
@@ -1266,7 +1387,9 @@
         showScanResult(false, gate.msg, site);
         return;
       }
-      const userOp = u.operator || "OP-SX";
+      const userOp = (u.entitlement === "设备租赁白名单" && u.channelId)
+        ? (channelSwapPolicy(u.channelId).hostOperatorId || CHANNELS[u.channelId]?.operatorId || "OP-SX")
+        : (u.operator || "OP-SX");
       const cabOp = site.operator;
       const batOp = site.batteryOperator || site.operator;
       const cabFee = userOp !== cabOp ? 0.5 : 0;
@@ -1275,7 +1398,7 @@
       state.swapOrders.unshift({
         id, site: site.name, time: new Date().toLocaleString("zh-CN"), status: "成功",
         type: u.entitlement || "个人套餐", userId: u.userId,
-        userOwner: userOp, cabinetOwner: cabOp, batteryOwner: batOp, l1Fee: cabFee + batFee
+        userOwner: u.channelId || userOp, cabinetOwner: cabOp, batteryOwner: batOp, l1Fee: cabFee + batFee
       });
       if (u.entitlement === "渠道人天") u.swapUsed = (u.swapUsed || 0) + 1;
       else if (u.entitlement === "设备租赁白名单") u.swapUsed = (u.swapUsed || 0) + 1;

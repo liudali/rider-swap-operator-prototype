@@ -2,7 +2,7 @@
       role: "operator", loginKey: "entity:operator", channelEntityId: "CH-SF", leasingEntityId: "LEASE-HD", loginEmployeeId: null,
       view: "overview",
       deviceTab: "cabinet", orderTab: "package", flowTab: "receipt",
-      platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "ledger", platformChannelTab: "list",
+      platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "ledger", platformChannelTab: "list", platformMarketingTab: "campaigns",
       platformLeasingTab: "companies", depositTab: "pending", operatorCreditTab: "assignments",
       dayPoolTab: "pools", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider",
       pricingTab: "pkg", channelSalesTab: "contracts", refundTab: "queue",
@@ -11,11 +11,154 @@
       operatorFormId: null, platformFeeRateEditId: null, leasingCompanyFormId: null, siteFormId: null, channelPartnerContractId: null, bindInventorySn: null,
       leaseFormId: null, leaseFormMode: null, followBillId: null, rentPayBillId: null,
       leaseAgreementsTab: "contracts", deviceListFormId: null, deviceReplaceListId: null,
-      financeTab: "dashboard", financeSelectedAppId: "FDA-2606-01", financeAssetFilter: "全部",
+      financeTab: "dashboard", financeSelectedAppId: "FDA-2606-01", financeAssetFilter: "全部", financeSelectedPackageId: "FAP-2606-01",
       channelLinkForm: null,
+      siteExpenseTab: "sites",
+      sitePartnersTab: "profiles",
+      sitePartnerId: null,
+      detailSiteExpenseId: null,
+      detailSitePartnersId: null,
       detailSubId: null, detailSwapId: null, detailLeaseId: null, detailOperatorId: null, detailRefundId: null,
       cabinetDetailSn: null
     };
+
+    let protoFormState = null;
+    let protoConfirmState = null;
+
+    function showProtoToast(msg, ms) {
+      const el = document.querySelector("#protoToast");
+      if (!el) return;
+      el.textContent = String(msg).replace(/\n+/g, " · ");
+      el.classList.add("show");
+      clearTimeout(showProtoToast._hide);
+      showProtoToast._hide = setTimeout(() => el.classList.remove("show"), ms ?? 2800);
+    }
+
+    function escProtoAttr(s) {
+      return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    }
+
+    function renderProtoField(f) {
+      const req = f.required !== false ? "required" : "";
+      const ro = f.readonly ? "readonly" : "";
+      if (f.type === "select") {
+        return `<label>${escProtoAttr(f.label)}<select name="${escProtoAttr(f.name)}" ${req}>${(f.options || []).map(o => {
+          const label = f.optionLabels?.[o] ?? o;
+          return `<option value="${escProtoAttr(o)}"${o === f.value ? " selected" : ""}>${escProtoAttr(label)}</option>`;
+        }).join("")}</select></label>`;
+      }
+      if (f.type === "textarea") {
+        return `<label>${escProtoAttr(f.label)}<textarea name="${escProtoAttr(f.name)}" rows="${f.rows || 3}" ${req} ${ro}>${escProtoAttr(f.value || "")}</textarea></label>`;
+      }
+      return `<label>${escProtoAttr(f.label)}<input name="${escProtoAttr(f.name)}" type="${f.type || "text"}" value="${escProtoAttr(f.value ?? "")}" ${req} ${ro}></label>`;
+    }
+
+    function closeProtoForm() {
+      protoFormState = null;
+      const form = document.querySelector("#protoForm");
+      if (form) { form.innerHTML = ""; form.style.display = ""; }
+      const suc = document.querySelector("#protoFormSuccess");
+      const err = document.querySelector("#protoFormError");
+      if (suc) { suc.hidden = true; suc.textContent = ""; }
+      if (err) { err.hidden = true; err.textContent = ""; }
+      document.querySelector("#cancelProtoForm")?.removeAttribute("hidden");
+      document.querySelector("#protoFormMask")?.classList.remove("open");
+      document.querySelector("#protoFormModal")?.classList.remove("open");
+      const submitBtn = document.querySelector("#submitProtoForm");
+      if (submitBtn) submitBtn.textContent = "确定";
+    }
+
+    function openProtoForm({ title, fields, submitLabel, onSubmit }) {
+      protoFormState = { onSubmit, phase: "form" };
+      document.querySelector("#protoFormTitle").textContent = title || "填写信息";
+      document.querySelector("#submitProtoForm").textContent = submitLabel || "确定";
+      document.querySelector("#protoFormSuccess").hidden = true;
+      document.querySelector("#protoFormError").hidden = true;
+      document.querySelector("#cancelProtoForm")?.removeAttribute("hidden");
+      const form = document.querySelector("#protoForm");
+      form.style.display = "";
+      form.innerHTML = (fields || []).map(renderProtoField).join("");
+      document.querySelector("#protoFormMask").classList.add("open");
+      document.querySelector("#protoFormModal").classList.add("open");
+    }
+
+    function submitProtoForm() {
+      if (!protoFormState) return;
+      if (protoFormState.phase === "done") {
+        const after = protoFormState.afterClose;
+        closeProtoForm();
+        if (after) after();
+        return;
+      }
+      const form = document.querySelector("#protoForm");
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      const data = Object.fromEntries(new FormData(form).entries());
+      const errEl = document.querySelector("#protoFormError");
+      const result = protoFormState.onSubmit(data);
+      if (typeof result === "string") {
+        errEl.textContent = result;
+        errEl.hidden = false;
+        return;
+      }
+      if (result && typeof result === "object" && result.successMessage) {
+        form.style.display = "none";
+        errEl.hidden = true;
+        document.querySelector("#cancelProtoForm")?.setAttribute("hidden", "");
+        const suc = document.querySelector("#protoFormSuccess");
+        suc.textContent = result.successMessage;
+        suc.hidden = false;
+        document.querySelector("#submitProtoForm").textContent = "完成";
+        protoFormState = { phase: "done", afterClose: result.afterClose };
+        return;
+      }
+      const afterClose = result && result.afterClose;
+      closeProtoForm();
+      if (afterClose) afterClose();
+    }
+
+    function openProtoConfirm({ title, message, confirmLabel, onConfirm, onCancel }) {
+      protoConfirmState = { onConfirm, onCancel };
+      document.querySelector("#protoConfirmTitle").textContent = title || "确认";
+      document.querySelector("#protoConfirmMessage").textContent = message || "";
+      document.querySelector("#okProtoConfirm").textContent = confirmLabel || "确定";
+      document.querySelector("#protoConfirmMask").classList.add("open");
+      document.querySelector("#protoConfirmModal").classList.add("open");
+    }
+
+    function closeProtoConfirm(ok) {
+      const cb = protoConfirmState;
+      protoConfirmState = null;
+      document.querySelector("#protoConfirmMask")?.classList.remove("open");
+      document.querySelector("#protoConfirmModal")?.classList.remove("open");
+      if (ok && cb?.onConfirm) cb.onConfirm();
+      else if (!ok && cb?.onCancel) cb.onCancel();
+    }
+
+    function openProtoCopyUrl(url, title) {
+      openProtoForm({
+        title: title || "复制链接",
+        fields: [{ name: "url", label: "链接", value: url, readonly: true }],
+        submitLabel: "复制",
+        onSubmit: (data) => {
+          if (navigator.clipboard?.writeText) navigator.clipboard.writeText(data.url);
+          return {
+            successMessage: navigator.clipboard ? "已复制到剪贴板" : "请手动选中上方链接复制",
+            afterClose: () => {}
+          };
+        }
+      });
+    }
+
+    function initProtoDialogs() {
+      document.querySelector("#closeProtoForm")?.addEventListener("click", closeProtoForm);
+      document.querySelector("#cancelProtoForm")?.addEventListener("click", closeProtoForm);
+      document.querySelector("#submitProtoForm")?.addEventListener("click", submitProtoForm);
+      document.querySelector("#protoFormMask")?.addEventListener("click", closeProtoForm);
+      document.querySelector("#cancelProtoConfirm")?.addEventListener("click", () => closeProtoConfirm(false));
+      document.querySelector("#okProtoConfirm")?.addEventListener("click", () => closeProtoConfirm(true));
+      document.querySelector("#protoConfirmMask")?.addEventListener("click", () => closeProtoConfirm(false));
+      window.alert = showProtoToast;
+    }
 
     function myEmployees() {
       return employeeStore[currentEntity().id] || [];
@@ -49,6 +192,28 @@
 
     function isCardChannel() {
       return isChannelRole() && channelProfile().settlementMode === "卡差价";
+    }
+
+    function cardContractForChannel(channelId) {
+      return channelContracts.find(c => c.channelId === channelId && contractSettlementMode(c) === "卡差价");
+    }
+
+    function channelInstantCommissionEnabled(channelId) {
+      const c = cardContractForChannel(channelId);
+      return !!(c?.instantCommissionPayout && c.commissionRate > 0);
+    }
+
+    function channelHasPayoutAccount(channelId) {
+      return paymentAccounts.some(a => a.entityId === channelId && a.status === "已开通");
+    }
+
+    function formatCommissionRate(rate) {
+      if (rate == null || !Number.isFinite(rate)) return "—";
+      return (rate * 100).toFixed(1).replace(/\.0$/, "") + "%";
+    }
+
+    function commissionSettlementLabel(channelId) {
+      return channelInstantCommissionEnabled(channelId) ? "即时分账" : "线下待结";
     }
 
     function channelUsesCreditEval(channelId) {
@@ -151,9 +316,9 @@
       document.querySelector("#qrDownloadBtn").onclick = () => window.alert("演示：已生成 PNG 二维码（" + link.linkCode + ".png）");
       document.querySelector("#qrCopyBtn").onclick = () => {
         if (navigator.clipboard?.writeText) {
-          navigator.clipboard.writeText(link.linkUrl).then(() => window.alert("已复制小程序链接"));
+          navigator.clipboard.writeText(link.linkUrl).then(() => showProtoToast("已复制小程序链接"));
         } else {
-          window.prompt("复制链接", link.linkUrl);
+          openProtoCopyUrl(link.linkUrl, "复制小程序链接");
         }
       };
     }
@@ -349,6 +514,7 @@
 
     function getAllowedNavItems() {
       if (isEntityLogin()) {
+        if (state.role === "sitePartner") return NAV.sitePartner || [];
         if (state.role === "channel") return CHANNEL_NAV[channelEntityId()] || NAV.channel;
         return NAV[state.role] || NAV.operator;
       }
@@ -377,10 +543,17 @@
           state.role = "leasing";
           state.leasingEntityId = id;
           state.channelEntityId = null;
+          state.sitePartnerId = null;
+        } else if (sitePartners.find(p => p.id === id)) {
+          state.role = "sitePartner";
+          state.sitePartnerId = id;
+          state.channelEntityId = null;
+          state.leasingEntityId = null;
         } else {
           state.role = id;
           state.channelEntityId = id === "channel" ? "CH-SF" : null;
           state.leasingEntityId = id === "leasing" ? "LEASE-HD" : null;
+          state.sitePartnerId = null;
         }
         state.loginEmployeeId = null;
         return;
@@ -420,11 +593,23 @@
           }
         });
       });
+      const partnerOpts = sitePartners.filter(p => p.status === "启用").map(p => {
+        const op = entityNameById(p.operatorId);
+        const type = p.partnerType || "个人";
+        return `<option value="entity:${p.id}">站点合伙人 · ${p.name}（${type} · ${op}）</option>`;
+      }).join("");
       return `<optgroup label="经营主体">${entityOpts}</optgroup>
+        <optgroup label="站点合伙人">${partnerOpts || "<option disabled>—</option>"}</optgroup>
         <optgroup label="员工登录">${staffOpts || "<option disabled>—</option>"}</optgroup>`;
     }
 
     function currentEntity() {
+      if (state.role === "sitePartner") {
+        const p = sitePartners.find(x => x.id === (state.sitePartnerId || "SP-01"));
+        if (!p) return ENT.sitePartner;
+        const op = platformOperators.find(o => o.id === p.operatorId);
+        return { id: p.id, name: p.name, type: "站点合伙人", partnerType: p.partnerType, operatorId: p.operatorId, operatorName: op?.name || p.operatorId };
+      }
       if (state.role === "channel") {
         const id = state.channelEntityId || "CH-SF";
         return CHANNEL_REGISTRY[id] || ENT.channel;
@@ -454,6 +639,7 @@
       if (state.view === "platformFlows") return "platformFlows_" + state.platformFlowTab;
       if (state.view === "platformDevices") return state.platformDeviceTab === "import" ? "platformDevices_pending" : "platformDevices_" + state.platformDeviceTab;
       if (state.view === "platformChannels") return "platformChannels_" + state.platformChannelTab;
+      if (state.view === "platformMarketing") return "platformMarketing_" + state.platformMarketingTab;
       if (state.view === "deviceBinding") return "platformDevices_pending";
       if (state.view === "devices") {
         if (state.deviceTab === "cabinet") return "devices_cabinet";
@@ -725,6 +911,89 @@
     function isChannelRole() { return state.role === "channel"; }
     function isOperatorRole() { return state.role === "operator"; }
     function isPlatformRole() { return state.role === "platform"; }
+    function isSitePartnerRole() { return state.role === "sitePartner"; }
+
+    function currentSitePartner() {
+      if (!isSitePartnerRole()) return null;
+      return sitePartners.find(p => p.id === (state.sitePartnerId || "SP-01")) || null;
+    }
+
+    function myPartnerBindings() {
+      const p = currentSitePartner();
+      if (!p) return [];
+      return sitePartnerBindings.filter(b => b.partnerId === p.id && b.status === "生效");
+    }
+
+    function myPartnerSplitLines() {
+      const p = currentSitePartner();
+      if (!p) return [];
+      return sitePartnerSplitLines.filter(l => l.partnerId === p.id);
+    }
+
+    function partnerAccruedTotal(partnerId) {
+      const pid = partnerId || currentSitePartner()?.id;
+      if (!pid) return 0;
+      return sitePartnerSplitLines.filter(l => l.partnerId === pid).reduce((s, l) => s + (l.partnerAmount || 0), 0);
+    }
+
+    function partnerMonthAccrued(partnerId, month) {
+      const pid = partnerId || currentSitePartner()?.id;
+      const m = month || "2026-06";
+      if (!pid) return 0;
+      return sitePartnerSplitLines.filter(l => l.partnerId === pid && (l.date || "").startsWith(m)).reduce((s, l) => s + (l.partnerAmount || 0), 0);
+    }
+
+    function partnerWithdrawnTotal(partnerId) {
+      const pid = partnerId || currentSitePartner()?.id;
+      if (!pid) return 0;
+      return sitePartnerWithdrawalRequests.filter(w => w.partnerId === pid && w.status === "已到账").reduce((s, w) => s + w.amount, 0);
+    }
+
+    function partnerPendingWithdrawTotal(partnerId) {
+      const pid = partnerId || currentSitePartner()?.id;
+      if (!pid) return 0;
+      return sitePartnerWithdrawalRequests.filter(w => w.partnerId === pid && w.status === "待审核").reduce((s, w) => s + w.amount, 0);
+    }
+
+    function partnerWithdrawableBalance(partnerId) {
+      const accrued = partnerAccruedTotal(partnerId);
+      const withdrawn = partnerWithdrawnTotal(partnerId);
+      const pending = partnerPendingWithdrawTotal(partnerId);
+      return Math.max(0, +(accrued - withdrawn - pending).toFixed(2));
+    }
+
+    function myPartnerWithdrawals() {
+      const p = currentSitePartner();
+      if (!p) return [];
+      return sitePartnerWithdrawalRequests.filter(w => w.partnerId === p.id);
+    }
+
+    function openPartnerWithdrawForm() {
+      const p = currentSitePartner();
+      if (!p) return;
+      const avail = partnerWithdrawableBalance(p.id);
+      if (avail <= 0) { showProtoToast("可提现余额不足"); return; }
+      if (myPartnerWithdrawals().some(w => w.status === "待审核")) { showProtoToast("已有待审核申请"); return; }
+      openProtoForm({
+        title: "发起提现申请",
+        fields: [
+          { name: "amount", label: "提现金额（元）", type: "number", value: String(Math.min(avail, 100).toFixed(2)) }
+        ],
+        submitLabel: "提交至运营商",
+        onSubmit: (data) => {
+          const amount = parseFloat(data.amount);
+          if (!Number.isFinite(amount) || amount <= 0) return "请输入有效金额";
+          if (amount > avail + 0.009) return "不得超过可提现余额 ¥" + avail.toFixed(2);
+          sitePartnerWithdrawalRequests.unshift({
+            id: "SPW-" + Date.now().toString().slice(-6), partnerId: p.id, operatorId: p.operatorId,
+            amount, applyTime: new Date().toISOString().slice(0, 16).replace("T", " "),
+            reviewTime: null, reviewedBy: null, status: "待审核", paidTime: null,
+            accountLabel: p.bankAccount || "—", rejectReason: null
+          });
+          return { successMessage: "已提交 · 等待运营商审核后代付", afterClose: () => render() };
+        }
+      });
+    }
 
     function creditForOperator(operatorId) {
       return operatorCreditAccounts.find(a => a.operatorId === operatorId) || null;
@@ -1358,9 +1627,10 @@
       const mode = contractSettlementMode(c);
       if (mode === "卡差价") {
         const skus = channelLinkSkus.filter(s => s.channelId === c.channelId);
+        const instant = c.instantCommissionPayout ? `<br><small style="color:var(--green)">佣金及时到付 · ${formatCommissionRate(c.commissionRate)}</small>` : "";
         return skus.length
-          ? skus.map(s => `${s.name}<br><small>正式 ¥${s.officialPrice} / 专享 ¥${s.channelPrice} / 佣 ¥${s.commissionPerOrder}</small>`).join("<br>")
-          : "推广链接分销";
+          ? skus.map(s => `${s.name}<br><small>正式 ¥${s.officialPrice} / 专享 ¥${s.channelPrice} / 佣 ¥${s.commissionPerOrder}</small>`).join("<br>") + instant
+          : "推广链接分销" + instant;
       }
       if (mode === "设备租赁") {
         const pool = channelRentPoolData.find(p => p.channelId === c.channelId);
@@ -1376,7 +1646,10 @@
       const mode = contractSettlementMode(c);
       if (mode === "卡差价") {
         const skus = channelLinkSkus.filter(s => s.channelId === c.channelId);
-        return `授权 ${skus.length} 个 SKU<br><small>推广链接 · 佣金结算 · 24h 归因</small>`;
+        const settle = c.instantCommissionPayout
+          ? `佣金及时到付 · ${formatCommissionRate(c.commissionRate)}`
+          : "佣金线下结算";
+        return `授权 ${skus.length} 个 SKU<br><small>推广链接 · ${settle} · 24h 归因</small>`;
       }
       if (mode === "设备租赁") {
         const site = c.dedicatedSiteName || "—";
@@ -1444,6 +1717,22 @@
       return interOpLedger.filter(r =>
         r.payerId === eid || r.payeeCabinetId === eid || r.payeeBatteryId === eid
       );
+    }
+
+    function myChannelInterOpLedger() {
+      if (!isLeaseChannel()) return [];
+      const cid = channelEntityId();
+      return channelInterOpLedger.filter(r => r.channelId === cid);
+    }
+
+    function channelSwapPolicyFor(cid) {
+      return channelSwapPolicy[cid] || { crossNetworkEnabled: false, crossNetworkDepositPaid: false };
+    }
+
+    function whitelistAccessLabel(access) {
+      return access === "free"
+        ? '<span class="tag neutral">白名单免费</span>'
+        : '<span class="tag warn">白名单付费</span>';
     }
 
     function interOpRowView(r) {
@@ -1587,6 +1876,17 @@
       return ["全部", ...new Set(cabinets.filter(c => c.deviceOwnerId === eid).map(c => c.site))];
     }
 
+    function ownSiteIdOptions() {
+      return [{ v: "全部", t: "全部站点" }, ...myOperatorSites().map(s => ({ v: s.id, t: s.name }))];
+    }
+
+    function ownPartnerSiteIdOptions() {
+      const p = currentSitePartner();
+      if (!p) return [{ v: "全部", t: "全部站点" }];
+      const siteIds = new Set(myPartnerBindings().map(b => b.siteId));
+      return [{ v: "全部", t: "全部站点" }, ...sites.filter(s => siteIds.has(s.id)).map(s => ({ v: s.id, t: s.name }))];
+    }
+
     function renderFilterField(spec, f) {
       const val = f[spec.key] ?? "";
       if (spec.type === "select") {
@@ -1611,6 +1911,16 @@
         { key: "siteName", label: "站点名称", placeholder: "模糊搜索" },
         { key: "city", label: "城市", type: "select", options: [{ v: "全部", t: "全部城市" }, { v: "上海", t: "上海" }] },
         { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "在营", t: "在营" }, { v: "建设中", t: "建设中" }] }
+      ],
+      sitePartners: [
+        { key: "keyword", label: "合伙人", placeholder: "姓名/公司/手机" },
+        { key: "siteId", label: "站点", type: "select", options: () => ownSiteIdOptions() }
+      ],
+      partnerLedger: [
+        { key: "keyword", label: "关键词", placeholder: "站点/单号" },
+        { key: "siteId", label: "站点", type: "select", options: () => ownPartnerSiteIdOptions() },
+        { key: "dateFrom", label: "日起", type: "date" },
+        { key: "dateTo", label: "日止", type: "date" }
       ],
       devices: [
         { key: "sn", label: "设备编号", placeholder: "柜机 SN / 电池 SN" },
@@ -1669,8 +1979,7 @@
         { key: "settle", label: "清分状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "已清分", t: "已清分" }, { v: "已提现", t: "已提现" }, { v: "已冲正", t: "已冲正" }] }
       ],
       flows_payout: [
-        { key: "period", label: "结算周期", placeholder: "如 2026-04" },
-        { key: "status", label: "提现状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "已提现", t: "已提现" }, { v: "处理中", t: "处理中" }] }
+        { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待审核", t: "待审核" }, { v: "已提现", t: "已提现" }, { v: "已驳回", t: "已驳回" }] }
       ],
       users: [
         { key: "userId", label: "用户 ID", placeholder: "如 U1028" },
@@ -1684,7 +1993,7 @@
         { key: "refundId", label: "退款单号", placeholder: "RF-" },
         { key: "orderId", label: "套餐单号", placeholder: "SUB-" },
         { key: "phone", label: "用户手机", placeholder: "" },
-        { key: "type", label: "退款类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "中途完结", t: "中途完结" }, { v: "7天未使用退订", t: "7天未使用退订" }, { v: "单次未换电退订", t: "单次未换电退订" }] },
+        { key: "type", label: "退款类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "冷静期退款", t: "冷静期退款" }, { v: "中途完结", t: "中途完结" }, { v: "7天未使用退订", t: "7天未使用退订" }, { v: "单次未换电退订", t: "单次未换电退订" }] },
         { key: "status", label: "处理状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待审核", t: "待审核" }, { v: "已退款", t: "已退款" }, { v: "已驳回", t: "已驳回" }] },
         { key: "applyFrom", label: "申请日起", type: "date" },
         { key: "applyTo", label: "申请日止", type: "date" }
@@ -1808,6 +2117,31 @@
         { key: "teamId", label: "团队", type: "select", options: () => [{ v: "全部", t: "全部团队" }].concat(dayPoolTeams.filter(t => t.channelId === "CH-SF").map(t => ({ v: t.id, t: t.name }))) },
         { key: "quotaStatus", label: "额度状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "使用中", t: "使用中" }, { v: "未分配", t: "未分配" }, { v: "已收回", t: "已收回" }] }
       ],
+      platformMarketing_campaigns: [
+        { key: "keyword", label: "活动名称/ID", placeholder: "CMP-" },
+        { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "进行中", t: "进行中" }, { v: "已结束", t: "已结束" }, { v: "已停用", t: "已停用" }] }
+      ],
+      platformMarketing_agreements: [
+        { key: "operatorId", label: "运营商", type: "select", options: () => platformOperatorOptions() },
+        { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待确认", t: "待确认" }, { v: "已启用", t: "已启用" }, { v: "已停用", t: "已停用" }] }
+      ],
+      platformMarketing_links: [
+        { key: "campaignId", label: "活动", type: "select", options: () => [{ v: "全部", t: "全部" }].concat(platformMarketingCampaigns.map(c => ({ v: c.id, t: c.name }))) },
+        { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "启用", t: "启用" }, { v: "停用", t: "停用" }] }
+      ],
+      platformMarketing_pending: [
+        { key: "keyword", label: "订单/手机", placeholder: "PMO-" },
+        { key: "activationStatus", label: "激活状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "pending", t: "待激活" }, { v: "activated", t: "已激活" }, { v: "refunded", t: "已退款" }] }
+      ],
+      platformMarketing_settlements: [
+        { key: "operatorId", label: "运营商", type: "select", options: () => platformOperatorOptions() },
+        { key: "month", label: "月份", placeholder: "2026-06" }
+      ],
+      platformMarketing_statements: [
+        { key: "month", label: "月份", type: "select", options: () => [{ v: "全部", t: "全部" }, { v: "2026-06", t: "2026-06" }] },
+        { key: "operatorId", label: "运营商", type: "select", options: () => platformOperatorOptions() },
+        { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待确认", t: "待确认" }, { v: "已确认", t: "已确认" }] }
+      ],
       platformFlows_userPay: [
         { key: "orderId", label: "关联单号", placeholder: "" },
         { key: "flowType", label: "流水类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "套餐支付", t: "套餐支付" }, { v: "额度池采购", t: "额度池采购" }, { v: "额度池零售", t: "额度池零售" }, { v: "退款出款", t: "退款出款" }] },
@@ -1821,6 +2155,10 @@
       platformFlows_platformFee: [
         { key: "operatorId", label: "计提主体", type: "select", options: () => platformOperatorOptions() },
         { key: "trigger", label: "触发场景", type: "select", options: [{ v: "全部", t: "全部" }, { v: "确认消耗", t: "B 端确认消耗" }, { v: "支付成功", t: "C 端支付成功" }] }
+      ],
+      platformFlows_withdrawReview: [
+        { key: "operatorId", label: "运营商", type: "select", options: () => platformOperatorOptions() },
+        { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待审核", t: "待审核" }, { v: "已提现", t: "已提现" }, { v: "已驳回", t: "已驳回" }] }
       ],
       channelOrders: [
         { key: "payFrom", label: "支付日起", type: "date" },
@@ -1912,9 +2250,63 @@
     function myRefundSettings() {
       const eid = currentEmployee() ? currentEmployee().entityId : currentEntity().id;
       if (!operatorRefundSettings[eid]) {
-        operatorRefundSettings[eid] = { mode: "manual", updatedAt: new Date().toISOString().slice(0, 10), updatedBy: entityNameById(eid) };
+        operatorRefundSettings[eid] = {
+          mode: "manual", coolingPeriodDays: 3, coolingPeriodEnabled: true, coolingDefaultAudit: true,
+          updatedAt: new Date().toISOString().slice(0, 10), updatedBy: entityNameById(eid)
+        };
       }
-      return operatorRefundSettings[eid];
+      const s = operatorRefundSettings[eid];
+      if (s.coolingPeriodDays == null) s.coolingPeriodDays = 3;
+      if (s.coolingPeriodEnabled == null) s.coolingPeriodEnabled = true;
+      if (s.coolingDefaultAudit == null) s.coolingDefaultAudit = true;
+      return s;
+    }
+
+    function applyRefundApproval(rf, pkgRefund, depositRefund, note) {
+      rf.pkgRefund = pkgRefund;
+      rf.depositRefund = depositRefund || 0;
+      rf.totalRefund = Math.round((pkgRefund + (depositRefund || 0)) * 100) / 100;
+      if (note) rf.operatorNote = note;
+      rf.status = "已退款";
+      rf.processedTime = new Date().toISOString().slice(0, 16).replace("T", " ");
+      rf.processedBy = currentEmployee()?.name || currentEntity().name;
+      rf.processMode = "manual";
+      const sc = serviceChangeRequests.find(x => x.id === rf.scId);
+      if (sc) sc.status = "已退款";
+      const p = packageOrders.find(x => x.id === rf.orderId);
+      if (p) {
+        p.status = "中途完结";
+        p.serviceState = "中途完结";
+        p.refundStatus = "已退款";
+      }
+    }
+
+    function promptApproveRefund(rfId) {
+      const rf = refundRequests.find(x => x.id === rfId);
+      if (!rf || rf.status !== "待审核") return;
+      if (!canAuditRefund()) return;
+      if (rf.coolingPeriod || rf.type === "冷静期退款") {
+        openProtoForm({
+          title: "确认冷静期退款",
+          fields: [
+            { name: "pkgRefund", label: "退套餐费（元）", value: String(rf.suggestedRefund ?? rf.pkgRefund) },
+            { name: "depositRefund", label: "退押金（元）", value: String(rf.depositRefund || 0) },
+            { name: "note", label: "调整说明（可选）", value: rf.operatorNote || "" }
+          ],
+          submitLabel: "确认退款",
+          onSubmit: (data) => {
+            const pkg = parseFloat(data.pkgRefund);
+            const dep = parseFloat(data.depositRefund);
+            if (Number.isNaN(pkg) || pkg < 0) return "请填写有效套餐退款金额";
+            if (Number.isNaN(dep) || dep < 0) return "请填写有效押金退款金额";
+            applyRefundApproval(rf, pkg, dep || 0, (data.note || "").trim());
+            return { successMessage: "已确认退款 ¥" + rf.totalRefund + "，系统将原路执行", afterClose: () => render() };
+          }
+        });
+        return;
+      }
+      applyRefundApproval(rf, rf.pkgRefund, rf.depositRefund, null);
+      render();
     }
 
     function myRefundRequests() {
@@ -2017,6 +2409,105 @@
       return "¥" + (n || 0).toLocaleString("zh-CN");
     }
 
+    function operatorClearedBalance(operatorId) {
+      return packageOrders
+        .filter(p => p.deviceOwnerId === operatorId && p.payout === "已清分")
+        .reduce((s, p) => s + (p.accrued || 0), 0);
+    }
+
+    function operatorWithdrawnTotal(operatorId) {
+      return operatorWithdrawalRequests
+        .filter(w => w.operatorId === operatorId && w.status === "已提现")
+        .reduce((s, w) => s + w.amount, 0);
+    }
+
+    function operatorPendingWithdrawTotal(operatorId) {
+      return operatorWithdrawalRequests
+        .filter(w => w.operatorId === operatorId && ["待审核", "审核通过", "处理中"].includes(w.status))
+        .reduce((s, w) => s + w.amount, 0);
+    }
+
+    function operatorFinanceMonthDue(operatorId, month) {
+      const m = month || "2026-06";
+      const appIds = new Set(financeApplications.filter(a => a.operatorId === operatorId).map(a => a.id));
+      return financeRepaymentSchedules
+        .filter(s => appIds.has(s.applicationId) && s.dueDate.startsWith(m) && s.status !== "已还清")
+        .reduce((x, s) => x + s.dueAmount - (s.paidAmount || 0), 0);
+    }
+
+    function operatorWithdrawableBalance(operatorId) {
+      const cleared = operatorClearedBalance(operatorId);
+      const withdrawn = operatorWithdrawnTotal(operatorId);
+      const pending = operatorPendingWithdrawTotal(operatorId);
+      const monthDue = operatorFinanceMonthDue(operatorId);
+      return Math.max(0, +(cleared - withdrawn - pending - monthDue).toFixed(2));
+    }
+
+    function operatorDefaultWithdrawAccount(operatorId) {
+      const rows = paymentAccounts.filter(a => a.entityId === operatorId && a.accountScope === "c_end" && (a.status === "已开通" || a.status === "已绑定"));
+      return rows.find(a => a.default) || rows[0] || null;
+    }
+
+    function myOperatorWithdrawals() {
+      if (!isOperatorRole()) return [];
+      return operatorWithdrawalRequests.filter(w => w.operatorId === currentEntity().id);
+    }
+
+    function openApplyWithdrawForm() {
+      const opId = currentEntity().id;
+      const avail = operatorWithdrawableBalance(opId);
+      const acct = operatorDefaultWithdrawAccount(opId);
+      const monthDue = operatorFinanceMonthDue(opId);
+      if (!acct) { showProtoToast("请先在收款账户绑定默认子商户"); return; }
+      if (avail <= 0) { showProtoToast("可提现余额不足（已扣除本月融资待还 ¥" + monthDue.toLocaleString("zh-CN") + "）"); return; }
+      if (myOperatorWithdrawals().some(w => w.status === "待审核")) { showProtoToast("已有待审核申请"); return; }
+      openProtoForm({
+        title: "发起提现申请",
+        fields: [
+          { name: "amount", label: "提现金额（元）", type: "number", value: String(Math.min(avail, 500).toFixed(2)) },
+          { name: "accountId", label: "到账账户", type: "select", options: [acct.id], optionLabels: { [acct.id]: acct.channel + " · " + acct.mchNo }, value: acct.id }
+        ],
+        submitLabel: "提交申请",
+        onSubmit: (data) => {
+          const amount = parseFloat(data.amount);
+          if (!Number.isFinite(amount) || amount <= 0) return "请输入有效金额";
+          if (amount > avail + 0.009) return "不得超过可提现余额 ¥" + avail.toFixed(2);
+          operatorWithdrawalRequests.unshift({
+            id: "WD-" + Date.now().toString().slice(-6), operatorId: opId, amount,
+            applyTime: new Date().toISOString().slice(0, 16).replace("T", " "),
+            reviewTime: null, reviewedBy: null, status: "待审核", withdrawTime: null,
+            accountId: acct.id, accountLabel: acct.channel + " · " + acct.mchNo,
+            monthDueReserved: monthDue, rejectReason: null
+          });
+          return { successMessage: "已提交 · 等待平台审核后打款", afterClose: () => render() };
+        }
+      });
+    }
+
+    function approveOperatorWithdraw(withdrawId) {
+      const w = operatorWithdrawalRequests.find(x => x.id === withdrawId);
+      if (!w || w.status !== "待审核") return;
+      const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+      w.status = "已提现";
+      w.reviewTime = now;
+      w.reviewedBy = currentEmployee()?.name || "平台管理员";
+      w.withdrawTime = now;
+      showProtoToast("已通过 · 已发起提现至 " + w.accountLabel);
+      render();
+    }
+
+    function rejectOperatorWithdraw(withdrawId, reason) {
+      const w = operatorWithdrawalRequests.find(x => x.id === withdrawId);
+      if (!w || w.status !== "待审核") return;
+      const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+      w.status = "已驳回";
+      w.reviewTime = now;
+      w.reviewedBy = currentEmployee()?.name || "平台管理员";
+      w.rejectReason = (reason || "").trim() || "不符合提现条件";
+      showProtoToast("已驳回");
+      render();
+    }
+
     function myFinanceProjects() {
       const oid = currentEntity().id;
       if (isLeasingRole()) return financeProjects.filter(p => p.financierId === oid);
@@ -2034,6 +2525,183 @@
     function myFinanceAssets() {
       const oid = isOperatorRole() ? currentEntity().id : null;
       return oid ? financeAssets.filter(a => a.operatorId === oid) : financeAssets;
+    }
+
+    function financePackageById(id) {
+      return financeAssetPackages.find(p => p.id === id);
+    }
+
+    function myFinancePackages() {
+      const oid = currentEntity().id;
+      return financeAssetPackages.filter(p => p.operatorId === oid).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+    }
+
+    function isFinanceAssetSelectable(sn, excludePackageId) {
+      const a = financeAssets.find(x => x.sn === sn);
+      if (!a) return false;
+      if (!["可融资"].includes(a.status)) return false;
+      if (a.appId) return false;
+      if (a.packageId && a.packageId !== excludePackageId) {
+        const pkg = financePackageById(a.packageId);
+        if (pkg && pkg.status !== "已作废") return false;
+      }
+      return true;
+    }
+
+    function releasePackageAssets(pkg) {
+      (pkg.assetSns || []).forEach(sn => {
+        const a = financeAssets.find(x => x.sn === sn);
+        if (a && a.packageId === pkg.id && !a.appId) {
+          a.packageId = null;
+          if (a.status === "包内占选") a.status = "可融资";
+        }
+      });
+    }
+
+    function assignPackageAssets(pkg, sns) {
+      releasePackageAssets(pkg);
+      pkg.assetSns = [...sns];
+      const proj = financeProjectById(pkg.projectId);
+      pkg.refAmount = sns.length * (proj?.unitRef || 15000);
+      const sites = [...new Set(sns.map(sn => financeAssets.find(x => x.sn === sn)?.site).filter(Boolean))];
+      pkg.regionSummary = sites.length ? `华东 · 上海 · ${sites.length} 站` : "—";
+      sns.forEach(sn => {
+        const a = financeAssets.find(x => x.sn === sn);
+        if (a) { a.packageId = pkg.id; a.status = "包内占选"; }
+      });
+      pkg.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+    }
+
+    function createFinancePackage(name, projectId) {
+      const proj = financeProjectById(projectId);
+      if (!proj) return null;
+      const id = "FAP-" + Date.now().toString().slice(-6);
+      const pkg = {
+        id, operatorId: currentEntity().id, projectId, financierId: proj.financierId,
+        name: name || "新资产包", status: "草稿", applicationId: null, assetSns: [], refAmount: 0,
+        regionSummary: "—", remark: "", createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+        updatedAt: new Date().toISOString().slice(0, 16).replace("T", " ")
+      };
+      financeAssetPackages.unshift(pkg);
+      return pkg;
+    }
+
+    function createFinanceAppFromPackage(packageId) {
+      const pkg = financePackageById(packageId);
+      if (!pkg || pkg.status !== "草稿" || !pkg.assetSns.length) return "请先为资产包选择至少一台设备";
+      if (pkg.applicationId) return "该资产包已生成批次";
+      const proj = financeProjectById(pkg.projectId);
+      const month = "2026-06";
+      const batchNo = financeApplications.filter(a => a.month === month && a.operatorId === pkg.operatorId).length + 1;
+      const appId = `FDA-${month.replace("-", "")}-0${batchNo}`;
+      const prePlanId = `FPR-${month.replace("-", "")}-0${batchNo}-v1`;
+      const refAmount = pkg.refAmount || pkg.assetSns.length * (proj?.unitRef || 15000);
+      financeApplications.unshift({
+        id: appId, operatorId: pkg.operatorId, projectId: pkg.projectId, financierId: pkg.financierId, packageId: pkg.id,
+        month, batchNo, status: "草稿", requestedAmount: refAmount, refAmount,
+        assetSns: [...pkg.assetSns], regionSummary: pkg.regionSummary,
+        submittedAt: null, confirmedAt: null, confirmedAmount: null, confirmNote: null,
+        prePlanId, loanNoteId: null, createdAt: new Date().toISOString().slice(0, 16).replace("T", " ")
+      });
+      financePrePlans.push({
+        id: prePlanId, applicationId: appId, version: 1, status: "草稿",
+        lines: [
+          { term: 1, dueDate: "2026-07-15", principal: Math.round(refAmount / 2), rent: 800, serviceFee: 0 },
+          { term: 2, dueDate: "2026-08-15", principal: refAmount - Math.round(refAmount / 2), rent: 750, serviceFee: 0 }
+        ]
+      });
+      pkg.applicationId = appId;
+      pkg.status = "已生成批次";
+      pkg.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+      state.financeSelectedAppId = appId;
+      state.financeTab = "ledger";
+      return null;
+    }
+
+    function financePackageAssetTable(sns) {
+      return (sns || []).map(sn => {
+        const a = financeAssets.find(x => x.sn === sn);
+        return `<tr>
+          <td><strong>${sn}</strong></td><td>${a?.type || "—"}</td><td>${a?.site || "—"}</td>
+          <td>${a?.users ?? "—"}</td><td>${a?.cabinetEff != null ? Math.round(a.cabinetEff * 100) + "%" : "—"}</td>
+          <td>${a?.income30d != null ? finYuan(a.income30d) : "—"}</td>
+          <td>${a ? tag(a.status) : "—"}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="7">暂无设备</td></tr>`;
+    }
+
+    function financeApprovalTimeline(app) {
+      const steps = [
+        { key: "create", label: "创建批次", done: true, time: app.createdAt },
+        { key: "submit", label: "提交资方", done: !!app.submittedAt, time: app.submittedAt },
+        { key: "diligence", label: "尽调审查", done: app.status === "尽调通过" || app.status === "已放款", time: app.diligenceAt, fail: app.status === "已驳回" },
+        { key: "fund", label: "登记放款", done: app.status === "已放款", time: app.fundedAt }
+      ];
+      return `<div class="finance-timeline">${steps.map(s => {
+        const cls = s.fail ? "fail" : s.done ? "done" : "";
+        return `<div class="finance-timeline-step ${cls}"><span class="dot"></span><div><strong>${s.label}</strong><br><small>${s.time || (s.fail ? "已驳回" : "待处理")}</small></div></div>`;
+      }).join("")}</div>`;
+    }
+
+    function openFinancePackageEditor(packageId) {
+      const pkg = packageId ? financePackageById(packageId) : null;
+      const isNew = !pkg;
+      const projects = myFinanceProjects();
+      const projectId = pkg?.projectId || projects[0]?.id;
+      const selectable = myFinanceAssets().filter(a => isFinanceAssetSelectable(a.sn, pkg?.id));
+      const selected = new Set(pkg?.assetSns || []);
+      const checkRows = [...selectable, ...myFinanceAssets().filter(a => selected.has(a.sn))].filter((a, i, arr) => arr.findIndex(x => x.sn === a.sn) === i)
+        .map(a => {
+          const locked = !isFinanceAssetSelectable(a.sn, pkg?.id) && !selected.has(a.sn);
+          return `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;${locked ? "opacity:.45" : ""}">
+            <input type="checkbox" name="pkgAsset" value="${a.sn}" ${selected.has(a.sn) ? "checked" : ""} ${locked ? "disabled" : ""}>
+            <span><strong>${a.sn}</strong> · ${a.type} · ${a.site} ${locked ? `<small style="color:var(--red)">（已被 ${a.packageId || a.appId} 占用）</small>` : ""}</span>
+          </label>`;
+        }).join("") || `<p style="color:var(--muted)">暂无可选资产，请先在资产池确认可融资设备。</p>`;
+      document.querySelector("#drawerTitle").textContent = isNew ? "新建资产包" : "编辑资产包 · " + pkg.name;
+      document.querySelector("#drawerBody").innerHTML = `
+        <form id="financePackageForm" class="form-grid">
+          <label>资产包名称<input name="name" value="${pkg?.name || ""}" required placeholder="如：浦东站 6 月首批"></label>
+          <label>授信项目<select name="projectId" ${pkg?.status && pkg.status !== "草稿" ? "disabled" : ""}>
+            ${projects.map(p => `<option value="${p.id}"${p.id === projectId ? " selected" : ""}>${p.name}</option>`).join("")}
+          </select></label>
+          <label style="grid-column:1/-1">备注<textarea name="remark" rows="2">${pkg?.remark || ""}</textarea></label>
+          <fieldset style="grid-column:1/-1;border:1px solid var(--line);border-radius:8px;padding:12px">
+            <legend style="font-size:13px;color:var(--muted)">选择资产 ${noteBtn("finance_asset_exclusion")}</legend>
+            ${checkRows}
+          </fieldset>
+        </form>
+        <div class="form-actions" style="margin-top:12px">
+          <button type="button" class="btn" id="cancelFinancePackage">取消</button>
+          <button type="button" class="btn primary" id="saveFinancePackage" data-pkg-id="${pkg?.id || ""}">保存</button>
+        </div>`;
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      document.querySelector("#cancelFinancePackage").onclick = closeDrawer;
+      document.querySelector("#saveFinancePackage").onclick = () => {
+        const form = document.querySelector("#financePackageForm");
+        const fd = new FormData(form);
+        const name = (fd.get("name") || "").trim();
+        if (!name) { showProtoToast("请填写资产包名称"); return; }
+        const pid = fd.get("projectId");
+        const sns = fd.getAll("pkgAsset");
+        let target = pkg;
+        if (isNew) {
+          target = createFinancePackage(name, pid);
+          if (!target) return;
+        } else {
+          target.name = name;
+          target.remark = (fd.get("remark") || "").trim();
+          if (target.status === "草稿") target.projectId = pid;
+        }
+        assignPackageAssets(target, sns);
+        closeDrawer();
+        state.financeSelectedPackageId = target.id;
+        state.financeTab = "packages";
+        render();
+        showProtoToast("资产包已保存");
+      };
     }
 
     function financeProjectById(id) {
@@ -2058,14 +2726,41 @@
       return financeApplications.filter(a => a.financierId === currentEntity().id && a.status === "已提交资方").length;
     }
 
+    function operatorCreditByIds(operatorId, financierId) {
+      return financeOperatorCredits.find(c => c.operatorId === operatorId && c.financierId === financierId);
+    }
+
+    function operatorCreditSummary(operatorId, financierId) {
+      const oc = operatorCreditByIds(operatorId, financierId);
+      const apps = financeApplications.filter(a => a.operatorId === operatorId && a.financierId === financierId);
+      const pending = apps.filter(a => a.status === "已提交资方" || a.status === "尽调通过")
+        .reduce((s, a) => s + (a.confirmedAmount || a.requestedAmount), 0);
+      if (!oc) {
+        const limit = financeProjects.filter(p => p.operatorId === operatorId && p.financierId === financierId).reduce((s, p) => s + p.creditLimit, 0);
+        const used = financeProjects.filter(p => p.operatorId === operatorId && p.financierId === financierId).reduce((s, p) => s + (p.usedAmount || 0), 0);
+        return { limit, used, pending, available: Math.max(0, limit - used - pending), revolving: false };
+      }
+      if (oc.pendingAmount !== pending) oc.pendingAmount = pending;
+      const available = Math.max(0, oc.totalLimit - oc.usedAmount - pending);
+      return { limit: oc.totalLimit, used: oc.usedAmount, pending, available, revolving: oc.revolving, record: oc };
+    }
+
+    function syncOperatorCreditPending(operatorId, financierId) {
+      const sum = operatorCreditSummary(operatorId, financierId);
+      const oc = operatorCreditByIds(operatorId, financierId);
+      if (oc) oc.pendingAmount = sum.pending;
+      financeProjects.filter(p => p.operatorId === operatorId && p.financierId === financierId)
+        .forEach(p => { p.pendingAmount = sum.pending; });
+    }
+
     function projectCreditSummary(projectId) {
       const p = financeProjectById(projectId);
-      if (!p) return { limit: 0, used: 0, pending: 0, available: 0 };
-      const apps = financeApplications.filter(a => a.projectId === projectId);
-      const pending = apps.filter(a => a.status === "已提交资方" || a.status === "资方已确认").reduce((s, a) => s + (a.confirmedAmount || a.requestedAmount), 0);
-      const used = p.usedAmount || 0;
-      const available = Math.max(0, p.creditLimit - used - pending);
-      return { limit: p.creditLimit, used, pending, available, revolving: p.revolving };
+      if (!p) return { limit: 0, used: 0, pending: 0, available: 0, revolving: false };
+      return operatorCreditSummary(p.operatorId, p.financierId);
+    }
+
+    function agreementByApp(appId) {
+      return financeAgreements.find(a => a.applicationId === appId);
     }
 
     function submitFinanceApplication(appId) {
@@ -2077,31 +2772,58 @@
         const a = financeAssets.find(x => x.sn === sn);
         if (a) { a.status = "申请锁定"; a.appId = app.id; }
       });
-      const proj = financeProjectById(app.projectId);
-      if (proj) proj.pendingAmount = (proj.pendingAmount || 0) + app.requestedAmount;
+      const pkg = app.packageId ? financePackageById(app.packageId) : null;
+      if (pkg) { pkg.status = "已提交"; pkg.updatedAt = app.submittedAt; }
       const plan = financePrePlanById(app.prePlanId);
       if (plan) plan.status = "待确认";
+      syncOperatorCreditPending(app.operatorId, app.financierId);
     }
 
     function confirmFinanceApplication(appId, amount, note) {
       const app = financeAppById(appId);
       if (!app || app.status !== "已提交资方") return;
-      app.status = "资方已确认";
-      app.confirmedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+      app.status = "尽调通过";
+      app.diligenceAt = new Date().toISOString().slice(0, 16).replace("T", " ");
       app.confirmedAmount = amount || app.requestedAmount;
-      app.confirmNote = note || "资方确认通过";
+      app.confirmNote = note || "尽调通过";
       const plan = financePrePlanById(app.prePlanId);
       if (plan) plan.status = "已确认";
+      const pkg = app.packageId ? financePackageById(app.packageId) : null;
+      if (pkg) { pkg.status = "尽调通过"; pkg.updatedAt = app.diligenceAt; }
+      syncOperatorCreditPending(app.operatorId, app.financierId);
+    }
+
+    function rejectFinanceApplication(appId, reason) {
+      const app = financeAppById(appId);
+      if (!app || app.status !== "已提交资方") return;
+      app.status = "已驳回";
+      app.rejectReason = reason || "尽调驳回";
+      app.diligenceAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+      app.assetSns.forEach(sn => {
+        const a = financeAssets.find(x => x.sn === sn);
+        if (a && a.appId === app.id) {
+          a.appId = null;
+          a.status = a.packageId ? "包内占选" : "可融资";
+        }
+      });
+      const pkg = app.packageId ? financePackageById(app.packageId) : null;
+      if (pkg) { pkg.status = "已生成批次"; pkg.updatedAt = app.diligenceAt; }
+      const plan = financePrePlanById(app.prePlanId);
+      if (plan) plan.status = "草稿";
+      syncOperatorCreditPending(app.operatorId, app.financierId);
     }
 
     function fundFinanceApplication(appId) {
       const app = financeAppById(appId);
-      if (!app || app.status !== "资方已确认") return;
+      if (!app || app.status !== "尽调通过") return;
+      if (!isLeasingRole()) { showProtoToast("登记放款仅资方可操作"); return; }
       const noteId = "LN-" + Date.now().toString().slice(-6);
       const plan = financePrePlanById(app.prePlanId);
+      app.fundedAt = new Date().toISOString().slice(0, 10);
+      const agrId = "FLA-" + app.fundedAt.replace(/-/g, "") + String(app.batchNo).padStart(2, "0");
       app.status = "已放款";
       app.loanNoteId = noteId;
-      app.fundedAt = new Date().toISOString().slice(0, 10);
+      app.agreementId = agrId;
       financeLoanNotes.push({
         id: noteId, applicationId: app.id, operatorId: app.operatorId, financierId: app.financierId,
         projectId: app.projectId, noteNo: "HZ" + app.fundedAt.replace(/-/g, "") + "001",
@@ -2121,11 +2843,38 @@
         const a = financeAssets.find(x => x.sn === sn);
         if (a) { a.status = "已融资"; a.loanNoteId = noteId; }
       });
+      const pkg = app.packageId ? financePackageById(app.packageId) : null;
+      if (pkg) { pkg.status = "已放款"; pkg.updatedAt = app.fundedAt; }
+      financeAgreements.push({
+        id: agrId, agreementNo: "FLA-" + app.fundedAt.replace(/-/g, "") + String(app.batchNo).padStart(3, "0"),
+        operatorId: app.operatorId, financierId: app.financierId, projectId: app.projectId,
+        applicationId: app.id, loanNoteId: noteId, deviceSns: [...app.assetSns],
+        status: "履约中", signedAt: app.fundedAt, remark: "登记放款生成 · 一协议一还款计划"
+      });
+      const oc = operatorCreditByIds(app.operatorId, app.financierId);
       const proj = financeProjectById(app.projectId);
-      if (proj) {
-        proj.usedAmount = (proj.usedAmount || 0) + (app.confirmedAmount || app.requestedAmount);
-        proj.pendingAmount = Math.max(0, (proj.pendingAmount || 0) - app.requestedAmount);
+      const amt = app.confirmedAmount || app.requestedAmount;
+      if (oc) {
+        oc.usedAmount = (oc.usedAmount || 0) + amt;
+        oc.pendingAmount = Math.max(0, (oc.pendingAmount || 0) - amt);
       }
+      if (proj) {
+        proj.usedAmount = (proj.usedAmount || 0) + amt;
+        proj.pendingAmount = Math.max(0, (proj.pendingAmount || 0) - amt);
+      }
+      if (plan) plan.status = "已固化";
+    }
+
+    function tryReleaseRevolvingCredit(loanNoteId) {
+      const note = financeLoanNotes.find(n => n.id === loanNoteId);
+      if (!note) return;
+      const scheds = financeRepaymentSchedules.filter(s => s.loanNoteId === loanNoteId);
+      if (!scheds.length || !scheds.every(s => s.status === "已还清")) return;
+      const oc = operatorCreditByIds(note.operatorId, note.financierId);
+      const proj = financeProjectById(note.projectId);
+      if (!oc?.revolving && !proj?.revolving) return;
+      if (oc) oc.usedAmount = Math.max(0, (oc.usedAmount || 0) - note.amount);
+      if (proj) proj.usedAmount = Math.max(0, (proj.usedAmount || 0) - note.amount);
     }
 
     function registerFinanceRepayment(scheduleId, amount) {
@@ -2133,6 +2882,59 @@
       if (!row) return;
       row.paidAmount = Math.min(row.dueAmount, (row.paidAmount || 0) + amount);
       row.status = row.paidAmount >= row.dueAmount ? "已还清" : "部分已还";
+      tryReleaseRevolvingCredit(row.loanNoteId);
+    }
+
+    function submitFinanceRepaymentTicket(scheduleId, amount, payMethod, voucherNote) {
+      const row = financeRepaymentSchedules.find(s => s.id === scheduleId);
+      if (!row || amount <= 0) return "无效还款";
+      const app = financeAppById(row.applicationId);
+      const id = "RT-" + Date.now().toString().slice(-6);
+      financeRepaymentTickets.unshift({
+        id, scheduleId, applicationId: row.applicationId, operatorId: app?.operatorId || currentEntity().id,
+        financierId: app?.financierId, amount, payMethod: payMethod || "对公转账",
+        voucherNote: voucherNote || "", status: "待确认",
+        submittedAt: new Date().toISOString().slice(0, 16).replace("T", " "), confirmedAt: null, confirmedBy: null
+      });
+      return null;
+    }
+
+    function confirmFinanceRepaymentTicket(ticketId) {
+      const t = financeRepaymentTickets.find(x => x.id === ticketId);
+      if (!t || t.status !== "待确认") return;
+      registerFinanceRepayment(t.scheduleId, t.amount);
+      t.status = "已确认";
+      t.confirmedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+      t.confirmedBy = currentEmployee()?.name || currentEntity().name;
+    }
+
+    function replaceFinanceAsset(oldSn, newSn, reason) {
+      const oldA = financeAssets.find(a => a.sn === oldSn);
+      const newA = financeAssets.find(a => a.sn === newSn);
+      if (!oldA || !newA) return "SN 不存在";
+      if (newA.status !== "可融资") return "新 SN 须为可融资状态";
+      const pkgId = oldA.packageId;
+      const appId = oldA.appId;
+      const inherit = { packageId: pkgId, appId, loanNoteId: oldA.loanNoteId, status: oldA.status };
+      oldA.status = "已替换";
+      oldA.packageId = null;
+      oldA.appId = null;
+      oldA.loanNoteId = null;
+      Object.assign(newA, inherit);
+      if (pkgId) {
+        const pkg = financePackageById(pkgId);
+        if (pkg) pkg.assetSns = pkg.assetSns.map(s => s === oldSn ? newSn : s);
+      }
+      const app = appId ? financeAppById(appId) : financeApplications.find(a => a.assetSns.includes(oldSn));
+      if (app) app.assetSns = app.assetSns.map(s => s === oldSn ? newSn : s);
+      const agr = financeAgreements.find(a => a.deviceSns.includes(oldSn));
+      if (agr) agr.deviceSns = agr.deviceSns.map(s => s === oldSn ? newSn : s);
+      financeAssetReplacements.unshift({
+        id: "FAR-" + Date.now().toString().slice(-4), oldSn, newSn,
+        reason: reason || "坏件更换", replacedAt: new Date().toISOString().slice(0, 10),
+        operatorId: currentEntity().id, by: currentEmployee()?.name || currentEntity().name
+      });
+      return null;
     }
 
     function confirmLeaseContract(contractId) {
@@ -2362,6 +3164,12 @@
           : "";
         return `<div class="own-scope-banner">${noteBtn("day_pool_channel")} 当前登录 <strong>${e.name}</strong>：额度池 · 骑手团队 · 登记分配。${opHint}</div>`;
       }
+      if (isSitePartnerRole()) {
+        const p = currentSitePartner();
+        const op = entityNameById(p?.operatorId);
+        const cnt = myPartnerBindings().length;
+        return `<div class="own-scope-banner">${noteBtn("partner_portal")} 当前登录 <strong>${p?.name || "合伙人"}</strong>（${p?.partnerType || "个人"}）· 关联合伙人运营商 <strong>${op}</strong>；绑定 ${cnt} 个站点。<strong>只读</strong>查看分润配置与明细。</div>`;
+      }
       const hasLease = myLeaseContracts().length > 0;
       const leaseHint = "";
       const empHint = myEmployees().length ? " 员工与权限见「员工」菜单。" : "";
@@ -2380,6 +3188,7 @@
           : k === "depositManage" && pendingDepositRechargeCount() > 0 ? " !"
           : k === "financeDrawdown" && pendingFinanceDrawdownCount() > 0 ? " !"
           : k === "refundManage" && pendingRefundCount() > 0 ? " !"
+          : k === "partnerWithdraw" && partnerPendingWithdrawTotal() > 0 ? " !"
           : "";
         return `<button type="button" class="${cls}" data-view="${k}">${NAV_LABEL[k]}${badge}</button>`;
       }).join("");
@@ -2394,12 +3203,19 @@
         document.querySelector("#tenantType").textContent = "员工登录 · " + (emp.jobTitle || "运营");
         document.querySelector("#treeHint").textContent = "所属：" + entityNameById(emp.entityId);
       } else {
-        const r = ROLE[state.role];
+        const r = ROLE[state.role] || ROLE.operator;
         const ch = state.role === "channel" ? channelProfile() : null;
         const ent = currentEntity();
-        document.querySelector("#tenantName").textContent = ch ? ch.name : (ent.name || r.name);
-        document.querySelector("#tenantType").textContent = ch ? `${r.type} · ${ch.settlementMode}` : r.type;
-        document.querySelector("#treeHint").textContent = ch ? ch.tree : r.tree;
+        if (state.role === "sitePartner") {
+          const p = currentSitePartner();
+          document.querySelector("#tenantName").textContent = p?.name || "站点合伙人";
+          document.querySelector("#tenantType").textContent = `站点合伙人 · ${p?.partnerType || "个人"}`;
+          document.querySelector("#treeHint").textContent = `运营商：${entityNameById(p?.operatorId)} · ${r.tree}`;
+        } else {
+          document.querySelector("#tenantName").textContent = ch ? ch.name : (ent.name || r.name);
+          document.querySelector("#tenantType").textContent = ch ? `${r.type} · ${ch.settlementMode}` : r.type;
+          document.querySelector("#treeHint").textContent = ch ? ch.tree : r.tree;
+        }
       }
       if (sel) sel.value = state.loginKey;
     }
@@ -2413,7 +3229,7 @@
         const ch = isChannelRole() ? channelProfile() : null;
         const mode = ch?.settlementMode;
         if (mode === "卡差价") return ["channel_settlement_card", "channel_card_margin", "module_channel_links"];
-        if (mode === "设备租赁") return ["channel_settlement_rent", "lease_whitelist", "lease_battery_hold"];
+        if (mode === "设备租赁") return ["channel_settlement_rent", "lease_whitelist", "lease_whitelist_pkg", "lease_battery_hold"];
         if (mode === "激活码") return ["channel_settlement_activation", "platform_fee_trigger"];
         return ["day_pool_panel", "day_pool_contract", "entitlement_api"];
       }
@@ -2479,7 +3295,7 @@
 
     function updateScopeHint() {
       const emp = currentEmployee();
-      const parts = emp ? [emp.name, "员工"] : [ROLE[state.role].name];
+      const parts = emp ? [emp.name, "员工"] : [isSitePartnerRole() ? (currentSitePartner()?.name || "站点合伙人") : (ROLE[state.role]?.name || "")];
       const e = currentEntity();
       const ownerId = emp ? emp.entityId : e.id;
       let extra = isPlatformRole()
@@ -2488,6 +3304,8 @@
         ? "出租协议 " + myLeaseContracts().length + " 份"
         : isChannelRole()
           ? "额度池 " + myDayPools().length + " 个 · 签约运营商 " + myChannelContracts().length + " 家"
+          : isSitePartnerRole()
+            ? `绑定站点 ${myPartnerBindings().length} 个 · 累计分润 ¥${partnerAccruedTotal().toFixed(2)}`
           : operatorScopeDeviceHint(ownerId);
       document.querySelector("#scopeHint").innerHTML =
         "数据范围：" + parts.join(" · ") + " · " + extra;
@@ -2706,29 +3524,8 @@
           </div>`).join("")}</div>
           <p style="font-size:11px;color:var(--muted);margin:0">日用电趋势（kWh）</p>`
         : `<p style="font-size:12px;color:var(--muted);margin:0">当前筛选条件下暂无日用电数据</p>`;
-      const siteBody = stats.siteRows.length ? stats.siteRows.map(r => `<tr>
-        <td>${r.site}</td>
-        <td><strong>${r.cabinets}</strong> 台</td>
-        <td><strong>${r.kwh.toFixed(3)}</strong> kWh</td>
-        <td>${r.avgKwh.toFixed(3)} kWh</td>
-        <td>${stats.totalKwh ? (r.kwh / stats.totalKwh * 100).toFixed(1) + "%" : "—"}</td>
-      </tr>`).join("") + `<tr class="site-stats-total">
-        <td><strong>合计</strong>（${stats.siteRows.length} 个站点）</td>
-        <td><strong>${stats.cabinetCount}</strong> 台</td>
-        <td><strong>${stats.totalKwh.toFixed(3)}</strong> kWh</td>
-        <td>${avgPerCab.toFixed(3)} kWh</td>
-        <td>100%</td>
-      </tr>` : `<tr><td colspan="5">当前筛选下暂无用电数据</td></tr>`;
-      const cabBody = stats.cabRows.length ? stats.cabRows.map(r => `<tr>
-        <td><strong>${r.deviceId}</strong><br><small style="color:var(--muted)">SN: ${r.sn}</small></td>
-        <td>${r.deviceName || "—"}</td>
-        <td>${r.site}</td>
-        <td><strong>${r.kwh.toFixed(3)}</strong> kWh</td>
-        <td>${r.currentReading != null ? r.currentReading + " kWh" : "—"}<br><small style="color:var(--muted)">当前读数</small></td>
-        <td><button type="button" class="link-btn" data-open-cab-detail="${r.sn}">查看柜机</button></td>
-      </tr>`).join("") : `<tr><td colspan="6">当前筛选下暂无柜机明细</td></tr>`;
       return `<section class="panel" style="margin-top:16px">
-        ${panelHead("用电量统计", filterHint + " · 按站点/柜机汇总", "overview_power_stats")}
+        ${panelHead("用电量统计", filterHint + " · 汇总统计", "overview_power_stats")}
         <div class="panel-body">
           <div class="power-filter-bar" id="powerFilterBar">
             <div class="field">
@@ -2759,20 +3556,7 @@
             <div class="detail-item"><span>日均用电</span><strong>${avgPerDay.toFixed(3)} kWh</strong></div>
           </div>
           ${trendHtml}
-          <p style="font-size:12px;color:var(--muted);margin:16px 0 8px">按站点汇总 ${noteBtn("overview_power_site")}</p>
-          <div class="orders-table-wrap" style="margin-bottom:16px">
-            <table class="site-stats-table">
-              <thead><tr><th>站点</th><th>柜机数</th><th>用电量</th><th>单柜均值</th><th>占比</th></tr></thead>
-              <tbody>${siteBody}</tbody>
-            </table>
-          </div>
-          <p style="font-size:12px;color:var(--muted);margin:0 0 8px">按柜机明细 ${noteBtn("overview_power_cabinet")}</p>
-          <div class="orders-table-wrap">
-            <table>
-              <thead><tr><th>设备编号/ SN</th><th>设备名称</th><th>站点</th><th>期间用电</th><th>当前读数</th><th>操作</th></tr></thead>
-              <tbody>${cabBody}</tbody>
-            </table>
-          </div>
+          <p style="font-size:12px;color:var(--muted);margin:16px 0 0">各站点场地费、电费及周期账单请前往 <button type="button" class="link-btn" data-view-jump="siteExpenses">站点支出</button> 管理。</p>
         </div>
       </section>`;
     }
@@ -3682,22 +4466,47 @@
     }
 
     function renderAccounts() {
-      const rows = paymentAccounts.filter(a => a.entityId === currentEntity().id);
+      const opId = currentEntity().id;
+      const isLeaseCh = isLeaseChannel();
+      const isCardInstant = isCardChannel() && channelInstantCommissionEnabled(opId);
+      let body = "";
+      if (isLeaseCh) {
+        const rows = paymentAccounts.filter(a => a.entityId === opId);
+        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("lease_whitelist_pkg")} 设备租赁模式：<strong>白名单用户购套餐</strong>款进入本渠道子商户，<strong>不经运营商提现审核</strong>；设备月租 MO 仍付运营商。</p>
+          <table>
+            <thead><tr><th>账户编号</th><th>通道</th><th>商户名称</th><th>商户号/账号</th><th>用途</th><th>状态</th><th>默认</th></tr></thead>
+            <tbody>${rows.map(a => accountRowHtml(a)).join("") || "<tr><td colspan='7'>暂无账户</td></tr>"}</tbody>
+          </table>`;
+      } else if (isCardInstant) {
+        const rows = paymentAccounts.filter(a => a.entityId === opId);
+        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_card_accounts")} 运营商已为您开启<strong>佣金及时到付</strong>；链接购卡佣金将分账至以下子商户。用户套餐款仍进运营商子商户。</p>
+          <table>
+            <thead><tr><th>账户编号</th><th>通道</th><th>商户名称</th><th>商户号/账号</th><th>用途</th><th>状态</th><th>默认</th></tr></thead>
+            <tbody>${rows.map(a => accountRowHtml(a)).join("") || "<tr><td colspan='7'>暂无账户，请联系运营商协助进件</td></tr>"}</tbody>
+          </table>`;
+      } else if (isCardChannel()) {
+        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_instant_commission")} 当前签约未开启佣金及时到付，无需配置收款账户。用户经推广链接购卡款进运营商子商户。</p>
+          <div class="empty" style="padding:24px;text-align:center;color:var(--muted)">未开启即时到付 · 无收款账户</div>`;
+      } else {
+        const rows = paymentAccounts.filter(a => a.entityId === opId);
+        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("arch_b")} 骑手套餐默认入账标记为「骑手套餐收款」的微信商户。</p>
+          <table>
+            <thead><tr><th>账户编号</th><th>通道</th><th>商户名称</th><th>商户号/账号</th><th>用途</th><th>状态</th><th>默认</th></tr></thead>
+            <tbody>${rows.length ? rows.map(a => accountRowHtml(a)).join("") : "<tr><td colspan='7'>暂无账户，请进件开通</td></tr>"}</tbody>
+          </table>`;
+      }
+      function accountRowHtml(a) {
+        return `<tr>
+          <td>${a.id}</td><td>${a.channel}</td><td>${a.mchName}</td><td>${a.mchNo}</td>
+          <td>${a.purpose}</td><td>${tag(a.status)}</td><td>${a.default ? tag("默认") : "—"}</td>
+        </tr>`;
+      }
       return `
         ${ownScopeBanner()}
         <section class="panel">
-          ${panelHead("收款账户管理", "本主体全部进件账户；骑手收款须与资金实收商户号一致", "accounts_panel")}
+          ${panelHead("收款账户管理", isLeaseCh ? "白名单套餐 C 端收款进件账户" : isCardInstant ? "链接购卡佣金分账进件账户" : isCardChannel() ? "佣金及时到付（未开启）" : "本主体全部进件账户；骑手收款须与资金实收商户号一致", isCardInstant ? "channel_card_accounts" : "accounts_panel")}
           <div class="panel-body orders-table-wrap">
-            ${state.role === "operator" ? `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("arch_b")} 骑手套餐默认入账标记为「骑手套餐收款」的微信商户。</p>` : ""}
-            <table>
-              <thead><tr>
-                <th>账户编号</th><th>通道</th><th>商户名称</th><th>商户号/账号</th><th>用途</th><th>状态</th><th>默认</th>
-              </tr></thead>
-              <tbody>${rows.length ? rows.map(a => `<tr>
-                <td>${a.id}</td><td>${a.channel}</td><td>${a.mchName}</td><td>${a.mchNo}</td>
-                <td>${a.purpose}</td><td>${tag(a.status)}</td><td>${a.default ? tag("默认") : "—"}</td>
-              </tr>`).join("") : "<tr><td colspan='7'>暂无账户，请进件开通</td></tr>"}</tbody>
-            </table>
+            ${body}
           </div>
         </section>`;
     }
@@ -4076,7 +4885,29 @@
         <label class="field-act">服务人天（计提用）<input name="codeValidityDays" type="number" min="1" step="1" value="${contract?.codeValidityDays ?? 30}" /></label>
         <p class="field-act form-span-2" style="font-size:12px;color:var(--muted);margin:0">激活码：渠道批发码库存；骑手核销获套餐；平台 1% 在核销时按标准人天价×服务人天×B 端费率计提。</p>
         ${cardSkuPricingFieldsHtml(contract?.channelId)}
+        <div class="field-card field-card-instant form-span-2" style="padding:12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc">
+          <p style="font-size:12px;font-weight:600;margin:0 0 10px">${noteBtn("channel_instant_commission")} 佣金及时到付（仅渠道分销）</p>
+          <label>开启即时到付<select name="instantCommissionPayout" id="instantCommissionPayout">
+            <option value="0" ${!contract?.instantCommissionPayout ? "selected" : ""}>关闭 · 佣金线下结算</option>
+            <option value="1" ${contract?.instantCommissionPayout ? "selected" : ""}>开启 · 支付成功即时分账至渠道</option>
+          </select></label>
+          <label class="field-card-instant-on">渠道佣金比例（%）<input name="commissionRatePct" type="number" min="0.1" max="50" step="0.1" value="${contract?.commissionRate != null ? (contract.commissionRate * 100) : 9}" /></label>
+          <p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--muted);margin:8px 0 0">平台服务费仍按默认 <strong>1%</strong> 即时清分。开启须渠道在「收款账户」完成进件（微信/支付宝子商户）。</p>
+          ${contract?.channelId && !channelHasPayoutAccount(contract.channelId) ? `<p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--warn);margin:8px 0 0">⚠ 当前渠道尚未开通收款账户，无法正式开启即时到付。</p>` : ""}
+        </div>
         <label class="field-rent">月租（元/月 · 签约统一价）<input name="monthlyRent" type="number" min="1000" step="100" value="${contract?.monthlyRent ?? 12000}" /></label>
+        <label class="field-rent">白名单默认类型<select name="whitelistDefaultAccess">
+          <option value="paid" ${contract?.whitelistDefaultAccess !== "free" ? "selected" : ""}>白名单付费（须购白名单套餐）</option>
+          <option value="free" ${contract?.whitelistDefaultAccess === "free" ? "selected" : ""}>白名单免费（B2B 月租覆盖）</option>
+        </select></label>
+        <div class="field-rent form-span-2" style="padding:12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc">
+          <p style="font-size:12px;font-weight:600;margin:0 0 10px">${noteBtn("channel_lease_crossnet")} 跨网换电（小型运营商）</p>
+          <label>开通跨网<select name="crossNetworkEnabled">
+            <option value="1" ${contract?.crossNetworkEnabled !== false ? "selected" : ""}>开通 · 须缴平台跨网保证金</option>
+            <option value="0" ${contract?.crossNetworkEnabled === false ? "selected" : ""}>关闭</option>
+          </select></label>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:8px 0 0">设备租赁渠道可视为<strong>小型运营商</strong>：名下骑手 userOwner=渠道。开通后骑手在他网换电产生<strong>跨网设备服务费</strong>，由渠道向平台保证金/信用额度支付（演示保证金 ¥20,000）。</p>
+        </div>
         <label class="field-rent">专属站点 ${noteBtn("lease_dedicated_site")}<select name="dedicatedSiteId">
           <option value="">（暂不绑定）</option>
           <option value="new">+ 新建专属站点</option>
@@ -4095,11 +4926,16 @@
         if (m === "卡差价") document.querySelectorAll(".field-card").forEach(el => { el.style.display = ""; });
         if (m === "设备租赁") document.querySelectorAll(".field-rent").forEach(el => { el.style.display = ""; });
         if (m === "激活码") document.querySelectorAll(".field-act").forEach(el => { el.style.display = ""; });
+        const instantOn = document.querySelector("#instantCommissionPayout")?.value === "1";
+        document.querySelectorAll(".field-card-instant-on").forEach(el => {
+          el.style.display = (m === "卡差价" && instantOn) ? "" : "none";
+        });
         const modal = document.querySelector("#channelPartnerModal");
         if (modal) modal.style.width = m === "卡差价" ? "min(720px,calc(100vw - 32px))" : "min(640px,calc(100vw - 32px))";
       };
       syncModeFields();
       document.querySelector("#channelPartnerMode")?.addEventListener("change", syncModeFields);
+      document.querySelector("#instantCommissionPayout")?.addEventListener("change", syncModeFields);
       document.querySelector("#channelPartnerModal").classList.add("open");
       document.querySelector("#channelPartnerMask").classList.add("open");
     }
@@ -4130,6 +4966,20 @@
       const codeSkuName = settlementMode === "激活码" ? (data.codeSkuName || "30天包月") : null;
       const codeValidityDays = settlementMode === "激活码" ? parseInt(data.codeValidityDays, 10) || 30 : null;
       const monthlyRent = settlementMode === "设备租赁" ? parseFloat(data.monthlyRent) : null;
+      const instantCommissionPayout = settlementMode === "卡差价" && data.instantCommissionPayout === "1";
+      const commissionRatePct = parseFloat(data.commissionRatePct);
+      const commissionRate = instantCommissionPayout && Number.isFinite(commissionRatePct) ? commissionRatePct / 100 : null;
+      if (settlementMode === "卡差价" && instantCommissionPayout) {
+        if (!Number.isFinite(commissionRatePct) || commissionRatePct <= 0 || commissionRatePct > 50) {
+          window.alert("请填写有效的渠道佣金比例（0.1%～50%）");
+          return;
+        }
+        const cidCheck = state.channelPartnerContractId === "new" ? null : channelContracts.find(c => c.id === state.channelPartnerContractId)?.channelId;
+        if (cidCheck && !channelHasPayoutAccount(cidCheck)) {
+          window.alert("无法开启：请渠道商先在「收款账户」完成支付通道进件");
+          return;
+        }
+      }
       let dedicatedSiteId = settlementMode === "设备租赁" ? (data.dedicatedSiteId || null) : null;
       let dedicatedSiteName = null;
       if (settlementMode === "设备租赁" && dedicatedSiteId === "new" && data.newSiteName?.trim()) {
@@ -4171,6 +5021,13 @@
           operatorId: op.id, operatorName: op.name, settlementMode,
           wholesalePrice, minDays, minCodes, codeSkuName, codeValidityDays, codeInventory: 0, codesRedeemed: 0,
           monthlyRent, dedicatedSiteId, dedicatedSiteName, whitelistCount: 0, billingStatus: "待首缴", sites: [],
+          whitelistDefaultAccess: settlementMode === "设备租赁" ? (data.whitelistDefaultAccess || "paid") : undefined,
+          crossNetworkEnabled: settlementMode === "设备租赁" ? data.crossNetworkEnabled === "1" : undefined,
+          crossNetworkDepositPaid: settlementMode === "设备租赁" && data.crossNetworkEnabled === "1" ? false : undefined,
+          crossNetworkDepositAmount: settlementMode === "设备租赁" ? 20000 : undefined,
+          instantCommissionPayout: settlementMode === "卡差价" ? instantCommissionPayout : false,
+          commissionRate: settlementMode === "卡差价" && instantCommissionPayout ? commissionRate : null,
+          instantCommissionEnabledAt: settlementMode === "卡差价" && instantCommissionPayout ? new Date().toISOString().slice(0, 10) : null,
           status: data.contractStatus, validFrom: data.validFrom, validTo: data.validTo
         });
         if (settlementMode === "人天池") {
@@ -4192,9 +5049,21 @@
             whitelistCount: 0, dedicatedSiteId, dedicatedSiteName, nextDue: data.validFrom, billingStatus: "待首缴",
             monthSwaps: 0, operatorId: op.id, operatorName: op.name
           });
+          channelSwapPolicy[channelId] = {
+            crossNetworkEnabled: data.crossNetworkEnabled === "1",
+            crossNetworkDepositPaid: data.crossNetworkEnabled === "1",
+            crossNetworkDepositAmount: 20000, depositBalance: 0, creditLimit: 0, used: 0, available: 0,
+            crossSwapEnabled: false, hostOperatorId: op.id
+          };
         }
         if (settlementMode === "卡差价") {
           applyCardSkuPricingFromForm(channelId, data, true);
+          channelSettlementModes.push({
+            id: "CSM-" + channelId.slice(-4), channelId, mode: "卡差价", status: "启用",
+            desc: instantCommissionPayout ? "推广链接分销 · 佣金即时分账" : "推广链接分销 · 佣金线下结算",
+            cardSku: "包月30天卡", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25,
+            commissionRate, instantCommissionPayout, linkOrders: 0, monthCommission: 0, linkClicks: 0
+          });
         }
         if (settlementMode === "激活码") {
           channelSettlementModes.push({
@@ -4229,6 +5098,19 @@
         contract.status = data.contractStatus;
         contract.validFrom = data.validFrom;
         contract.validTo = data.validTo;
+        if (contractSettlementMode(contract) === "卡差价") {
+          contract.instantCommissionPayout = instantCommissionPayout;
+          contract.commissionRate = instantCommissionPayout ? commissionRate : null;
+          if (instantCommissionPayout && !contract.instantCommissionEnabledAt) {
+            contract.instantCommissionEnabledAt = new Date().toISOString().slice(0, 10);
+          }
+          const csm = channelSettlementModes.find(m => m.channelId === contract.channelId);
+          if (csm) {
+            csm.instantCommissionPayout = instantCommissionPayout;
+            csm.commissionRate = commissionRate;
+            csm.desc = instantCommissionPayout ? "推广链接分销 · 佣金即时分账" : "推广链接分销 · 佣金线下结算";
+          }
+        }
         if (contractSettlementMode(contract) === "人天池") {
           const quota = operatorDayQuotaPrices.find(q => q.operatorId === op.id && q.channelId === contract.channelId);
           if (quota) {
@@ -4243,6 +5125,25 @@
           const lease = channelLeaseSummary.find(p => p.channelId === contract.channelId);
           if (lease && monthlyRent) lease.monthlyRent = monthlyRent;
           if (lease && dedicatedSiteName) { lease.dedicatedSiteName = dedicatedSiteName; lease.dedicatedSiteId = dedicatedSiteId; }
+          contract.whitelistDefaultAccess = data.whitelistDefaultAccess || "paid";
+          contract.crossNetworkEnabled = data.crossNetworkEnabled === "1";
+          if (contract.crossNetworkEnabled && !contract.crossNetworkDepositPaid) {
+            contract.crossNetworkDepositPaid = true;
+            contract.crossNetworkDepositAmount = contract.crossNetworkDepositAmount || 20000;
+          }
+          const csm = channelSettlementModes.find(m => m.channelId === contract.channelId);
+          if (csm) csm.crossNetworkEnabled = contract.crossNetworkEnabled;
+          const pol = channelSwapPolicyFor(contract.channelId);
+          pol.crossNetworkEnabled = contract.crossNetworkEnabled;
+          if (contract.crossNetworkEnabled && !pol.crossNetworkDepositPaid) {
+            pol.crossNetworkDepositPaid = true;
+            pol.crossNetworkDepositAmount = 20000;
+            pol.depositBalance = pol.depositBalance || 18000;
+            pol.creditLimit = pol.creditLimit || 150000;
+            pol.available = (pol.creditLimit || 150000) - (pol.used || 0);
+            pol.crossSwapEnabled = true;
+            pol.hostOperatorId = op.id;
+          }
         }
         if (contractSettlementMode(contract) === "卡差价") {
           applyCardSkuPricingFromForm(contract.channelId, data, false);
@@ -4257,6 +5158,79 @@
       window.alert(leaseStop
         ? "演示：渠道商已设为「已停用」。设备租赁白名单用户不可取电，仍可还电入柜（骑手端选 lease_suspended 体验）。"
         : "演示：渠道商信息已保存（Mock）");
+    }
+
+    function myPlatformMarketingAgreements() {
+      const op = currentEntity();
+      if (!isOperatorRole()) return platformMarketingAgreements;
+      return platformMarketingAgreements.filter(a => a.operatorId === op.id);
+    }
+
+    function myPlatformMarketingOrders() {
+      const op = currentEntity();
+      if (!isOperatorRole()) return platformMarketingOrders;
+      return platformMarketingOrders.filter(o => o.activatedOperatorId === op.id);
+    }
+
+    function myPlatformMarketingStatements() {
+      const op = currentEntity();
+      if (!isOperatorRole()) return platformMarketingStatements;
+      return platformMarketingStatements.filter(s => s.operatorId === op.id);
+    }
+
+    function activatePlatformMarketingOrder(orderId, operatorId, cabinetSn, siteId) {
+      const o = platformMarketingOrders.find(x => x.id === orderId);
+      if (!o || o.activationStatus !== "pending") return false;
+      if (!operatorEnrolledInPlatformMarketing(operatorId, o.campaignId, o.skuId)) {
+        showProtoToast("该运营商未参与此活动，无法激活");
+        return false;
+      }
+      const fee = platformMarketingFeeFor(operatorId, o.campaignId, o.skuId);
+      const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+      o.activationStatus = "activated";
+      o.activatedOperatorId = operatorId;
+      o.activatedOperatorName = operatorLabel(operatorId);
+      o.activatedAt = now;
+      o.activatedCabinetSn = cabinetSn;
+      o.activatedSiteId = siteId;
+      o.marketingServiceFee = fee;
+      o.operatorPayout = Math.round((o.paidPrice - fee) * 100) / 100;
+      o.status = "服务中";
+      o.pkgValidTo = o.skuId === "SKU-7D"
+        ? new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+        : new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+      const link = platformMarketingLinks.find(l => l.linkCode === o.linkCode);
+      if (link) link.conversions = (link.conversions || 0) + 1;
+      platformMarketingSettlements.unshift({
+        id: "PMS-" + Date.now().toString().slice(-6),
+        orderId: o.id, operatorId, operatorName: operatorLabel(operatorId),
+        paid: o.paidPrice, platformFee: o.platformFee, marketingFee: fee, payout: o.operatorPayout,
+        activatedAt: now, status: "已拨付"
+      });
+      return true;
+    }
+
+    function refundPlatformMarketingOrder(orderId) {
+      const o = platformMarketingOrders.find(x => x.id === orderId);
+      if (!o || o.activationStatus !== "pending") return false;
+      o.activationStatus = "refunded";
+      o.status = "已退款";
+      o.refundStatus = "平台原路退";
+      o.refundTime = new Date().toISOString().slice(0, 16).replace("T", " ");
+      o.refundAmount = o.paidPrice;
+      return true;
+    }
+
+    function confirmPlatformMarketingAgreement(agreementId) {
+      const a = platformMarketingAgreements.find(x => x.id === agreementId);
+      if (!a || a.status !== "待确认") return;
+      a.status = "已启用";
+      a.confirmedAt = new Date().toISOString().slice(0, 10);
+    }
+
+    function confirmPlatformMarketingStatement(statementId) {
+      const s = platformMarketingStatements.find(x => x.id === statementId);
+      if (s && s.status === "待确认") s.status = "已确认";
     }
 
     function openBindForm(sn) {
@@ -5348,7 +6322,7 @@
                 <td>${tag(c.status)}</td>
                 <td>${c.createdByOperatorName || "—"}<br><small style="color:var(--muted)">${c.createdByOperatorId || ""}</small></td>
                 <td>${c.signedOperators.join("、")}</td>
-                <td>${c.paySummary || "向运营商付款"}<br><small style="color:var(--muted)">无收款账户</small></td>
+                <td>${c.paySummary || "向运营商付款"}<br><small style="color:var(--muted)">${c.settlementMode === "设备租赁" ? "白名单套餐收款" : "无 C 端收款"}</small></td>
                 <td><small>${summary}</small></td>
                 <td>员工 ${c.staffCount} · 骑手 ${c.riderCount}<br><small>团队 ${c.teamCount}</small></td>
               </tr>`;
@@ -5358,10 +6332,197 @@
         </section>`)}`;
     }
 
+    function renderPlatformMarketing() {
+      const tab = state.platformMarketingTab;
+      const tabDefs = [
+        ["campaigns", "活动管理"], ["agreements", "运营商签约"], ["links", "链接与二维码"],
+        ["pending", "营销订单"], ["settlements", "拨付流水"], ["statements", "营销对账"]
+      ];
+      const sidebar = tabSidebar(tabDefs, tab, "pmtab");
+      const f = getPf();
+      let body = "";
+
+      if (tab === "campaigns") {
+        const rows = platformMarketingCampaigns.filter(c => {
+          if (f.status !== "全部" && c.status !== f.status) return false;
+          if (f.keyword && !matchKw(c.name, f.keyword) && !matchKw(c.id, f.keyword)) return false;
+          return true;
+        });
+        body = `<section class="panel">
+          ${panelHead("营销活动", "Campaign 统一定价 · 链接不带 op", "platform_marketing", noteBtn("platform_marketing"))}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>活动</th><th>周期</th><th>SKU / 活动价</th><th>签约运营商</th><th>状态</th></tr></thead>
+              <tbody>${rows.map(c => {
+                const enrolled = platformMarketingAgreements.filter(a => a.campaignId === c.id && a.status === "已启用").length;
+                const skuLines = c.skuPrices.map(s => `${s.skuName} ¥${s.activityPrice}<small style="color:var(--muted)">（零售 ¥${s.officialPrice}）</small>`).join("<br>");
+                return `<tr>
+                  <td><strong>${c.name}</strong><br><small>${c.id}</small></td>
+                  <td>${c.startAt} ~ ${c.endAt}</td>
+                  <td>${skuLines}</td>
+                  <td>${enrolled} 家已启用</td>
+                  <td>${tag(c.status)}</td>
+                </tr>`;
+              }).join("") || "<tr><td colspan='5'>暂无活动</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      } else if (tab === "agreements") {
+        const rows = platformMarketingAgreements.filter(a => {
+          if (f.operatorId !== "全部" && a.operatorId !== f.operatorId) return false;
+          if (f.status !== "全部" && a.status !== f.status) return false;
+          return true;
+        });
+        body = `<section class="panel">
+          ${panelHead("运营商签约", "opt-in 参与 · 营销服务费/单", "platform_marketing")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>协议</th><th>运营商</th><th>活动</th><th>SKU</th><th>营销服务费/单</th><th>状态</th><th>确认日</th></tr></thead>
+              <tbody>${rows.map(a => `<tr>
+                <td>${a.id}</td>
+                <td>${a.operatorName}<br><small>${a.operatorId}</small></td>
+                <td>${a.campaignName}</td>
+                <td>${a.skuName}</td>
+                <td>¥${a.marketingServiceFee}</td>
+                <td>${tag(a.status)}</td>
+                <td>${a.confirmedAt || "—"}</td>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无签约</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      } else if (tab === "links") {
+        const rows = platformMarketingLinks.filter(l => {
+          if (f.campaignId !== "全部" && l.campaignId !== f.campaignId) return false;
+          if (f.status !== "全部" && l.status !== f.status) return false;
+          return true;
+        });
+        body = `<section class="panel">
+          ${panelHead("推广链接与二维码", "无 op · ch=PLATFORM · 24h 归因", "platform_marketing_collect")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>用途</th><th>链接码</th><th>URL</th><th>点击</th><th>成交</th><th>状态</th></tr></thead>
+              <tbody>${rows.map(l => `<tr>
+                <td>${l.purpose}</td>
+                <td>${l.linkCode}</td>
+                <td><small style="word-break:break-all">${l.linkUrl}</small></td>
+                <td>${l.clicks}</td>
+                <td>${l.conversions}</td>
+                <td>${tag(l.status)}</td>
+              </tr>`).join("") || "<tr><td colspan='6'>暂无链接</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      } else if (tab === "pending") {
+        const rows = platformMarketingOrders.filter(o => {
+          if (f.activationStatus !== "全部" && o.activationStatus !== f.activationStatus) return false;
+          if (f.keyword && !matchKw(o.id, f.keyword) && !matchKw(o.phone, f.keyword) && !matchKw(o.riderName, f.keyword)) return false;
+          return true;
+        });
+        const pendingCount = platformMarketingOrders.filter(o => o.activationStatus === "pending").length;
+        body = `<section class="panel">
+          ${panelHead("平台营销订单", `待激活 ${pendingCount} 笔 · 架构 C 平台代收`, "platform_marketing_collect")}
+          <div class="panel-body orders-table-wrap">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_marketing_payout")} 支付成功计提 1%；激活后拨付运营商（实付 − 营销服务费）。</p>
+            <table>
+              <thead><tr><th>订单</th><th>用户</th><th>活动/链接</th><th>实付</th><th>1%技服</th><th>激活状态</th><th>激活运营商</th><th>拨付</th><th>操作</th></tr></thead>
+              <tbody>${rows.map(o => `<tr>
+                <td>${o.id}<br><small>${o.payTime}</small></td>
+                <td>${o.riderName}<br><small>${o.phone}</small></td>
+                <td>${o.campaignId}<br><small>${o.linkPurpose || o.linkCode}</small></td>
+                <td>¥${o.paidPrice}</td>
+                <td>¥${o.platformFee}</td>
+                <td>${o.activationStatus === "pending" ? tag("待激活") : o.activationStatus === "activated" ? tag("已激活") : tag(o.status)}</td>
+                <td>${o.activatedOperatorName || "—"}${o.activatedAt ? `<br><small>${o.activatedAt}</small>` : ""}</td>
+                <td>${o.operatorPayout != null ? `¥${o.operatorPayout}<br><small>营销费 ¥${o.marketingServiceFee}</small>` : "—"}</td>
+                <td>${o.activationStatus === "pending"
+                  ? `<button type="button" class="link-btn" data-pm-activate="${o.id}">模拟 OP-SX 取电</button>
+                     <button type="button" class="link-btn" data-pm-refund="${o.id}">激活前退款</button>`
+                  : "—"}</td>
+              </tr>`).join("") || "<tr><td colspan='9'>暂无订单</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      } else if (tab === "settlements") {
+        const rows = platformMarketingSettlements.filter(s => {
+          if (f.operatorId !== "全部" && s.operatorId !== f.operatorId) return false;
+          if (f.month && !s.activatedAt.startsWith(f.month)) return false;
+          return true;
+        });
+        body = `<section class="panel">
+          ${panelHead("激活拨付流水", "实付 − 营销服务费", "platform_marketing_payout")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>流水</th><th>订单</th><th>运营商</th><th>实付</th><th>1%技服</th><th>营销费</th><th>拨付</th><th>激活时间</th><th>状态</th></tr></thead>
+              <tbody>${rows.map(s => `<tr>
+                <td>${s.id}</td><td>${s.orderId}</td>
+                <td>${s.operatorName}</td>
+                <td>¥${s.paid}</td><td>¥${s.platformFee}</td><td>¥${s.marketingFee}</td>
+                <td><strong>¥${s.payout}</strong></td>
+                <td>${s.activatedAt}</td><td>${tag(s.status)}</td>
+              </tr>`).join("") || "<tr><td colspan='9'>暂无拨付记录</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      } else {
+        const rows = platformMarketingStatements.filter(s => {
+          if (f.month !== "全部" && s.month !== f.month) return false;
+          if (f.operatorId !== "全部" && s.operatorId !== f.operatorId) return false;
+          if (f.status !== "全部" && s.status !== f.status) return false;
+          return true;
+        });
+        body = `<section class="panel">
+          ${panelHead("营销对账", "自然月汇总应付运营商拨付", "platform_marketing_payout")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>账单</th><th>月份</th><th>运营商</th><th>激活笔数</th><th>应付拨付</th><th>营销费合计</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>${rows.map(s => `<tr>
+                <td>${s.id}</td><td>${s.month}</td><td>${s.operatorName}</td>
+                <td>${s.orderCount}</td><td>¥${s.payoutTotal}</td><td>¥${s.marketingFeeTotal}</td>
+                <td>${tag(s.status)}</td>
+                <td>${s.status === "待确认" ? `<button type="button" class="link-btn" data-pm-confirm-stmt="${s.id}">平台确认</button>` : "—"}</td>
+              </tr>`).join("") || "<tr><td colspan='8'>本月无平台营销成交</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      }
+      return `${ownScopeBanner()}${pageWithTabs(sidebar, body)}`;
+    }
+
+
     function renderPlatformFlows() {
       const tab = state.platformFlowTab;
-      const tabDefs = [["userPay", "用户支付记录"], ["interOp", "运营商之间"], ["platformFee", "平台提成"]];
+      const tabDefs = [["userPay", "用户支付记录"], ["interOp", "运营商之间"], ["platformFee", "平台提成"], ["withdrawReview", "运营商提现审核"]];
       const sidebar = tabSidebar(tabDefs, tab, "pftab");
+      if (tab === "withdrawReview") {
+        const f = getPf();
+        const rows = operatorWithdrawalRequests.filter(w => {
+          if (f.operatorId !== "全部" && w.operatorId !== f.operatorId) return false;
+          if (f.status !== "全部" && w.status !== f.status) return false;
+          return true;
+        });
+        const pending = rows.filter(w => w.status === "待审核").length;
+        return `${ownScopeBanner()}${pageWithTabs(sidebar, `<section class="panel">
+            ${panelHead("运营商提现审核", `待审 ${pending} 条 · 共 ${rows.length} 条`, "platform_withdraw_review")}
+            <div class="panel-body orders-table-wrap">
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_withdraw_review")} 用户付款已实时清分；运营商提现须审核通过后打款至绑定账户。<strong>渠道商-设备租赁</strong>不适用。</p>
+              <table>
+                <thead><tr><th>申请单</th><th>运营商</th><th>金额</th><th>到账账户</th><th>本月待还预留</th><th>申请时间</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody>${rows.map(w => `<tr>
+                  <td>${w.id}</td>
+                  <td>${operatorLabel(w.operatorId)}</td>
+                  <td><strong>¥${w.amount}</strong></td>
+                  <td><small>${w.accountLabel}</small></td>
+                  <td>${w.monthDueReserved ? "¥" + w.monthDueReserved.toLocaleString("zh-CN") : "—"}</td>
+                  <td>${w.applyTime}</td>
+                  <td>${tag(w.status)}${w.rejectReason ? `<br><small style="color:var(--red)">${w.rejectReason}</small>` : ""}</td>
+                  <td>${w.status === "待审核"
+                    ? `<button type="button" class="link-btn" data-approve-withdraw="${w.id}">通过</button> · <button type="button" class="link-btn" data-reject-withdraw="${w.id}">驳回</button>`
+                    : (w.withdrawTime || "—")}</td>
+                </tr>`).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
+              </table>
+            </div>
+          </section>`)}`;
+      }
       if (tab === "interOp") {
         const f = getPf();
         const rows = interOpDailyBills.filter(b => {
@@ -5594,9 +6755,9 @@
             ${overdue ? `<div class="pool-warn-banner"><strong>月租待缴</strong>：${lease.billingStatus || "待缴纳"}，白名单用户将<strong>停服</strong>。
               <button type="button" class="link-btn" data-view-jump="rentPool">去缴纳</button></div>` : ""}
             <div class="kpi-grid">
-              ${kpi("白名单", whitelist.length + " 人", "免 C 端购套餐", "白", "lease_whitelist")}
+              ${kpi("白名单", whitelist.length + " 人", "购渠道套餐", "白", "lease_whitelist")}
               ${kpi("月租合计", "¥" + (lease.monthlyRent || 0).toLocaleString(), lease.devicesCovered + " 台设备", "租", "channel_settlement_rent")}
-              ${kpi("本月换电", (lease.monthSwaps || 0) + " 次", "白名单不计费", "换", "channel_settlement_rent")}
+              ${kpi("本月套餐", (lease.pkgOrdersMonth || 12) + " 单", "款入渠道账户", "购", "lease_whitelist_pkg")}
               ${kpi("专属站点", lease.dedicatedSiteName || "—", lease.billingStatus || "—", "站", "lease_dedicated_site")}
             </div>
             ${contractPanel}
@@ -5668,8 +6829,10 @@
         const st = u.serviceState || "";
         return !u.pkg.includes("退款") && !u.pkg.includes("完结") && st !== "已冻结" && st !== "中途完结";
       }).length;
-      const ownCleared = os.filter(p => p.payout === "已清分").reduce((s, p) => s + p.accrued, 0);
-      const ownWithdrawn = os.filter(p => p.payout === "已清分" && p.status === "已完结").reduce((s, p) => s + p.accrued, 0);
+      const ownCleared = operatorClearedBalance(e.id);
+      const monthDue = operatorFinanceMonthDue(e.id);
+      const withdrawable = operatorWithdrawableBalance(e.id);
+      const pendingWd = operatorPendingWithdrawTotal(e.id);
       const siteStatsPanel = renderOverviewSiteStats();
       const powerStatsPanel = renderOverviewPowerStats();
       const siteNames = [...new Set(ownCabList.map(c => c.site))];
@@ -5701,7 +6864,8 @@
               ${kpi("租赁柜机", dev.leaseCabList.length, dev.leaseCabList.length ? "在线 " + leaseCabOnline + " 台 · " + leaseCabRate + "%" : "—", "租柜", "overview_lease_cab")}
               ${kpi("租赁电池", dev.leaseBatList.length, "租赁协议关联", "租电", "overview_lease_bat")}
               ${kpi("已清分金额", "¥" + ownCleared.toLocaleString("zh-CN"), "支付成功实时清分", "清", "overview_cleared")}
-              ${kpi("可提现余额", "¥" + (ownCleared - ownWithdrawn).toLocaleString("zh-CN"), "已清分未提现", "提", "overview_withdrawable")}
+              ${kpi("可提现余额", "¥" + withdrawable.toLocaleString("zh-CN"), monthDue > 0 ? "已扣本月待还 ¥" + monthDue.toLocaleString("zh-CN") : "已清分未提现", "提", "overview_withdrawable")}
+              ${kpi("提现待审", pendingWd > 0 ? "¥" + pendingWd.toLocaleString("zh-CN") : "无", "平台审核中", "审", "flows_withdraw_apply")}
               ${kpi("活跃用户", scale(activeUsers), "去重骑手", "骑", "overview_users")}
               ${kpi("跨网待日清", "¥" + interPending.toFixed(2), credit ? (credit.depositBalance > 0 ? "保证金 ¥" + credit.depositBalance.toLocaleString("zh-CN") : "信用可用 ¥" + credit.available.toFixed(0)) : "运营商往来账", "往", "overview_inter_pending")}
               ${kpi("平台服务费", "¥" + feeAccrued.toFixed(2), feeOwed > 0 ? "欠费 ¥" + feeOwed.toFixed(2) : "本月计提", "服", "overview_platform_fee_kpi")}
@@ -5721,6 +6885,404 @@
               <div class="detail-item"><span>轧差净额 ${noteBtn("inter_op_net")}</span><strong>¥${(interReceivable - interPayable).toFixed(2)}</strong></div>
               <div class="detail-item"><span>操作</span><button type="button" class="link-btn" data-view-jump="interOp">查看往来账</button></div>
             </div>
+          </div>
+        </section>`;
+    }
+
+    function mySitePartners() {
+      if (!isOperatorRole()) return [];
+      return sitePartners.filter(p => p.operatorId === currentEntity().id);
+    }
+
+    function mySitePartnerBindings() {
+      if (!isOperatorRole()) return [];
+      return sitePartnerBindings.filter(b => b.operatorId === currentEntity().id);
+    }
+
+    function mySitePartnerSplitLines() {
+      if (!isOperatorRole()) return [];
+      const opId = currentEntity().id;
+      const siteIds = new Set(myOperatorSites().map(s => s.id));
+      return sitePartnerSplitLines.filter(l => siteIds.has(l.siteId));
+    }
+
+    function sitePartnerTypeTag(type) {
+      return type === "公司" ? `<span class="tag neutral">公司</span>` : `<span class="tag">个人</span>`;
+    }
+
+    function sitePartnerBindingsForSite(siteId, operatorId) {
+      return sitePartnerBindings.filter(b => b.siteId === siteId && b.operatorId === operatorId && b.status === "生效");
+    }
+
+    function sitePartnerTotalRate(siteId, operatorId) {
+      return sitePartnerBindingsForSite(siteId, operatorId).reduce((s, b) => s + b.ratePct, 0);
+    }
+
+    function sitePartnersCellHtml(siteId, operatorId) {
+      const list = sitePartnerBindingsForSite(siteId, operatorId);
+      if (!list.length) return `<span style="color:var(--muted)">未配置</span>`;
+      const total = sitePartnerTotalRate(siteId, operatorId);
+      const rows = list.map(b => {
+        const pending = b.pendingRatePct != null ? ` <small style="color:var(--warn)">→${b.pendingRatePct}%</small>` : "";
+        const type = b.partnerType === "公司" ? "公司" : "个人";
+        return `<div style="font-size:13px">${b.partnerName} <small style="color:var(--muted)">${type}</small> <strong>${b.ratePct}%</strong>${pending}</div>`;
+      }).join("");
+      return `${rows}<small style="color:var(--muted)">合计 ${total}%</small>`;
+    }
+
+    function canEditSitePartners() {
+      return isEntityLogin() || employeeHasPerm("sites.edit") || employeeHasPerm("site_partners.edit");
+    }
+
+    function sitePartnerRateLabel(binding) {
+      if (!binding) return "—";
+      const pending = binding.pendingRatePct != null
+        ? `<br><small style="color:var(--warn)">待生效 ${binding.pendingRatePct}%（次日 0:00）</small>`
+        : "";
+      const type = binding.partnerType === "公司" ? "公司" : "个人";
+      return `${binding.partnerName} <small style="color:var(--muted)">${type}</small> · <strong>${binding.ratePct}%</strong>${pending}`;
+    }
+
+    function sitePartnerPendingEffectiveAt() {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10) + " 00:00";
+    }
+
+    function filterSitePartnerKeyword(row, keyword, fields) {
+      if (!keyword || !String(keyword).trim()) return true;
+      const kw = String(keyword).trim().toLowerCase();
+      return fields.some(f => String(row[f] || "").toLowerCase().includes(kw));
+    }
+
+    function filterSitePartnerBySite(siteId, rowSiteId) {
+      if (!siteId || siteId === "全部") return true;
+      return rowSiteId === siteId;
+    }
+
+    function openNewSitePartnerForm() {
+      openProtoForm({
+        title: "新增站点合伙人",
+        fields: [
+          { name: "partnerType", label: "类型", type: "select", options: ["个人", "公司"], value: "个人" },
+          { name: "name", label: "名称（个人姓名/公司全称）", value: "" },
+          { name: "contactName", label: "联系人（公司必填）", value: "", required: false },
+          { name: "phone", label: "手机/电话", value: "" },
+          { name: "bankAccount", label: "收款账户", value: "" }
+        ],
+        submitLabel: "保存",
+        onSubmit: (data) => {
+          const name = (data.name || "").trim();
+          if (!name) return "请填写名称";
+          if (data.partnerType === "公司" && !(data.contactName || "").trim()) return "公司须填写联系人";
+          const id = "SP-" + String(sitePartners.length + 1).padStart(2, "0");
+          sitePartners.push({
+            id, operatorId: currentEntity().id, partnerType: data.partnerType, name,
+            contactName: (data.contactName || "").trim() || null,
+            phone: (data.phone || "").trim() || "—",
+            bankAccount: (data.bankAccount || "").trim() || "—",
+            status: "启用"
+          });
+          return { successMessage: "已新增合伙人 " + name, afterClose: () => render() };
+        }
+      });
+    }
+
+    function openEditSitePartnerForm(partnerId) {
+      const p = sitePartners.find(x => x.id === partnerId);
+      if (!p || p.operatorId !== currentEntity().id) return;
+      openProtoForm({
+        title: "编辑合伙人 · " + p.name,
+        fields: [
+          { name: "partnerType", label: "类型", type: "select", options: ["个人", "公司"], value: p.partnerType || "个人" },
+          { name: "name", label: "名称", value: p.name },
+          { name: "contactName", label: "联系人", value: p.contactName || "", required: false },
+          { name: "phone", label: "手机/电话", value: p.phone },
+          { name: "bankAccount", label: "收款账户", value: p.bankAccount },
+          { name: "status", label: "状态", type: "select", options: ["启用", "停用"], value: p.status }
+        ],
+        submitLabel: "保存",
+        onSubmit: (data) => {
+          p.partnerType = data.partnerType || p.partnerType || "个人";
+          p.name = (data.name || "").trim() || p.name;
+          p.contactName = (data.contactName || "").trim() || null;
+          p.phone = data.phone || p.phone;
+          p.bankAccount = data.bankAccount || p.bankAccount;
+          p.status = data.status || p.status;
+          sitePartnerBindings.filter(b => b.partnerId === p.id).forEach(b => {
+            b.partnerName = p.name;
+            b.partnerType = p.partnerType;
+          });
+          return { successMessage: "已保存", afterClose: () => {
+            if (state.detailSitePartnersId) openSitePartnersDrawer(state.detailSitePartnersId);
+            else render();
+          }};
+        }
+      });
+    }
+
+    function openBindSitePartnerForm(siteId) {
+      const site = sites.find(s => s.id === siteId);
+      const opId = currentEntity().id;
+      const partners = mySitePartners().filter(p => p.status === "启用");
+      const boundIds = new Set(sitePartnerBindingsForSite(siteId, opId).map(b => b.partnerId));
+      const available = partners.filter(p => !boundIds.has(p.id));
+      if (!available.length) {
+        showProtoToast(boundIds.size ? "该站已绑定全部合伙人，请先在档案中新增" : "请先在合伙人档案中新增合伙人");
+        return;
+      }
+      const total = sitePartnerTotalRate(siteId, opId);
+      openProtoForm({
+        title: "添加合伙人 · " + (site?.name || siteId),
+        fields: [
+          { name: "partnerId", label: "合伙人", type: "select", options: available.map(p => p.id), optionLabels: Object.fromEntries(available.map(p => [p.id, `${p.name}（${p.partnerType || "个人"}）`])), value: available[0].id },
+          { name: "ratePct", label: "本站分润比例（%）", type: "number", value: String(Math.min(20, 99 - total)) }
+        ],
+        submitLabel: "添加",
+        onSubmit: (data) => {
+          const rate = parseFloat(data.ratePct);
+          if (!Number.isFinite(rate) || rate <= 0 || rate > 99) return "比例须为 1～99";
+          if (total + rate > 99.009) return `本站合伙人比例合计不得超过 99%（当前已占 ${total}%）`;
+          const p = sitePartners.find(x => x.id === data.partnerId);
+          if (!p) return "请选择合伙人";
+          sitePartnerBindings.push({
+            id: "SPB-" + Date.now().toString().slice(-4), siteId, operatorId: opId,
+            partnerId: p.id, partnerName: p.name, partnerType: p.partnerType || "个人",
+            ratePct: rate, pendingRatePct: null, effectiveAt: new Date().toISOString().slice(0, 10), status: "生效"
+          });
+          return { successMessage: `已添加 ${p.name} · 本站 ${rate}%`, afterClose: () => openSitePartnersDrawer(siteId) };
+        }
+      });
+    }
+
+    function openEditSitePartnerBindingForm(bindingId) {
+      const b = sitePartnerBindings.find(x => x.id === bindingId);
+      if (!b) return;
+      const others = sitePartnerTotalRate(b.siteId, b.operatorId) - b.ratePct;
+      openProtoForm({
+        title: "调整分润比例 · " + b.partnerName,
+        fields: [
+          { name: "ratePct", label: "新比例（%）", type: "number", value: String(b.pendingRatePct ?? b.ratePct) }
+        ],
+        submitLabel: "保存",
+        onSubmit: (data) => {
+          const rate = parseFloat(data.ratePct);
+          if (!Number.isFinite(rate) || rate <= 0 || rate > 99) return "比例须为 1～99";
+          if (others + rate > 99.009) return `本站合伙人比例合计不得超过 99%（其他合伙人已占 ${others}%）`;
+          if (rate === b.ratePct) {
+            b.pendingRatePct = null;
+            b.pendingEffectiveAt = null;
+          } else {
+            b.pendingRatePct = rate;
+            b.pendingEffectiveAt = sitePartnerPendingEffectiveAt();
+          }
+          return { successMessage: "已保存 · 新比例将于次日 0:00 生效", afterClose: () => openSitePartnersDrawer(b.siteId) };
+        }
+      });
+    }
+
+    function removeSitePartnerBinding(bindingId) {
+      const b = sitePartnerBindings.find(x => x.id === bindingId);
+      if (!b) return;
+      const siteId = b.siteId;
+      b.status = "已解绑";
+      showProtoToast("已解绑 " + b.partnerName);
+      openSitePartnersDrawer(siteId);
+    }
+
+    function openSitePartnersDrawer(siteId) {
+      const site = sites.find(s => s.id === siteId);
+      const opId = currentEntity().id;
+      if (!site) return;
+      state.detailSitePartnersId = siteId;
+      const canEdit = canEditSitePartners() && !site.channelDedicated;
+      const bindings = sitePartnerBindingsForSite(siteId, opId);
+      const total = sitePartnerTotalRate(siteId, opId);
+      document.querySelector("#drawerTitle").textContent = "站点合伙人 · " + site.name;
+      document.querySelector("#drawerSub").textContent = site.id + " · 本站比例合计 " + total + "% / 99%";
+      const rows = bindings.length ? bindings.map(b => {
+        const pending = b.pendingRatePct != null ? `<br><small style="color:var(--warn)">待生效 ${b.pendingRatePct}%（${(b.pendingEffectiveAt || "次日 0:00").replace(" 00:00", "")}）</small>` : "";
+        return `<tr>
+          <td>${b.partnerName}<br>${sitePartnerTypeTag(b.partnerType)}</td>
+          <td><strong>${b.ratePct}%</strong>${pending}</td>
+          <td>${canEdit ? `<button type="button" class="link-btn" data-edit-site-partner-bind="${b.id}">调比例</button> · <button type="button" class="link-btn" data-remove-site-partner-bind="${b.id}">解绑</button>` : "—"}</td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="3" style="color:var(--muted)">尚未配置合伙人</td></tr>`;
+      document.querySelector("#drawerBody").innerHTML = `
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("site_partner_binding")} 一站可配置<strong>多位</strong>合伙人；同一合伙人可在其他站点另设比例。比例变更<strong>次日 0:00</strong>生效。</div>
+        ${site.channelDedicated ? `<p class="perm-banner">渠道专属站默认不参与站点合伙人分润。</p>` : ""}
+        <section class="panel" style="margin:0">
+          ${panelHead("本站合伙人", "在站点管理中维护", "site_partner_binding", canEdit ? `<button type="button" class="btn primary" data-bind-site-partner="${siteId}">+ 添加合伙人</button>` : "")}
+          <div class="panel-body orders-table-wrap" style="padding-top:0">
+            <table>
+              <thead><tr><th>合伙人</th><th>本站比例</th><th>操作</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+            ${total > 99 ? `<p class="perm-banner" style="margin-top:12px">⚠ 本站比例合计超过 99%，请调整。</p>` : ""}
+          </div>
+        </section>`;
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindInteractiveActions(document.querySelector("#drawerBody"));
+    }
+
+    function renderPartnerOverview() {
+      const p = currentSitePartner();
+      if (!p) return "";
+      const bindings = myPartnerBindings();
+      const accrued = partnerAccruedTotal(p.id);
+      const monthAmt = partnerMonthAccrued(p.id, "2026-06");
+      const withdrawable = partnerWithdrawableBalance(p.id);
+      const withdrawn = partnerWithdrawnTotal(p.id);
+      const pending = partnerPendingWithdrawTotal(p.id);
+      const siteMap = Object.fromEntries(sites.map(s => [s.id, s.name]));
+      const bindingRows = bindings.map(b => {
+        const pending = b.pendingRatePct != null ? `<br><small style="color:var(--warn)">待生效 ${b.pendingRatePct}%</small>` : "";
+        return `<tr>
+          <td>${siteMap[b.siteId] || b.siteId}<br><small>${b.siteId}</small></td>
+          <td><strong>${b.ratePct}%</strong>${pending}</td>
+          <td>${(b.effectiveAt || "—").slice(0, 10)}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="3">暂无绑定站点</td></tr>`;
+      const recent = myPartnerSplitLines().slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
+      const recentRows = recent.map(r => `<tr>
+        <td>${r.date}</td><td>${r.siteName}</td><td>${r.partnerRatePct}%</td>
+        <td>¥${r.partnerAmount}</td><td><small>${r.orderRef}</small></td>
+      </tr>`).join("") || `<tr><td colspan="5">暂无分润记录</td></tr>`;
+      return `${ownScopeBanner()}
+        <section class="panel">
+          ${panelHead("经营概览", `关联合伙人运营商：${entityNameById(p.operatorId)}`, "partner_portal")}
+          <div class="panel-body">
+            <div class="kpi-grid in-panel" style="margin-bottom:16px">
+              ${kpi("累计分润", "¥" + accrued.toFixed(2), "已确认切分", "累", "site_partner_split")}
+              ${kpi("本月分润", "¥" + monthAmt.toFixed(2), "2026-06", "月", "site_partner_split")}
+              ${kpi("可提现", "¥" + withdrawable.toFixed(2), pending ? "待审 ¥" + pending : "已扣已提", "提", "partner_withdraw")}
+              ${kpi("绑定站点", String(bindings.length), withdrawn ? "已提 ¥" + withdrawn : "—", "站", "site_partner_binding")}
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px">${noteBtn("partner_portal")} 分润比例由运营商配置；您可查看明细并申请提现结算。</p>
+          </div>
+        </section>
+        <section class="panel" style="margin-top:16px">
+          ${panelHead("我的站点绑定", "只读 · 比例变更次日 0:00 生效", "partner_bindings_readonly")}
+          <div class="panel-body orders-table-wrap">
+            <table><thead><tr><th>站点</th><th>本站比例</th><th>生效日</th></tr></thead><tbody>${bindingRows}</tbody></table>
+          </div>
+        </section>
+        <section class="panel" style="margin-top:16px">
+          ${panelHead("最近分润", "近 5 笔", "site_partner_split", `<button type="button" class="link-btn" data-view-jump="partnerLedger">查看全部</button>`)}
+          <div class="panel-body orders-table-wrap">
+            <table><thead><tr><th>日期</th><th>站点</th><th>比例</th><th>分润额</th><th>关联单</th></tr></thead><tbody>${recentRows}</tbody></table>
+          </div>
+        </section>`;
+    }
+
+    function renderPartnerBindings() {
+      const p = currentSitePartner();
+      const bindings = myPartnerBindings();
+      const siteMap = Object.fromEntries(sites.map(s => [s.id, s]));
+      const rows = bindings.map(b => {
+        const site = siteMap[b.siteId];
+        const pending = b.pendingRatePct != null
+          ? `<br><small style="color:var(--warn)">待生效 ${b.pendingRatePct}% · ${(b.pendingEffectiveAt || "次日 0:00").replace(" 00:00", "")}</small>`
+          : "";
+        return `<tr>
+          <td>${site?.name || b.siteId}<br><small>${b.siteId}</small></td>
+          <td>${site?.city || "—"}</td><td>${site?.type || "—"}</td>
+          <td>${sitePartnerTypeTag(b.partnerType)}</td>
+          <td><strong>${b.ratePct}%</strong>${pending}</td>
+          <td>${(b.effectiveAt || "—").slice(0, 10)}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="6">暂无绑定 · 请联系运营商在站点管理中配置</td></tr>`;
+      return `${ownScopeBanner()}
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("partner_bindings_readonly")} 本站分润比例由运营商在<strong>站点管理 → 合伙人</strong>维护；合伙人门户<strong>不可自行修改</strong>。</div>
+        <section class="panel">
+          ${panelHead("我的站点", `共 ${bindings.length} 个绑定站点`, "site_partner_binding")}
+          <div class="panel-body orders-table-wrap">
+            <table><thead><tr><th>站点</th><th>城市</th><th>类型</th><th>合伙人类型</th><th>本站比例</th><th>绑定生效日</th></tr></thead>
+            <tbody>${rows}</tbody></table>
+          </div>
+        </section>`;
+    }
+
+    function renderPartnerLedger() {
+      const f = getPf();
+      const rows = myPartnerSplitLines().filter(r => {
+        if (!filterSitePartnerBySite(f.siteId, r.siteId)) return false;
+        if (!filterSitePartnerKeyword(r, f.keyword, ["siteName", "orderRef", "splitLabel"])) return false;
+        if (!matchDateStr(r.date, f.dateFrom, f.dateTo)) return false;
+        return true;
+      }).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      const total = rows.reduce((s, r) => s + (r.partnerAmount || 0), 0);
+      return `${ownScopeBanner()}
+        <section class="panel">
+          ${panelHead("分润明细", `共 ${rows.length} 笔 · 合计 ¥${total.toFixed(2)}`, "site_partner_split")}
+          <div class="panel-body orders-table-wrap">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("site_partner_split")} 仅个人用户 C 端确认收入；渠道人天、设备租赁白名单不参与。</p>
+            <table>
+              <thead><tr><th>日期</th><th>站点</th><th>本站比例</th><th>计提基数</th><th>我的分润</th><th>切分标签</th><th>关联单</th></tr></thead>
+              <tbody>${rows.map(r => `<tr>
+                <td>${r.date}</td><td>${r.siteName}</td><td>${r.partnerRatePct}%</td>
+                <td>¥${r.shareBase}</td><td><strong>¥${r.partnerAmount}</strong></td>
+                <td><small>${r.splitLabel}</small></td><td>${r.orderRef}</td>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无分润明细</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+    }
+
+    function renderPartnerWithdraw() {
+      const p = currentSitePartner();
+      const accrued = partnerAccruedTotal(p?.id);
+      const withdrawable = partnerWithdrawableBalance(p?.id);
+      const withdrawn = partnerWithdrawnTotal(p?.id);
+      const pending = partnerPendingWithdrawTotal(p?.id);
+      const rows = myPartnerWithdrawals();
+      const applyBtn = `<button type="button" class="btn primary" data-apply-partner-withdraw>发起提现申请</button>`;
+      return `${ownScopeBanner()}
+        <section class="panel">
+          ${panelHead("提现结算", `共 ${rows.length} 条申请`, "partner_withdraw", applyBtn)}
+          <div class="panel-body">
+            <div class="kpi-grid in-panel" style="margin-bottom:14px">
+              ${kpi("累计分润", "¥" + accrued.toFixed(2), "台账累计", "累", "site_partner_split")}
+              ${kpi("可提现余额", "¥" + withdrawable.toFixed(2), "已扣已提与待审", "提", "partner_withdraw")}
+              ${kpi("已到账", "¥" + withdrawn.toFixed(2), "历史提现", "到", "partner_withdraw")}
+              ${kpi("待审核", pending ? "¥" + pending : "—", "运营商处理中", "审", "partner_withdraw")}
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("partner_withdraw")} 提现向<strong>运营商</strong>申请，审核后通过对公/代付打款；非平台审核流程。</p>
+            <div class="orders-table-wrap">
+            <table>
+              <thead><tr><th>申请单</th><th>金额</th><th>到账账户</th><th>申请时间</th><th>审核</th><th>状态</th><th>到账时间</th></tr></thead>
+              <tbody>${rows.map(w => `<tr>
+                <td>${w.id}</td><td><strong>¥${w.amount}</strong></td><td><small>${w.accountLabel}</small></td>
+                <td>${w.applyTime}</td>
+                <td>${w.reviewedBy ? w.reviewedBy + "<br><small>" + (w.reviewTime || "") + "</small>" : "—"}</td>
+                <td>${tag(w.status)}${w.rejectReason ? `<br><small style="color:var(--red)">${w.rejectReason}</small>` : ""}</td>
+                <td>${w.paidTime || "—"}</td>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无提现申请</td></tr>"}</tbody>
+            </table>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    function renderPartnerAccount() {
+      const p = currentSitePartner();
+      if (!p) return "";
+      return `${ownScopeBanner()}
+        <section class="panel">
+          ${panelHead("收款账户", "档案信息只读 · 变更请联系运营商", "partner_portal")}
+          <div class="panel-body">
+            <div class="detail-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px">
+              <div class="detail-item"><span>类型</span>${sitePartnerTypeTag(p.partnerType || "个人")}</div>
+              <div class="detail-item"><span>名称</span>${p.name}</div>
+              <div class="detail-item"><span>联系人</span>${p.contactName || "—"}</div>
+              <div class="detail-item"><span>手机/电话</span>${p.phone}</div>
+              <div class="detail-item"><span>收款账户</span>${p.bankAccount}</div>
+              <div class="detail-item"><span>关联合伙人运营商</span>${entityNameById(p.operatorId)}</div>
+              <div class="detail-item"><span>状态</span>${tag(p.status)}</div>
+            </div>
+            <p style="margin-top:16px;font-size:12px;color:var(--muted)">提现默认打款至上述账户；账户变更须由运营商在「站点合伙人 → 档案」中维护。</p>
           </div>
         </section>`;
     }
@@ -5756,15 +7318,442 @@
           ${panelHead("站点列表", "本运营商名下站点（含筹备中、无设备站点）", "sites_panel", canEditSites ? `<button type="button" class="btn primary" data-new-site>+ 新增站点</button>` : "")}
           <div class="panel-body">
             <table>
-              <thead><tr><th>站点</th><th>城市</th><th>类型</th><th>开放范围</th><th>换电柜</th><th>电池</th><th>状态</th>${canEditSites ? "<th>操作</th>" : ""}</tr></thead>
-              <tbody>${ss.map(s => `<tr>
+              <thead><tr><th>站点</th><th>城市</th><th>类型</th><th>开放范围</th><th>站点合伙人</th><th>换电柜</th><th>电池</th><th>状态</th>${canEditSites ? "<th>操作</th>" : ""}</tr></thead>
+              <tbody>${ss.map(s => {
+                const partnerCell = s.channelDedicated
+                  ? `<span style="color:var(--muted)">渠道专属</span><br><small>默认不参与</small>`
+                  : sitePartnersCellHtml(s.id, s.operatorId);
+                const partnerBtn = canEditSites && !s.channelDedicated
+                  ? `<button type="button" class="link-btn" data-site-partners="${s.id}">合伙人</button>`
+                  : "";
+                return `<tr>
                 <td>${s.name}<br><small style="color:var(--muted)">${s.id}</small></td>
                 <td>${s.city}</td><td>${s.type}</td>
                 <td>${s.channelDedicated ? `<span style="color:var(--brand)">渠道专用</span><br><small>仅白名单可见</small>` : "公众开放"}</td>
+                <td>${partnerCell}</td>
                 <td>${s.cabinets}</td><td>${s.batteries}</td><td>${tag(s.status)}</td>
-                ${canEditSites ? `<td><button type="button" class="link-btn" data-edit-site="${s.id}">编辑</button></td>` : ""}
-              </tr>`).join("") || `<tr><td colspan='${canEditSites ? 8 : 7}'>暂无</td></tr>`}</tbody>
+                ${canEditSites ? `<td><button type="button" class="link-btn" data-edit-site="${s.id}">编辑</button>${partnerBtn ? " · " + partnerBtn : ""}</td>` : ""}
+              </tr>`;
+              }).join("") || `<tr><td colspan='${canEditSites ? 9 : 8}'>暂无</td></tr>`}</tbody>
             </table>
+          </div>
+        </section>`;
+    }
+
+    function renderSitePartners() {
+      const canEdit = isEntityLogin() || employeeHasPerm("site_partners.edit");
+      const tabs = [["profiles", "合伙人档案"], ["bindings", "分润绑定一览"], ["ledger", "分润明细"]];
+      const tab = state.sitePartnersTab || "profiles";
+      const f = getPf();
+      const partners = mySitePartners().filter(p => {
+        if (f.siteId && f.siteId !== "全部") {
+          const hasSite = mySitePartnerBindings().some(b => b.partnerId === p.id && b.siteId === f.siteId && b.status === "生效");
+          if (!hasSite) return false;
+        }
+        return filterSitePartnerKeyword(p, f.keyword, ["name", "phone", "contactName"]);
+      });
+      const bindings = mySitePartnerBindings().filter(b => {
+        if (b.status !== "生效") return false;
+        if (!filterSitePartnerBySite(f.siteId, b.siteId)) return false;
+        return filterSitePartnerKeyword(b, f.keyword, ["partnerName"]);
+      });
+      let body = "";
+      if (tab === "profiles") {
+        const addBtn = canEdit ? `<button type="button" class="btn primary" data-new-site-partner>+ 新增合伙人</button>` : "";
+        body = `<section class="panel">
+          ${panelHead("合伙人档案", "个人/公司 · 比例在站点管理中按站配置", "site_partner_panel", addBtn)}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>类型</th><th>名称</th><th>联系人</th><th>手机/电话</th><th>收款账户</th><th>绑定站点数</th><th>状态</th>${canEdit ? "<th>操作</th>" : ""}</tr></thead>
+              <tbody>${partners.map(p => {
+                const cnt = bindings.filter(b => b.partnerId === p.id).length;
+                return `<tr>
+                  <td>${sitePartnerTypeTag(p.partnerType || "个人")}</td>
+                  <td>${p.name}</td>
+                  <td>${p.contactName || "—"}</td>
+                  <td>${p.phone}</td><td>${p.bankAccount}</td><td>${cnt}</td><td>${tag(p.status)}</td>
+                  ${canEdit ? `<td><button type="button" class="link-btn" data-edit-site-partner="${p.id}">编辑</button></td>` : ""}
+                </tr>`;
+              }).join("") || `<tr><td colspan='${canEdit ? 8 : 7}'>暂无合伙人</td></tr>`}</tbody>
+            </table>
+          </div>
+        </section>`;
+      } else if (tab === "ledger") {
+        const rows = mySitePartnerSplitLines().filter(r => {
+          if (!filterSitePartnerBySite(f.siteId, r.siteId)) return false;
+          return filterSitePartnerKeyword(r, f.keyword, ["partnerName", "siteName", "orderRef"]);
+        });
+        body = `<section class="panel">
+          ${panelHead("分润明细", "仅个人用户 C 端确认收入 · 平台 1% + 合伙人 R% + 运营商余量", "site_partner_split")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>日期</th><th>站点</th><th>合伙人</th><th>本站比例</th><th>计提基数</th><th>平台</th><th>合伙人</th><th>运营商</th><th>切分</th><th>关联单</th></tr></thead>
+              <tbody>${rows.map(r => `<tr>
+                <td>${r.date}</td><td>${r.siteName}</td><td>${r.partnerName}</td><td>${r.partnerRatePct}%</td>
+                <td>¥${r.shareBase}</td><td>¥${r.platformAmount}</td><td>¥${r.partnerAmount}</td><td>¥${r.operatorAmount}</td>
+                <td><small>${r.splitLabel}</small></td><td>${r.orderRef}</td>
+              </tr>`).join("") || "<tr><td colspan='10'>暂无分润明细</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      } else {
+        const siteMap = Object.fromEntries(sites.map(s => [s.id, s.name]));
+        body = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("site_partner_binding")} 请在<strong>站点管理 → 合伙人</strong>中配置。一站可多位合伙人；同一人可多站不同比例。演示：浦东站 <strong>王场地方 25% + 李物业 5%</strong>。</div>
+        <section class="panel">
+          ${panelHead("分润绑定一览", "站点 × 合伙人 · 只读汇总", "site_partner_binding")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>站点</th><th>合伙人</th><th>类型</th><th>本站比例</th><th>待生效</th><th>操作</th></tr></thead>
+              <tbody>${bindings.map(b => {
+                const pending = b.pendingRatePct != null ? `${b.pendingRatePct}% · ${(b.pendingEffectiveAt || "次日 0:00").replace(" 00:00", "")}` : "—";
+                const siteName = siteMap[b.siteId] || b.siteId;
+                return `<tr>
+                  <td>${siteName}<br><small>${b.siteId}</small></td>
+                  <td>${b.partnerName}</td>
+                  <td>${sitePartnerTypeTag(b.partnerType)}</td>
+                  <td><strong>${b.ratePct}%</strong></td>
+                  <td>${pending}</td>
+                  <td><button type="button" class="link-btn" data-site-partners="${b.siteId}">去站点配置</button></td>
+                </tr>`;
+              }).join("") || "<tr><td colspan='6'>暂无绑定 · 请至站点管理配置</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      }
+      return `${ownScopeBanner()}${pageWithTabs(tabSidebar(tabs, tab, "sptab"), body)}`;
+    }
+
+    function getSiteExpensePf() {
+      if (!state.pf.siteExpenses) state.pf.siteExpenses = { ...PF_DEFAULTS.siteExpenses };
+      return state.pf.siteExpenses;
+    }
+
+    function siteExpenseDateRange(sp) {
+      const p = sp || getSiteExpensePf();
+      if (p.dateFrom && p.dateTo) return { from: p.dateFrom, to: p.dateTo };
+      return { from: "2026-06-01", to: "2026-06-30" };
+    }
+
+    function syncSiteExpenseRangeDates(pf) {
+      if (pf.range === "lastMonth") { pf.dateFrom = "2026-05-01"; pf.dateTo = "2026-05-31"; }
+      else if (pf.range === "quarter") { pf.dateFrom = "2026-04-01"; pf.dateTo = "2026-06-30"; }
+      else { pf.dateFrom = "2026-06-01"; pf.dateTo = "2026-06-30"; pf.range = pf.range || "month"; }
+    }
+
+    function applySiteExpenseFiltersFromDom() {
+      const sp = getSiteExpensePf();
+      document.querySelectorAll("[data-site-expense-pf]").forEach(el => {
+        sp[el.dataset.siteExpensePf] = el.value;
+      });
+      return sp;
+    }
+
+    function billInExpenseRange(bill, from, to) {
+      return bill.periodStart <= to && bill.periodEnd >= from;
+    }
+
+    function paymentsInExpenseRange(bill, from, to) {
+      return (bill.payments || []).filter(p => {
+        const d = (p.payTime || "").slice(0, 10);
+        return d >= from && d <= to;
+      });
+    }
+
+    function siteExpenseProfile(siteId) {
+      return siteExpenseProfiles.find(p => p.siteId === siteId && p.operatorId === currentEntity().id);
+    }
+
+    function mySiteExpenseProfiles() {
+      const opId = currentEntity().id;
+      return myOperatorSites().map(s => {
+        const prof = siteExpenseProfiles.find(p => p.siteId === s.id && p.operatorId === opId);
+        return { site: s, profile: prof || null };
+      });
+    }
+
+    function siteExpenseBillsFor(siteId) {
+      return siteExpenseBills
+        .filter(b => b.siteId === siteId && b.operatorId === currentEntity().id)
+        .sort((a, b) => b.periodStart.localeCompare(a.periodStart));
+    }
+
+    function mySiteExpenseBills() {
+      return siteExpenseBills
+        .filter(b => b.operatorId === currentEntity().id)
+        .sort((a, b) => b.periodStart.localeCompare(a.periodStart));
+    }
+
+    function billPaidAmount(bill) {
+      return (bill.payments || []).reduce((s, p) => s + p.amount, 0);
+    }
+
+    function billRemainAmount(bill) {
+      return Math.max(0, +(bill.totalAmount - billPaidAmount(bill)).toFixed(2));
+    }
+
+    function syncBillStatus(bill) {
+      const paid = billPaidAmount(bill);
+      if (paid <= 0) bill.status = "待支付";
+      else if (paid + 0.009 >= bill.totalAmount) bill.status = "已结清";
+      else bill.status = "部分支付";
+    }
+
+    function expenseStatusTag(status) {
+      const cls = status === "待支付" ? "risk" : status === "部分支付" ? "warn" : "";
+      return cls ? `<span class="tag ${cls}">${status}</span>` : tag(status);
+    }
+
+    function formatExpenseFee(prof) {
+      if (!prof) return "—";
+      const venue = prof.venueFeeAmount ? `¥${prof.venueFeeAmount}/${prof.venueFeeUnit}` : "—";
+      const elec = prof.electricityMode === "包月"
+        ? `包月 ¥${prof.electricityFixedAmount || 0}`
+        : `按量 ¥${prof.electricityUnitPrice || 0}/kWh`;
+      return `${venue} · ${elec}`;
+    }
+
+    function openSiteExpenseDetail(siteId) {
+      const site = sites.find(s => s.id === siteId);
+      const prof = siteExpenseProfile(siteId);
+      const bills = siteExpenseBillsFor(siteId);
+      if (!site) return;
+      state.detailSiteExpenseId = siteId;
+      document.querySelector("#drawerTitle").textContent = "站点支出 · " + site.name;
+      const profBlock = prof ? `
+        <div class="detail-grid" style="margin-bottom:16px">
+          <div class="detail-item"><span>场地所有人 ${noteBtn("site_expenses_landlord")}</span><strong>${prof.landlordName}</strong><br><small style="color:var(--muted)">${prof.landlordContact || ""} ${prof.landlordPhone || ""}</small></div>
+          <div class="detail-item"><span>付费周期 ${noteBtn("site_expenses_cycle")}</span><strong>${prof.paymentCycle}</strong></div>
+          <div class="detail-item"><span>场地费 ${noteBtn("site_expenses_venue")}</span><strong>¥${prof.venueFeeAmount}/${prof.venueFeeUnit}</strong></div>
+          <div class="detail-item"><span>电费 ${noteBtn("site_expenses_electricity")}</span><strong>${prof.electricityMode === "包月" ? "包月 ¥" + prof.electricityFixedAmount : "按量 ¥" + prof.electricityUnitPrice + "/kWh"}</strong></div>
+          <div class="detail-item"><span>收款方式 ${noteBtn("site_expenses_pay_method")}</span><strong>${prof.payMethod}</strong><br><small style="color:var(--muted)">${prof.payeeName}<br>${prof.payAccount}</small></div>
+          ${prof.remark ? `<div class="detail-item" style="grid-column:1/-1"><span>备注</span>${prof.remark}</div>` : ""}
+        </div>` : `<p class="perm-banner">尚未配置支出信息，请点击「编辑配置」完善。</p>`;
+      const billRows = bills.length ? bills.map(b => {
+        const paid = billPaidAmount(b);
+        const remain = billRemainAmount(b);
+        const payRows = (b.payments || []).length ? (b.payments || []).map(p => `<tr>
+          <td>${p.payTime}</td><td>¥${p.amount.toFixed(2)}</td><td>${p.method}</td><td>${p.ref || "—"}</td><td>${p.operator}</td><td>${p.remark || "—"}</td>
+        </tr>`).join("") : `<tr><td colspan="6" style="color:var(--muted)">暂无支付记录</td></tr>`;
+        return `<tr>
+          <td><strong>${b.periodStart}</strong> ~ ${b.periodEnd}</td>
+          <td>¥${b.venueFee.toFixed(2)}</td>
+          <td>${b.electricityKwh != null ? b.electricityKwh.toFixed(2) + " kWh" : "—"}<br><small>¥${b.electricityFee.toFixed(2)}</small></td>
+          <td><strong>¥${b.totalAmount.toFixed(2)}</strong></td>
+          <td>${expenseStatusTag(b.status)}<br><small style="color:var(--muted)">应付 ${b.dueDate}</small></td>
+          <td>已付 ¥${paid.toFixed(2)}${remain > 0 ? `<br><small style="color:var(--red)">待付 ¥${remain.toFixed(2)}</small>` : ""}</td>
+          <td>${remain > 0 ? `<button type="button" class="link-btn" data-register-expense-pay="${b.id}">登记支付</button>` : "—"}</td>
+        </tr>
+        <tr class="site-expense-pay-row"><td colspan="7" style="padding:0 0 12px 24px;background:var(--surface-soft)">
+          <p style="font-size:12px;color:var(--muted);margin:8px 0 4px">支付记录 ${noteBtn("site_expenses_payment")}</p>
+          <table style="width:100%;font-size:13px"><thead><tr><th>支付时间</th><th>金额</th><th>方式</th><th>流水号</th><th>经办人</th><th>备注</th></tr></thead><tbody>${payRows}</tbody></table>
+        </td></tr>`;
+      }).join("") : `<tr><td colspan="7">暂无周期账单</td></tr>`;
+      document.querySelector("#drawerBody").innerHTML = `
+        ${profBlock}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <p style="margin:0;font-size:13px;color:var(--muted)">周期账单 ${noteBtn("site_expenses_bill")}</p>
+          <button type="button" class="btn" data-edit-site-expense="${siteId}">编辑配置</button>
+        </div>
+        <div class="orders-table-wrap">
+          <table>
+            <thead><tr><th>账期</th><th>场地费</th><th>电费</th><th>合计</th><th>状态</th><th>实付/待付</th><th>操作</th></tr></thead>
+            <tbody>${billRows}</tbody>
+          </table>
+        </div>`;
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindDrawerActions();
+    }
+
+    function openSiteExpenseForm(siteId) {
+      const site = sites.find(s => s.id === siteId);
+      if (!site) return;
+      let prof = siteExpenseProfile(siteId);
+      if (!prof) {
+        prof = {
+          siteId, operatorId: currentEntity().id,
+          landlordName: "", landlordPhone: "", landlordContact: "",
+          venueFeeAmount: 0, venueFeeUnit: "月",
+          electricityMode: "按量", electricityUnitPrice: 1.2, electricityFixedAmount: null,
+          paymentCycle: "月结", payMethod: "对公转账", payeeName: "", payAccount: "", remark: ""
+        };
+      }
+      openProtoForm({
+        title: "站点支出配置 · " + site.name,
+        fields: [
+          { name: "landlordName", label: "场地所有人", value: prof.landlordName },
+          { name: "landlordContact", label: "联系人", value: prof.landlordContact || "" },
+          { name: "landlordPhone", label: "联系电话", value: prof.landlordPhone || "" },
+          { name: "venueFeeAmount", label: "场地费金额（元）", type: "number", value: String(prof.venueFeeAmount || 0) },
+          { name: "venueFeeUnit", label: "场地费周期", type: "select", options: ["月", "季", "年"], value: prof.venueFeeUnit || "月" },
+          { name: "electricityMode", label: "电费模式", type: "select", options: ["按量", "包月"], value: prof.electricityMode || "按量" },
+          { name: "electricityUnitPrice", label: "电费单价（元/kWh，按量时）", type: "number", value: String(prof.electricityUnitPrice ?? 1.2) },
+          { name: "electricityFixedAmount", label: "包月电费（元，包月时）", type: "number", value: String(prof.electricityFixedAmount ?? 0) },
+          { name: "paymentCycle", label: "付费周期", type: "select", options: ["月结", "季结", "年结"], value: prof.paymentCycle || "月结" },
+          { name: "payMethod", label: "收款方式", type: "select", options: ["对公转账", "微信", "支付宝", "现金"], value: prof.payMethod || "对公转账" },
+          { name: "payeeName", label: "收款户名", value: prof.payeeName || "" },
+          { name: "payAccount", label: "收款账号", value: prof.payAccount || "" },
+          { name: "remark", label: "备注", value: prof.remark || "", required: false }
+        ],
+        submitLabel: "保存",
+        onSubmit: (data) => {
+          const row = {
+            siteId, operatorId: currentEntity().id,
+            landlordName: (data.landlordName || "").trim(),
+            landlordContact: (data.landlordContact || "").trim(),
+            landlordPhone: (data.landlordPhone || "").trim(),
+            venueFeeAmount: Number(data.venueFeeAmount) || 0,
+            venueFeeUnit: data.venueFeeUnit,
+            electricityMode: data.electricityMode,
+            electricityUnitPrice: data.electricityMode === "按量" ? Number(data.electricityUnitPrice) || 0 : null,
+            electricityFixedAmount: data.electricityMode === "包月" ? Number(data.electricityFixedAmount) || 0 : null,
+            paymentCycle: data.paymentCycle,
+            payMethod: data.payMethod,
+            payeeName: (data.payeeName || "").trim(),
+            payAccount: (data.payAccount || "").trim(),
+            remark: (data.remark || "").trim()
+          };
+          const idx = siteExpenseProfiles.findIndex(p => p.siteId === siteId && p.operatorId === currentEntity().id);
+          if (idx >= 0) siteExpenseProfiles[idx] = row;
+          else siteExpenseProfiles.push(row);
+          return {
+            successMessage: "站点支出配置已保存",
+            afterClose: () => {
+              if (state.detailSiteExpenseId === siteId) openSiteExpenseDetail(siteId);
+              else render();
+            }
+          };
+        }
+      });
+    }
+
+    function registerSiteExpensePayment(billId, data) {
+      const bill = siteExpenseBills.find(b => b.id === billId);
+      if (!bill) return "账单不存在";
+      const amount = Number(data.amount);
+      if (!amount || amount <= 0) return "请输入有效支付金额";
+      if (!bill.payments) bill.payments = [];
+      bill.payments.unshift({
+        id: "SEP-" + Date.now().toString().slice(-6),
+        payTime: new Date().toISOString().slice(0, 16).replace("T", " "),
+        amount,
+        method: data.method || "对公转账",
+        ref: (data.ref || "").trim(),
+        operator: currentEmployee()?.name || currentEntity().name,
+        remark: (data.remark || "").trim()
+      });
+      syncBillStatus(bill);
+      return null;
+    }
+
+    function renderSiteExpenses() {
+      const canEdit = isEntityLogin() || employeeHasPerm("site_expenses.edit");
+      const tab = state.siteExpenseTab || "sites";
+      const sp = getSiteExpensePf();
+      const { from, to } = siteExpenseDateRange(sp);
+      const profiles = mySiteExpenseProfiles();
+      const allBills = mySiteExpenseBills().filter(b => billInExpenseRange(b, from, to));
+      const pendingBills = allBills.filter(b => b.status !== "已结清");
+      const pendingAmount = pendingBills.reduce((s, b) => s + billRemainAmount(b), 0);
+      const periodDue = allBills.reduce((s, b) => s + b.totalAmount, 0);
+      const periodPaid = allBills.reduce((s, b) => s + paymentsInExpenseRange(b, from, to).reduce((x, p) => x + p.amount, 0), 0);
+      const filterHint = from + " ~ " + to;
+      const siteRows = profiles.map(({ site, profile }) => {
+        const bills = siteExpenseBillsFor(site.id).filter(b => billInExpenseRange(b, from, to));
+        const pending = bills.filter(b => b.status !== "已结清").length;
+        const lastBill = bills.sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
+        const periodSiteDue = bills.reduce((s, b) => s + billRemainAmount(b), 0);
+        return `<tr>
+          <td>${site.name}<br><small style="color:var(--muted)">${site.id}</small></td>
+          <td>${profile ? profile.landlordName : "—"}<br><small style="color:var(--muted)">${profile?.landlordContact || ""}</small></td>
+          <td>${profile ? profile.paymentCycle : "—"}</td>
+          <td>${profile ? formatExpenseFee(profile) : "—"}</td>
+          <td>${profile ? `${profile.payMethod}<br><small style="color:var(--muted)">${profile.payeeName || "—"}</small>` : "—"}</td>
+          <td>${pending ? `<span class="tag warn">${pending} 笔待付</span><br><small>待付 ¥${periodSiteDue.toFixed(2)}</small>` : tag("已结清")}</td>
+          <td>${lastBill ? lastBill.periodStart + " ~ " + lastBill.periodEnd : "—"}</td>
+          <td>
+            <button type="button" class="link-btn" data-open-site-expense="${site.id}">账单明细</button>
+            ${canEdit ? ` · <button type="button" class="link-btn" data-edit-site-expense="${site.id}">配置</button>` : ""}
+          </td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="8">暂无站点</td></tr>`;
+      const billRows = allBills.sort((a, b) => b.periodStart.localeCompare(a.periodStart)).map(b => {
+        const site = sites.find(s => s.id === b.siteId);
+        const remain = billRemainAmount(b);
+        const paysInRange = paymentsInExpenseRange(b, from, to);
+        const paidInRange = paysInRange.reduce((s, p) => s + p.amount, 0);
+        return `<tr>
+          <td>${site?.name || b.siteId}</td>
+          <td>${b.periodStart} ~ ${b.periodEnd}<br><small style="color:var(--muted)">应付 ${b.dueDate}</small></td>
+          <td>¥${b.venueFee.toFixed(2)}</td>
+          <td>${b.electricityKwh != null ? b.electricityKwh.toFixed(2) + " kWh / " : ""}¥${b.electricityFee.toFixed(2)}</td>
+          <td><strong>¥${b.totalAmount.toFixed(2)}</strong></td>
+          <td>${expenseStatusTag(b.status)}</td>
+          <td>${paysInRange.length} 笔 · 已付 ¥${paidInRange.toFixed(2)}${remain > 0 ? `<br><small style="color:var(--red)">待付 ¥${remain.toFixed(2)}</small>` : ""}</td>
+          <td>
+            <button type="button" class="link-btn" data-open-site-expense="${b.siteId}">详情</button>
+            ${canEdit && remain > 0 ? ` · <button type="button" class="link-btn" data-register-expense-pay="${b.id}">登记支付</button>` : ""}
+          </td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="8">当前筛选条件下暂无账单</td></tr>`;
+      return `
+        ${ownScopeBanner()}
+        <section class="panel">
+          ${panelHead("站点支出", filterHint + " · 场地费 · 电费 · 周期账单", "site_expenses_panel")}
+          <div class="panel-body">
+            <div class="power-filter-bar" id="siteExpenseFilterBar" style="margin-bottom:16px">
+              <div class="field">
+                <label>账期起 ${noteBtn("site_expenses_time")}</label>
+                <input type="date" data-site-expense-pf="dateFrom" value="${sp.dateFrom || from}">
+              </div>
+              <div class="field">
+                <label>账期止</label>
+                <input type="date" data-site-expense-pf="dateTo" value="${sp.dateTo || to}">
+              </div>
+              <div class="field">
+                <label>快捷范围</label>
+                <select data-site-expense-pf="range">
+                  <option value="month"${sp.range === "month" ? " selected" : ""}>本月（2026-06）</option>
+                  <option value="lastMonth"${sp.range === "lastMonth" ? " selected" : ""}>上月（2026-05）</option>
+                  <option value="quarter"${sp.range === "quarter" ? " selected" : ""}>近 3 月（Q2）</option>
+                </select>
+              </div>
+              <div class="field pf-actions">
+                <label>&nbsp;</label>
+                <button type="button" class="btn primary" data-site-expense-query>查询</button>
+              </div>
+            </div>
+            <div class="kpi-grid in-panel" style="margin-bottom:16px">
+              ${kpi("管理站点", profiles.length, "含筹备中站点", "站", "site_expenses_panel")}
+              ${kpi("待付账单", pendingBills.length, "合计待付 ¥" + pendingAmount.toLocaleString("zh-CN", { minimumFractionDigits: 2 }), "单", "site_expenses_bill")}
+              ${kpi("期间应付", "¥" + periodDue.toLocaleString("zh-CN", { minimumFractionDigits: 2 }), filterHint + " 账期合计", "应", "site_expenses_bill")}
+              ${kpi("期间已付", "¥" + periodPaid.toLocaleString("zh-CN", { minimumFractionDigits: 2 }), "筛选期内支付流水", "付", "site_expenses_payment")}
+            </div>
+            <div class="tab-bar" style="margin-bottom:12px">
+              <button type="button" class="btn${tab === "sites" ? " primary" : ""}" data-site-expense-tab="sites">按站点</button>
+              <button type="button" class="btn${tab === "bills" ? " primary" : ""}" data-site-expense-tab="bills">全部账单</button>
+            </div>
+            ${tab === "sites" ? `
+            <div class="orders-table-wrap">
+              <table>
+                <thead><tr>
+                  <th>站点</th><th>场地所有人 ${noteBtn("site_expenses_landlord")}</th><th>付费周期 ${noteBtn("site_expenses_cycle")}</th>
+                  <th>场地费/电费 ${noteBtn("site_expenses_venue")}</th><th>收款方式 ${noteBtn("site_expenses_pay_method")}</th>
+                  <th>待付</th><th>最近账期</th><th>操作</th>
+                </tr></thead>
+                <tbody>${siteRows}</tbody>
+              </table>
+            </div>` : `
+            <div class="orders-table-wrap">
+              <table>
+                <thead><tr>
+                  <th>站点</th><th>账期</th><th>场地费</th><th>电费 ${noteBtn("site_expenses_electricity")}</th>
+                  <th>合计</th><th>状态</th><th>支付记录</th><th>操作</th>
+                </tr></thead>
+                <tbody>${billRows}</tbody>
+              </table>
+            </div>`}
           </div>
         </section>`;
     }
@@ -5786,6 +7775,79 @@
       if (c.deployAddress) return c.deployAddress;
       const siteMeta = sites.find(s => s.name === c.site);
       return siteMeta?.address || c.site || "—";
+    }
+
+    function cabinetHasSiteBinding(c) {
+      if (!c?.site || c.site === "待绑定" || c.site === "—") return false;
+      return myOperatorSites().some(s => s.name === c.site && s.status !== "已停用");
+    }
+
+    function moveCabinetTargetSites(currentSiteName) {
+      return myOperatorSites().filter(s => s.status === "在营" && s.name !== currentSiteName);
+    }
+
+    function moveCabinetToSite(sn, targetSiteName, remark) {
+      const c = cabinetBySn(sn);
+      if (!c || !filterOwnRow(c)) return "无权操作该柜机";
+      if (!cabinetHasSiteBinding(c)) return "该柜机尚未绑定站点，无法移柜";
+      const site = sites.find(s => s.name === targetSiteName && s.operatorId === currentEntity().id);
+      if (!site || site.status !== "在营") return "目标站点无效或不在营";
+      if (site.name === c.site) return "目标站点不能与当前站点相同";
+      const fromSite = c.site;
+      c.site = site.name;
+      c.city = site.city;
+      c.deployAddress = site.address || c.deployAddress;
+      const fa = financeAssets.find(a => a.sn === c.sn && a.type === "换电柜");
+      if (fa) fa.site = site.name;
+      myDeviceAlerts().filter(a => a.deviceSn === c.sn).forEach(a => { a.siteName = site.name; });
+      if (Array.isArray(cabinetMoveLogs)) {
+        cabinetMoveLogs.unshift({
+          id: "CM-" + Date.now().toString().slice(-6),
+          sn: c.sn,
+          fromSite,
+          toSite: site.name,
+          operatorId: currentEntity().id,
+          operatorName: currentEmployee()?.name || currentEntity().name,
+          remark: (remark || "").trim(),
+          movedAt: new Date().toISOString().slice(0, 16).replace("T", " ")
+        });
+      }
+      return null;
+    }
+
+    function openMoveCabinetForm(sn) {
+      const c = cabinetBySn(sn);
+      if (!c || !filterOwnRow(c)) {
+        showProtoToast("未找到该换电柜");
+        return;
+      }
+      if (!cabinetHasSiteBinding(c)) {
+        showProtoToast("该柜机尚未绑定站点，无法移柜");
+        return;
+      }
+      const targets = moveCabinetTargetSites(c.site);
+      if (!targets.length) {
+        showProtoToast("暂无其他在营站点可移入");
+        return;
+      }
+      openProtoForm({
+        title: "移柜 · " + c.sn,
+        fields: [
+          { name: "fromSite", label: "当前站点", value: c.site, readonly: true },
+          { name: "toSite", label: "目标站点", type: "select", options: targets.map(s => s.name), value: targets[0].name },
+          { name: "remark", label: "移柜说明", required: false, value: "" }
+        ],
+        submitLabel: "确认移柜",
+        onSubmit: (data) => {
+          const fromSite = c.site;
+          const err = moveCabinetToSite(sn, data.toSite, data.remark);
+          if (err) return err;
+          return {
+            successMessage: `已将 ${sn} 从「${fromSite}」迁至「${data.toSite}」（演示）`,
+            afterClose: () => render()
+          };
+        }
+      });
     }
 
     function cabinetIccid(c) {
@@ -5902,7 +7964,7 @@
               ${cell("已使用电量", c.usedPowerKwh != null ? c.usedPowerKwh : "—")}
               ${cell("投放地址", cabinetDeployAddress(c) || "—")}
               ${cell("电柜 SN", c.sn)}
-              ${cell("所属站点", c.site)}
+              ${cell("所属站点", `${c.site}${opsDemo && cabinetHasSiteBinding(c) ? `<br><button type="button" class="link-btn" data-move-cab="${c.sn}">移柜</button>` : ""}`)}
               ${cell("权属", ownershipCell(c))}
               <div class="cab-detail-cell"><span>换电模式切换</span>
                 <div class="cab-inline-ctrl">
@@ -6076,6 +8138,7 @@
       if (tab === "cabinet") {
         const f = getPf();
         const rows = cabinets.filter(filterOwnRow).filter(c => filterCabinetRows(c, f));
+        const canMoveCab = isOperatorRole();
         body = `
           <div class="cab-toolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
             <button type="button" class="btn primary" data-pf-confirm>查询</button>
@@ -6106,6 +8169,7 @@
                   <td class="row-actions" style="white-space:nowrap">
                     <button type="button" class="link-btn" data-open-cab-compose="${c.sn}">电柜组成</button>
                     <button type="button" class="link-btn" data-edit-cab="${c.sn}">编辑</button>
+                    ${canMoveCab && cabinetHasSiteBinding(c) ? `<button type="button" class="link-btn" data-move-cab="${c.sn}">移柜</button>` : ""}
                     <button type="button" class="link-btn" data-open-cab-detail="${c.sn}">查看详情</button>
                   </td>
                 </tr>`;
@@ -6373,6 +8437,7 @@
       ];
       if (rf.status === "已驳回" && batteryOk) steps[2].state = "fail";
       if (rf.status === "已退款" && rf.processMode === "auto") steps[2].label = "系统自动审核";
+      if (rf.coolingPeriod || rf.type === "冷静期退款") steps[2].label = "运营商审核（冷静期）";
       return { steps, sc };
     }
 
@@ -6410,8 +8475,10 @@
           <div class="detail-item"><span>用户</span><strong>${rf.user}<br><small>${rf.phone}</small></strong></div>
           <div class="detail-item"><span>站点</span><strong>${rf.site}</strong></div>
           <div class="detail-item"><span>套餐</span><strong>${rf.pkgName}</strong></div>
-          <div class="detail-item"><span>应退合计</span><strong>¥${rf.totalRefund}</strong></div>
+          <div class="detail-item"><span>应退合计</span><strong>¥${rf.totalRefund}</strong>${rf.coolingPeriod ? `<br><small style="color:var(--muted)">建议套餐退 ¥${rf.suggestedRefund ?? rf.pkgRefund}（已用 ${rf.usedDays ?? "—"} 天）</small>` : ""}</div>
           <div class="detail-item"><span>平台费不退</span><strong>¥${rf.platformFeeNonRefund}</strong></div>
+          ${rf.coolingPeriod ? `<div class="detail-item"><span>冷静期</span><strong>开通后 3 天内 · 剩余 ${rf.coolingDaysLeft ?? "—"} 天</strong></div>` : ""}
+          ${rf.operatorNote ? `<div class="detail-item" style="grid-column:1/-1"><span>审核备注</span><strong>${rf.operatorNote}</strong></div>` : ""}
           <div class="detail-item"><span>垫付</span><strong>${rf.needAdvance ? tag("须垫付") + "<br><small>" + (rf.advanceReason || "") + "</small>" : "—"}</strong></div>
           <div class="detail-item"><span>当前状态</span><strong>${tag(rf.status)}</strong></div>
         </div>
@@ -6423,9 +8490,9 @@
               <div><strong>${s.label}</strong>${s.time ? `<br><small style="color:var(--muted)">${s.time}</small>` : ""}${s.state === "fail" && rf.rejectReason ? `<br><small style="color:var(--red)">${rf.rejectReason}</small>` : ""}</div>
             </div>`).join("")}</div>
             ${rf.status === "待审核" && canAuditRefund() ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn primary" data-approve-refund="${rf.id}">确认退款</button>
+              <button type="button" class="btn primary" data-approve-refund="${rf.id}">${rf.coolingPeriod ? "确认退款（可改金额）" : "确认退款"}</button>
               <button type="button" class="btn" data-reject-refund="${rf.id}">驳回</button>
-            </div>` : rf.status === "待审核" ? `<p class="perm-banner" style="margin:12px 0 0">待有「退款确认操作」权限的员工审核</p>` : ""}
+            </div>${rf.coolingPeriod ? `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">${noteBtn("refund_cooling_period")} 冷静期退款须运营商确认实退金额，系统仅提供建议值。</p>` : ""}` : rf.status === "待审核" ? `<p class="perm-banner" style="margin:12px 0 0">待有「退款确认操作」权限的员工审核</p>` : ""}
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
@@ -6505,7 +8572,7 @@
         </div>
         <p style="font-size:12px;color:var(--muted);margin:0 0 12px">
           ${noteBtn("orders_deposit")} ${noteBtn("orders_deposit_waiver")} ${noteBtn("orders_freeze")} ${noteBtn("orders_early_end")}
-          ${noteBtn("arch_b")} ${noteBtn("payout_pkg")} 支付成功即<strong>实时清分</strong>，可提现；中途完结/冻结期间退款按规则冲正。</p>
+          ${noteBtn("arch_b")} 支付成功即<strong>实时清分</strong>入账；运营商<strong>提现须平台审核</strong>；中途完结/冻结期间退款按规则冲正。</p>
         ${pkgFreezeSection(p)}
         ${pkgResumePickupSection(p)}
         ${pkgRefundSection(p)}
@@ -6702,16 +8769,28 @@
       const sidebar = tabSidebar(tabDefs, tab, "refund-tab");
       if (tab === "settings") {
         const autoActive = mode === "auto";
+        const coolDays = settings.coolingPeriodDays ?? 3;
         return `${ownScopeBanner()}
-          <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("refund_manage")}${noteBtn("refund_mode_auto")}${noteBtn("refund_mode_manual")}
-            当前模式：<strong>${autoActive ? "自动退款" : "手动确认"}</strong> · 最近更新 ${settings.updatedAt} · ${settings.updatedBy}</div>
+          <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("refund_manage")}${noteBtn("refund_cooling_period")}${noteBtn("refund_mode_auto")}${noteBtn("refund_mode_manual")}
+            当前模式：<strong>${autoActive ? "自动退款" : "手动确认"}</strong> · 冷静期 <strong>${coolDays} 天</strong> · 最近更新 ${settings.updatedAt} · ${settings.updatedBy}</div>
           ${pageWithTabs(sidebar, `<section class="panel">
-            ${panelHead("退款处理模式", "切换后对新申请立即生效；进行中的待审核单不受影响", "refund_manage")}
+            ${panelHead("3 天冷静期", "开通后用户可申请退大部分费用；超过冷静期平台不主动退", "refund_cooling_period")}
+            <div class="panel-body">
+              <div class="detail-grid">
+                <div class="detail-item"><span>冷静期时长</span><strong>${coolDays} 个自然日</strong><br><small style="color:var(--muted)">自支付成功/开通服务起算</small></div>
+                <div class="detail-item"><span>审核方式</span><strong>${settings.coolingDefaultAudit !== false ? "须运营商审核" : "可配置"}</strong><br><small style="color:var(--muted)">不受自动退款模式影响</small></div>
+                <div class="detail-item"><span>建议应退</span><strong>实付 × 剩余天数 ÷ 总天数</strong><br><small style="color:var(--muted)">押金按还电规则另计</small></div>
+                <div class="detail-item"><span>超过冷静期</span><strong>不强制退款</strong><br><small style="color:var(--muted)">平台不主动退还；可走中途完结/SKU 退订</small></div>
+              </div>
+            </div>
+          </section>
+          <section class="panel">
+            ${panelHead("退款处理模式", "切换后对新申请立即生效；冷静期申请始终须人工确认", "refund_manage")}
             <div class="panel-body">
               <div class="detail-grid" style="grid-template-columns:repeat(2,1fr);gap:14px">
                 <button type="button" class="btn ${autoActive ? "primary" : ""}" data-refund-mode="auto" style="text-align:left;padding:16px;height:auto">
                   <strong>自动退款</strong>
-                  <p style="margin:8px 0 0;font-size:12px;color:var(--muted);font-weight:normal">符合 §5.2.1 SKU 规则且已还电 → 系统自动原路退款，无需人工点击。</p>
+                  <p style="margin:8px 0 0;font-size:12px;color:var(--muted);font-weight:normal">符合 §5.2.1 SKU 规则且已还电 → 系统自动原路退款。<strong>冷静期申请除外</strong>。</p>
                 </button>
                 <button type="button" class="btn ${!autoActive ? "primary" : ""}" data-refund-mode="manual" style="text-align:left;padding:16px;height:auto">
                   <strong>手动确认</strong>
@@ -6725,11 +8804,12 @@
             ${panelHead("自动退款适用规则（摘要）", "详见 PRD §5.2.1 与个人套餐定价与退款", "refund_mode_auto")}
             <div class="panel-body">
               <table>
-                <thead><tr><th>SKU</th><th>门槛</th><th>手动模式下</th></tr></thead>
+                <thead><tr><th>类型 / SKU</th><th>门槛</th><th>说明</th></tr></thead>
                 <tbody>
-                  <tr><td>包月 / 7天</td><td>剩余 ≥ 1 天、未持电池</td><td>仍须人工确认后执行</td></tr>
-                  <tr><td>1天 / 单次</td><td>购买后 24h 内、未换电</td><td>仍须人工确认后执行</td></tr>
-                  <tr><td>中途完结</td><td>已还电；退未使用套餐费 + 押金</td><td>默认进入待审核</td></tr>
+                  <tr><td><strong>冷静期退款</strong></td><td>开通后 ≤ ${coolDays} 天、已还电</td><td><strong>始终须运营商审核</strong>；实退金额由运营商决定</td></tr>
+                  <tr><td>包月 / 7天</td><td>剩余 ≥ 1 天、未持电池</td><td>手动模式下须人工确认</td></tr>
+                  <tr><td>1天 / 单次</td><td>购买后 24h 内、未换电</td><td>手动模式下须人工确认</td></tr>
+                  <tr><td>中途完结</td><td>已还电；退未使用套餐费 + 押金</td><td>超过冷静期后的常规路径</td></tr>
                 </tbody>
               </table>
               <p style="font-size:12px;color:var(--muted);margin:12px 0 0">平台 1% 技术服务费不退（D36 / 5A）。</p>
@@ -6747,7 +8827,7 @@
         ${pageWithTabs(sidebar, `<section class="panel">
           ${panelHead("退款申请", `共 ${rows.length} 条 · ${mode === "auto" ? "自动模式：合规单可免审" : "手动模式：须确认后系统执行"}`, "refund_manage")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("refund_manage")}${noteBtn("orders_early_end")} 列表展示申请与<strong>退款进度</strong>；点击「详情」查看关联单据与支付流水。确认退款后由<strong>运营商子商户自动原路退</strong>；清分明细冲正；若已提现则标记垫付。平台 1% 不退。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("refund_manage")}${noteBtn("refund_cooling_period")}${noteBtn("orders_early_end")} 列表展示申请与<strong>退款进度</strong>；<strong>冷静期</strong>单确认时可修改实退金额。确认后由<strong>运营商子商户自动原路退</strong>；清分明细冲正；若已提现则标记垫付。平台 1% 不退。</p>
             <table>
               <thead><tr>
                 <th>退款单</th><th>类型</th><th>套餐单</th><th>用户</th><th>站点</th>
@@ -6771,7 +8851,7 @@
                   <td><button type="button" class="link-btn" data-open-sub="${r.orderId}">${r.orderId}</button></td>
                   <td>${r.user}<br><small>${r.phone}</small></td>
                   <td>${r.site}</td>
-                  <td><strong>¥${r.totalRefund}</strong><br><small style="color:var(--muted)">套餐 ¥${r.pkgRefund}${r.depositRefund ? " + 押 ¥" + r.depositRefund : ""} · 平台费不退 ¥${r.platformFeeNonRefund}</small></td>
+                  <td><strong>¥${r.totalRefund}</strong><br><small style="color:var(--muted)">套餐 ¥${r.pkgRefund}${r.depositRefund ? " + 押 ¥" + r.depositRefund : ""} · 平台费不退 ¥${r.platformFeeNonRefund}${r.coolingPeriod ? "<br>建议套餐 ¥" + (r.suggestedRefund ?? r.pkgRefund) + " · 已用 " + (r.usedDays ?? "—") + " 天" : ""}</small></td>
                   <td>${refundProgressMini(r)}</td>
                   <td>${tag(r.status)}</td>
                   <td>${r.needAdvance ? tag("须垫付") : "—"}</td>
@@ -6786,42 +8866,62 @@
     }
 
     function accrualCols() {
-      return "<th>运营商净额</th><th>清分状态</th>";
+      return "<th>平台 1%</th><th>渠道佣金</th><th>运营商净额</th><th>清分状态</th>";
     }
 
     function accrualCells(row) {
-      return `<td>¥${row.op}</td><td>${tag(row.settle)}</td>`;
+      const plat = row.platform != null ? `¥${row.platform}` : "—";
+      const ch = row.channel != null ? `¥${row.channel}` : "—";
+      return `<td>${plat}</td><td>${ch}</td><td>¥${row.op}</td><td>${tag(row.settle)}</td>`;
     }
 
     function flowsArchBanner() {
-      return `<div class="perm-banner">${noteBtn("arch_b")} 支付架构 <strong>B</strong>：C 端骑手资金进入<strong>运营商</strong>进件商户；渠道商仅向运营商采购付款，无收款账户。
+      return `<div class="perm-banner">${noteBtn("arch_b")} 支付架构 <strong>B</strong>：C 端骑手资金进入<strong>运营商</strong>进件商户；平台 1% 实时清分。骑士卡渠道开启<strong>佣金及时到付</strong>后，链接购卡佣金同步分账至渠道子商户。
         <br><small style="opacity:.85">${multiPartyCollectionExplore.summary} · 状态：${multiPartyCollectionExplore.status}</small></div>`;
     }
 
     function renderFlows() {
       const tab = state.flowTab;
       const arch = flowsArchBanner();
-      const tabDefs = [["receipt", "资金实收"], ["accrual", "清分明细"], ["payout", "提现明细"]];
+      const tabDefs = [["receipt", "资金实收"], ["accrual", "清分明细"], ["payout", "提现申请"]];
       const sidebar = tabSidebar(tabDefs, tab, "ftab");
       if (tab === "payout") {
         const f = getPf();
-        const batches = payoutBatches.filter(b => {
-          if (!matchKw(b.period, f.period)) return false;
-          if (f.status !== "全部" && b.status !== f.status) return false;
+        const opId = currentEntity().id;
+        const cleared = operatorClearedBalance(opId);
+        const monthDue = operatorFinanceMonthDue(opId);
+        const withdrawable = operatorWithdrawableBalance(opId);
+        const withdrawn = operatorWithdrawnTotal(opId);
+        const pendingWd = operatorPendingWithdrawTotal(opId);
+        const rows = myOperatorWithdrawals().filter(w => {
+          if (f.status !== "全部" && w.status !== f.status) return false;
           return true;
         });
+        const applyBtn = `<button type="button" class="btn primary" data-apply-withdraw>发起提现申请</button>`;
         return `${pageWithTabs(sidebar, `<section class="panel">
-            ${panelHead("提现明细", `共 ${batches.length} 条`, "flows_payout")}
+            ${panelHead("提现申请", `共 ${rows.length} 条`, "flows_payout", applyBtn)}
             <div class="panel-body">
               ${arch}
+              <div class="kpi-grid in-panel" style="margin-bottom:14px">
+                ${kpi("已清分", "¥" + cleared.toLocaleString("zh-CN"), "实时入账", "清", "overview_cleared")}
+                ${kpi("本月融资待还", "¥" + monthDue.toLocaleString("zh-CN"), "可提现须预留", "还", "finance_repayments")}
+                ${kpi("可提现余额", "¥" + withdrawable.toLocaleString("zh-CN"), "已扣待还与待审", "提", "overview_withdrawable")}
+                ${kpi("已提现", "¥" + withdrawn.toLocaleString("zh-CN"), pendingWd ? "待审 ¥" + pendingWd : "累计", "出", "flows_payout")}
+              </div>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("flows_payout")}${noteBtn("flows_withdraw_apply")} 支付成功即清分；提现须<strong>平台审核</strong>后打款至收款账户默认子商户。</p>
+              <div class="orders-table-wrap">
               <table>
-                <thead><tr><th>提现单</th><th>关联订单</th><th>收款商户</th><th>周期</th><th>提现金额</th><th>状态</th><th>提现时间</th></tr></thead>
-                <tbody>${batches.map(b => `<tr>
-                  <td>${b.id}</td><td>${b.pkg}</td><td>${b.op}</td><td>${b.period}</td>
-                  <td>¥${b.opNet}</td><td>${tag(b.status)}</td>
-                  <td>${b.withdrawTime || "—"}</td>
-                </tr>`).join("")}</tbody>
+                <thead><tr><th>申请单</th><th>金额</th><th>到账账户</th><th>待还预留</th><th>申请时间</th><th>审核</th><th>状态</th><th>到账时间</th></tr></thead>
+                <tbody>${rows.map(w => `<tr>
+                  <td>${w.id}</td><td><strong>¥${w.amount}</strong></td><td><small>${w.accountLabel}</small></td>
+                  <td>${w.monthDueReserved ? "¥" + w.monthDueReserved.toLocaleString("zh-CN") : "—"}</td>
+                  <td>${w.applyTime}</td>
+                  <td>${w.reviewedBy ? w.reviewedBy + "<br><small>" + (w.reviewTime || "") + "</small>" : "—"}</td>
+                  <td>${tag(w.status)}${w.rejectReason ? `<br><small style="color:var(--red)">${w.rejectReason}</small>` : ""}</td>
+                  <td>${w.withdrawTime || "—"}</td>
+                </tr>`).join("") || "<tr><td colspan='8'>暂无提现申请</td></tr>"}</tbody>
               </table>
+              </div>
             </div>
           </section>`)}`;
       }
@@ -6852,7 +8952,7 @@
       const rc = filterFundReceipts(fundReceipts.filter(filterOwnRow));
       const paySum = rc.filter(r => r.type === "套餐支付" && r.status === "成功").reduce((s, r) => s + r.net, 0);
       const refundSum = rc.filter(r => r.type.includes("退款") || r.type.includes("押金")).reduce((s, r) => s + r.net, 0);
-      const hint = "<p style=\"font-size:12px;color:var(--muted);margin:0 0 12px\">" + noteBtn("flows_receipt") + " 收款商户：<strong>" + PAYEE_OPERATOR + "</strong>（微信 " + PAYEE_MCH.wx + "）。实收 <strong>¥" + paySum.toFixed(2) + "</strong>，退款出款（运营商子商户） <strong>¥" + Math.abs(refundSum).toFixed(2) + "</strong>。</p>";
+      const hint = "<p style=\"font-size:12px;color:var(--muted);margin:0 0 12px\">" + noteBtn("flows_receipt") + " 实收 <strong>¥" + paySum.toFixed(2) + "</strong>，退款出款 <strong>¥" + Math.abs(refundSum).toFixed(2) + "</strong>。</p>";
       return `${ownScopeBanner()}${pageWithTabs(sidebar, `<section class="panel">
           ${panelHead("资金实收", "仅自有设备关联套餐", "flows_receipt")}
           <div class="panel-body">
@@ -7872,9 +9972,65 @@
     function renderChannelSales() {
       if (state.channelSalesTab === "pools") state.channelSalesTab = "assets";
       const tab = state.channelSalesTab;
-      const tabs = [["contracts", "签约渠道"], ["orders", "服务订单"], ["assets", "渠道权益"]];
+      const tabs = [["contracts", "签约渠道"], ["orders", "服务订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]];
       const sidebar = tabSidebar(tabs, tab, "cstab");
       let body = "";
+      if (tab === "platformMarketing") {
+        const op = currentEntity();
+        const agreements = myPlatformMarketingAgreements();
+        const orders = myPlatformMarketingOrders();
+        const statements = myPlatformMarketingStatements();
+        const campaign = platformMarketingCampaigns[0];
+        const hasEnrollment = agreements.some(a => a.status === "已启用");
+        body = `<section class="panel">
+          ${panelHead("平台营销协议", "自愿参与 · Campaign 活动价只读", "platform_marketing", noteBtn("platform_marketing"))}
+          <div class="panel-body orders-table-wrap">
+            ${!hasEnrollment && !agreements.length
+              ? `<p style="color:var(--muted);margin:0 0 12px">未参与平台营销。可在下表确认活动协议后承接用户激活。</p>`
+              : ""}
+            ${campaign ? `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">进行中活动：<strong>${campaign.name}</strong>（${campaign.id}）· 30天卡活动价 ¥${campaign.skuPrices.find(s => s.skuId === "SKU-30D")?.activityPrice || "—"}</p>` : ""}
+            <table>
+              <thead><tr><th>活动</th><th>SKU</th><th>活动价（只读）</th><th>营销服务费/单</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>${agreements.length ? agreements.map(a => {
+                const sku = campaign?.skuPrices.find(s => s.skuId === a.skuId);
+                return `<tr>
+                  <td>${a.campaignName}</td><td>${a.skuName}</td>
+                  <td>¥${sku?.activityPrice ?? "—"}</td>
+                  <td>¥${a.marketingServiceFee}</td>
+                  <td>${tag(a.status)}</td>
+                  <td>${a.status === "待确认" ? `<button type="button" class="link-btn" data-pm-confirm-agreement="${a.id}">确认参与</button>` : "—"}</td>
+                </tr>`;
+              }).join("") : `<tr><td colspan="6">暂无协议 · ${op.name} 尚未签约平台营销活动</td></tr>`}</tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          ${panelHead("本运营商激活成交", "仅展示在本 OP 柜机首服取电的订单", "platform_marketing_payout")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>订单</th><th>用户</th><th>实付</th><th>营销费</th><th>应付拨付</th><th>激活时间</th><th>柜机</th></tr></thead>
+              <tbody>${orders.length ? orders.map(o => `<tr>
+                <td>${o.id}</td><td>${o.riderName}<br><small>${o.phone}</small></td>
+                <td>¥${o.paidPrice}</td><td>¥${o.marketingServiceFee}</td><td>¥${o.operatorPayout}</td>
+                <td>${o.activatedAt || "—"}</td><td>${o.activatedCabinetSn || "—"}</td>
+              </tr>`).join("") : "<tr><td colspan='7'>暂无本运营商激活的 platform 订单</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          ${panelHead("营销对账", "月度拨付确认", "platform_marketing_payout")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>月份</th><th>笔数</th><th>应付拨付</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>${statements.length ? statements.map(s => `<tr>
+                <td>${s.month}</td><td>${s.orderCount}</td><td>¥${s.payoutTotal}</td><td>${tag(s.status)}</td>
+                <td>${s.status === "待确认" ? `<button type="button" class="link-btn" data-pm-confirm-stmt-op="${s.id}">确认对账</button>` : "—"}</td>
+              </tr>`).join("") : "<tr><td colspan='5'>暂无对账单</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+        return `${ownScopeBanner()}${pageWithTabs(sidebar, body)}`;
+      }
       if (tab === "contracts") {
         const rows = myChannelContracts();
         const addBtn = `<button type="button" class="btn primary" data-new-channel-partner>+ 新增渠道商</button>`;
@@ -8306,7 +10462,7 @@
           ${kpi("已作废", stats.已作废, "不可再用", "废", "channel_settlement_activation")}
         </div>
         <section class="panel">
-          ${panelHead("激活码库存", "一码一用 · 渠道自行发放 · 骑手不经平台付款", "channel_settlement_activation", `<button type="button" class="btn" onclick="alert('演示：批量导入激活码')">批量导入</button>`)}
+          ${panelHead("激活码库存", "一码一用 · 渠道自行发放 · 骑手不经平台付款", "channel_settlement_activation", `<button type="button" class="btn" data-mock-import-act>批量导入</button>`)}
           <div class="panel-body orders-table-wrap">
             <table><thead><tr><th>激活码</th><th>套餐</th><th>服务天数</th><th>状态</th><th>发放批次/对象</th><th>核销时间</th><th>采购单</th></tr></thead>
             <tbody>${rows || "<tr><td colspan='7'>暂无激活码</td></tr>"}</tbody></table>
@@ -8337,16 +10493,21 @@
       const contract = myChannelContracts()[0];
       if (isCardChannel() && mode) {
         const skus = channelLinkSkus.filter(s => s.channelId === cid);
+        const instant = channelInstantCommissionEnabled(cid);
         return `
           ${ownScopeBanner()}
           <div class="pool-hero">
             <h2>渠道分销 · ${channelProfile().name}</h2>
-            <p>推广<strong>专属购卡链接</strong>；用户按渠道专享价（如包月 <strong>¥${mode.channelPrice}</strong>，低于正式价 ¥${mode.officialPrice}）<strong>直购</strong>；订单与用户带渠道标记；运营商按单支付佣金 <strong>¥${mode.commissionPerOrder}</strong>。</p>
+            <p>推广<strong>专属购卡链接</strong>；用户按渠道专享价（如包月 <strong>¥${mode.channelPrice}</strong>，低于正式价 ¥${mode.officialPrice}）<strong>直购</strong>；订单与用户带渠道标记。${instant
+              ? `佣金<strong>及时到付</strong>（实付 × <strong>${formatCommissionRate(contract?.commissionRate || mode.commissionRate)}</strong> 即时分账）。`
+              : `运营商按单支付佣金 <strong>¥${mode.commissionPerOrder}</strong>（线下结算）。`}</p>
           </div>
           <div class="kpi-grid">
             ${kpi("链接成交", mode.linkOrders + " 单", "点击 " + mode.linkClicks, "单", "channel_settlement_card")}
-            ${kpi("单均佣金", "¥" + mode.commissionPerOrder, mode.cardSku, "佣", "channel_card_margin")}
-            ${kpi("本月应结佣", "¥" + mode.monthCommission, "线下与运营商结", "结", "channel_card_margin")}
+            ${instant
+              ? kpi("佣金比例", formatCommissionRate(contract?.commissionRate || mode.commissionRate), "支付成功即时分账", "佣", "channel_instant_commission")
+              : kpi("单均佣金", "¥" + mode.commissionPerOrder, mode.cardSku, "佣", "channel_card_margin")}
+            ${kpi(instant ? "本月已分账佣金" : "本月应结佣", "¥" + mode.monthCommission, instant ? "已即时到付" : "线下与运营商结", "结", "channel_card_margin")}
             ${kpi("签约运营商", contract?.operatorName || "—", "渠道分销", "运", "day_pool_contract")}
           </div>
           <section class="panel">
@@ -8369,32 +10530,39 @@
               <li>渠道在「套餐与链接」为各套餐<strong>新建多条推广链接</strong>并标注用途；可<strong>生成二维码</strong>；用户扫码/点击<strong>直达运营商小程序</strong></li>
               <li>用户完成<strong>注册登录与实名认证</strong>后购套餐；点击链接起 <strong>24h</strong> 内购买授权 SKU 均享<strong>渠道专享价</strong></li>
               <li>支付由<strong>平台代收</strong>至运营商子商户，成功<strong>实时清分</strong> 1%</li>
+              <li>${instant
+                ? `已开启<strong>佣金及时到付</strong>：渠道佣金 = 实付 × ${formatCommissionRate(contract?.commissionRate || mode.commissionRate)}，支付成功<strong>即时分账</strong>至渠道收款账户`
+                : "佣金见「佣金对账」，运营商与渠道<strong>线下结算</strong>"}</li>
               <li>订单与用户写入<strong>渠道来源标记</strong>；换电权益即时开通</li>
-              <li>佣金见「佣金对账」，运营商与渠道<strong>线下结算</strong></li>
             </ol></div>
           </section>`;
       }
       if (isLeaseChannel() && mode) {
         const lease = channelLeaseSummary.find(p => p.channelId === channelEntityId()) || {};
+        const pol = channelSwapPolicyFor(channelEntityId());
+        const freeCnt = channelLeaseWhitelist.filter(r => r.channelId === channelEntityId() && r.status === "启用" && r.whitelistAccess === "free").length;
+        const paidCnt = channelLeaseWhitelist.filter(r => r.channelId === channelEntityId() && r.status === "启用" && r.whitelistAccess === "paid").length;
         return `
           ${ownScopeBanner()}
-          <div class="pool-hero">${noteBtn("channel_settlement_rent")}${noteBtn("lease_dedicated_site")}
+          <div class="pool-hero">${noteBtn("channel_settlement_rent")}${noteBtn("lease_dedicated_site")}${noteBtn("lease_whitelist_access")}
             <h2>设备租赁 · ${channelProfile().name}</h2>
-            <p>运营商维护 <strong>${mode.devicesCovered || lease.devicesCovered || 0}</strong> 台租赁设备（月租合计 <strong>¥${(mode.monthlyRent || 0).toLocaleString()}</strong>）；<strong>白名单 ${mode.whitelistCount || lease.whitelistCount || 0} 人</strong>免 C 端购套餐换电。专属站：<strong>${mode.dedicatedSite || lease.dedicatedSiteName || contract?.dedicatedSiteName || "—"}</strong>。</p>
+            <p>渠道可视为<strong>小型运营商</strong>（设备租赁、userOwner=渠道）。运营商维护 <strong>${mode.devicesCovered || lease.devicesCovered || 0}</strong> 台租赁设备（月租 <strong>¥${(mode.monthlyRent || 0).toLocaleString()}</strong>）；白名单 <strong>${mode.whitelistCount || lease.whitelistCount || 0} 人</strong>（免费 ${freeCnt} / 付费 ${paidCnt}）。专属站：<strong>${mode.dedicatedSite || lease.dedicatedSiteName || contract?.dedicatedSiteName || "—"}</strong>。跨网：${pol.crossNetworkEnabled ? tag("已开通") : tag("未开通")}。</p>
           </div>
           <div class="kpi-grid">
-            ${kpi("白名单用户", (mode.whitelistCount || lease.whitelistCount || 0) + " 人", "仅名单内可换电", "白", "lease_whitelist")}
+            ${kpi("白名单用户", (mode.whitelistCount || lease.whitelistCount || 0) + " 人", `免费 ${freeCnt} · 付费 ${paidCnt}`, "白", "lease_whitelist_access")}
             ${kpi("月租合计", "¥" + (mode.monthlyRent || 0).toLocaleString(), "设备 " + (mode.devicesCovered || 0) + " 台", "租", "channel_settlement_rent")}
-            ${kpi("账期状态", lease.billingStatus || mode.billingStatus || "—", "下次 " + (mode.nextDue || "—"), "单", "channel_settlement_rent")}
-            ${kpi("签约运营商", contract?.operatorName || "—", "设备租赁", "运", "day_pool_contract")}
+            ${kpi("跨网保证金", pol.crossNetworkDepositPaid ? "¥" + (pol.crossNetworkDepositAmount || 20000).toLocaleString() : "未缴", pol.crossNetworkEnabled ? "平台代收" : "未开通跨网", "跨", "channel_lease_crossnet")}
+            ${kpi("签约运营商", contract?.operatorName || "—", "设备出租方", "运", "day_pool_contract")}
           </div>
           <section class="panel">
-            ${panelHead("结算规则（演示）", "设备租赁 · 白名单模式", "channel_settlement_rent")}
+            ${panelHead("结算规则（演示）", "设备租赁 · 白名单免费/付费", "channel_settlement_rent")}
             <div class="panel-body"><ol style="margin:0;padding-left:20px;font-size:13px;color:var(--muted);line-height:1.8">
               <li>运营商维护<strong>租赁设备清单</strong>与<strong>专属站点</strong>（专用·不对公众开放；小程序<strong>仅白名单可见</strong>）</li>
-              <li>渠道在「白名单用户」<strong>自行添加/移除</strong>骑手；仅名单内可换电，<strong>无需购套餐</strong></li>
-              <li>渠道按月向运营商支付设备月租（MO-）；<strong>欠费停服</strong>，非白名单用户扫码拦截</li>
-              <li>与人天池不同：无预占扣天；无 C 端兜底 SKU</li>
+              <li><strong>白名单免费</strong>：B2B 月租已覆盖，名单内骑手<strong>免 C 端购套餐</strong>即可换电</li>
+              <li><strong>白名单付费</strong>：名单内骑手须购买「<strong>白名单套餐</strong>」（款进渠道收款账户）后方可换电</li>
+              <li>渠道在「白名单用户」<strong>自行添加/移除</strong>骑手，添加时选择免费或付费类型</li>
+              <li>渠道按月向运营商支付设备月租（MO-）；<strong>欠费停服</strong></li>
+              <li>可选开通<strong>跨网换电</strong>：须向平台缴纳跨网保证金；骑手在他网换电产生<strong>跨网设备服务费</strong>，由渠道保证金/信用额度支付（规则同运营商）</li>
             </ol></div>
           </section>`;
       }
@@ -8526,18 +10694,19 @@
           ${panelHead("购卡记录", "仅展示经本渠道推广链接成交的套餐购买 · 共 " + all.length + " 笔，筛选后 " + orders.length + " 笔", "module_channel_orders")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>佣金</th><th>链接用途</th><th>链接码</th><th>支付时间</th><th>状态</th></tr></thead>
+              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算</th><th>链接用途</th><th>链接码</th><th>支付时间</th><th>状态</th></tr></thead>
               <tbody>${orders.map(o => `<tr>
                 <td>${o.id}</td>
                 <td>${o.riderName}<br><small>${o.phone}</small></td>
                 <td>${o.skuName}<br><small style="color:var(--muted)">正式 ¥${o.officialPrice}</small></td>
                 <td><strong>¥${o.paidPrice}</strong></td>
-                <td>¥${o.commission}</td>
+                <td>¥${o.commission}${o.commissionRate ? `<br><small>${formatCommissionRate(o.commissionRate)}</small>` : ""}</td>
+                <td>${tag(o.commissionSettlement || commissionSettlementLabel(cid))}</td>
                 <td>${o.linkPurpose || "—"}</td>
                 <td><small>${o.linkCode}</small></td>
                 <td>${o.payTime}</td>
                 <td>${tag(o.status)}</td>
-              </tr>`).join("") || "<tr><td colspan='9'>暂无购卡记录</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='10'>暂无购卡记录</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -8546,6 +10715,8 @@
     function renderCommissionStatement() {
       const cid = channelEntityId();
       const f = getPf();
+      const instant = channelInstantCommissionEnabled(cid);
+      const contract = cardContractForChannel(cid);
       const months = commissionMonthsForChannel(cid);
       const monthRows = (f.month && f.month !== "全部" ? [f.month] : months).map(m => commissionMonthSummary(cid, m));
       const grand = monthRows.reduce((acc, r) => ({
@@ -8558,25 +10729,27 @@
       const focus = focusMonth ? commissionMonthSummary(cid, focusMonth) : null;
       return `
         ${ownScopeBanner()}
-        <div class="platform-price-banner" style="margin-bottom:14px">佣金按<strong>自然月</strong>汇总 · 用户经链接购卡由平台<strong>代收</strong> · 支付成功<strong>实时清分</strong> 1% · 渠道佣金由运营商<strong>线下结算</strong></div>
+        <div class="platform-price-banner" style="margin-bottom:14px">${instant
+          ? `已开启<strong>佣金及时到付</strong> · 佣金比例 <strong>${formatCommissionRate(contract?.commissionRate)}</strong> · 支付成功<strong>即时分账</strong>至渠道子商户 · 平台 1% 同步清分`
+          : `佣金按<strong>自然月</strong>汇总 · 用户经链接购卡由平台<strong>代收</strong> · 支付成功<strong>实时清分</strong> 1% · 渠道佣金由运营商<strong>线下结算</strong>`}</div>
         <div class="kpi-grid">
           ${kpi("统计月份", (f.month && f.month !== "全部" ? f.month : months.length + " 个月"), focus ? focus.orderCount + " 笔成交" : "—", "月", "channel_card_margin")}
           ${kpi("实付合计", "¥" + (focus ? focus.totalPaid : grand.totalPaid).toLocaleString(), "用户支付总额", "付", "channel_settlement_card")}
-          ${kpi("应结佣金", "¥" + (focus ? focus.totalCommission : grand.totalCommission).toLocaleString(), "线下与运营商结", "佣", "channel_card_margin")}
+          ${kpi(instant ? "已分账佣金" : "应结佣金", "¥" + (focus ? focus.totalCommission : grand.totalCommission).toLocaleString(), instant ? "已即时到付" : "线下与运营商结", "佣", "channel_card_margin")}
           ${kpi("平台 1%", "¥" + (focus ? focus.totalFee : grand.totalFee).toFixed(2), "已清分", "服", "platform_fee")}
         </div>
         <section class="panel">
-          ${panelHead("月度佣金汇总", "按自然月统计链接购卡与应结佣金", "channel_card_margin")}
+          ${panelHead("月度佣金汇总", instant ? "按自然月统计 · 佣金已即时分账" : "按自然月统计链接购卡与应结佣金", "channel_card_margin")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>月份</th><th>成交笔数</th><th>实付合计</th><th>应结佣金</th><th>平台 1%</th><th>结算状态</th></tr></thead>
+              <thead><tr><th>月份</th><th>成交笔数</th><th>实付合计</th><th>${instant ? "已分账佣金" : "应结佣金"}</th><th>平台 1%</th><th>结算状态</th></tr></thead>
               <tbody>${monthRows.map(r => `<tr>
                 <td><strong>${r.month}</strong></td>
                 <td>${r.orderCount}</td>
                 <td>¥${r.totalPaid.toLocaleString()}</td>
                 <td><strong style="color:var(--green)">¥${r.totalCommission.toLocaleString()}</strong></td>
                 <td>¥${r.totalFee.toFixed(2)}</td>
-                <td>${tag(r.orderCount ? "待线下结算" : "无成交")}</td>
+                <td>${tag(r.orderCount ? (instant ? "已即时分账" : "待线下结算") : "无成交")}</td>
               </tr>`).join("") || "<tr><td colspan='6'>暂无对账数据</td></tr>"}</tbody>
             </table>
           </div>
@@ -8585,10 +10758,12 @@
           ${panelHead(focusMonth + " 明细", "该月经链接购卡订单", "module_channel_orders")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>佣金</th><th>链接用途</th><th>支付时间</th></tr></thead>
+              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算方式</th><th>链接用途</th><th>支付时间</th></tr></thead>
               <tbody>${focus.orders.map(o => `<tr>
                 <td>${o.id}</td><td>${o.riderName}<br><small>${o.phone}</small></td><td>${o.skuName}</td>
-                <td>¥${o.paidPrice}</td><td>¥${o.commission}</td><td>${o.linkPurpose || "—"}</td><td>${o.payTime}</td>
+                <td>¥${o.paidPrice}</td><td>¥${o.commission}</td>
+                <td>${tag(o.commissionSettlement || commissionSettlementLabel(cid))}</td>
+                <td>${o.linkPurpose || "—"}</td><td>${o.payTime}</td>
               </tr>`).join("")}</tbody>
             </table>
           </div>
@@ -8606,7 +10781,7 @@
         <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("channel_settlement_rent")} 月租合计 <strong>¥${(lease.monthlyRent || contract?.monthlyRent || 0).toLocaleString()}/月</strong> · 账期 <strong>${lease.billingStatus || "—"}</strong> · 欠费<strong>停服</strong>（白名单用户不可换电）</div>
         <div class="kpi-grid">
           ${kpi("本月月租", "¥" + (lease.monthlyRent || 0).toLocaleString(), lease.devicesCovered + " 台设备", "租", "channel_settlement_rent")}
-          ${kpi("白名单", (lease.whitelistCount || 0) + " 人", "免 C 端购套餐", "白", "lease_whitelist")}
+          ${kpi("白名单", (lease.whitelistCount || 0) + " 人", "购渠道套餐", "白", "lease_whitelist")}
           ${kpi("本月换电", (lease.monthSwaps || 0) + " 次", "白名单不计费", "换", "channel_settlement_rent")}
           ${kpi("下次账期", lease.nextDue || "—", "建议提前 3 天缴纳", "日", "channel_settlement_rent")}
         </div>
@@ -8701,25 +10876,101 @@
         </section>`;
     }
 
+    function renderLeasePkgPricing() {
+      const cid = channelEntityId();
+      const skus = channelLeasePkgSkus.filter(s => s.channelId === cid);
+      const orders = channelLeasePkgOrders.filter(o => o.channelId === cid);
+      return `
+        ${ownScopeBanner()}
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("lease_whitelist_pkg")} 以下套餐<strong>仅白名单用户</strong>可在小程序购买；支付进入<strong>本渠道收款账户</strong>（演示：1678901234***）。</div>
+        <section class="panel">
+          ${panelHead("白名单套餐定价", "渠道自定 · 运营商不代设 C 端价", "lease_whitelist_pkg", `<button type="button" class="btn primary" data-edit-lease-pkg>编辑价格（演示）</button>`)}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>SKU</th><th>套餐名</th><th>零售价</th><th>有效期</th><th>状态</th></tr></thead>
+              <tbody>${skus.map(s => `<tr>
+                <td>${s.id}</td><td><strong>${s.name}</strong></td><td>¥${s.price}</td>
+                <td>${s.validityDays} 天</td><td>${tag(s.status)}</td>
+              </tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          ${panelHead("白名单购套餐订单", "收款方 = 本渠道子商户", "lease_whitelist_pkg")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>子商户</th><th>支付时间</th></tr></thead>
+              <tbody>${orders.map(o => `<tr>
+                <td>${o.id}</td><td>${o.userName}<br><small>${o.phone}</small></td><td>${o.skuName}</td>
+                <td>¥${o.amount}</td><td>${o.subMch}</td><td>${o.payTime}</td>
+              </tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </section>`;
+    }
+
     function renderLeaseWhitelist() {
       const cid = channelEntityId();
       const rows = channelLeaseWhitelist.filter(r => r.channelId === cid);
+      const contract = myChannelContracts()[0];
       const isCh = isChannelRole();
       const addBtn = isCh ? `<button type="button" class="btn primary" data-add-whitelist-user>+ 添加白名单</button>` : "";
       return `
         ${ownScopeBanner()}
-        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("lease_whitelist")} 白名单由<strong>渠道自行维护</strong>（扁平名单，<strong>无团队</strong>）。仅名单内用户可换电、可见专属站。</div>
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("lease_whitelist")}${noteBtn("lease_whitelist_access")} 白名单由<strong>渠道自行维护</strong>（扁平名单，<strong>无团队</strong>）。<strong>白名单免费</strong>：B2B 月租覆盖，免购套餐换电；<strong>白名单付费</strong>：须购<strong>白名单套餐</strong>后方可换电。签约默认类型：<strong>${contract?.whitelistDefaultAccess === "free" ? "白名单免费" : "白名单付费"}</strong>。</div>
         <section class="panel">
-          ${panelHead("白名单用户", "添加/移除可换电骑手 · 无团队", "lease_whitelist", addBtn)}
+          ${panelHead("白名单用户", "添加/移除可换电骑手 · 区分免费/付费", "lease_whitelist", addBtn)}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>骑手</th><th>手机</th><th>添加时间</th><th>本月换电</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>骑手</th><th>手机</th><th>白名单类型</th><th>套餐状态</th><th>添加时间</th><th>本月换电</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${rows.map(r => `<tr>
                 <td>${r.name}</td><td>${r.phone}</td>
+                <td>${whitelistAccessLabel(r.whitelistAccess || "paid")}</td>
+                <td>${r.whitelistAccess === "free" ? "—" : tag(r.pkgStatus || "—")}</td>
                 <td>${r.addedAt}<br><small>${r.addedBy || "—"}</small></td>
                 <td>${r.swaps || 0}</td><td>${tag(r.status)}</td>
                 <td>${isCh && r.status === "启用" ? `<button type="button" class="link-btn" data-remove-whitelist="${r.id}">移除</button>` : "—"}</td>
               </tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </section>`;
+    }
+
+    function renderChannelInterOp() {
+      const cid = channelEntityId();
+      const pol = channelSwapPolicyFor(cid);
+      const contract = myChannelContracts()[0];
+      const rows = myChannelInterOpLedger();
+      const pendingPay = rows.filter(r => r.status === "待日清").reduce((s, r) => s + (r.cabinetFee || 0) + (r.batteryFee || 0), 0);
+      const creditWarn = pol.crossNetworkEnabled && !pol.crossNetworkDepositPaid
+        ? `<div class="pool-warn-banner">⚠ 跨网已签约但未缴平台保证金，跨网换电不可用。${noteBtn("channel_lease_crossnet")}</div>`
+        : (pol.crossSwapEnabled === false
+          ? `<div class="pool-warn-banner">⚠ 渠道信用额度不足，已关闭跨网换电。${noteBtn("channel_lease_crossnet")}</div>`
+          : "");
+      const rowHtml = rows.map(r => `<tr>
+        <td>${r.swapId}</td><td>${r.date}</td><td>${r.site}</td>
+        <td>${tag("平台代付")}</td>
+        <td>¥${((r.cabinetFee || 0) + (r.batteryFee || 0)).toFixed(2)}</td>
+        <td><small>${r.feeType}</small></td><td>${tag(r.status)}</td>
+      </tr>`).join("");
+      return `${ownScopeBanner()}
+        <div class="platform-price-banner">${noteBtn("channel_inter_op")}${noteBtn("channel_lease_crossnet")}
+          设备租赁渠道开通跨网后，本渠道骑手在他网换电的<strong>跨网设备服务费</strong>经平台代收代付；渠道只见平台代付/代收，不见对手方运营商。
+          统价：柜 ¥${l1UnifiedPricing.cabinetFee}/次 · 电 ¥${l1UnifiedPricing.batteryFee}/次。
+        </div>
+        ${creditWarn}
+        <div class="kpi-grid">
+          ${kpi("跨网开关", pol.crossNetworkEnabled ? "已开通" : "未开通", contract?.crossNetworkDepositPaid ? "保证金已缴" : "—", "跨", "channel_lease_crossnet")}
+          ${kpi("跨网保证金", pol.depositBalance != null ? "¥" + pol.depositBalance.toLocaleString() : "—", "应缴 ¥" + (pol.crossNetworkDepositAmount || 20000).toLocaleString(), "保", "channel_lease_crossnet")}
+          ${kpi("信用可用", pol.available != null ? "¥" + pol.available.toLocaleString() : "—", pol.crossSwapEnabled === false ? "已停跨网" : "跨网扣款", "额", "day_pool_channel")}
+          ${kpi("待日清代付", "¥" + pendingPay.toFixed(2), "近期待清分", "付", "channel_inter_op")}
+        </div>
+        <section class="panel">
+          ${panelHead("跨网往来明细", "本渠道骑手在他网换电 · 平台代收代付", "channel_inter_op")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>换电单</th><th>日期</th><th>站点</th><th>方向</th><th>金额</th><th>费用项</th><th>状态</th></tr></thead>
+              <tbody>${rowHtml || "<tr><td colspan='7'>暂无跨网往来</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -9296,6 +11547,9 @@
           if (c) openCabinetDrawer(c, "edit");
         };
       });
+      root.querySelectorAll("[data-move-cab]").forEach(btn => {
+        btn.onclick = () => openMoveCabinetForm(btn.dataset.moveCab);
+      });
       root.querySelectorAll("[data-export-bat-flow]").forEach(btn => {
         btn.onclick = () => window.alert("演示：已生成电池流转记录 CSV（近 30 天 · 按 SN 汇总）");
       });
@@ -9328,9 +11582,9 @@
         btn.onclick = () => {
           const url = btn.dataset.copyLink;
           if (navigator.clipboard?.writeText) {
-            navigator.clipboard.writeText(url).then(() => window.alert("已复制小程序链接：\n" + url));
+            navigator.clipboard.writeText(url).then(() => showProtoToast("已复制小程序链接"));
           } else {
-            window.prompt("复制小程序链接", url);
+            openProtoCopyUrl(url, "复制小程序链接");
           }
         };
       });
@@ -9412,6 +11666,32 @@
       });
       root.querySelectorAll("[data-pctab]").forEach(btn => {
         btn.onclick = () => { state.platformChannelTab = btn.dataset.pctab; render(); };
+      });
+      root.querySelectorAll("[data-pmtab]").forEach(btn => {
+        btn.onclick = () => { state.platformMarketingTab = btn.dataset.pmtab; render(); };
+      });
+      root.querySelectorAll("[data-pm-activate]").forEach(btn => {
+        btn.onclick = () => {
+          const ok = activatePlatformMarketingOrder(btn.dataset.pmActivate, "OP-SX", "CAB-22018", "ST-SH-01");
+          if (ok) { showProtoToast("演示：周骑手在绿色出行柜机取电激活，已生成拨付 ¥234"); render(); }
+        };
+      });
+      root.querySelectorAll("[data-pm-refund]").forEach(btn => {
+        btn.onclick = () => {
+          if (refundPlatformMarketingOrder(btn.dataset.pmRefund)) {
+            showProtoToast("演示：平台子商户原路退款成功");
+            render();
+          }
+        };
+      });
+      root.querySelectorAll("[data-pm-confirm-stmt]").forEach(btn => {
+        btn.onclick = () => { confirmPlatformMarketingStatement(btn.dataset.pmConfirmStmt); showProtoToast("平台已确认对账单"); render(); };
+      });
+      root.querySelectorAll("[data-pm-confirm-stmt-op]").forEach(btn => {
+        btn.onclick = () => { confirmPlatformMarketingStatement(btn.dataset.pmConfirmStmtOp); showProtoToast("运营商已确认营销对账"); render(); };
+      });
+      root.querySelectorAll("[data-pm-confirm-agreement]").forEach(btn => {
+        btn.onclick = () => { confirmPlatformMarketingAgreement(btn.dataset.pmConfirmAgreement); showProtoToast("已确认参与平台营销活动"); render(); };
       });
       if (root === document) {
       const importBtn = document.querySelector("#deviceImportBtn");
@@ -9525,12 +11805,17 @@
       });
       root.querySelectorAll("[data-reject-lease]").forEach(btn => {
         btn.onclick = () => {
-          const reason = window.prompt("拒绝原因", "条款不接受");
-          if (reason === null) return;
-          if (rejectLeaseContract(btn.dataset.rejectLease, reason)) {
-            closeDrawer();
-            render();
-          }
+          openProtoForm({
+            title: "拒绝签约",
+            fields: [{ name: "reason", label: "拒绝原因", value: "条款不接受" }],
+            onSubmit: (data) => {
+              if (rejectLeaseContract(btn.dataset.rejectLease, data.reason)) {
+                closeDrawer();
+                return { afterClose: () => render() };
+              }
+              return "操作失败";
+            }
+          });
         };
       });
       root.querySelectorAll("[data-pay-rent]").forEach(btn => {
@@ -9546,24 +11831,39 @@
       });
       root.querySelectorAll("[data-reject-rent-offline]").forEach(btn => {
         btn.onclick = () => {
-          const reason = window.prompt("驳回原因", "转账金额或流水号不符");
-          if (reason === null) return;
-          if (rejectLeaseOfflineTicket(btn.dataset.rejectRentOffline, reason)) render();
+          openProtoForm({
+            title: "驳回线下到账",
+            fields: [{ name: "reason", label: "驳回原因", value: "转账金额或流水号不符" }],
+            onSubmit: (data) => {
+              if (rejectLeaseOfflineTicket(btn.dataset.rejectRentOffline, data.reason)) {
+                return { afterClose: () => render() };
+              }
+              return "操作失败";
+            }
+          });
         };
       });
       root.querySelectorAll("[data-adjust-channel-credit]").forEach(btn => {
         btn.onclick = () => {
           const prof = channelCreditProfiles.find(p => p.channelId === btn.dataset.adjustChannelCredit);
           if (!prof) return;
-          const v = Number(window.prompt("调整渠道信用额度（元）", String(prof.creditLimit)));
-          if (!Number.isFinite(v) || v < 0) return;
-          prof.operatorOverride = v;
-          prof.creditLimit = v;
-          prof.creditedAmount = Math.min(prof.requiredDeposit, v);
-          prof.gap = Math.max(0, prof.requiredDeposit - prof.creditedAmount);
-          prof.alert = prof.gap > 0 ? "押金缺口 ¥" + prof.gap.toLocaleString() + "，请提交打款凭证" : null;
-          window.alert("演示：已调整 " + btn.dataset.adjustChannelCredit + " 信用额度为 ¥" + v);
-          render();
+          openProtoForm({
+            title: "调整渠道信用额度",
+            fields: [{ name: "amount", label: "信用额度（元）", type: "number", value: String(prof.creditLimit) }],
+            onSubmit: (data) => {
+              const v = Number(data.amount);
+              if (!Number.isFinite(v) || v < 0) return "请输入有效金额";
+              prof.operatorOverride = v;
+              prof.creditLimit = v;
+              prof.creditedAmount = Math.min(prof.requiredDeposit, v);
+              prof.gap = Math.max(0, prof.requiredDeposit - prof.creditedAmount);
+              prof.alert = prof.gap > 0 ? "押金缺口 ¥" + prof.gap.toLocaleString() + "，请提交打款凭证" : null;
+              return {
+                successMessage: "已调整 " + btn.dataset.adjustChannelCredit + " 信用额度为 ¥" + v.toLocaleString("zh-CN"),
+                afterClose: () => render()
+              };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-approve-deposit-proof]").forEach(btn => {
@@ -9591,29 +11891,48 @@
       root.querySelectorAll("[data-submit-deposit-proof]").forEach(btn => {
         btn.onclick = () => {
           const cid = channelEntityId();
-          const amount = Number(window.prompt("补缴金额（元）", "10000"));
-          if (!Number.isFinite(amount) || amount <= 0) return;
-          const ref = window.prompt("银行流水号", "20260612" + Date.now().toString().slice(-6));
-          if (!ref) return;
-          channelDepositProofs.unshift({
-            id: "DP-" + Date.now().toString().slice(-6), channelId: cid, amount, transferRef: ref,
-            transferDate: new Date().toISOString().slice(0, 10), status: "待审核",
-            submitTime: new Date().toISOString().slice(0, 16).replace("T", " "), reviewedBy: null, reviewTime: null
+          openProtoForm({
+            title: "提交打款凭证",
+            fields: [
+              { name: "amount", label: "补缴金额（元）", type: "number", value: "10000" },
+              { name: "transferRef", label: "银行流水号", value: "20260612" + Date.now().toString().slice(-6) }
+            ],
+            submitLabel: "提交",
+            onSubmit: (data) => {
+              const amount = Number(data.amount);
+              if (!Number.isFinite(amount) || amount <= 0) return "请输入有效补缴金额";
+              if (!data.transferRef?.trim()) return "请填写银行流水号";
+              channelDepositProofs.unshift({
+                id: "DP-" + Date.now().toString().slice(-6), channelId: cid, amount, transferRef: data.transferRef.trim(),
+                transferDate: new Date().toISOString().slice(0, 10), status: "待审核",
+                submitTime: new Date().toISOString().slice(0, 16).replace("T", " "), reviewedBy: null, reviewTime: null
+              });
+              return {
+                successMessage: "已提交打款凭证，等待运营商审核",
+                afterClose: () => render()
+              };
+            }
           });
-          window.alert("演示：已提交打款凭证，等待运营商审核");
-          render();
         };
       });
       root.querySelectorAll("[data-edit-deposit-standard]").forEach(btn => {
         btn.onclick = () => {
-          const bat = Number(window.prompt("电池押金标准（元/块）", String(platformDepositStandard.battery)));
-          const cab = Number(window.prompt("换电柜押金标准（元/台）", String(platformDepositStandard.cabinet)));
-          if (!Number.isFinite(bat) || !Number.isFinite(cab)) return;
-          platformDepositStandard.battery = bat;
-          platformDepositStandard.cabinet = cab;
-          platformDepositStandard.updatedAt = new Date().toISOString().slice(0, 10);
-          window.alert("演示：已更新全平台押金标准");
-          render();
+          openProtoForm({
+            title: "编辑全平台押金标准",
+            fields: [
+              { name: "battery", label: "电池押金标准（元/块）", type: "number", value: String(platformDepositStandard.battery) },
+              { name: "cabinet", label: "换电柜押金标准（元/台）", type: "number", value: String(platformDepositStandard.cabinet) }
+            ],
+            onSubmit: (data) => {
+              const bat = Number(data.battery);
+              const cab = Number(data.cabinet);
+              if (!Number.isFinite(bat) || !Number.isFinite(cab)) return "请输入有效金额";
+              platformDepositStandard.battery = bat;
+              platformDepositStandard.cabinet = cab;
+              platformDepositStandard.updatedAt = new Date().toISOString().slice(0, 10);
+              return { successMessage: "已更新全平台押金标准", afterClose: () => render() };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-collect-follow]").forEach(btn => {
@@ -9671,9 +11990,12 @@
         btn.onclick = () => {
           const b = platformLeaseBindings.find(x => x.id === btn.dataset.disableLeaseBinding);
           if (!b || b.status !== "启用") return;
-          if (!window.confirm(`停用 ${lessorLabel(b.lessorId)} ↔ ${operatorLabel(b.operatorId)} 绑定？`)) return;
-          b.status = "已停用";
-          render();
+          openProtoConfirm({
+            title: "停用绑定",
+            message: `停用 ${lessorLabel(b.lessorId)} ↔ ${operatorLabel(b.operatorId)} 绑定？`,
+            confirmLabel: "停用",
+            onConfirm: () => { b.status = "已停用"; render(); }
+          });
         };
       });
       root.querySelectorAll("[data-new-leasing-company]").forEach(btn => {
@@ -9687,6 +12009,88 @@
       });
       root.querySelectorAll("[data-edit-site]").forEach(btn => {
         btn.onclick = () => openSiteForm(btn.dataset.editSite);
+      });
+      root.querySelectorAll("[data-site-expense-tab]").forEach(btn => {
+        btn.onclick = () => { state.siteExpenseTab = btn.dataset.siteExpenseTab; render(); };
+      });
+      root.querySelectorAll("[data-sptab]").forEach(btn => {
+        btn.onclick = () => { state.sitePartnersTab = btn.dataset.sptab; render(); };
+      });
+      root.querySelectorAll("[data-new-site-partner]").forEach(btn => {
+        btn.onclick = () => openNewSitePartnerForm();
+      });
+      root.querySelectorAll("[data-edit-site-partner]").forEach(btn => {
+        btn.onclick = () => openEditSitePartnerForm(btn.dataset.editSitePartner);
+      });
+      root.querySelectorAll("[data-bind-site-partner]").forEach(btn => {
+        btn.onclick = () => openBindSitePartnerForm(btn.dataset.bindSitePartner);
+      });
+      root.querySelectorAll("[data-site-partners]").forEach(btn => {
+        btn.onclick = () => openSitePartnersDrawer(btn.dataset.sitePartners);
+      });
+      root.querySelectorAll("[data-edit-site-partner-bind]").forEach(btn => {
+        btn.onclick = () => openEditSitePartnerBindingForm(btn.dataset.editSitePartnerBind);
+      });
+      root.querySelectorAll("[data-remove-site-partner-bind]").forEach(btn => {
+        btn.onclick = () => removeSitePartnerBinding(btn.dataset.removeSitePartnerBind);
+      });
+      root.querySelectorAll("[data-apply-withdraw]").forEach(btn => {
+        btn.onclick = () => openApplyWithdrawForm();
+      });
+      root.querySelectorAll("[data-apply-partner-withdraw]").forEach(btn => {
+        btn.onclick = () => openPartnerWithdrawForm();
+      });
+      root.querySelectorAll("[data-approve-withdraw]").forEach(btn => {
+        btn.onclick = () => approveOperatorWithdraw(btn.dataset.approveWithdraw);
+      });
+      root.querySelectorAll("[data-reject-withdraw]").forEach(btn => {
+        btn.onclick = () => {
+          const wid = btn.dataset.rejectWithdraw;
+          openProtoForm({
+            title: "驳回提现申请",
+            fields: [{ name: "reason", label: "驳回原因", value: "可提现余额不足或资料不符" }],
+            submitLabel: "确认驳回",
+            onSubmit: (data) => {
+              rejectOperatorWithdraw(wid, data.reason);
+              return { successMessage: "已驳回", afterClose: () => {} };
+            }
+          });
+        };
+      });
+      root.querySelectorAll("[data-open-site-expense]").forEach(btn => {
+        btn.onclick = () => openSiteExpenseDetail(btn.dataset.openSiteExpense);
+      });
+      root.querySelectorAll("[data-edit-site-expense]").forEach(btn => {
+        btn.onclick = () => openSiteExpenseForm(btn.dataset.editSiteExpense);
+      });
+      root.querySelectorAll("[data-register-expense-pay]").forEach(btn => {
+        btn.onclick = () => {
+          const bill = siteExpenseBills.find(b => b.id === btn.dataset.registerExpensePay);
+          if (!bill) return;
+          const prof = siteExpenseProfile(bill.siteId);
+          const remain = billRemainAmount(bill);
+          openProtoForm({
+            title: "登记支付 · " + bill.id,
+            fields: [
+              { name: "amount", label: "支付金额（元）", type: "number", value: String(remain) },
+              { name: "method", label: "支付方式", type: "select", options: ["对公转账", "微信", "支付宝", "现金"], value: prof?.payMethod || "对公转账" },
+              { name: "ref", label: "流水号/凭证号", value: "" },
+              { name: "remark", label: "备注", value: "", required: false }
+            ],
+            submitLabel: "登记",
+            onSubmit: (data) => {
+              const err = registerSiteExpensePayment(bill.id, data);
+              if (err) return err;
+              return {
+                successMessage: "支付已登记，账单状态已更新",
+                afterClose: () => {
+                  if (state.detailSiteExpenseId === bill.siteId) openSiteExpenseDetail(bill.siteId);
+                  else render();
+                }
+              };
+            }
+          });
+        };
       });
       root.querySelectorAll("[data-new-channel-partner]").forEach(btn => {
         btn.onclick = () => openChannelPartnerForm(null);
@@ -9709,23 +12113,70 @@
       root.querySelectorAll("[data-confirm-act-order]").forEach(btn => {
         btn.onclick = () => { if (confirmChannelActivationOrder(btn.dataset.confirmActOrder)) render(); };
       });
+      root.querySelectorAll("[data-edit-lease-pkg]").forEach(btn => {
+        btn.onclick = () => {
+          const cid = channelEntityId();
+          const skus = channelLeasePkgSkus.filter(s => s.channelId === cid);
+          const main = skus.find(s => s.id === "LP-30") || skus[0];
+          if (!main) return;
+          openProtoForm({
+            title: "编辑白名单套餐价格",
+            fields: [
+              { name: "skuId", label: "SKU", value: main.id, readonly: true },
+              { name: "name", label: "套餐名", value: main.name },
+              { name: "price", label: "零售价（元）", type: "number", value: main.price },
+              { name: "validityDays", label: "有效期（天）", type: "number", value: main.validityDays }
+            ],
+            submitLabel: "保存",
+            onSubmit: (data) => {
+              const price = parseFloat(data.price);
+              const days = parseInt(data.validityDays, 10);
+              if (!Number.isFinite(price) || price <= 0) return "请填写有效零售价";
+              if (!Number.isFinite(days) || days <= 0) return "请填写有效天数";
+              main.name = (data.name || "").trim() || main.name;
+              main.price = price;
+              main.validityDays = days;
+              main.updatedAt = new Date().toISOString().slice(0, 10);
+              return { successMessage: "已更新 " + main.id + " · ¥" + price, afterClose: () => render() };
+            }
+          });
+        };
+      });
       root.querySelectorAll("[data-add-whitelist-user]").forEach(btn => {
         btn.onclick = () => {
-          const name = window.prompt("骑手姓名", "新骑手");
-          const phone = window.prompt("手机号", "138****0000");
-          if (!name || !phone) return;
-          const uid = "U" + Date.now().toString().slice(-4);
-          channelLeaseWhitelist.unshift({
-            id: uid, channelId: channelEntityId(),
-            name, phone, swaps: 0, status: "启用",
-            addedAt: new Date().toISOString().slice(0, 10), addedBy: "渠道管理员", lastSwap: "—"
+          const contract = myChannelContracts()[0];
+          const defaultAccess = contract?.whitelistDefaultAccess || "paid";
+          openProtoForm({
+            title: "添加白名单用户",
+            fields: [
+              { name: "name", label: "骑手姓名", value: "新骑手" },
+              { name: "phone", label: "手机号", value: "138****0000" },
+              { name: "whitelistAccess", label: "白名单类型", type: "select", options: ["paid", "free"], optionLabels: { paid: "白名单付费（须购套餐）", free: "白名单免费（月租覆盖）" }, value: defaultAccess }
+            ],
+            submitLabel: "添加",
+            onSubmit: (data) => {
+              const name = (data.name || "").trim();
+              const phone = (data.phone || "").trim();
+              const access = data.whitelistAccess === "free" ? "free" : "paid";
+              if (!name || !phone) return "请填写骑手姓名和手机号";
+              const uid = "U" + Date.now().toString().slice(-4);
+              channelLeaseWhitelist.unshift({
+                id: uid, channelId: channelEntityId(),
+                name, phone, whitelistAccess: access,
+                pkgStatus: access === "free" ? "—" : "未购",
+                swaps: 0, status: "启用",
+                addedAt: new Date().toISOString().slice(0, 10), addedBy: "渠道管理员", lastSwap: "—"
+              });
+              channelBatteryHolders.unshift({
+                channelId: channelEntityId(), userId: uid, userName: name, phone,
+                batterySn: null, soc: null, since: null, site: "—", status: "未持有"
+              });
+              return {
+                successMessage: "已添加白名单：" + name + "（" + (access === "free" ? "免费" : "付费") + "）",
+                afterClose: () => render()
+              };
+            }
           });
-          channelBatteryHolders.unshift({
-            channelId: channelEntityId(), userId: uid, userName: name, phone,
-            batterySn: null, soc: null, since: null, site: "—", status: "未持有"
-          });
-          render();
-          window.alert("已添加白名单：" + name);
         };
       });
       root.querySelectorAll("[data-remove-whitelist]").forEach(btn => {
@@ -9737,19 +12188,33 @@
       });
       root.querySelectorAll("[data-add-lease-device]").forEach(btn => {
         btn.onclick = () => {
-          const sn = window.prompt("设备 SN", "CAB-NEW-001");
-          const type = window.prompt("类型（换电柜/电池）", "换电柜");
-          if (!sn) return;
-          channelRentDevices.push({
-            channelId: "CH-RENT", sn, type: type || "换电柜", site: "京东物流专属站", siteId: "ST-SH-JD",
-            status: "在租", swapCount: 0
+          openProtoForm({
+            title: "绑定租赁设备",
+            fields: [
+              { name: "sn", label: "设备 SN", value: "CAB-NEW-001" },
+              { name: "type", label: "类型", type: "select", options: ["换电柜", "电池"], value: "换电柜" }
+            ],
+            submitLabel: "绑定",
+            onSubmit: (data) => {
+              const sn = (data.sn || "").trim();
+              if (!sn) return "请填写设备 SN";
+              channelRentDevices.push({
+                channelId: "CH-RENT", sn, type: data.type || "换电柜", site: "京东物流专属站", siteId: "ST-SH-JD",
+                status: "在租", swapCount: 0
+              });
+              return {
+                successMessage: "已绑定设备 " + sn + "（月租仍按签约统一价）",
+                afterClose: () => render()
+              };
+            }
           });
-          render();
-          window.alert("已绑定设备 " + sn + "（月租仍按签约统一价）");
         };
       });
       root.querySelectorAll("[data-create-dedicated-site]").forEach(btn => {
-        btn.onclick = () => window.alert("演示：可在「签约渠道 → 编辑」中选择「+ 新建专属站点」并填写站点名称。");
+        btn.onclick = () => showProtoToast("演示：可在「签约渠道 → 编辑」中选择「+ 新建专属站点」并填写站点名称。");
+      });
+      root.querySelectorAll("[data-mock-import-act]").forEach(btn => {
+        btn.onclick = () => showProtoToast("演示：批量导入激活码");
       });
       root.querySelectorAll("[data-simulate-online-pay]").forEach(btn => {
         btn.onclick = () => {
@@ -9791,19 +12256,34 @@
       });
       root.querySelectorAll("[data-reject-deposit]").forEach(btn => {
         btn.onclick = () => {
-          const reason = window.prompt("驳回原因", "转账金额与申请不一致");
-          if (reason === null) return;
-          if (rejectDepositRecharge(btn.dataset.rejectDeposit, reason)) render();
+          openProtoForm({
+            title: "驳回保证金充值",
+            fields: [{ name: "reason", label: "驳回原因", value: "转账金额与申请不一致" }],
+            onSubmit: (data) => {
+              if (rejectDepositRecharge(btn.dataset.rejectDeposit, data.reason)) {
+                return { afterClose: () => render() };
+              }
+              return "操作失败";
+            }
+          });
         };
       });
       root.querySelectorAll("[data-manual-deposit]").forEach(btn => {
         btn.onclick = () => {
-          const amt = Number(window.prompt("手工入账金额（元）", "1000"));
-          if (!amt || amt <= 0) return;
-          const remark = window.prompt("备注", "线下补录") || "手工入账";
-          appendDepositLedger(btn.dataset.manualDeposit, "手工入账", amt, remark, "平台财务");
-          const o = depositRechargeOrders.find(x => x.operatorId === btn.dataset.manualDeposit && x.status === "待确认");
-          render();
+          openProtoForm({
+            title: "手工入账",
+            fields: [
+              { name: "amount", label: "入账金额（元）", type: "number", value: "1000" },
+              { name: "remark", label: "备注", value: "线下补录" }
+            ],
+            onSubmit: (data) => {
+              const amt = Number(data.amount);
+              if (!amt || amt <= 0) return "请输入有效金额";
+              const remark = (data.remark || "").trim() || "手工入账";
+              appendDepositLedger(btn.dataset.manualDeposit, "手工入账", amt, remark, "平台财务");
+              return { afterClose: () => render() };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-adjust-credit-limit]").forEach(btn => {
@@ -9814,20 +12294,23 @@
           const cap = operatorCreditCap(opId);
           const prof = operatorCreditProfile(opId);
           if (!prof?.tierCode) {
-            window.alert("该运营商尚未定档，请先在「运营商信用评估」完成定档。");
+            showProtoToast("该运营商尚未定档，请先在「运营商信用评估」完成定档。");
             return;
           }
-          const hint = cap != null ? `（档位封顶 ¥${cap.toLocaleString("zh-CN")}）` : "";
-          const v = Number(window.prompt("信用额度上限（元）" + hint, String(credit.creditLimit)));
-          if (v == null || isNaN(v) || v < 0) return;
-          if (cap != null && v > cap) {
-            window.alert(`不得超过档位封顶 ¥${cap.toLocaleString("zh-CN")}。`);
-            return;
-          }
-          credit.creditLimit = v;
-          credit.available = Math.max(0, v - credit.used);
-          credit.crossSwapEnabled = credit.available > 0 || credit.depositBalance > 0;
-          render();
+          const hint = cap != null ? `档位封顶 ¥${cap.toLocaleString("zh-CN")}` : "";
+          openProtoForm({
+            title: "调整信用额度上限",
+            fields: [{ name: "limit", label: hint ? `信用额度上限（元，${hint}）` : "信用额度上限（元）", type: "number", value: String(credit.creditLimit) }],
+            onSubmit: (data) => {
+              const v = Number(data.limit);
+              if (isNaN(v) || v < 0) return "请输入有效额度";
+              if (cap != null && v > cap) return `不得超过档位封顶 ¥${cap.toLocaleString("zh-CN")}。`;
+              credit.creditLimit = v;
+              credit.available = Math.max(0, v - credit.used);
+              credit.crossSwapEnabled = credit.available > 0 || credit.depositBalance > 0;
+              return { afterClose: () => render() };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-opcredtab]").forEach(btn => {
@@ -9837,36 +12320,55 @@
         btn.onclick = () => {
           const opId = btn.dataset.assignTier;
           const prof = operatorCreditProfile(opId);
-          const opts = operatorAdmissionTierConfig.map(t => `${t.code}=${t.name}`).join(" / ");
           const def = prof?.tierCode || "B";
-          const tierCode = window.prompt(`选择档位（${opts}）`, def);
-          if (!tierCode) return;
-          const code = tierCode.trim().toUpperCase().slice(0, 1);
-          if (!admissionTierByCode(code)) { window.alert("无效档位，请输入 A/B/C/D"); return; }
-          const reason = window.prompt("变更原因", prof?.tierCode ? "年度复审/人工升降档" : "入网审批通过") || "定档";
-          const err = assignOperatorTier(opId, code, reason, "平台管理员");
-          if (err) { window.alert(err); return; }
-          const tier = admissionTierByCode(code);
-          const credit = creditForOperator(opId);
-          if (credit && credit.creditLimit === 0 && tier.creditCap > 0) {
-            credit.creditLimit = tier.creditCap;
-            credit.available = Math.max(0, tier.creditCap - credit.used);
-          }
-          window.alert(`已定为 ${tierLabel(code)}；信用封顶 ¥${tier.creditCap.toLocaleString("zh-CN")}。`);
-          render();
+          openProtoForm({
+            title: "运营商定档",
+            fields: [
+              { name: "tierCode", label: "档位（A/B/C/D）", value: def },
+              { name: "reason", label: "变更原因", value: prof?.tierCode ? "年度复审/人工升降档" : "入网审批通过" }
+            ],
+            onSubmit: (data) => {
+              const code = (data.tierCode || "").trim().toUpperCase().slice(0, 1);
+              if (!admissionTierByCode(code)) return "无效档位，请输入 A/B/C/D";
+              const reason = (data.reason || "").trim() || "定档";
+              const err = assignOperatorTier(opId, code, reason, "平台管理员");
+              if (err) return err;
+              const tier = admissionTierByCode(code);
+              const credit = creditForOperator(opId);
+              if (credit && credit.creditLimit === 0 && tier.creditCap > 0) {
+                credit.creditLimit = tier.creditCap;
+                credit.available = Math.max(0, tier.creditCap - credit.used);
+              }
+              return {
+                successMessage: `已定为 ${tierLabel(code)}；信用封顶 ¥${tier.creditCap.toLocaleString("zh-CN")}。`,
+                afterClose: () => render()
+              };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-edit-admission-tier]").forEach(btn => {
         btn.onclick = () => {
           const tier = admissionTierByCode(btn.dataset.editAdmissionTier);
           if (!tier) return;
-          const cap = Number(window.prompt(`${tier.code} ${tier.name} · 信用封顶（元）`, String(tier.creditCap)));
-          if (cap == null || isNaN(cap) || cap < 0) return;
-          tier.creditCap = cap;
-          const minD = window.prompt(`${tier.code} · 最低保证金（元，D档填0表示全额预存）`, String(tier.minDeposit));
-          if (minD != null && !isNaN(Number(minD))) tier.minDeposit = Number(minD);
-          window.alert("演示：档位政策已更新（仅影响后续定档校验）。");
-          render();
+          openProtoForm({
+            title: `${tier.code} 档 · ${tier.name}`,
+            fields: [
+              { name: "creditCap", label: "信用封顶（元）", type: "number", value: String(tier.creditCap) },
+              { name: "minDeposit", label: "最低保证金（元，D档填0表示全额预存）", type: "number", value: String(tier.minDeposit) }
+            ],
+            onSubmit: (data) => {
+              const cap = Number(data.creditCap);
+              if (isNaN(cap) || cap < 0) return "请输入有效信用封顶";
+              tier.creditCap = cap;
+              const minD = Number(data.minDeposit);
+              if (!isNaN(minD)) tier.minDeposit = minD;
+              return {
+                successMessage: "档位政策已更新（仅影响后续定档校验）",
+                afterClose: () => render()
+              };
+            }
+          });
         };
       });
       if (root === document) {
@@ -9890,12 +12392,17 @@
         btn.onclick = () => {
           const a = deviceAlerts.find(x => x.id === btn.dataset.closeAlert);
           if (!a || a.status !== "待处理") return;
-          const note = window.prompt("关闭说明", "现场已处理");
-          if (note == null) return;
-          a.status = "已关闭";
-          a.handleNote = note || "已关闭";
-          a.handledBy = currentEmployee()?.name || currentEntity().name;
-          render();
+          openProtoForm({
+            title: "关闭告警",
+            fields: [{ name: "note", label: "关闭说明", value: "现场已处理" }],
+            submitLabel: "关闭告警",
+            onSubmit: (data) => {
+              a.status = "已关闭";
+              a.handleNote = (data.note || "").trim() || "已关闭";
+              a.handledBy = currentEmployee()?.name || currentEntity().name;
+              return { afterClose: () => render() };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-refund-tab]").forEach(btn => {
@@ -9918,39 +12425,28 @@
         };
       });
       root.querySelectorAll("[data-approve-refund]").forEach(btn => {
-        btn.onclick = () => {
-          const rf = refundRequests.find(x => x.id === btn.dataset.approveRefund);
-          if (!rf || rf.status !== "待审核") return;
-          if (!canAuditRefund()) return;
-          rf.status = "已退款";
-          rf.processedTime = new Date().toISOString().slice(0, 16).replace("T", " ");
-          rf.processedBy = currentEmployee()?.name || currentEntity().name;
-          rf.processMode = "manual";
-          const sc = serviceChangeRequests.find(x => x.id === rf.scId);
-          if (sc) sc.status = "已退款";
-          const p = packageOrders.find(x => x.id === rf.orderId);
-          if (p) {
-            p.status = "中途完结";
-            p.serviceState = "中途完结";
-            p.refundStatus = "已退款";
-          }
-          render();
-        };
+        btn.onclick = () => promptApproveRefund(btn.dataset.approveRefund);
       });
       root.querySelectorAll("[data-reject-refund]").forEach(btn => {
         btn.onclick = () => {
           const rf = refundRequests.find(x => x.id === btn.dataset.rejectRefund);
           if (!rf || rf.status !== "待审核") return;
           if (!canAuditRefund()) return;
-          const reason = window.prompt("驳回原因", "仍持有电池，请先还电");
-          if (reason == null || !String(reason).trim()) return;
-          rf.status = "已驳回";
-          rf.rejectReason = String(reason).trim();
-          rf.processedTime = new Date().toISOString().slice(0, 16).replace("T", " ");
-          rf.processedBy = currentEmployee()?.name || currentEntity().name;
-          const sc = serviceChangeRequests.find(x => x.id === rf.scId);
-          if (sc) sc.status = "已驳回";
-          render();
+          openProtoForm({
+            title: "驳回退款",
+            fields: [{ name: "reason", label: "驳回原因", value: "仍持有电池，请先还电" }],
+            onSubmit: (data) => {
+              const reason = (data.reason || "").trim();
+              if (!reason) return "请填写驳回原因";
+              rf.status = "已驳回";
+              rf.rejectReason = reason;
+              rf.processedTime = new Date().toISOString().slice(0, 16).replace("T", " ");
+              rf.processedBy = currentEmployee()?.name || currentEntity().name;
+              const sc = serviceChangeRequests.find(x => x.id === rf.scId);
+              if (sc) sc.status = "已驳回";
+              return { afterClose: () => render() };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-view-jump]").forEach(btn => {
@@ -9984,7 +12480,44 @@
         btn.onclick = () => { state.financeTab = btn.dataset.ftab; render(); };
       });
       root.querySelectorAll("[data-fin-select-app]").forEach(btn => {
-        btn.onclick = () => { state.financeSelectedAppId = btn.dataset.finSelectApp; if (state.view === "financeManage") state.financeTab = "ledger"; render(); };
+        btn.onclick = () => {
+          state.financeSelectedAppId = btn.dataset.finSelectApp;
+          if (state.view === "financeManage") state.financeTab = "ledger";
+          render();
+        };
+      });
+      root.querySelectorAll("[data-fin-reject]").forEach(btn => {
+        btn.onclick = () => {
+          openProtoForm({
+            title: "驳回放款申请",
+            fields: [{ name: "reason", label: "驳回原因", value: "资产运营数据未达准入标准" }],
+            submitLabel: "驳回",
+            onSubmit: (data) => {
+              rejectFinanceApplication(btn.dataset.finReject, (data.reason || "").trim());
+              return { successMessage: "已驳回，批次退回运营商", afterClose: () => render() };
+            }
+          });
+        };
+      });
+      root.querySelectorAll("[data-new-finance-package]").forEach(btn => {
+        btn.onclick = () => openFinancePackageEditor(null);
+      });
+      root.querySelectorAll("[data-edit-finance-package]").forEach(btn => {
+        btn.onclick = () => openFinancePackageEditor(btn.dataset.editFinancePackage);
+      });
+      root.querySelectorAll("[data-select-finance-package]").forEach(btn => {
+        btn.onclick = () => { state.financeSelectedPackageId = btn.dataset.selectFinancePackage; state.financeTab = "packages"; render(); };
+      });
+      root.querySelectorAll("[data-open-finance-package]").forEach(btn => {
+        btn.onclick = () => { state.financeSelectedPackageId = btn.dataset.openFinancePackage; state.view = "financeManage"; state.financeTab = "packages"; render(); };
+      });
+      root.querySelectorAll("[data-create-app-from-package]").forEach(btn => {
+        btn.onclick = () => {
+          const err = createFinanceAppFromPackage(btn.dataset.createAppFromPackage);
+          if (err) { showProtoToast(err); return; }
+          showProtoToast("已生成放款批次，请至融资台账提交资方");
+          render();
+        };
       });
       root.querySelectorAll("[data-fin-submit]").forEach(btn => {
         btn.onclick = () => { submitFinanceApplication(btn.dataset.finSubmit); window.alert("已提交资方，资产已锁定"); render(); };
@@ -9993,29 +12526,85 @@
         btn.onclick = () => {
           const app = financeAppById(btn.dataset.finConfirm);
           if (!app) return;
-          const amt = Number(window.prompt("资方确认金额（元）", String(app.requestedAmount)));
-          if (amt == null || isNaN(amt)) return;
-          confirmFinanceApplication(app.id, amt, window.prompt("确认说明（可选）", "按申请确认") || "");
-          window.alert("已确认放款申请与预还款计划");
-          render();
+          openProtoForm({
+            title: "尽调审查 · " + app.id,
+            fields: [
+              { name: "amount", label: "尽调确认金额（元）", type: "number", value: String(app.requestedAmount) },
+              { name: "note", label: "尽调说明（可选）", value: "运营数据与标的物符合准入", required: false }
+            ],
+            submitLabel: "尽调通过",
+            onSubmit: (data) => {
+              const amt = Number(data.amount);
+              if (isNaN(amt)) return "请输入有效金额";
+              confirmFinanceApplication(app.id, amt, (data.note || "").trim() || "尽调通过");
+              return {
+                successMessage: "尽调通过，待登记放款",
+                afterClose: () => render()
+              };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-fin-fund]").forEach(btn => {
         btn.onclick = () => {
-          fundFinanceApplication(btn.dataset.finFund);
-          window.alert("已录入借据，预还款计划已固化为正式还款计划");
-          render();
+          if (!isLeasingRole()) { showProtoToast("登记放款仅资方可操作"); return; }
+          openProtoConfirm({
+            title: "登记放款",
+            message: "将绑定资产包、协议、借据与正式还款计划，确认执行？",
+            confirmLabel: "登记放款",
+            onConfirm: () => {
+              fundFinanceApplication(btn.dataset.finFund);
+              showProtoToast("已登记放款，协议与还款计划已生成");
+              render();
+            }
+          });
         };
       });
       root.querySelectorAll("[data-fin-repay]").forEach(btn => {
         btn.onclick = () => {
           const row = financeRepaymentSchedules.find(s => s.id === btn.dataset.finRepay);
           if (!row) return;
-          const amt = Number(window.prompt("登记还款金额（元）", String(row.dueAmount - row.paidAmount)));
-          if (amt == null || isNaN(amt) || amt <= 0) return;
-          registerFinanceRepayment(row.id, amt);
-          window.alert("还款已登记");
+          openProtoForm({
+            title: "提交还款工单",
+            fields: [
+              { name: "amount", label: "还款金额（元）", type: "number", value: String(row.dueAmount - row.paidAmount) },
+              { name: "payMethod", label: "付款方式", type: "select", options: ["对公转账", "网银", "其他"], value: "对公转账" },
+              { name: "voucherNote", label: "凭证备注", required: false, value: "" }
+            ],
+            submitLabel: "提交工单",
+            onSubmit: (data) => {
+              const amt = Number(data.amount);
+              if (isNaN(amt) || amt <= 0) return "请输入有效还款金额";
+              const err = submitFinanceRepaymentTicket(row.id, amt, data.payMethod, data.voucherNote);
+              if (err) return err;
+              return { successMessage: "还款工单已提交，待资方确认", afterClose: () => render() };
+            }
+          });
+        };
+      });
+      root.querySelectorAll("[data-fin-repay-confirm]").forEach(btn => {
+        btn.onclick = () => {
+          confirmFinanceRepaymentTicket(btn.dataset.finRepayConfirm);
+          showProtoToast("还款已确认入账");
           render();
+        };
+      });
+      root.querySelectorAll("[data-fin-asset-replace]").forEach(btn => {
+        btn.onclick = () => {
+          const sn = btn.dataset.finAssetReplace;
+          openProtoForm({
+            title: "资产替换 · " + sn,
+            fields: [
+              { name: "newSn", label: "新 SN", placeholder: "如 BAT-SH-1100" },
+              { name: "reason", label: "原因", value: "坏件更换", required: false }
+            ],
+            submitLabel: "确认替换",
+            onSubmit: (data) => {
+              const err = replaceFinanceAsset(sn, (data.newSn || "").trim(), data.reason);
+              if (err) return err;
+              return { successMessage: "资产已替换", afterClose: () => render() };
+            }
+          });
         };
       });
       root.querySelectorAll("[data-fin-asset-filter]").forEach(sel => {
@@ -10033,28 +12622,30 @@
       const overdue = schedules.filter(s => s.status === "逾期").reduce((x, s) => x + s.dueAmount - s.paidAmount, 0);
       const draftCnt = apps.filter(a => a.status === "草稿").length;
       const submittedCnt = apps.filter(a => a.status === "已提交资方").length;
-      const confirmedCnt = apps.filter(a => a.status === "资方已确认").length;
+      const confirmedCnt = apps.filter(a => a.status === "尽调通过").length;
       const projects = myFinanceProjects();
-      const creditUsed = projects.reduce((s, p) => s + (p.usedAmount || 0), 0);
-      const creditLimit = projects.reduce((s, p) => s + p.creditLimit, 0);
+      const oc = isOperatorRole() ? operatorCreditSummary(currentEntity().id, projects[0]?.financierId || "LEASE-HD") : null;
+      const creditUsed = oc ? oc.used : projects.reduce((s, p) => s + (p.usedAmount || 0), 0);
+      const creditLimit = oc ? oc.limit : projects.reduce((s, p) => s + p.creditLimit, 0);
+      const creditPending = oc ? oc.pending : 0;
       return `<section class="panel"><div class="panel-body">
         <div class="kpi-grid in-panel">
           <div class="kpi-card"><div class="kpi-label">本月待还</div><div class="kpi-value">${finYuan(monthDue)}</div></div>
           <div class="kpi-card"><div class="kpi-label">逾期</div><div class="kpi-value" style="color:var(--red)">${finYuan(overdue)}</div></div>
           <div class="kpi-card"><div class="kpi-label">待提交申请</div><div class="kpi-value">${draftCnt}</div></div>
-          <div class="kpi-card"><div class="kpi-label">待资方确认</div><div class="kpi-value">${submittedCnt}</div></div>
+          <div class="kpi-card"><div class="kpi-label">待尽调 ${noteBtn("finance_due_diligence")}</div><div class="kpi-value">${submittedCnt}</div></div>
         </div>
         <div class="kpi-grid in-panel" style="margin-top:12px">
-          <div class="kpi-card"><div class="kpi-label">待录入借据</div><div class="kpi-value">${confirmedCnt}</div></div>
-          <div class="kpi-card"><div class="kpi-label">授信已占用</div><div class="kpi-value">${finYuan(creditUsed)}</div></div>
-          <div class="kpi-card"><div class="kpi-label">授信总额</div><div class="kpi-value">${finYuan(creditLimit)}</div></div>
-          <div class="kpi-card"><div class="kpi-label">可融资资产</div><div class="kpi-value">${myFinanceAssets().filter(a => a.status === "可融资").length} 台</div></div>
+          <div class="kpi-card"><div class="kpi-label">待登记放款 ${noteBtn("finance_disburse")}</div><div class="kpi-value">${confirmedCnt}</div></div>
+          <div class="kpi-card"><div class="kpi-label">已占用</div><div class="kpi-value">${finYuan(creditUsed)}</div></div>
+          <div class="kpi-card"><div class="kpi-label">拟占用/已申请</div><div class="kpi-value">${finYuan(creditPending)}</div></div>
+          <div class="kpi-card"><div class="kpi-label">主体授信总额 ${noteBtn("finance_operator_credit")}</div><div class="kpi-value">${finYuan(creditLimit)}</div></div>
         </div>
         <h4 style="margin:18px 0 10px">待办</h4>
         <table><thead><tr><th>类型</th><th>对象</th><th>状态</th><th>操作</th></tr></thead><tbody>
           ${draftCnt ? `<tr><td>放款申请</td><td>${apps.filter(a => a.status === "草稿").map(a => a.id).join("、")}</td><td>${tag("草稿")}</td><td><button type="button" class="linkish" data-fin-goto-tab="ledger">去台账</button></td></tr>` : ""}
-          ${submittedCnt ? `<tr><td>资方确认</td><td>${apps.filter(a => a.status === "已提交资方").map(a => a.id).join("、")}</td><td>${tag("已提交资方")}</td><td><button type="button" class="linkish" data-fin-goto-tab="ledger">查看</button></td></tr>` : ""}
-          ${confirmedCnt ? `<tr><td>录入借据</td><td>${apps.filter(a => a.status === "资方已确认").map(a => a.id).join("、")}</td><td>${tag("资方已确认")}</td><td><button type="button" class="linkish" data-fin-goto-tab="ledger">录入</button></td></tr>` : ""}
+          ${submittedCnt ? `<tr><td>尽调审查</td><td>${apps.filter(a => a.status === "已提交资方").map(a => a.id).join("、")}</td><td>${tag("已提交资方")}</td><td><button type="button" class="linkish" data-fin-goto-tab="ledger">查看</button></td></tr>` : ""}
+          ${confirmedCnt ? `<tr><td>登记放款</td><td>${apps.filter(a => a.status === "尽调通过").map(a => a.id).join("、")}</td><td>${tag("尽调通过")}</td><td><small style="color:var(--muted)">资方操作</small></td></tr>` : ""}
           ${overdue ? `<tr><td>逾期还款</td><td>${schedules.filter(s => s.status === "逾期").map(s => s.dueDate).join("、")}</td><td>${tag("逾期")}</td><td><button type="button" class="linkish" data-fin-goto-tab="repayments">还款日历</button></td></tr>` : ""}
           ${!draftCnt && !submittedCnt && !confirmedCnt && !overdue ? "<tr><td colspan='4'>暂无待办</td></tr>" : ""}
         </tbody></table>
@@ -10068,36 +12659,75 @@
       const fin = financeFinanciers.find(f => f.id === app.financierId);
       const plan = financePrePlanById(app.prePlanId);
       const note = financeLoanNoteByApp(app.id);
-      const assetRows = app.assetSns.map(sn => {
-        const a = financeAssets.find(x => x.sn === sn);
-        return `<tr><td>${sn}</td><td>${a?.type || "—"}</td><td>${a?.site || "—"}</td><td>${a ? tag(a.status) : "—"}</td></tr>`;
-      }).join("");
+      const agr = agreementByApp(app.id);
+      const pkg = app.packageId ? financePackageById(app.packageId) : null;
+      const cr = projectCreditSummary(app.projectId);
+      const assetRows = financePackageAssetTable(app.assetSns);
       const planRows = (plan?.lines || []).map(ln => `<tr><td>${ln.term}</td><td>${ln.dueDate}</td><td>${finYuan(ln.principal)}</td><td>${finYuan(ln.rent)}</td><td>${finYuan(ln.principal + ln.rent + (ln.serviceFee || 0))}</td></tr>`).join("");
       const schedRows = financeRepaymentSchedules.filter(s => s.applicationId === app.id).map(s =>
         `<tr><td>${s.term}</td><td>${s.dueDate}</td><td>${finYuan(s.dueAmount)}</td><td>${finYuan(s.paidAmount)}</td><td>${tag(s.status)}</td></tr>`
       ).join("");
       const actions = [];
       if (isOperatorRole() && app.status === "草稿") actions.push(`<button type="button" class="btn primary" data-fin-submit="${app.id}">提交资方</button>`);
-      if (isOperatorRole() && app.status === "资方已确认") actions.push(`<button type="button" class="btn primary" data-fin-fund="${app.id}">录入借据 · 放款完成</button>`);
       return `<div class="panel" style="margin-top:14px;border:1px solid var(--line)">
         ${panelHead("批次详情 · " + app.id, `${app.month} 第 ${app.batchNo} 批 · ${tag(app.status)}`, null, actions.join(" "))}
         <div class="panel-body">
+          ${financeApprovalTimeline(app)}
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;font-size:13px">
             <div><strong>资方</strong><br>${fin?.name || app.financierId}</div>
             <div><strong>授信项目</strong><br>${proj?.name || app.projectId}</div>
             <div><strong>区域</strong><br>${app.regionSummary || "—"}</div>
             <div><strong>申请金额</strong><br>${finYuan(app.requestedAmount)} <small style="color:var(--muted)">参考 ${finYuan(app.refAmount)}</small></div>
-            <div><strong>确认金额</strong><br>${app.confirmedAmount != null ? finYuan(app.confirmedAmount) : "—"}</div>
+            <div><strong>尽调确认</strong><br>${app.confirmedAmount != null ? finYuan(app.confirmedAmount) : "—"}</div>
+            <div><strong>协议 ${noteBtn("finance_agreement")}</strong><br>${agr ? agr.agreementNo : "—"}</div>
             <div><strong>借据</strong><br>${note ? note.noteNo + " · " + finYuan(note.amount) : "—"}</div>
+            <div><strong>资产包</strong><br>${pkg ? `<button type="button" class="link-btn" data-open-finance-package="${pkg.id}">${pkg.name}</button>` : "—"}</div>
+            <div><strong>额度</strong><br>可用 ${finYuan(cr.available)} / 拟占用 ${finYuan(cr.pending)}</div>
           </div>
-          <h4>资产清单（${app.assetSns.length}）</h4>
-          <table><thead><tr><th>SN</th><th>类型</th><th>站点</th><th>状态</th></tr></thead><tbody>${assetRows || "<tr><td colspan='4'>—</td></tr>"}</tbody></table>
+          <h4>资产包明细（${app.assetSns.length} 台） ${noteBtn("finance_asset_package")}</h4>
+          <table><thead><tr><th>SN</th><th>类型</th><th>站点</th><th>用户数</th><th>柜效</th><th>近30日收入</th><th>状态</th></tr></thead><tbody>${assetRows}</tbody></table>
           <h4 style="margin-top:14px">预还款计划 ${plan ? tag(plan.status) : ""}</h4>
           <table><thead><tr><th>期次</th><th>应还日</th><th>本金</th><th>租金/利息</th><th>合计</th></tr></thead><tbody>${planRows || "<tr><td colspan='5'>未维护</td></tr>"}</tbody></table>
           ${schedRows ? `<h4 style="margin-top:14px">正式还款计划</h4><table><thead><tr><th>期次</th><th>应还日</th><th>应还</th><th>实还</th><th>状态</th></tr></thead><tbody>${schedRows}</tbody></table>` : ""}
-          ${app.confirmNote ? `<p style="margin-top:10px;font-size:13px;color:var(--muted)">资方确认说明：${app.confirmNote}</p>` : ""}
+          ${app.confirmNote ? `<p style="margin-top:10px;font-size:13px;color:var(--muted)">尽调说明：${app.confirmNote}</p>` : ""}
+          ${app.rejectReason ? `<p style="margin-top:10px;font-size:13px;color:var(--red)">驳回原因：${app.rejectReason}</p>` : ""}
         </div>
       </div>`;
+    }
+
+    function renderFinancePackages() {
+      const pkgs = myFinancePackages();
+      const sel = state.financeSelectedPackageId;
+      const rows = pkgs.map(p => {
+        const proj = financeProjectById(p.projectId);
+        const active = sel === p.id ? " style=\"background:var(--brand-soft)\"" : "";
+        const appLink = p.applicationId ? `<button type="button" class="link-btn" data-fin-select-app="${p.applicationId}">${p.applicationId}</button>` : "—";
+        const actions = [];
+        if (p.status === "草稿") {
+          actions.push(`<button type="button" class="link-btn" data-edit-finance-package="${p.id}">编辑</button>`);
+          if (p.assetSns.length) actions.push(`<button type="button" class="link-btn" data-create-app-from-package="${p.id}">生成放款批次</button>`);
+        } else if (p.status === "已生成批次" && p.applicationId) {
+          actions.push(`<button type="button" class="link-btn" data-fin-select-app="${p.applicationId}">查看批次</button>`);
+        }
+        return `<tr${active}><td><button type="button" class="linkish" data-select-finance-package="${p.id}">${p.id}</button></td>
+          <td>${p.name}</td><td>${proj?.name || p.projectId}</td><td>${p.assetSns.length} 台</td>
+          <td>${finYuan(p.refAmount)}</td><td>${tag(p.status)}</td><td>${appLink}</td>
+          <td>${actions.join(" · ") || "—"}</td></tr>`;
+      }).join("");
+      const detailPkg = financePackageById(sel);
+      const detail = detailPkg ? `<div class="panel" style="margin-top:14px;border:1px solid var(--line)">
+        ${panelHead("资产包详情 · " + detailPkg.name, tag(detailPkg.status), "finance_asset_package")}
+        <div class="panel-body">
+          <p style="font-size:13px;color:var(--muted)">${detailPkg.regionSummary} · 参考融资额 ${finYuan(detailPkg.refAmount)}</p>
+          <table><thead><tr><th>SN</th><th>类型</th><th>站点</th><th>用户数</th><th>柜效</th><th>近30日收入</th><th>状态</th></tr></thead>
+          <tbody>${financePackageAssetTable(detailPkg.assetSns)}</tbody></table>
+          ${detailPkg.remark ? `<p style="margin-top:10px;font-size:13px">备注：${detailPkg.remark}</p>` : ""}
+        </div>
+      </div>` : "";
+      return `<section class="panel">${panelHead("资产包", "先组包再生成放款批次；已被占用的设备不可重复选择", "finance_asset_package", `<button type="button" class="btn primary" data-new-finance-package>+ 新建资产包</button>`)}
+        <div class="panel-body"><table><thead><tr>
+          <th>包编号</th><th>名称</th><th>授信项目</th><th>设备数</th><th>参考额</th><th>状态</th><th>关联批次</th><th>操作</th>
+        </tr></thead><tbody>${rows || "<tr><td colspan='8'>暂无资产包</td></tr>"}</tbody></table>${detail}</div></section>`;
     }
 
     function renderFinanceLedger() {
@@ -10119,16 +12749,20 @@
     }
 
     function renderFinanceProjects() {
+      const oid = isOperatorRole() ? currentEntity().id : null;
+      const finId = myFinanceProjects()[0]?.financierId || "LEASE-HD";
+      const oc = oid ? operatorCreditSummary(oid, finId) : null;
+      const ocBanner = oc ? `<div class="perm-banner" style="margin-bottom:12px">${noteBtn("finance_operator_credit")} <strong>主体级总授信</strong>（资方录入）：总额 ${finYuan(oc.limit)} · 已占用 ${finYuan(oc.used)} · 拟占用/已申请 ${finYuan(oc.pending)} · 可用 ${finYuan(oc.available)} · ${oc.revolving ? "循环" : "非循环"}</div>` : "";
       const rows = myFinanceProjects().map(p => {
         const fin = financeFinanciers.find(f => f.id === p.financierId);
         const cr = projectCreditSummary(p.id);
-        return `<tr><td>${fin?.name || p.financierId}</td><td>${p.name}</td><td>${finYuan(p.creditLimit)}</td>
+        return `<tr><td>${fin?.name || p.financierId}</td><td>${p.name}</td><td>${finYuan(cr.limit)}</td>
           <td>${finYuan(cr.used)}</td><td>${finYuan(cr.pending)}</td><td>${finYuan(cr.available)}</td>
           <td>${p.revolving ? "循环" : "非循环"}</td><td>${finYuan(p.unitRef)}/台</td><td>${tag(p.status)}</td></tr>`;
       }).join("");
-      return `<section class="panel">${panelHead("授信项目", "资方 + 项目维度额度；拟占用含已提交未放款批次")}
-        <div class="panel-body"><table><thead><tr>
-          <th>资方</th><th>项目</th><th>授信总额</th><th>已占用</th><th>拟占用</th><th>可用</th><th>额度类型</th><th>单台参考</th><th>状态</th>
+      return `<section class="panel">${panelHead("授信项目", "主体级总授信 + 项目子视图；拟占用含已提交待审与尽调通过待放款", "finance_projects")}
+        <div class="panel-body">${ocBanner}<table><thead><tr>
+          <th>资方</th><th>项目</th><th>授信总额</th><th>已占用</th><th>拟占用/已申请</th><th>可用</th><th>额度类型</th><th>单台参考</th><th>状态</th>
         </tr></thead><tbody>${rows || "<tr><td colspan='9'>暂无项目</td></tr>"}</tbody></table></div></section>`;
     }
 
@@ -10136,14 +12770,18 @@
       const filter = state.financeAssetFilter || "全部";
       let assets = myFinanceAssets();
       if (filter !== "全部") assets = assets.filter(a => a.status === filter);
-      const rows = assets.map(a => `<tr><td>${a.sn}</td><td>${a.type}</td><td>${a.region}</td><td>${a.city}</td><td>${a.site}</td>
+      const rows = assets.map(a => {
+        const repBtn = isOperatorRole() && ["已融资", "包内占选", "申请锁定"].includes(a.status)
+          ? ` <button type="button" class="link-btn" data-fin-asset-replace="${a.sn}">替换</button>` : "";
+        return `<tr><td>${a.sn}${repBtn}</td><td>${a.type}</td><td>${a.region}</td><td>${a.city}</td><td>${a.site}</td>
         <td>${a.users ?? "—"}</td><td>${a.cabinetEff != null ? Math.round(a.cabinetEff * 100) + "%" : "—"}</td>
-        <td>${tag(a.status)}</td><td>${a.appId || "—"}</td></tr>`).join("");
+        <td>${tag(a.status)}</td><td>${a.packageId || "—"}<br><small style="color:var(--muted)">${a.appId || ""}</small></td></tr>`;
+      }).join("");
       const opts = ["全部", ...FIN_ASSET_STATUS].map(s => `<option ${filter === s ? "selected" : ""}>${s}</option>`).join("");
-      return `<section class="panel">${panelHead("可融资资产池", "人工确认可融资设备；可加入放款申请批次")}
+      return `<section class="panel">${panelHead("可融资资产池", "人工确认入池；包内/已融资设备可替换", "finance_assets", noteBtn("finance_asset_replace"))}
         <div class="panel-body">
           <div style="margin-bottom:12px">状态筛选：<select data-fin-asset-filter>${opts}</select></div>
-          <table><thead><tr><th>SN</th><th>类型</th><th>区域</th><th>城市</th><th>站点</th><th>用户数</th><th>柜效</th><th>融资状态</th><th>关联批次</th></tr></thead>
+          <table><thead><tr><th>SN</th><th>类型</th><th>区域</th><th>城市</th><th>站点</th><th>用户数</th><th>柜效</th><th>融资状态</th><th>关联资产包/批次</th></tr></thead>
           <tbody>${rows || "<tr><td colspan='9'>无匹配资产</td></tr>"}</tbody></table>
         </div></section>`;
     }
@@ -10154,29 +12792,65 @@
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
       const body = rows.map(s => {
         const unpaid = s.dueAmount - s.paidAmount;
-        const act = isOperatorRole() && unpaid > 0 ? `<button type="button" class="linkish" data-fin-repay="${s.id}">登记还款</button>` : "—";
+        const act = isOperatorRole() && unpaid > 0 ? `<button type="button" class="linkish" data-fin-repay="${s.id}">提交还款工单</button>` : "—";
         return `<tr><td>${s.dueDate}</td><td>${s.applicationId}</td><td>第 ${s.term} 期</td>
           <td>${finYuan(s.dueAmount)}</td><td>${finYuan(s.paidAmount)}</td><td>${finYuan(unpaid)}</td>
           <td>${tag(s.status)}</td><td>${act}</td></tr>`;
       }).join("");
       const dueSum = rows.filter(s => s.dueDate.startsWith("2026-06")).reduce((x, s) => x + s.dueAmount - s.paidAmount, 0);
-      return `<section class="panel">${panelHead("还款日历", `2026 年 6 月待还合计 ${finYuan(dueSum)} · 按应还日列表`)}
+      return `<section class="panel">${panelHead("还款日历", `2026 年 6 月待还合计 ${finYuan(dueSum)} · 运营商提交工单、资方确认 ${noteBtn("finance_repay_ticket")}`)}
         <div class="panel-body"><table><thead><tr>
           <th>应还日</th><th>批次</th><th>期次</th><th>应还</th><th>实还</th><th>未还</th><th>状态</th><th>操作</th>
         </tr></thead><tbody>${body || "<tr><td colspan='8'>暂无还款计划</td></tr>"}</tbody></table></div></section>`;
     }
 
     function renderFinanceManage() {
-      const tabs = [["dashboard", "工作台"], ["ledger", "融资台账"], ["projects", "授信项目"], ["assets", "资产池"], ["repayments", "还款日历"]];
+      const tabs = [["dashboard", "工作台"], ["packages", "资产包"], ["ledger", "融资台账"], ["projects", "授信项目"], ["assets", "资产池"], ["repayments", "还款日历"]];
       const tab = state.financeTab || "dashboard";
-      const map = { dashboard: renderFinanceDashboard, ledger: renderFinanceLedger, projects: renderFinanceProjects, assets: renderFinanceAssets, repayments: renderFinanceRepayments };
+      const map = { dashboard: renderFinanceDashboard, packages: renderFinancePackages, ledger: renderFinanceLedger, projects: renderFinanceProjects, assets: renderFinanceAssets, repayments: renderFinanceRepayments };
       return `${ownScopeBanner()}${pageWithTabs(tabSidebar(tabs, tab, "ftab"), map[tab] ? map[tab]() : "")}`;
+    }
+
+    function renderFinanceDrawdownDetail(app) {
+      if (!app) return "";
+      const pkg = app.packageId ? financePackageById(app.packageId) : null;
+      const proj = financeProjectById(app.projectId);
+      const plan = financePrePlanById(app.prePlanId);
+      const cr = projectCreditSummary(app.projectId);
+      const planRows = (plan?.lines || []).map(ln => `<tr><td>${ln.term}</td><td>${ln.dueDate}</td><td>${finYuan(ln.principal)}</td><td>${finYuan(ln.rent)}</td><td>${finYuan(ln.principal + ln.rent + (ln.serviceFee || 0))}</td></tr>`).join("");
+      const usagePct = cr.limit ? Math.min(100, Math.round((cr.used + cr.pending) / cr.limit * 100)) : 0;
+      const confirmBtn = app.status === "已提交资方" ? `<button type="button" class="btn primary" data-fin-confirm="${app.id}">尽调通过</button>` : "";
+      const rejectBtn = app.status === "已提交资方" ? `<button type="button" class="btn" data-fin-reject="${app.id}">驳回</button>` : "";
+      const fundBtn = app.status === "尽调通过" ? `<button type="button" class="btn primary" data-fin-fund="${app.id}">登记放款</button>` : "";
+      return `<div class="panel finance-approval-panel" style="margin-top:14px;border:1px solid var(--line)">
+        ${panelHead("尽调 / 放款 · " + app.id, tag(app.status), "finance_due_diligence")}
+        <div class="panel-body">
+          ${financeApprovalTimeline(app)}
+          <div class="kpi-grid in-panel" style="margin:16px 0">
+            <div class="kpi-card"><div class="kpi-label">承租运营商</div><div class="kpi-value" style="font-size:15px">${entityNameById(app.operatorId)}</div></div>
+            <div class="kpi-card"><div class="kpi-label">申请金额</div><div class="kpi-value">${finYuan(app.requestedAmount)}</div></div>
+            <div class="kpi-card"><div class="kpi-label">设备数</div><div class="kpi-value">${app.assetSns.length} 台</div></div>
+            <div class="kpi-card"><div class="kpi-label">资产包</div><div class="kpi-value" style="font-size:14px">${pkg?.name || "—"}</div></div>
+          </div>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 8px">授信项目：${proj?.name || app.projectId} · 可用 ${finYuan(cr.available)} / 总额 ${finYuan(cr.limit)}</p>
+          <div class="finance-credit-bar"><i style="width:${usagePct}%"></i></div>
+          <small style="color:var(--muted)">已占用 ${finYuan(cr.used)} + 拟占用 ${finYuan(cr.pending)}</small>
+          <h4 style="margin-top:16px">资产包明细 ${noteBtn("finance_asset_package")}</h4>
+          <table><thead><tr><th>SN</th><th>类型</th><th>站点</th><th>用户数</th><th>柜效</th><th>近30日收入</th><th>状态</th></tr></thead>
+          <tbody>${financePackageAssetTable(app.assetSns)}</tbody></table>
+          <h4 style="margin-top:16px">预还款计划 ${noteBtn("finance_pre_plan")}</h4>
+          <table><thead><tr><th>期次</th><th>应还日</th><th>本金</th><th>租金/利息</th><th>合计</th></tr></thead><tbody>${planRows || "<tr><td colspan='5'>—</td></tr>"}</tbody></table>
+          ${app.confirmNote ? `<p style="margin-top:10px;font-size:13px;color:var(--muted)">审批说明：${app.confirmNote}</p>` : ""}
+          ${app.rejectReason ? `<p style="margin-top:10px;font-size:13px;color:var(--red)">驳回原因：${app.rejectReason}</p>` : ""}
+          <div style="margin-top:16px;display:flex;gap:8px">${confirmBtn}${rejectBtn}${fundBtn}</div>
+        </div>
+      </div>`;
     }
 
     function renderFinanceDrawdown() {
       const eid = currentEntity().id;
       const apps = financeApplications.filter(a => a.financierId === eid).sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
-      const sel = state.financeSelectedAppId || apps.find(a => a.status === "已提交资方")?.id;
+      const sel = state.financeSelectedAppId || apps.find(a => a.status === "已提交资方")?.id || apps.find(a => a.status === "尽调通过")?.id;
       const rows = apps.map(a => {
         const op = entityNameById(a.operatorId);
         const active = sel === a.id ? " style=\"background:var(--brand-soft)\"" : "";
@@ -10184,25 +12858,27 @@
           <td>${op}</td><td>${a.month} · 第 ${a.batchNo} 批</td><td>${a.assetSns.length}</td>
           <td>${finYuan(a.requestedAmount)}</td><td>${tag(a.status)}</td><td>${a.submittedAt || "—"}</td></tr>`;
       }).join("");
-      const app = financeAppById(sel);
-      let detail = "";
-      if (app) {
-        const plan = financePrePlanById(app.prePlanId);
-        const planRows = (plan?.lines || []).map(ln => `<tr><td>${ln.term}</td><td>${ln.dueDate}</td><td>${finYuan(ln.principal + ln.rent)}</td></tr>`).join("");
-        const confirmBtn = app.status === "已提交资方" ? `<button type="button" class="btn primary" data-fin-confirm="${app.id}">确认申请与预还款计划</button>` : "";
-        const fundBtn = app.status === "资方已确认" ? `<button type="button" class="btn" data-fin-fund="${app.id}">录入借据（演示）</button>` : "";
-        detail = `<div class="panel" style="margin-top:14px"><div class="panel-body">
-          <h4>${app.id} · ${tag(app.status)}</h4>
-          <p>承租运营商：<strong>${entityNameById(app.operatorId)}</strong> · 申请 ${finYuan(app.requestedAmount)} · 设备 ${app.assetSns.join("、")}</p>
-          <h4 style="margin-top:12px">预还款计划</h4>
-          <table><thead><tr><th>期次</th><th>应还日</th><th>合计</th></tr></thead><tbody>${planRows}</tbody></table>
-          <div style="margin-top:14px;display:flex;gap:8px">${confirmBtn}${fundBtn}</div>
-        </div></div>`;
-      }
-      return `${ownScopeBanner()}<section class="panel">${panelHead("放款申请", `待确认 ${pendingFinanceDrawdownCount()} 笔 · 资方审核运营商提交的放款批次`)}
+      const detail = renderFinanceDrawdownDetail(financeAppById(sel));
+      const credits = financeOperatorCredits.filter(c => c.financierId === eid);
+      const creditRows = credits.map(c => `<tr><td>${entityNameById(c.operatorId)}</td><td>${finYuan(c.totalLimit)}</td><td>${finYuan(c.usedAmount)}</td><td>${finYuan(c.pendingAmount)}</td><td>${finYuan(Math.max(0, c.totalLimit - c.usedAmount - c.pendingAmount))}</td><td>${c.revolving ? "循环" : "非循环"}</td><td>${c.approvedAt}</td></tr>`).join("");
+      const tickets = financeRepaymentTickets.filter(t => t.financierId === eid && t.status === "待确认");
+      const ticketRows = tickets.map(t => {
+        const sched = financeRepaymentSchedules.find(s => s.id === t.scheduleId);
+        return `<tr><td>${t.id}</td><td>${entityNameById(t.operatorId)}</td><td>${t.applicationId}</td><td>${sched ? "第 " + sched.term + " 期" : "—"}</td><td>${finYuan(t.amount)}</td><td>${t.payMethod}</td><td>${t.submittedAt}</td><td><button type="button" class="link-btn" data-fin-repay-confirm="${t.id}">确认入账</button></td></tr>`;
+      }).join("");
+      return `${ownScopeBanner()}
+        <section class="panel">${panelHead("主体授信（录入）", "批授信线下完成后由资方录入", "finance_operator_credit")}
+          <div class="panel-body"><table><thead><tr><th>运营商</th><th>总额</th><th>已占用</th><th>拟占用</th><th>可用</th><th>类型</th><th>批授信日</th></tr></thead>
+          <tbody>${creditRows || "<tr><td colspan='7'>暂无</td></tr>"}</tbody></table></div></section>
+        <section class="panel" style="margin-top:16px">${panelHead("放款申请 / 尽调", `待尽调 ${pendingFinanceDrawdownCount()} 笔`, "finance_due_diligence")}
         <div class="panel-body"><table><thead><tr>
           <th>批次号</th><th>运营商</th><th>申请月</th><th>设备数</th><th>申请金额</th><th>状态</th><th>提交时间</th>
-        </tr></thead><tbody>${rows || "<tr><td colspan='7'>暂无申请</td></tr>"}</tbody></table>${detail}</div></section>`;
+        </tr></thead><tbody>${rows || "<tr><td colspan='7'>暂无申请</td></tr>"}</tbody></table>${detail}</div></section>
+        <section class="panel" style="margin-top:16px">${panelHead("还款工单确认", `${tickets.length} 笔待确认 ${noteBtn("finance_repay_ticket")}`, "finance_repay_ticket")}
+          <div class="panel-body"><table><thead><tr><th>工单号</th><th>运营商</th><th>批次</th><th>期次</th><th>金额</th><th>方式</th><th>提交时间</th><th>操作</th></tr></thead>
+          <tbody>${ticketRows || "<tr><td colspan='8'>暂无待确认工单</td></tr>"}</tbody></table>
+          <p style="margin-top:10px;font-size:12px;color:var(--muted)">违约金参考：宽限期 3 天 · 日率 0.05% · 上限当期应还 24% ${noteBtn("finance_penalty")}</p>
+        </div></section>`;
     }
 
     function bindPageDynamicControls() {
@@ -10225,8 +12901,78 @@
       /* 说明按钮使用 document 级事件委托，见文末 init */
     }
 
+    const VIEW_RENDERERS = {
+      overview: renderOverview,
+      pricing: renderPricing,
+      channelSales: renderChannelSales,
+      sites: renderSites,
+      sitePartners: renderSitePartners,
+      siteExpenses: renderSiteExpenses,
+      partnerOverview: renderPartnerOverview,
+      partnerBindings: renderPartnerBindings,
+      partnerLedger: renderPartnerLedger,
+      partnerWithdraw: renderPartnerWithdraw,
+      partnerAccount: renderPartnerAccount,
+      devices: renderDevices,
+      leaseAgreements: renderLeaseAgreements,
+      leaseCollect: renderLeaseCollect,
+      leaseRent: renderLeaseRent,
+      financeManage: renderFinanceManage,
+      financeDrawdown: renderFinanceDrawdown,
+      orderPackage: renderOrders,
+      orderSwap: renderOrders,
+      orderFreeze: renderOrders,
+      orderAudit: renderOrderAudit,
+      refundManage: renderRefundManage,
+      flows: renderFlows,
+      interOp: renderInterOp,
+      depositAccount: renderDepositAccount,
+      platformFee: renderPlatformFee,
+      employees: renderEmployees,
+      users: renderUsers,
+      accounts: renderAccounts,
+      dayPool: renderDayPool,
+      channelSettlement: renderChannelSettlement,
+      activationCodes: renderActivationCodes,
+      activationRecords: renderActivationRecords,
+      channelCredit: renderChannelCredit,
+      channelLinks: renderChannelLinks,
+      channelOrders: renderChannelOrders,
+      commissionStatement: renderCommissionStatement,
+      rentPool: renderRentPool,
+      rentDevices: renderRentDevices,
+      leaseBatteryHold: renderLeaseBatteryHold,
+      leaseWhitelist: renderLeaseWhitelist,
+      leasePkgPricing: renderLeasePkgPricing,
+      channelInterOp: renderChannelInterOp,
+      operators: renderOperators,
+      platformLeasing: renderPlatformLeasing,
+      operatorCreditEval: renderOperatorCreditEval,
+      depositManage: renderDepositManage,
+      deviceBinding: renderDeviceBinding,
+      l1Pricing: renderL1Pricing,
+      platformUsers: renderPlatformUsers,
+      platformOrders: renderPlatformOrders,
+      platformDevices: renderPlatformDevices,
+      platformChannels: renderPlatformChannels,
+      platformMarketing: renderPlatformMarketing,
+      platformFlows: renderPlatformFlows,
+      platformAccounts: renderPlatformAccounts
+    };
+
+    function renderCurrentViewHtml() {
+      const fn = VIEW_RENDERERS[state.view];
+      if (!fn) return `<section class="panel"><div class="panel-body"><p>页面未实现：${state.view}</p></div></section>`;
+      return fn();
+    }
+
     function render() {
-      renderNav();
+      try {
+        renderNav();
+      } catch (e) {
+        console.error(e);
+        document.querySelector("#nav").innerHTML = `<button type="button" class="active" data-view="overview">总览</button>`;
+      }
       syncTenantUi();
       renderGlobalHeader();
       updateScopeHint();
@@ -10234,55 +12980,14 @@
       document.querySelector("#pageTitle").textContent = pageMeta[0];
       document.querySelector("#pageDesc").textContent = pageMeta[1];
       document.querySelector("#pageModuleNote").innerHTML = renderPageModuleNote();
-      const html = {
-        overview: renderOverview(),
-        pricing: renderPricing(),
-        channelSales: renderChannelSales(),
-        sites: renderSites(),
-        devices: renderDevices(),
-        leaseAgreements: renderLeaseAgreements(),
-        leaseCollect: renderLeaseCollect(),
-        leaseRent: renderLeaseRent(),
-        financeManage: renderFinanceManage(),
-        financeDrawdown: renderFinanceDrawdown(),
-        orderPackage: renderOrders(), orderSwap: renderOrders(), orderFreeze: renderOrders(),
-        orderAudit: renderOrderAudit(),
-        refundManage: renderRefundManage(),
-        flows: renderFlows(),
-        interOp: renderInterOp(),
-        depositAccount: renderDepositAccount(),
-        platformFee: renderPlatformFee(),
-        employees: renderEmployees(),
-        users: renderUsers(),
-        accounts: renderAccounts(),
-        dayPool: renderDayPool(),
-        channelSettlement: renderChannelSettlement(),
-        activationCodes: renderActivationCodes(),
-        activationRecords: renderActivationRecords(),
-        channelCredit: renderChannelCredit(),
-        channelLinks: renderChannelLinks(),
-        channelOrders: renderChannelOrders(),
-        commissionStatement: renderCommissionStatement(),
-        rentPool: renderRentPool(),
-        rentDevices: renderRentDevices(),
-        leaseBatteryHold: renderLeaseBatteryHold(),
-        leaseWhitelist: renderLeaseWhitelist(),
-        operators: renderOperators(),
-        platformLeasing: renderPlatformLeasing(),
-        operatorCreditEval: renderOperatorCreditEval(),
-        depositManage: renderDepositManage(),
-        deviceBinding: renderDeviceBinding(),
-        l1Pricing: renderL1Pricing(),
-        platformUsers: renderPlatformUsers(),
-        platformOrders: renderPlatformOrders(),
-        platformDevices: renderPlatformDevices(),
-        platformChannels: renderPlatformChannels(),
-        platformFlows: renderPlatformFlows(),
-        platformAccounts: renderPlatformAccounts()
-      };
-      document.querySelector("#views").innerHTML = Object.keys(html).map(k =>
-        `<div class="view ${state.view === k ? "active" : ""}">${html[k]}</div>`
-      ).join("");
+      let body = "";
+      try {
+        body = renderCurrentViewHtml();
+      } catch (e) {
+        console.error(e);
+        body = `<section class="panel"><div class="panel-body"><p style="color:var(--red);margin:0 0 8px"><strong>页面渲染失败</strong>：${String(e.message || e)}</p><p style="font-size:13px;color:var(--muted);margin:0">请打开浏览器控制台查看详情；建议通过 <code>python3 main.py</code> 访问 <code>/prototype/index.html</code>。</p></div></section>`;
+      }
+      document.querySelector("#views").innerHTML = `<div class="view active">${body}</div>`;
       bindInteractiveActions(document);
       bindPageDynamicControls();
       if (state.detailSubId) openPackageDetail(state.detailSubId);
@@ -10307,7 +13012,8 @@
       applyLoginKey(e.target.value);
       state.employeeTab = "staff";
       const nav = getAllowedNavItems();
-      state.view = nav.includes("overview") ? "overview" : nav[0];
+      if (state.role === "sitePartner") state.view = "partnerOverview";
+      else state.view = nav.includes("overview") ? "overview" : nav[0];
       closeDrawer();
       closeEmployeeForm();
       render();
@@ -10473,6 +13179,22 @@
       applyPowerFiltersFromDom();
       render();
     });
+    document.addEventListener("change", e => {
+      const el = e.target.closest("[data-site-expense-pf]");
+      if (!el || state.view !== "siteExpenses") return;
+      const sp = getSiteExpensePf();
+      sp[el.dataset.siteExpensePf] = el.value;
+      if (el.dataset.siteExpensePf === "range") {
+        syncSiteExpenseRangeDates(sp);
+        render();
+      }
+    });
+    document.addEventListener("click", e => {
+      if (!e.target.closest("[data-site-expense-query]")) return;
+      if (state.view !== "siteExpenses") return;
+      applySiteExpenseFiltersFromDom();
+      render();
+    });
 
     (function () {
       const link = document.getElementById("navDocsLink");
@@ -10481,5 +13203,10 @@
       }
     })();
 
-    render();
+    initProtoDialogs();
+    if (typeof NAV === "undefined" || typeof financeApplications === "undefined" || typeof platformMarketingCampaigns === "undefined") {
+      document.querySelector("#views").innerHTML = `<section class="panel"><div class="panel-body"><p style="color:var(--red);margin:0 0 8px"><strong>Mock 数据未加载</strong></p><p style="font-size:13px;color:var(--muted);margin:0">请确认已打开 <code>prototype/index.html</code>，并通过 <code>cd 原型/外卖 && python3 main.py</code> 启动本地服务后访问 <a href="/prototype/index.html">/prototype/index.html</a>。</p></div></section>`;
+    } else {
+      render();
+    }
   

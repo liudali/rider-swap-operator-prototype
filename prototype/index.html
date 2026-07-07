@@ -313,6 +313,36 @@
     </div>
     <div class="note-body" id="noteBody"></div>
   </div>
+  <div id="protoToast" class="proto-toast" role="status" aria-live="polite"></div>
+  <div class="note-mask" id="protoFormMask"></div>
+  <div class="note-modal" id="protoFormModal" role="dialog" aria-modal="true" style="width:min(480px,calc(100vw - 32px))">
+    <div class="note-head">
+      <h3 id="protoFormTitle">填写信息</h3>
+      <button class="btn" type="button" id="closeProtoForm">关闭</button>
+    </div>
+    <div class="note-body">
+      <div id="protoFormSuccess" class="proto-form-msg success" hidden></div>
+      <div id="protoFormError" class="proto-form-msg error" hidden></div>
+      <form id="protoForm" class="form-grid"></form>
+      <div class="form-actions" id="protoFormActions">
+        <button class="btn" type="button" id="cancelProtoForm">取消</button>
+        <button class="btn primary" type="button" id="submitProtoForm">确定</button>
+      </div>
+    </div>
+  </div>
+  <div class="note-mask" id="protoConfirmMask"></div>
+  <div class="note-modal" id="protoConfirmModal" role="dialog" aria-modal="true" style="width:min(420px,calc(100vw - 32px))">
+    <div class="note-head">
+      <h3 id="protoConfirmTitle">确认</h3>
+    </div>
+    <div class="note-body">
+      <p id="protoConfirmMessage" style="margin:0 0 16px"></p>
+      <div class="form-actions">
+        <button class="btn" type="button" id="cancelProtoConfirm">取消</button>
+        <button class="btn primary" type="button" id="okProtoConfirm">确定</button>
+      </div>
+    </div>
+  </div>
   <div class="note-mask data-panel-mask" id="dataPanelMask"></div>
   <div class="data-panel-modal" id="dataPanelModal" role="dialog" aria-modal="true" aria-labelledby="dataPanelTitle">
     <div class="note-head">
