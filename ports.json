@@ -1,0 +1,8 @@
+{
+  "外卖": {
+    "port": 8766,
+    "label": "骑手换电 · 运营商后台",
+    "entry": "/prototype/index.html",
+    "serveDir": "."
+  }
+}

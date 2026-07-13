@@ -26,9 +26,9 @@
 
 | 端 | 本地（须先 `python3 main.py`） | 在线（GitHub Pages） |
 |----|-------------------------------|----------------------|
-| **运营商后台** | http://127.0.0.1:8766/prototype/index.html | https://lihuoxiu555.github.io/rider-swap-operator-prototype/ |
-| **骑手端** | http://127.0.0.1:8766/prototype/mobile/index.html | https://lihuoxiu555.github.io/rider-swap-operator-prototype/mobile/index.html |
-| **产品文档** | http://127.0.0.1:8766/prototype/docs/index.html | https://lihuoxiu555.github.io/rider-swap-operator-prototype/documentation/ |
+| **运营商后台** | http://127.0.0.1:8766/prototype/index.html | https://liudali.github.io/rider-swap-operator-prototype/ |
+| **骑手端** | http://127.0.0.1:8766/prototype/mobile/index.html | https://liudali.github.io/rider-swap-operator-prototype/mobile/index.html |
+| **产品文档** | http://127.0.0.1:8766/prototype/docs/index.html | https://liudali.github.io/rider-swap-operator-prototype/documentation/ |
 
 > **注意**：本地根目录有 `prototype/` 前缀；GitHub Pages 发布的是 `docs/` 目录，**线上没有** `/prototype/` 路径（勿访问 `…/prototype/index.html`，会 404）。
 
@@ -39,7 +39,7 @@
 ## 快速开始
 
 ```bash
-cd 原型/外卖
+cd 原型-外卖
 python3 main.py
 ```
 
@@ -49,10 +49,10 @@ python3 main.py
 |------|----------|----------|
 | **本地** | http://127.0.0.1:8766/prototype/index.html | 未执行 `python3 main.py` 会无法连接 |
 | **本地** | http://127.0.0.1:8766/ | 根路径自动跳转 |
-| **在线** | https://lihuoxiu555.github.io/rider-swap-operator-prototype/ | `/prototype/index.html` 会 404（已加重定向） |
+| **在线** | https://liudali.github.io/rider-swap-operator-prototype/ | `/prototype/index.html` 会 404（已加重定向） |
 
 骑手端本地：http://127.0.0.1:8766/prototype/mobile/index.html  
-骑手端在线：https://lihuoxiu555.github.io/rider-swap-operator-prototype/mobile/index.html
+骑手端在线：https://liudali.github.io/rider-swap-operator-prototype/mobile/index.html
 
 ## 在线预览（团队直接点链接）
 
@@ -60,8 +60,8 @@ python3 main.py
 
 | 内容 | 链接 |
 |------|------|
-| **交互原型** | https://lihuoxiu555.github.io/rider-swap-operator-prototype/ |
-| **产品文档浏览器** | https://lihuoxiu555.github.io/rider-swap-operator-prototype/documentation/ |
+| **交互原型** | https://liudali.github.io/rider-swap-operator-prototype/ |
+| **产品文档浏览器** | https://liudali.github.io/rider-swap-operator-prototype/documentation/ |
 
 仓库 **Settings → Pages**：Source 选 **Deploy from a branch**，Branch `main`，Folder **`/docs`**。`git push` 后约 1～2 分钟生效。
 

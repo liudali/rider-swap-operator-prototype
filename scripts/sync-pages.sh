@@ -11,7 +11,7 @@ DOC_VIEWER_SRC="$ROOT/prototype/docs/index.html"
 DOC_VIEWER_DST="$ROOT/docs/documentation/index.html"
 MOBILE_SRC="$ROOT/prototype/mobile"
 MOBILE_DST="$ROOT/docs/mobile"
-PAGES_URL="https://lihuoxiu555.github.io/rider-swap-operator-prototype/"
+PAGES_URL="https://liudali.github.io/rider-swap-operator-prototype/"
 CHANGELOG="$ROOT/docs/原型变更记录.md"
 
 usage() {

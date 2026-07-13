@@ -4,7 +4,8 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+APP_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(APP_ROOT))
 
 from _serve import run_static_server  # noqa: E402
 
@@ -38,15 +39,14 @@ def sync_docs_to_viewer(app_root: Path) -> None:
 
 
 def main() -> None:
-    app_root = Path(__file__).resolve().parent
-    proto_root = app_root / "prototype"
+    proto_root = APP_ROOT / "prototype"
     if not proto_root.is_dir():
         raise SystemExit(f"Prototype directory not found: {proto_root}")
 
-    sync_docs_to_viewer(app_root)
+    sync_docs_to_viewer(APP_ROOT)
     run_static_server(
         project_id="外卖",
-        app_root=app_root,
+        app_root=APP_ROOT,
         no_cache=True,
         extra_lines=[
             "后台:   /prototype/index.html",
