@@ -1020,7 +1020,7 @@
 
     function formatMaxChannels(tier) {
       if (!tier) return "—";
-      return tier.maxChannels == null ? "不限" : "≤" + tier.maxChannels;
+      return "融资参考（不限渠道数）";
     }
 
     function operatorCreditCap(operatorId) {
@@ -4315,6 +4315,7 @@
         <label>关联设备清单<select name="deviceListId" required ${formMode === "change" ? "disabled" : ""}>${listSelect}</select></label>
         ${formMode !== "change" ? `<p style="font-size:12px;margin:0;grid-column:1/-1"><button type="button" class="link-btn" data-jump-device-lists>前往新建设备清单</button></p>` : ""}
         <label>租期类型<select name="termType"><option ${(!c || c.termType === "固定租期") ? "selected" : ""}>固定租期</option><option ${c?.termType === "滚动租期" ? "selected" : ""}>滚动租期</option></select></label>
+        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">滚动租期终止：须提前 N 天通知 → 生成<strong>终止结算单</strong> → 资方+运营商确认（平台只读）。<button type="button" class="link-btn" id="demoLeaseTerminate">演示终止结算单</button></p>
         <label>起始日<input name="start" type="date" value="${c?.start || new Date().toISOString().slice(0, 10)}" required></label>
         <div class="lease-fixed-fields" style="display:contents">
           <label>截止日<input name="end" type="date" value="${c?.end || ""}"></label>
@@ -4540,7 +4541,7 @@
               <div class="detail-item"><span>信用封顶</span><strong>¥${tier.creditCap.toLocaleString("zh-CN")}</strong></div>
               <div class="detail-item"><span>最低保证金</span><strong>${formatMinDeposit(tier)}</strong></div>
               <div class="detail-item"><span>跨网默认</span><strong>${tier.crossNetworkDefault ? "开" : "关"}</strong></div>
-              <div class="detail-item"><span>可签渠道</span><strong>${formatMaxChannels(tier)}（已签 ${st.channels}）</strong></div>
+              <div class="detail-item"><span>档位用途</span><strong>融资参考 · 已签渠道 ${st.channels}（不限）</strong></div>
               <div class="detail-item"><span>下次复审</span><strong>${prof.nextReviewAt || "—"}</strong></div>
             </div>` : `<p style="margin:0;font-size:13px;color:var(--warn)">该运营商尚未完成入网定档，请前往「运营商信用评估」。</p>`}
           </div>
@@ -5428,13 +5429,12 @@
           ${panelHead("准入档位政策包", "A/B/C/D 四档；调整影响新定档与复审，已生效运营商须人工升降档", "operator_credit_eval")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>档位</th><th>最低保证金</th><th>信用封顶</th><th>跨网默认</th><th>可签渠道</th><th>说明</th><th>操作</th></tr></thead>
+              <thead><tr><th>档位</th><th>最低保证金</th><th>信用封顶</th><th>跨网默认</th><th>说明（融资参考）</th><th>操作</th></tr></thead>
               <tbody>${operatorAdmissionTierConfig.map(t => `<tr>
                 <td><strong>${t.code} ${t.name}</strong></td>
                 <td>${formatMinDeposit(t)}</td>
                 <td>${t.creditCap ? "¥" + t.creditCap.toLocaleString("zh-CN") : "0"}</td>
                 <td>${t.crossNetworkDefault ? tag("开") : tag("关")}</td>
-                <td>${formatMaxChannels(t)}</td>
                 <td>${t.remark}</td>
                 <td><button type="button" class="link-btn" data-edit-admission-tier="${t.code}">编辑（演示）</button></td>
               </tr>`).join("")}</tbody>
@@ -5478,7 +5478,7 @@
                 const credit = creditForOperator(op.id);
                 const chCount = operatorAggregateStats(op.id).channels;
                 const chLimit = formatMaxChannels(tier);
-                const chWarn = tier?.maxChannels != null && chCount >= tier.maxChannels;
+                const chWarn = false; /* 2026-07-13：档位不限可签渠道数 */
                 return `<tr>
                   <td><strong>${op.name}</strong><br><small>${op.id}</small></td>
                   <td>${tag(tierLabel(prof.tierCode))}</td>
@@ -5580,7 +5580,7 @@
               <div class="detail-item"><span>最低保证金建议</span><strong>${formatMinDeposit(tier)}</strong></div>
               <div class="detail-item"><span>信用额度封顶</span><strong>${cap != null ? "¥" + cap.toLocaleString("zh-CN") : "—"}</strong></div>
               <div class="detail-item"><span>跨网默认</span><strong>${tier.crossNetworkDefault ? "允许" : "关闭"}</strong></div>
-              <div class="detail-item"><span>可签渠道数</span><strong>${formatMaxChannels(tier)}</strong></div>
+              <div class="detail-item"><span>档位用途</span><strong>可融资水平参考（与渠道数无关）</strong></div>
               <div class="detail-item"><span>下次复审</span><strong>${prof.nextReviewAt || "—"}</strong></div>
             </div>
           </div>
@@ -5947,6 +5947,23 @@
         </section>`;
     }
 
+
+    function renderSmsAlertRecordsPanel() {
+      const rows = (typeof smsAlertRecords !== "undefined" ? smsAlertRecords : []);
+      const tpls = (typeof smsAlertTemplates !== "undefined" ? smsAlertTemplates : []);
+      return `<section class="panel" style="margin-top:16px">
+        ${panelHead("预警短信 · 模板与记录", "一期：可配模板/接收人；发送可查（2026-07-13）", "day_pool_warn")}
+        <div class="panel-body orders-table-wrap">
+          <h4 style="margin:0 0 8px;font-size:13px">模板</h4>
+          <table><thead><tr><th>模板ID</th><th>名称</th><th>接收人</th><th>渠道</th></tr></thead>
+          <tbody>${tpls.map(x => `<tr><td>${x.id}</td><td>${x.name}</td><td>${x.receivers}</td><td>${x.channel}</td></tr>`).join("") || "<tr><td colspan='4'>—</td></tr>"}</tbody></table>
+          <h4 style="margin:16px 0 8px;font-size:13px">发送记录</h4>
+          <table><thead><tr><th>时间</th><th>模板</th><th>对象</th><th>手机</th><th>业务单</th><th>状态</th></tr></thead>
+          <tbody>${rows.map(r => `<tr><td>${r.time}</td><td>${r.template}</td><td>${r.toRole}</td><td>${r.to}</td><td>${r.bizRef}</td><td>${tag(r.status)}</td></tr>`).join("") || "<tr><td colspan='6'>—</td></tr>"}</tbody></table>
+        </div>
+      </section>`;
+    }
+
     function renderL1Pricing() {
       return `
         ${ownScopeBanner()}
@@ -5960,7 +5977,23 @@
               <label>状态<select id="l1Status"><option ${l1UnifiedPricing.status === "生效" ? "selected" : ""}>生效</option><option ${l1UnifiedPricing.status === "停用" ? "selected" : ""}>停用</option></select></label>
             </form>
             <p style="font-size:12px;color:var(--muted);margin:12px 0">最近更新：${l1UnifiedPricing.updatedAt} · ${l1UnifiedPricing.updatedBy}。变更后 enrichSwapTriplet / 运营商往来账演示按新单价计算。</p>
-            <button type="button" class="btn primary" id="saveL1Pricing">发布跨网统价（演示）</button>
+            <button type="button" class="btn primary" id="saveL1Pricing">发布全网默认价（演示）</button>
+            <p style="font-size:12px;color:var(--muted);margin:10px 0 0">改价<strong>不追溯</strong>历史跨网订单。城市覆盖见下表。</p>
+          </div>
+        </section>
+        <section class="panel">
+          ${panelHead("城市覆盖价", "默认全网价；可按城市单独覆盖柜机/电池单价（2026-07-13 确认）", "platform_l1_pricing")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>城市</th><th>柜机费</th><th>电池费</th><th>状态</th><th>更新</th><th>操作</th></tr></thead>
+              <tbody>${(typeof l1CityOverrides !== "undefined" ? l1CityOverrides : []).map(r => `<tr>
+                <td><strong>${r.city}</strong></td>
+                <td>¥${r.cabinetFee}</td><td>¥${r.batteryFee}</td>
+                <td>${tag(r.status)}</td><td>${r.updatedAt}</td>
+                <td><button type="button" class="link-btn" data-l1-city-edit="${r.id}">编辑（演示）</button></td>
+              </tr>`).join("") || "<tr><td colspan='6'>暂无城市覆盖</td></tr>"}</tbody>
+            </table>
+            <button type="button" class="btn" style="margin-top:10px" id="addL1CityOverride">+ 添加城市覆盖（演示）</button>
           </div>
         </section>
         <section class="panel">
@@ -6008,9 +6041,11 @@
               <li>运营商后台「运营商往来账」展示平台统价，不可自行改价</li>
               <li>B 端平台服务费按<strong>各运营商 B 端比例</strong> × 人天标准日值计提，与运营商实际批发价无关</li>
               <li>日清 ${INTER_OP_CLEAR_TIME}：优先划扣保证金，保证金为 0 才启用信用额度</li>
+              <li>城市覆盖价优先于全网默认价；改价不追溯</li>
             </ul>
           </div>
-        </section>`;
+        </section>
+        ${renderSmsAlertRecordsPanel()}`;
     }
 
     function renderPlatformUsers() {
@@ -6787,13 +6822,14 @@
         return `
           ${ownScopeBanner()}
           ${lowPool ? `<div class="pool-warn-banner">${noteBtn("day_pool_warn")}
+            <div style="font-size:12px;margin-top:6px">已触发「不足在职骑手×10天」规则 → 短信已发渠道商+运营商（见短信记录）</div>
             <strong>人天额度池余额预警</strong>：${lowPool.name}（${lowPool.id}）可用余额仅 <strong>${lowPool.balancePct}%</strong>（${lowPool.availableDays} 人天）。
             <button type="button" class="link-btn" data-view-jump="dayPool">进入额度池</button></div>` : ""}
           <div class="kpi-grid">
             ${kpi("人天池可用", poolAvail + " 人天", "预占中 " + poolFrozen + " 人天", "池", "day_pool_panel")}
             ${kpi("在职骑手", riderCount, "已登记团队成员", "骑", "day_pool_channel")}
             ${kpi("签约运营商", contract ? contract.operatorName : "—", contract ? "批发 ¥" + contract.wholesalePrice + "/人天" : "", "运", "day_pool_contract")}
-            ${kpi(lowPool ? "额度池预警" : "额度池数", lowPool ? lowPool.id + " · " + lowPool.balancePct + "%" : pools.length + " 个", lowPool ? "低于 20% 阈值" : "向运营商采购", lowPool ? "!" : "池", lowPool ? "day_pool_warn" : "day_pool_purchase")}
+            ${kpi(lowPool ? "额度池预警" : "额度池数", lowPool ? lowPool.id + " · " + lowPool.balancePct + "%" : pools.length + " 个", lowPool ? "低于 20% 或不足在职×10天" : "向运营商采购", lowPool ? "!" : "池", lowPool ? "day_pool_warn" : "day_pool_purchase")}
           </div>
           ${contract ? `<section class="panel">
             ${panelHead("签约运营商", "批发价与合同（只读）；可用站点见额度使用规则", "day_pool_contract")}
@@ -8002,7 +8038,22 @@
             </div>
           </div>
         </section>
+        <section class="panel" style="margin-top:14px">
+          ${panelHead("设备告警", "本柜 IoT Webhook 告警（一期真联调；原型 Mock）", "devices_cab")}
+          <div class="panel-body orders-table-wrap" style="padding-top:0">
+            <table>
+              <thead><tr><th>时间</th><th>级别</th><th>类型</th><th>消息</th><th>状态</th></tr></thead>
+              <tbody>${(typeof deviceAlerts !== "undefined" ? deviceAlerts : []).filter(a => a.deviceSn === c.sn).map(a => `<tr>
+                <td>${a.raisedAt || a.time || "—"}</td><td>${tag(a.severity || "中")}</td>
+                <td>${a.alertType || a.type || "—"}</td><td style="white-space:normal">${a.message || "—"}</td>
+                <td>${tag(a.status || "待处理")}</td>
+              </tr>`).join("") || "<tr><td colspan='5'>暂无本柜告警</td></tr>"}</tbody>
+            </table>
+            <p style="font-size:12px;color:var(--muted);margin:8px 0 0">短信模板/接收人见平台告警配置；发送记录可查。</p>
+          </div>
+        </section>
         ${opsDemo ? `<div class="cab-ops-bar">
+          <p style="width:100%;margin:0 0 8px;font-size:12px;color:var(--muted)">远程运维：原型为演示桩；生产接 IoT 真接口（2026-07-13 确认一期）</p>
           <button type="button" class="btn primary" data-cab-demo="查看电柜快照">查看电柜快照</button>
           <button type="button" class="btn primary" data-cab-demo="查看设备快照">查看设备快照</button>
           <button type="button" class="btn primary" data-cab-demo="查看发送请求记录">查看发送请求记录</button>
@@ -10056,6 +10107,7 @@
         <section class="panel">
           ${panelHead("渠道商权益与信用", "按结算模式展示权益 · 人天池/设备租赁适用信用评估", "channel_partner_rights")}
           <div class="panel-body orders-table-wrap">
+            <p style="font-size:12px;margin:0 0 12px"><label><input type="checkbox" id="depositStopOnShort" checked /> 押金不足时停服（一期可配 · 2026-07-13）</label></p>
             <table>
               <thead><tr><th>渠道商</th><th>结算模式</th><th>信用分</th><th>信用额度</th><th>应押/缺口</th><th>待审凭证</th><th>操作</th></tr></thead>
               <tbody>${rows.map(c => {
@@ -11497,7 +11549,7 @@
         btn.onclick = () => { state.cabinetDetailSn = null; render(); };
       });
       root.querySelectorAll("[data-cab-demo]").forEach(btn => {
-        btn.onclick = () => window.alert(`[Web 运维演示] ${btn.dataset.cabDemo} 指令已下发（D17）`);
+        btn.onclick = () => window.alert(`[IoT 远程运维 · 演示桩] ${btn.dataset.cabDemo} 已模拟下发；生产接真实 IoT 指令接口`);
       });
       root.querySelectorAll("[data-cab-refresh-iccid]").forEach(btn => {
         btn.onclick = () => window.alert("演示：已刷新物联网卡状态");
@@ -12877,11 +12929,28 @@
         <section class="panel" style="margin-top:16px">${panelHead("还款工单确认", `${tickets.length} 笔待确认 ${noteBtn("finance_repay_ticket")}`, "finance_repay_ticket")}
           <div class="panel-body"><table><thead><tr><th>工单号</th><th>运营商</th><th>批次</th><th>期次</th><th>金额</th><th>方式</th><th>提交时间</th><th>操作</th></tr></thead>
           <tbody>${ticketRows || "<tr><td colspan='8'>暂无待确认工单</td></tr>"}</tbody></table>
-          <p style="margin-top:10px;font-size:12px;color:var(--muted)">违约金参考：宽限期 3 天 · 日率 0.05% · 上限当期应还 24% ${noteBtn("finance_penalty")}</p>
-        </div></section>`;
+          <p style="margin-top:10px;font-size:12px;color:var(--muted)">违约金可配参数见下方 ${noteBtn("finance_penalty")}</p>
+        </div></section>
+        <section class="panel" style="margin-top:16px">${panelHead("违约金规则（可配）", "一期落地常规类型+参数；租金逾期只标记不停服", "finance_penalty")}
+          <div class="panel-body">
+            <p style="font-size:13px;margin:0 0 8px">类型：${(typeof leasePenaltyConfig !== "undefined" ? leasePenaltyConfig.types : []).join(" / ") || "逾期未缴 / 擅自转租 / 设备损毁 / 提前退租"}</p>
+            <p style="font-size:13px;margin:0 0 8px">宽限期 <strong>${typeof leasePenaltyConfig !== "undefined" ? leasePenaltyConfig.graceDays : 3}</strong> 天 · 日率 <strong>${typeof leasePenaltyConfig !== "undefined" ? leasePenaltyConfig.dailyRatePct : 0.05}%</strong> · 上限当期应还 <strong>${typeof leasePenaltyConfig !== "undefined" ? leasePenaltyConfig.capPctOfDue : 24}%</strong></p>
+            <button type="button" class="btn" id="editLeasePenalty">编辑参数（演示）</button>
+            <p style="font-size:12px;color:var(--muted);margin:8px 0 0">更新：${typeof leasePenaltyConfig !== "undefined" ? leasePenaltyConfig.updatedAt + " · " + leasePenaltyConfig.updatedBy : "—"}</p>
+          </div>
+        </section>`;
     }
 
     function bindPageDynamicControls() {
+      const ep = document.querySelector("#editLeasePenalty");
+      if (ep) ep.onclick = () => window.alert("演示：已打开违约金参数编辑（宽限期/日率/上限/类型多选）");
+      const term = document.querySelector("#demoLeaseTerminate");
+      if (term) term.onclick = () => window.alert("演示终止结算单 TS-260713\n· 提前通知日已满足\n· 应付租金/违约金/设备回收清单\n· 待资方+运营商确认（平台只读）");
+      const addCity = document.querySelector("#addL1CityOverride");
+      if (addCity) addCity.onclick = () => window.alert("演示：新增城市覆盖价（保存后仅影响新产生跨网费）");
+      document.querySelectorAll("[data-l1-city-edit]").forEach(btn => {
+        btn.onclick = () => window.alert("演示：编辑城市覆盖 " + btn.dataset.l1CityEdit);
+      });
       renderPageFilters();
       document.querySelectorAll("[data-swap-policy]").forEach(inp => {
         inp.onchange = () => {

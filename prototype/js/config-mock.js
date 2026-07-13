@@ -56,6 +56,25 @@
     const l1UnifiedPricing = { cabinetFee: 0.5, batteryFee: 0.1, effectiveFrom: "2026-01-01", status: "生效", updatedAt: "2026-01-01", updatedBy: "平台管理员" };
     /** 平台统一人天标准日值：B 端 1% 计提基数；亦为运营商面向渠道商的默认批发价（运营商可改） */
     const platformStandardDayPrice = { price: 8.5, effectiveFrom: "2026-01-01", status: "生效", updatedAt: "2026-01-01", updatedBy: "平台管理员" };
+    /** 跨网统价 · 城市覆盖（默认全网价可被城市行覆盖；改价不追溯） */
+    const l1CityOverrides = [
+      { id: "L1C-SH", city: "上海", cabinetFee: 0.5, batteryFee: 0.1, status: "沿用全网", updatedAt: "2026-07-01" },
+      { id: "L1C-HZ", city: "杭州", cabinetFee: 0.6, batteryFee: 0.12, status: "覆盖生效", updatedAt: "2026-07-10" }
+    ];
+    const leasePenaltyConfig = {
+      types: ["逾期未缴", "擅自转租", "设备损毁", "提前退租"],
+      graceDays: 3, dailyRatePct: 0.05, capPctOfDue: 24, updatedAt: "2026-07-13", updatedBy: "产品确认"
+    };
+    const smsAlertRecords = [
+      { id: "SMS-260713-01", time: "2026-07-13 09:00", template: "人天池不足10天", toRole: "渠道商·顺丰", to: "138****1001", bizRef: "QP-2601", status: "已发送" },
+      { id: "SMS-260713-02", time: "2026-07-13 09:00", template: "人天池不足10天", toRole: "运营商·绿色出行", to: "139****2002", bizRef: "QP-2601", status: "已发送" },
+      { id: "SMS-260712-01", time: "2026-07-12 18:20", template: "设备离线告警", toRole: "运营商运维", to: "137****3011", bizRef: "CAB-22019", status: "已发送" }
+    ];
+    const smsAlertTemplates = [
+      { id: "TPL-POOL-10D", name: "人天池不足10天", receivers: "渠道管理员+运营商管理员", channel: "短信" },
+      { id: "TPL-IOT-OFF", name: "设备离线告警", receivers: "运营商运维值班", channel: "短信" }
+    ];
+
     function platformAccrualDayPrice() { return platformStandardDayPrice.price; }
     /** 额度池规则：平台统一，全池一致 */
     const POOL_CONTRACT_RULES = {
@@ -373,7 +392,7 @@
       finance_due_diligence: { title: "尽调审查", content: "资方对运营商及标的物审查，<strong>非竞标</strong>。通过后待登记放款，占用拟占用额度。" },
       finance_disburse: { title: "登记放款", content: "<strong>仅资方</strong>可操作。绑定资产包、预还款计划、协议与借据。" },
       finance_repay_ticket: { title: "还款工单", content: "运营商提交还款（含部分还款）；资方确认后计入实还。循环额度借据还清后释放。" },
-      finance_penalty: { title: "违约金（参考）", content: "宽限期 3 天；日率 0.05% × 逾期天数 × 未还本息；上限不超过当期应还 24%。首期仅标记逾期。" },
+      finance_penalty: { title: "违约金（可配）", content: "一期可配：违约类型（逾期未缴/擅自转租/设备损毁/提前退租）+ 参数（宽限期、日率、上限比例）。系统按规则计算；租金逾期一期<strong>只标记不自动停服</strong>。" },
       finance_asset_exclusion: { title: "资产互斥", content: "同一 SN 同时仅属一个有效资产包/批次。「包内占选」= 草稿包占用；「申请锁定」= 已提交资方；「已融资」= 已绑定借据。" },
       finance_assets: { title: "可融资资产池", content: "人工确认可融资设备清单。状态含：可融资 / 包内占选 / 申请锁定 / 已融资 等；列「关联资产包/批次」便于追溯。" },
       finance_repayments: { title: "还款日历", content: "按自然日聚合多笔借据正式还款计划；展示应还、实还、未还与逾期；支持登记还款（演示）。" },
@@ -428,7 +447,7 @@
       day_pool_channel: { title: "渠道商额度管理", content: "骑手须登记在渠道商名下并归属某一<strong>团队</strong>；团队绑定消耗额度池。登记时校验无生效中个人套餐。退出团队或被移除时未用人天自动回池。" },
       day_pool_purchase: { title: "购买人天额度", content: "渠道商向签约运营商按批发价采购人天；<strong>同一运营商续费在原池增购</strong>，不因团队再建第二池。向新运营商签约才产生新池实例。" },
       day_pool_ledger: { title: "额度明细账本", content: "所有额度变动留痕。渠道商可见：购买、分配、收回、预占、确认消耗、释放、续费等。运营商调账类型：<strong>充值、赠送、退款、修正、过期恢复</strong>（协商退款走「退款」；过期恢复仅运营商、池过期后 30 天内）。" },
-      day_pool_warn: { title: "低余额预警", content: "可用余额低于总额度 20% 时，后台醒目提示并向渠道商管理员发送短信（演示为状态标记）。" },
+      day_pool_warn: { title: "低余额预警", content: "规则①余额&lt;总额 20%；规则②余额不足以支撑<strong>在职骑手×10 天</strong>。触发后<strong>短信预警渠道商+运营商</strong>，并写入短信记录表（2026-07-13 确认）。" },
       day_pool_refund: { title: "续费与退款", content: "<strong>续费</strong>：渠道商在原池上增购人天（在线/线下采购）。<strong>退款</strong>：不支持在线操作，须与运营商线下协商，由运营商后台扣减额度（类型：退款）。详见「额度池退款说明」。" },
       platform_scope: { title: "平台管理范围", content: "平台管理员可查看全业务汇总，治理运营商主体、设备绑定与跨网统价；不替代运营商日常运营与定价。" },
       platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、进件账户摘要、平台保证金与信用额度。运营商登录后仅见本人经营数据。" },
@@ -2008,10 +2027,10 @@
     ];
 
     const operatorAdmissionTierConfig = [
-      { code: "A", name: "战略", minDeposit: 50000, minDepositLabel: null, creditCap: 100000, crossNetworkDefault: true, maxChannels: null, remark: "平台重点招商" },
-      { code: "B", name: "标准", minDeposit: 20000, minDepositLabel: null, creditCap: 50000, crossNetworkDefault: true, maxChannels: 10, remark: "默认新入网" },
-      { code: "C", name: "审慎", minDeposit: 10000, minDepositLabel: null, creditCap: 10000, crossNetworkDefault: false, maxChannels: 3, remark: "需加保或担保" },
-      { code: "D", name: "观察", minDeposit: 0, minDepositLabel: "全额预存", creditCap: 0, crossNetworkDefault: false, maxChannels: 1, remark: "仅本站，无授信" }
+      { code: "A", name: "战略", minDeposit: 50000, minDepositLabel: null, creditCap: 100000, crossNetworkDefault: true, remark: "平台重点招商 · 融资参考优" },
+      { code: "B", name: "标准", minDeposit: 20000, minDepositLabel: null, creditCap: 50000, crossNetworkDefault: true, remark: "默认新入网 · 融资参考" },
+      { code: "C", name: "审慎", minDeposit: 10000, minDepositLabel: null, creditCap: 10000, crossNetworkDefault: false, remark: "需加保或担保 · 融资参考" },
+      { code: "D", name: "观察", minDeposit: 0, minDepositLabel: "全额预存", creditCap: 0, crossNetworkDefault: false, remark: "仅本站，无授信 · 融资参考弱" }
     ];
 
     const operatorCreditProfiles = [
