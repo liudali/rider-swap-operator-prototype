@@ -576,11 +576,13 @@
         ["operator", "运营商 · " + ENT.operator.name]
       ].map(([r, label]) => `<option value="entity:${r}">${label}</option>`).join("")
         + platformLeasingCompanies.map(l =>
-          `<option value="entity:${l.id}">租赁公司 · ${l.name}</option>`
+          `<option value="entity:${l.id}">【二期】租赁公司 · ${l.name}</option>`
         ).join("")
-        + Object.values(CHANNEL_REGISTRY).map(ch =>
-          `<option value="entity:${ch.id}">渠道商 · ${ch.name}（${ch.settlementMode}）</option>`
-        ).join("");
+        + Object.values(CHANNEL_REGISTRY).map(ch => {
+          const p2 = ch.settlementMode === "激活码" || ch.settlementMode === "设备租赁";
+          const prefix = p2 ? "【二期】" : "";
+          return `<option value="entity:${ch.id}">${prefix}渠道商 · ${ch.name}（${ch.settlementMode}）</option>`;
+        }).join("");
       let staffOpts = "";
       Object.keys(employeeStore).forEach(entityId => {
         (employeeStore[entityId] || []).forEach(e => {
@@ -1106,6 +1108,82 @@
       });
     }
 
+    function ymdLocal(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function parseYmdLocal(s) {
+      if (!s) return null;
+      const [y, m, d] = String(s).split("-").map(Number);
+      if (!y || !m || !d) return null;
+      const dt = new Date(y, m - 1, d);
+      dt.setHours(12, 0, 0, 0);
+      return dt;
+    }
+
+    function getDrillSwapPf() {
+      if (!state.pf.drillSwap) state.pf.drillSwap = { site: "全部", range: "7", dateFrom: "", dateTo: "" };
+      return state.pf.drillSwap;
+    }
+
+    function drillSwapSiteOptions(ctx) {
+      if (ctx === "platform") {
+        const names = [...new Set(sites.filter(s => s.status === "在营").map(s => s.name))].sort();
+        return ["全部", ...names];
+      }
+      if (ctx === "channel") {
+        const c = myChannelContracts()[0];
+        if (c?.dedicatedSiteName) return ["全部", c.dedicatedSiteName];
+        if (Array.isArray(c?.sites) && c.sites.length && c.sites[0] !== "全部") {
+          return ["全部", ...c.sites];
+        }
+        return ["全部"];
+      }
+      return ownSiteOptions();
+    }
+
+    function drillSwapDateList(pf) {
+      const today = new Date();
+      today.setHours(12, 0, 0, 0);
+      let to = new Date(today);
+      let from;
+      if (pf.range === "30") {
+        from = new Date(today);
+        from.setDate(from.getDate() - 29);
+      } else if (pf.range === "custom") {
+        from = parseYmdLocal(pf.dateFrom) || (() => { const d = new Date(today); d.setDate(d.getDate() - 6); return d; })();
+        to = parseYmdLocal(pf.dateTo) || new Date(today);
+        if (to > today) to = new Date(today);
+        if (from > to) from = new Date(to);
+        const spanDays = Math.round((to - from) / 86400000) + 1;
+        if (spanDays > 31) {
+          from = new Date(to);
+          from.setDate(from.getDate() - 30);
+        }
+      } else {
+        from = new Date(today);
+        from.setDate(from.getDate() - 6);
+      }
+      const list = [];
+      for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) list.push(new Date(d));
+      return list;
+    }
+
+    function mockDailySwapSeries(site, dates) {
+      const siteKey = site || "全部";
+      return dates.map(d => {
+        const key = siteKey + ":" + ymdLocal(d);
+        let h = 2166136261;
+        for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+        const base = siteKey === "全部" ? 42 : 14;
+        const weekend = (d.getDay() === 0 || d.getDay() === 6) ? 6 : 0;
+        return base + ((h >>> 0) % 19) + weekend;
+      });
+    }
+
     function smoothLinePath(points) {
       if (!points.length) return "";
       if (points.length === 1) return `M${points[0].x},${points[0].y}`;
@@ -1118,32 +1196,56 @@
       return d;
     }
 
-    function renderSparkChart(values, labels, color, allowNegative) {
+    function renderSparkChart(values, labels, color, allowNegative, opts) {
+      if (allowNegative && typeof allowNegative === "object") {
+        opts = allowNegative;
+        allowNegative = false;
+      }
+      opts = opts || {};
+      const compact = !!opts.compact;
       const lbs = labels || last7DayLabels();
-      const W = 360, H = 112, pl = 42, pr = 14, pt = 18, pb = 28;
-      const pad = Math.max(1, Math.round((Math.max(...values) - Math.min(...values)) * 0.12));
-      const max = Math.max(...values) + pad;
-      const min = allowNegative ? Math.min(...values) - pad : Math.max(0, Math.min(...values) - pad);
+      const n = Math.max(values.length, 1);
+      const W = compact
+        ? Math.min(720, Math.max(280, 32 + n * 22))
+        : Math.min(920, Math.max(360, 48 + n * 28));
+      const H = opts.height || (compact ? 88 : (n > 14 ? 148 : 128));
+      const pl = opts.pl ?? (compact ? 34 : 42);
+      const pr = opts.pr ?? 12;
+      const pt = opts.pt ?? (compact ? 10 : 18);
+      const pb = opts.pb ?? (compact ? 20 : 28);
+      const vmax = Math.max(...values, 0);
+      const vmin = Math.min(...values, 0);
+      const pad = Math.max(1, Math.round((vmax - vmin) * 0.12) || 1);
+      const max = vmax + pad;
+      const min = allowNegative ? vmin - pad : Math.max(0, vmin - pad);
       const span = max - min || 1;
       const iw = W - pl - pr, ih = H - pt - pb;
       const c = color || "#0d9488";
       const uid = "sg" + Math.random().toString(36).slice(2, 9);
       const coords = values.map((v, i) => {
-        const x = pl + (values.length <= 1 ? iw / 2 : (i / (values.length - 1)) * iw);
+        const x = pl + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw);
         const y = pt + ih - ((v - min) / span) * ih;
         return { x, y, v };
       });
       const linePath = smoothLinePath(coords);
-      const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(1)},${(pt + ih).toFixed(1)} L${coords[0].x.toFixed(1)},${(pt + ih).toFixed(1)} Z`;
+      const areaPath = coords.length
+        ? `${linePath} L${coords[coords.length - 1].x.toFixed(1)},${(pt + ih).toFixed(1)} L${coords[0].x.toFixed(1)},${(pt + ih).toFixed(1)} Z`
+        : "";
       const gridY = [0, 0.33, 0.66, 1].map(t => {
-        const val = Math.round(min + span * (1 - t));
+        const raw = min + span * (1 - t);
+        const val = Math.abs(raw) >= 100 ? Math.round(raw)
+          : Math.abs(raw) >= 10 ? raw.toFixed(1)
+          : Math.abs(raw) >= 1 ? raw.toFixed(2)
+          : raw.toFixed(3);
         const y = pt + ih * t;
         return `<line class="spark-grid" x1="${pl}" y1="${y}" x2="${W - pr}" y2="${y}"/>
           <text class="spark-axis" x="${pl - 8}" y="${y + 3.5}" text-anchor="end">${val}</text>`;
       }).join("");
       const last = coords.length - 1;
+      const labelStep = n > 20 ? Math.ceil(n / 8) : n > 12 ? 2 : 1;
+      const par = opts.stretch ? "none" : "xMidYMid meet";
       return `<div class="spark-chart-wrap" style="--spark-color:${c}">
-        <svg class="spark-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <svg class="spark-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="${par}" aria-hidden="true">
           <defs>
             <linearGradient id="${uid}-area" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="${c}" stop-opacity=".18"/>
@@ -1157,14 +1259,15 @@
             </linearGradient>
           </defs>
           ${gridY}
-          <path d="${areaPath}" fill="url(#${uid}-area)"/>
-          <path class="spark-line" d="${linePath}" stroke="url(#${uid}-line)"/>
+          ${areaPath ? `<path d="${areaPath}" fill="url(#${uid}-area)"/>` : ""}
+          ${linePath ? `<path class="spark-line" d="${linePath}" stroke="url(#${uid}-line)"/>` : ""}
           ${coords.map((p, i) => `<g>
             <circle class="spark-dot${i === last ? " spark-dot-last" : ""}" cx="${p.x}" cy="${p.y}" r="3.5" stroke="${c}"><title>${lbs[i] || ""}：${p.v}</title></circle>
             ${i === last ? `<circle class="spark-dot-last-inner" cx="${p.x}" cy="${p.y}" fill="${c}"/>` : ""}
           </g>`).join("")}
           ${lbs.map((lb, i) => {
-            const x = pl + (values.length <= 1 ? iw / 2 : (i / (values.length - 1)) * iw);
+            if (i !== last && i !== 0 && i % labelStep !== 0) return "";
+            const x = pl + (n <= 1 ? iw / 2 : (i / (n - 1)) * iw);
             const active = i === last;
             return `<text class="spark-axis" x="${x}" y="${H - 8}" text-anchor="middle" font-weight="${active ? "600" : "400"}" fill="${active ? c : "#94a3b8"}">${lb}</text>`;
           }).join("")}
@@ -1173,26 +1276,55 @@
     }
 
     function renderDataDrillPanel(ctx) {
-      const swap7 = [42, 38, 51, 47, 55, 49, 58];
-      const pkg7 = [12, 9, 15, 11, 14, 10, 16];
-      const links = ctx === "platform"
-        ? [{ label: "全平台换电趋势", view: "trends", series: swap7, color: "#2563eb", unit: "次" }, { label: "套餐订单明细", view: "details", series: pkg7, color: "#0d9488", unit: "单" }]
-        : ctx === "channel"
-          ? [{ label: "渠道消耗趋势", view: "trends", series: swap7, color: "#7c3aed", unit: "人天" }, { label: "团队明细", view: "details", series: pkg7, color: "#0d9488", unit: "人" }]
-          : [{ label: "换电次数趋势", view: "trends", series: swap7, color: "#0d9488", unit: "次" }, { label: "站点明细", view: "details", series: pkg7, color: "#2563eb", unit: "单" }];
-      const sum = arr => arr.reduce((s, v) => s + v, 0);
-      return `<section class="panel">
-        ${panelHead("数据下钻", "近 7 日趋势预览 · 点击弹窗查看完整数据面板", "data_drill_panel")}
+      const pf = getDrillSwapPf();
+      const siteOpts = drillSwapSiteOptions(ctx);
+      if (!siteOpts.includes(pf.site)) pf.site = "全部";
+      const dates = drillSwapDateList(pf);
+      const labels = dates.map(d => `${d.getMonth() + 1}/${d.getDate()}`);
+      const series = mockDailySwapSeries(pf.site, dates);
+      const sum = series.reduce((s, v) => s + v, 0);
+      const color = ctx === "platform" ? "#2563eb" : ctx === "channel" ? "#7c3aed" : "#0d9488";
+      const customFrom = pf.dateFrom || ymdLocal(dates[0]);
+      const customTo = pf.dateTo || ymdLocal(dates[dates.length - 1]);
+      const showCustom = pf.range === "custom";
+      return `<section class="panel swap-orders-panel">
+        ${panelHead("换电订单数", "", "data_drill_panel")}
         <div class="panel-body">
-          <div class="drill-grid">
-            ${links.map(l => `<article class="drill-card">
-              <div class="drill-card-head"><strong>${l.label}</strong><span class="drill-card-sum">${sum(l.series)} ${l.unit}</span></div>
-              <div class="drill-card-sub">近 7 日合计 · 最高 ${Math.max(...l.series)} / 最低 ${Math.min(...l.series)} ${noteBtn("data_drill_spark")}</div>
-              ${renderSparkChart(l.series, last7DayLabels(), l.color)}
-              <button type="button" class="drill-open-btn" data-open-data-panel="${l.view}">查看数据面板 →</button>
-            </article>`).join("")}
+          <div class="filter-inline-bar">
+            <label class="filter-inline">
+              <span>站点</span>
+              <select data-drill-swap="site">${siteOpts.map(s =>
+                `<option value="${s}"${s === pf.site ? " selected" : ""}>${s === "全部" ? "全部站点" : s}</option>`
+              ).join("")}</select>
+            </label>
+            <label class="filter-inline">
+              <span>时间</span>
+              <select data-drill-swap="range">
+                <option value="7"${pf.range === "7" ? " selected" : ""}>近 7 天</option>
+                <option value="30"${pf.range === "30" ? " selected" : ""}>近 30 天</option>
+                <option value="custom"${pf.range === "custom" ? " selected" : ""}>自定义</option>
+              </select>
+            </label>
+            ${showCustom ? `<label class="filter-inline filter-inline-range">
+              <span>起止</span>
+              <input type="date" data-drill-swap="dateFrom" value="${customFrom}">
+              <span class="range-sep">~</span>
+              <input type="date" data-drill-swap="dateTo" value="${customTo}">
+            </label>` : ""}
           </div>
-          <p style="font-size:12px;color:var(--muted);margin:14px 0 0">完整数据面板在当前页弹窗内打开，无需跳转新标签页。</p>
+          ${showCustom ? `<p class="drill-range-tip">最多 31 天</p>` : ""}
+          <div class="swap-orders-sum-row">
+            <div class="swap-orders-sum-left">
+              <strong>${sum}<em> 单</em></strong>
+              <span class="swap-orders-minmax">最高 ${Math.max(...series)} · 最低 ${Math.min(...series)}</span>
+            </div>
+            <button type="button" class="link-btn swap-orders-chart-link" data-open-data-panel="trends">完整面板</button>
+          </div>
+          <div class="swap-orders-chart">
+            ${renderSparkChart(series, labels, color, false, {
+              compact: true, height: 128, pl: 36, pr: 10, pt: 12, pb: 22, stretch: true
+            })}
+          </div>
         </div>
       </section>`;
     }
@@ -1899,7 +2031,6 @@
 
     const PAGE_FILTER_SPECS = {
       overview: [
-        { key: "site", label: "站点", type: "select", options: () => ownSiteOptions().map(s => ({ v: s, t: s === "全部" ? "全部站点" : s })) },
         { key: "range", label: "统计范围", type: "select", options: [{ v: "today", t: "今日" }, { v: "7", t: "近 7 日" }, { v: "30", t: "近 30 日" }] }
       ],
       interOp: [
@@ -2188,7 +2319,9 @@
 
     function renderPageFilters() {
       const key = pfKey();
-      const specs = PAGE_FILTER_SPECS[key];
+      let specs = PAGE_FILTER_SPECS[key];
+      /* 运营商总览：统计范围下沉到经营概览 KPI 区，顶部不再展示 */
+      if (key === "overview" && isOperatorRole()) specs = [];
       const box = document.querySelector("#pageFilters");
       if (!specs || !specs.length) {
         box.classList.remove("visible");
@@ -3176,13 +3309,187 @@
       return `<div class="own-scope-banner">${noteBtn("own_data")} 当前仅展示 <strong>${e.name}</strong>（${e.id}）名下设备经营数据。${leaseHint}${empHint}</div>`;
     }
 
+    /** 原型二期范围标记（可浏览，不作为一期交付） */
+    const PHASE2_VIEWS = new Set([
+      "employees",
+      "financeManage", "financeDrawdown", "platformLeasing",
+      "leaseAgreements", "leaseCollect", "leaseRent",
+      "activationCodes", "activationRecords",
+      "leasePkgPricing", "rentPool", "rentDevices", "leaseBatteryHold", "leaseWhitelist", "channelInterOp"
+    ]);
+
+    function phase2ChannelMode() {
+      if (!isChannelRole()) return null;
+      const mode = contractSettlementMode(channelProfile());
+      if (mode === "激活码" || mode === "设备租赁") return mode;
+      return null;
+    }
+
+    function isPhase2Identity() {
+      return isLeasingRole() || !!phase2ChannelMode();
+    }
+
+    function isPhase2View(view) {
+      return PHASE2_VIEWS.has(view || state.view);
+    }
+
+    function phase2Meta() {
+      if (isLeasingRole()) {
+        return {
+          short: "二期",
+          label: "设备租赁公司 · 融资协作",
+          detail: "含资方登录、「放款申请」及与运营商「融资管理」的协作链路；平台「租赁公司」绑定同属本范围。一期不交付，原型仅演示。"
+        };
+      }
+      const mode = phase2ChannelMode();
+      if (mode === "激活码") {
+        return {
+          short: "二期",
+          label: "渠道商 · 激活码",
+          detail: "激活码批发 / 核销 / 结算整条渠道模式标为二期。一期不交付，原型仅演示。"
+        };
+      }
+      if (mode === "设备租赁") {
+        return {
+          short: "二期",
+          label: "渠道商 · 设备租赁",
+          detail: "白名单套餐、月租账单、租赁设备、电池持有等整条渠道模式标为二期。一期不交付，原型仅演示。"
+        };
+      }
+      if (state.view === "financeManage") {
+        return {
+          short: "二期",
+          label: "运营商 · 融资管理",
+          detail: "与设备租赁公司（资方）放款/还款协作相关，标为二期。一期不交付，原型可浏览。"
+        };
+      }
+      if (state.view === "platformLeasing") {
+        return {
+          short: "二期",
+          label: "平台 · 租赁公司",
+          detail: "租赁公司档案与「租赁公司↔运营商」绑定，服务于融资协作，标为二期。"
+        };
+      }
+      if (state.view === "financeDrawdown") {
+        return {
+          short: "二期",
+          label: "资方 · 放款申请",
+          detail: "设备租赁公司侧放款/尽调确认，与运营商融资管理同一链路，标为二期。"
+        };
+      }
+      if (state.view === "employees") {
+        return {
+          short: "二期",
+          label: "员工模块",
+          detail: "各角色（平台 / 运营商 / 渠道商 / 资方等）「员工」账号与权限管理整块标为二期。一期不交付，原型仅演示。"
+        };
+      }
+      if (isPhase2View(state.view)) {
+        return {
+          short: "二期",
+          label: (NAV_LABEL[state.view] || "模块") + " · 二期范围",
+          detail: "本模块属于二期范围。一期不交付，原型仅演示。"
+        };
+      }
+      return null;
+    }
+
+    function phase2BadgeHtml(extraClass) {
+      return `<span class="badge-p2${extraClass ? " " + extraClass : ""}" title="二期范围：可浏览，一期不交付">二期</span>`;
+    }
+
+    function settlementModeLabel(mode) {
+      const m = mode || "人天池";
+      if (m === "设备租赁" || m === "激活码") return `${tag(m)}${phase2BadgeHtml()}`;
+      return tag(m);
+    }
+
+    function phase2BannerHtml() {
+      const m = phase2Meta();
+      if (!m) return "";
+      return `<div class="phase2-banner" role="status">${phase2BadgeHtml()}<div><strong>${m.label}</strong> — ${m.detail}</div></div>`;
+    }
+
+    /** 侧栏一级模块 → 二级子页（原页内 tab-sidebar） */
+    function getNavL2(view) {
+      const alertBadge = () => (myDeviceAlerts().filter(a => a.status === "待处理").length ? " !" : "");
+      const depBadge = () => (pendingDepositRechargeCount() ? " (" + pendingDepositRechargeCount() + ")" : "");
+      const refundBadge = () => {
+        const n = (typeof pendingRefundCount === "function" ? pendingRefundCount() : 0);
+        return n ? " (" + n + ")" : "";
+      };
+      const map = {
+        pricing: { stateKey: "pricingTab", tabs: [["pkg", "个人套餐价"], ["quota", "人天批发价"], ["card", "渠道分销价"]] },
+        channelSales: { stateKey: "channelSalesTab", tabs: [["contracts", "签约渠道"], ["orders", "服务订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]] },
+        devices: { stateKey: "deviceTab", tabs: () => [["cabinet", "换电柜"], ["battery", "电池"], ["alerts", "设备告警" + alertBadge()], ["iccid", "ICCID"]] },
+        flows: { stateKey: "flowTab", tabs: [["receipt", "资金实收"], ["accrual", "清分明细"], ["payout", "提现申请"]] },
+        refundManage: { stateKey: "refundTab", tabs: () => [["queue", "退款申请" + refundBadge()], ["settings", "退款设置"]] },
+        financeManage: { stateKey: "financeTab", tabs: [["dashboard", "工作台"], ["packages", "资产包"], ["ledger", "融资台账"], ["projects", "授信项目"], ["assets", "资产池"], ["repayments", "还款日历"]] },
+        sitePartners: { stateKey: "sitePartnersTab", tabs: [["profiles", "合伙人档案"], ["bindings", "分润绑定一览"], ["ledger", "分润明细"]] },
+        siteExpenses: { stateKey: "siteExpenseTab", tabs: [["sites", "按站点"], ["bills", "全部账单"]] },
+        leaseAgreements: { stateKey: "leaseAgreementsTab", tabs: [["contracts", "租赁协议"], ["deviceLists", "设备清单"]] },
+        dayPool: {
+          stateKey: "dayPoolTab",
+          tabs: () => (isOrgAdminLogin() ? [["consume", "消耗明细"]] : [
+            ["pools", "额度池"], ["teams", "骑手团队"], ["riders", "骑手登记"], ["allocations", "额度分配"],
+            ["rules", "额度使用规则"], ["consume", "消耗明细"], ["retail", "零售价"],
+            ["exceptions", "异常记录"], ["ledger", "额度明细"]
+          ])
+        },
+        depositManage: { stateKey: "depositTab", tabs: () => [["pending", "充值确认" + depBadge()], ["accounts", "账户总览"], ["ledger", "变动明细"]] },
+        operatorCreditEval: { stateKey: "operatorCreditTab", tabs: [["tierConfig", "档位配置"], ["assignments", "运营商定档"], ["logs", "变更记录"]] },
+        platformLeasing: { stateKey: "platformLeasingTab", tabs: [["companies", "租赁公司"], ["bindings", "租赁关系绑定"]] },
+        platformOrders: { stateKey: "platformOrderTab", tabs: [["package", "套餐购买订单"], ["swap", "换电订单"], ["serviceChange", "服务变更"], ["channel", "渠道商订单"]] },
+        platformDevices: { stateKey: "platformDeviceTab", tabs: [["ledger", "设备台账"], ["pending", "待绑定"], ["import", "批量导入"]] },
+        platformChannels: { stateKey: "platformChannelTab", tabs: [["list", "渠道商列表"], ["personnel", "人员明细"]] },
+        platformMarketing: { stateKey: "platformMarketingTab", tabs: [["campaigns", "活动管理"], ["agreements", "运营商签约"], ["links", "链接与二维码"], ["pending", "营销订单"], ["settlements", "拨付流水"], ["statements", "营销对账"]] },
+        platformFlows: { stateKey: "platformFlowTab", tabs: [["userPay", "用户支付记录"], ["interOp", "运营商之间"], ["platformFee", "平台提成"], ["withdrawReview", "运营商提现审核"]] }
+      };
+      const def = map[view];
+      if (!def) return null;
+      const tabs = typeof def.tabs === "function" ? def.tabs() : def.tabs;
+      return { stateKey: def.stateKey, tabs };
+    }
+
+    function currentNavL2Key(view) {
+      const def = getNavL2(view);
+      if (!def) return null;
+      return state[def.stateKey];
+    }
+
+    function setNavL2Key(view, tab) {
+      const def = getNavL2(view);
+      if (!def || !tab) return;
+      state[def.stateKey] = tab;
+    }
+
     function renderNav() {
       const items = getAllowedNavItems();
       if (!items.includes(state.view)) state.view = items[0];
+      const identityP2 = isPhase2Identity();
       document.querySelector("#nav").innerHTML = items.map(k => {
+        const viewP2 = identityP2 || isPhase2View(k);
+        const p2Mark = viewP2 ? phase2BadgeHtml() : "";
+        const l2 = getNavL2(k);
+        if (l2) {
+          const on = state.view === k;
+          const tabKeys = l2.tabs.map(t => t[0]);
+          if (on && !tabKeys.includes(state[l2.stateKey])) state[l2.stateKey] = tabKeys[0];
+          const cur = state[l2.stateKey] || tabKeys[0];
+          const l1Cls = ["nav-l1", on ? "parent-active" : "", viewP2 ? "nav-phase2" : ""].filter(Boolean).join(" ");
+          const children = l2.tabs.map(([tab, label]) => {
+            const cls = ["nav-l2", on && cur === tab ? "active" : "", viewP2 ? "nav-phase2" : ""].filter(Boolean).join(" ");
+            return `<button type="button" class="${cls}" data-view="${k}" data-nav-sub="${tab}">${label}</button>`;
+          }).join("");
+          return `<div class="nav-group${on ? " open" : ""}">
+            <button type="button" class="${l1Cls}" data-view="${k}" data-nav-sub="${cur}">${NAV_LABEL[k] || k}${p2Mark}</button>
+            <div class="nav-l2-wrap">${children}</div>
+          </div>`;
+        }
         const cls = [
           state.view === k ? "active" : "",
-          k === "dayPool" ? "nav-day-pool" : ""
+          k === "dayPool" ? "nav-day-pool" : "",
+          viewP2 ? "nav-phase2" : ""
         ].filter(Boolean).join(" ");
         const badge = k === "dayPool" && myDayPools().some(p => p.balancePct < 20) ? " !"
           : k === "depositManage" && pendingDepositRechargeCount() > 0 ? " !"
@@ -3190,7 +3497,7 @@
           : k === "refundManage" && pendingRefundCount() > 0 ? " !"
           : k === "partnerWithdraw" && partnerPendingWithdrawTotal() > 0 ? " !"
           : "";
-        return `<button type="button" class="${cls}" data-view="${k}">${NAV_LABEL[k]}${badge}</button>`;
+        return `<button type="button" class="${cls}" data-view="${k}">${NAV_LABEL[k]}${p2Mark}${badge}</button>`;
       }).join("");
     }
 
@@ -3269,17 +3576,28 @@
     }
 
     function panelHead(title, sub, noteId, extra = "") {
-      return `<div class="panel-head"><div><h2>${title}</h2><span>${sub}</span></div><div style="display:flex;align-items:center;gap:8px">${extra}${noteBtn(noteId)}</div></div>`;
+      return `<div class="panel-head"><div><h2>${title}</h2>${sub ? `<span>${sub}</span>` : ""}</div><div style="display:flex;align-items:center;gap:8px">${extra}${noteBtn(noteId)}</div></div>`;
     }
 
     function tabSidebar(tabs, activeKey, dataAttr) {
-      return `<nav class="tab-sidebar" aria-label="子模块">${tabs.map(([k, label]) =>
-        `<button type="button" class="${activeKey === k ? "active" : ""}" data-${dataAttr}="${k}">${label}</button>`
-      ).join("")}</nav>`;
+      /* L2 已收进左侧导航；保留空实现以免历史调用报错 */
+      return "";
     }
 
     function pageWithTabs(sidebarHtml, contentHtml) {
+      /* 一级/二级导航迁至侧栏后，页内不再包一层 tab-sidebar */
+      return contentHtml;
+    }
+
+    function pageWithInnerTabs(sidebarHtml, contentHtml) {
+      /* 三级子页（如人天池·消耗明细细分）仍用页内侧栏 */
       return `<div class="page-with-tabs">${sidebarHtml}<div class="tab-content">${contentHtml}</div></div>`;
+    }
+
+    function innerTabSidebar(tabs, activeKey, dataAttr) {
+      return `<nav class="tab-sidebar" aria-label="子模块">${tabs.map(([k, label]) =>
+        `<button type="button" class="${activeKey === k ? "active" : ""}" data-${dataAttr}="${k}">${label}</button>`
+      ).join("")}</nav>`;
     }
 
     function tag(s) {
@@ -3320,13 +3638,24 @@
       return { ownCabList, leaseCabList, ownBatList, leaseBatList, total };
     }
 
+    /** 电池在线：有 online 字段优先；否则随所在柜机；柜外/未知按 health=正常 [假设] */
+    function isBatteryOnline(b) {
+      if (typeof b.online === "boolean") return b.online;
+      const cabSn = b.inCab;
+      if (cabSn && cabSn !== "柜外充电") {
+        const cab = cabinets.find(c => c.sn === cabSn);
+        if (cab) return !!cab.online;
+      }
+      return b.health === "正常";
+    }
+
     function channelContractModeSummary() {
       const cs = myChannelContracts();
       const day = cs.filter(c => contractSettlementMode(c) === "人天池").length;
       const rent = cs.filter(c => contractSettlementMode(c) === "设备租赁").length;
       const card = cs.filter(c => contractSettlementMode(c) === "卡差价").length;
       const act = cs.filter(c => contractSettlementMode(c) === "激活码").length;
-      return { total: cs.length, day, rent, card, act, sub: `人天池 ${day} · 设备租赁 ${rent} · 骑士卡 ${card}${act ? " · 激活码 " + act : ""}` };
+      return { total: cs.length, day, rent, card, act, sub: `人天池 ${day} · 设备租赁 ${rent}（二期） · 骑士卡 ${card}${act ? " · 激活码 " + act + "（二期）" : ""}` };
     }
 
     function operatorScopeDeviceHint(ownerId) {
@@ -3338,6 +3667,30 @@
       const ov = state.pf.overview || PF_DEFAULTS.overview;
       const r = ov.range || "30";
       return r === "7" ? 5.2 : r === "30" ? 18 : 1;
+    }
+
+    function overviewRangeLabel() {
+      const r = (state.pf.overview || PF_DEFAULTS.overview).range || "30";
+      return r === "7" ? "近 7 日" : r === "30" ? "近 30 日" : "今日";
+    }
+
+    function overviewRangeSelectHtml() {
+      const r = (state.pf.overview || PF_DEFAULTS.overview).range || "30";
+      return `<div class="overview-range-bar" aria-label="统计范围">
+        <div class="field">
+          <label>统计范围</label>
+          <select data-overview-range>
+            <option value="today"${r === "today" ? " selected" : ""}>今日</option>
+            <option value="7"${r === "7" ? " selected" : ""}>近 7 日</option>
+            <option value="30"${r === "30" ? " selected" : ""}>近 30 日</option>
+          </select>
+        </div>
+        <p class="overview-range-hint">仅影响下方经营指标；柜机/电池/站点为实时快照</p>
+      </div>`;
+    }
+
+    function scaleMoney(n) {
+      return Math.round(n * rangeMultiplier() * 100) / 100;
     }
 
     function getPowerPf() {
@@ -3370,13 +3723,11 @@
     }
 
     function overviewPowerStats() {
-      const ov = state.pf.overview || PF_DEFAULTS.overview;
       const { from, to } = powerDateRange();
       const eid = isPlatformRole() ? null : currentEntity().id;
       let rows = cabinetPowerDaily.filter(r => {
         if (eid && r.deviceOwnerId !== eid) return false;
         if (r.date < from || r.date > to) return false;
-        if (ov.site !== "全部" && r.site !== ov.site) return false;
         return true;
       });
       const siteMap = {};
@@ -3414,12 +3765,10 @@
     }
 
     function siteBusinessStats() {
-      const ov = state.pf.overview || PF_DEFAULTS.overview;
       const eid = currentEntity().id;
       const ownCabs = cabinets.filter(c => c.deviceOwnerId === eid);
       const siteNames = [...new Set(ownCabs.map(c => c.site))].sort();
       return siteNames.map(siteName => {
-        if (ov.site !== "全部" && ov.site !== siteName) return null;
         const siteMeta = sites.find(s => s.name === siteName) || { id: "—", city: "—", address: "—", status: "—", waitingCount: 0 };
         const cabinetsAtSite = ownCabs.filter(c => c.site === siteName);
         const cabSns = new Set(cabinetsAtSite.map(c => c.sn));
@@ -3450,6 +3799,12 @@
       }).filter(Boolean);
     }
 
+    function busyLevelClass(level) {
+      if (level === "高") return "busy-high";
+      if (level === "中") return "busy-mid";
+      return "busy-low";
+    }
+
     function busyTag(level) {
       const cls = level === "高" ? "risk" : level === "中" ? "warn" : "";
       return cls ? `<span class="tag ${cls}">${level}</span>` : tag(level);
@@ -3457,51 +3812,16 @@
 
     function renderOverviewSiteStats() {
       const rows = siteBusinessStats();
-      const ov = state.pf.overview || PF_DEFAULTS.overview;
-      const filterHint = [ov.site !== "全部" ? ov.site : ""].filter(Boolean).join(" · ");
-      const totalCabBat = rows.reduce((s, r) => s + r.batteriesInCab, 0);
-      const totalCabinets = rows.reduce((s, r) => s + r.cabinets, 0);
-      const totalCabinetsOnline = rows.reduce((s, r) => s + r.cabinetsOnline, 0);
-      const totalCabinetsOffline = rows.reduce((s, r) => s + r.cabinetsOffline, 0);
-      const totalSlotUsed = rows.reduce((s, r) => s + r.slotUsed, 0);
-      const totalSlotTotal = rows.reduce((s, r) => s + r.slotTotal, 0);
-      const totalWaiting = rows.reduce((s, r) => s + r.waiting, 0);
-      const cabCell = (total, online, offline) =>
-        `<strong>${total} 台</strong><br><small style="color:var(--muted)">在线 ${online} · 离线 ${offline}</small>`;
-      const slotCell = (used, total, pct) =>
-        total ? `<strong>${used}/${total}</strong><br><small style="color:var(--muted)">占用 ${pct}%</small>` : "—";
-      const body = rows.length ? rows.map(r => `<tr>
-        <td>${r.siteName}<br><small style="color:var(--muted)">${r.siteId}</small></td>
-        <td style="white-space:normal;max-width:180px">${r.address}</td>
-        <td>${cabCell(r.cabinets, r.cabinetsOnline, r.cabinetsOffline)}</td>
-        <td>${slotCell(r.slotUsed, r.slotTotal, r.slotPct)}</td>
-        <td><strong>${r.batteriesInCab}</strong> 块</td>
-        <td><strong>${r.waiting}</strong> 人</td>
-        <td>${busyTag(r.busyLevel)}</td>
-        <td>${tag(r.status)}</td>
-      </tr>`).join("") + `<tr class="site-stats-total">
-        <td colspan="2"><strong>合计</strong>（${rows.length} 个站点）</td>
-        <td>${cabCell(totalCabinets, totalCabinetsOnline, totalCabinetsOffline)}</td>
-        <td>${slotCell(totalSlotUsed, totalSlotTotal, totalSlotTotal ? Math.round(totalSlotUsed / totalSlotTotal * 100) : 0)}</td>
-        <td><strong>${totalCabBat}</strong> 块</td>
-        <td><strong>${totalWaiting}</strong> 人</td>
-        <td></td>
-        <td></td>
-      </tr>` : `<tr><td colspan="8">当前筛选下暂无自有站点数据</td></tr>`;
-      return `<section class="panel" style="margin-top:16px">
-        ${panelHead("站点繁忙度分析", (filterHint || "全部站点") + " · 实时快照", "overview_site_stats")}
-        <div class="panel-body orders-table-wrap">
-          <table class="site-stats-table">
-            <thead><tr>
-              <th>站点 ${noteBtn("overview_site_name")}</th><th>地址 ${noteBtn("overview_site_address")}</th><th>柜机 ${noteBtn("overview_site_cabinets")}</th>
-              <th>格口占用 ${noteBtn("overview_site_slots")}</th>
-              <th>柜内电池 ${noteBtn("overview_site_cab_batteries")}</th>
-              <th>等待中 ${noteBtn("overview_site_waiting")}</th>
-              <th>繁忙度 ${noteBtn("overview_site_busy")}</th>
-              <th>站点状态 ${noteBtn("overview_site_status")}</th>
-            </tr></thead>
-            <tbody>${body}</tbody>
-          </table>
+      const cards = rows.length
+        ? rows.map(r => `<article class="site-busy-card ${busyLevelClass(r.busyLevel)}" title="${r.siteName}">
+            <strong class="site-busy-name">${r.siteName}</strong>
+            <span class="site-busy-level">${r.busyLevel}</span>
+          </article>`).join("")
+        : `<p class="site-busy-empty">暂无自有站点数据</p>`;
+      return `<section class="panel overview-site-busy-panel">
+        ${panelHead("站点繁忙度", "", "overview_site_stats")}
+        <div class="panel-body">
+          <div class="site-busy-grid">${cards}</div>
         </div>
       </section>`;
     }
@@ -3509,54 +3829,46 @@
     function renderOverviewPowerStats() {
       const pp = getPowerPf();
       const stats = overviewPowerStats();
-      const ov = state.pf.overview || PF_DEFAULTS.overview;
-      const filterHint = [
-        ov.site !== "全部" ? ov.site : "全部站点",
-        stats.from + " ~ " + stats.to
-      ].join(" · ");
       const avgPerCab = stats.cabinetCount ? stats.totalKwh / stats.cabinetCount : 0;
       const avgPerDay = stats.dayCount ? stats.totalKwh / stats.dayCount : 0;
-      const maxDay = Math.max(...stats.dailyTrend.map(d => d.kwh), 0.001);
+      const trendValues = stats.dailyTrend.map(d => Math.round(d.kwh * 1000) / 1000);
+      const trendLabels = stats.dailyTrend.map(d => {
+        const parts = String(d.date).split("-");
+        return parts.length >= 3 ? `${Number(parts[1])}/${Number(parts[2])}` : d.date;
+      });
       const trendHtml = stats.dailyTrend.length
-        ? `<div class="power-trend">${stats.dailyTrend.map(d => `<div class="power-bar-col" title="${d.date}：${d.kwh.toFixed(3)} kWh">
-            <i style="height:${Math.max(4, Math.round(d.kwh / maxDay * 100))}%"></i>
-            <span>${d.date.slice(8)}日</span>
-          </div>`).join("")}</div>
-          <p style="font-size:11px;color:var(--muted);margin:0">日用电趋势（kWh）</p>`
+        ? `<div class="power-trend-line">
+            ${renderSparkChart(trendValues, trendLabels, "#0d9488", false, { compact: true, height: 100 })}
+            <p class="power-trend-caption">日用电趋势（kWh）</p>
+          </div>`
         : `<p style="font-size:12px;color:var(--muted);margin:0">当前筛选条件下暂无日用电数据</p>`;
-      return `<section class="panel" style="margin-top:16px">
-        ${panelHead("用电量统计", filterHint + " · 汇总统计", "overview_power_stats")}
+      return `<section class="panel overview-power-panel">
+        ${panelHead("用电量统计", "", "overview_power_stats")}
         <div class="panel-body">
-          <div class="power-filter-bar" id="powerFilterBar">
-            <div class="field">
-              <label>统计日起</label>
+          <div class="power-filter-bar power-filter-inline" id="powerFilterBar">
+            <label class="filter-inline filter-inline-range">
+              <span>起止时间</span>
               <input type="date" data-power-pf="dateFrom" value="${pp.dateFrom || stats.from}">
-            </div>
-            <div class="field">
-              <label>统计日止</label>
+              <span class="range-sep">~</span>
               <input type="date" data-power-pf="dateTo" value="${pp.dateTo || stats.to}">
-            </div>
-            <div class="field">
-              <label>快捷范围</label>
+            </label>
+            <label class="filter-inline">
+              <span>快捷</span>
               <select data-power-pf="range">
                 <option value="today"${pp.range === "today" ? " selected" : ""}>今日</option>
                 <option value="7"${pp.range === "7" ? " selected" : ""}>近 7 日</option>
                 <option value="30"${pp.range === "30" ? " selected" : ""}>近 30 日</option>
               </select>
-            </div>
-            <div class="field pf-actions">
-              <label>&nbsp;</label>
-              <button type="button" class="btn primary" data-power-query>查询</button>
-            </div>
+            </label>
           </div>
-          <div class="power-stats-kpi">
-            <div class="detail-item"><span>总用电量 ${noteBtn("overview_power_kwh")}</span><strong>${stats.totalKwh.toFixed(3)} kWh</strong></div>
-            <div class="detail-item"><span>统计柜机</span><strong>${stats.cabinetCount} 台</strong></div>
-            <div class="detail-item"><span>单柜均值</span><strong>${avgPerCab.toFixed(3)} kWh</strong></div>
-            <div class="detail-item"><span>日均用电</span><strong>${avgPerDay.toFixed(3)} kWh</strong></div>
+          <div class="power-stats-kpi power-stats-kpi-compact">
+            <div class="power-kpi-chip"><span>总用电 ${noteBtn("overview_power_kwh")}</span><strong>${stats.totalKwh.toFixed(3)}</strong><em>kWh</em></div>
+            <div class="power-kpi-chip"><span>柜机</span><strong>${stats.cabinetCount}</strong><em>台</em></div>
+            <div class="power-kpi-chip"><span>单柜均</span><strong>${avgPerCab.toFixed(3)}</strong><em>kWh</em></div>
+            <div class="power-kpi-chip"><span>日均</span><strong>${avgPerDay.toFixed(3)}</strong><em>kWh</em></div>
           </div>
           ${trendHtml}
-          <p style="font-size:12px;color:var(--muted);margin:16px 0 0">各站点场地费、电费及周期账单请前往 <button type="button" class="link-btn" data-view-jump="siteExpenses">站点支出</button> 管理。</p>
+          <p style="font-size:11px;color:var(--muted);margin:8px 0 0">场地费/电费账单见 <button type="button" class="link-btn" data-view-jump="siteExpenses">站点支出</button></p>
         </div>
       </section>`;
     }
@@ -4855,12 +5167,12 @@
       state.channelPartnerContractId = contractId || "new";
       const stdPrice = platformAccrualDayPrice();
       const modeSelect = contract
-        ? `<label>结算模式<input value="${mode}" readonly /></label>`
+        ? `<label>结算模式<input value="${mode}${mode === "设备租赁" || mode === "激活码" ? "（二期）" : ""}" readonly /></label>`
         : `<label>结算模式<select name="settlementMode" id="channelPartnerMode">
             <option value="人天池">人天池</option>
             <option value="卡差价">卡差价</option>
-            <option value="设备租赁">设备租赁</option>
-            <option value="激活码">激活码</option>
+            <option value="设备租赁">设备租赁（二期）</option>
+            <option value="激活码">激活码（二期）</option>
           </select></label>`;
       document.querySelector("#channelPartnerFormTitle").textContent = contract
         ? "编辑渠道商 · " + (ch?.name || contract.channelName)
@@ -4872,7 +5184,7 @@
         ${modeSelect}
         <label>城市<select name="city"><option ${(!ch || ch.city === "上海") ? "selected" : ""}>上海</option><option ${ch?.city === "杭州" ? "selected" : ""}>杭州</option></select></label>
         <label>状态<select name="status"><option ${(!ch || ch.status === "在营") ? "selected" : ""}>在营</option><option ${ch?.status === "已停用" ? "selected" : ""}>已停用</option></select></label>
-        <p class="field-rent form-span-2" style="font-size:12px;color:var(--warn);margin:0">设备租赁 · 「已停用」后：白名单用户<strong>不出电</strong>，仍可<strong>还电入柜</strong>；扫码提示「当前站点已到期，请联系管理员续费」。</p>
+        <p class="field-rent form-span-2" style="font-size:12px;color:var(--warn);margin:0">${phase2BadgeHtml()} 设备租赁（二期）·「已停用」后：白名单用户<strong>不出电</strong>，仍可<strong>还电入柜</strong>；扫码提示「当前站点已到期，请联系管理员续费」。</p>
         <label>联系人<input name="contactName" value="${ch?.contactName || ""}" placeholder="选填" /></label>
         <label>联系电话<input name="contactPhone" value="${ch?.contactPhone || ""}" placeholder="选填" /></label>
         <label class="field-day">批发单价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${contract?.wholesalePrice ?? stdPrice}" /></label>
@@ -4884,7 +5196,7 @@
           <option ${contract?.codeSkuName === "7天体验" ? "selected" : ""}>7天体验</option>
         </select></label>
         <label class="field-act">服务人天（计提用）<input name="codeValidityDays" type="number" min="1" step="1" value="${contract?.codeValidityDays ?? 30}" /></label>
-        <p class="field-act form-span-2" style="font-size:12px;color:var(--muted);margin:0">激活码：渠道批发码库存；骑手核销获套餐；平台 1% 在核销时按标准人天价×服务人天×B 端费率计提。</p>
+        <p class="field-act form-span-2" style="font-size:12px;color:var(--muted);margin:0">${phase2BadgeHtml()} 激活码（二期）：渠道批发码库存；骑手核销获套餐；平台 1% 在核销时按标准人天价×服务人天×B 端费率计提。</p>
         ${cardSkuPricingFieldsHtml(contract?.channelId)}
         <div class="field-card field-card-instant form-span-2" style="padding:12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc">
           <p style="font-size:12px;font-weight:600;margin:0 0 10px">${noteBtn("channel_instant_commission")} 佣金及时到付（仅渠道分销）</p>
@@ -4919,7 +5231,7 @@
         <label>合同有效期起<input name="validFrom" type="date" value="${contract?.validFrom || "2026-01-01"}" required /></label>
         <label>合同有效期止<input name="validTo" type="date" value="${contract?.validTo || "2026-12-31"}" required /></label>
         <label>签约状态<select name="contractStatus"><option ${(!contract || contract.status === "启用") ? "selected" : ""}>启用</option><option ${contract?.status === "停用" ? "selected" : ""}>停用</option></select></label>
-        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">人天池：自动建池 · 渠道分销：配置授权 SKU 专享价/佣金 · 设备租赁：统一月租与专属站 · 激活码：批发码库存</p>`;
+        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">人天池：自动建池 · 渠道分销：配置授权 SKU 专享价/佣金 · <span class="badge-p2">二期</span>设备租赁：统一月租与专属站 · <span class="badge-p2">二期</span>激活码：批发码库存</p>`;
       const syncModeFields = () => {
         const m = contract ? mode : (document.querySelector("#channelPartnerMode")?.value || "人天池");
         document.querySelectorAll(".field-day, .field-card, .field-rent, .field-act").forEach(el => { el.style.display = "none"; });
@@ -5364,6 +5676,7 @@
 
     function renderPlatformOverview() {
       const st = platformBizStats();
+      const rangeHint = overviewRangeLabel();
       const opRows = platformOperators.map(op => {
         const agg = operatorAggregateStats(op.id);
         const credit = creditForOperator(op.id);
@@ -5377,10 +5690,10 @@
           ${kpi("用户", st.users, "注册骑手", "骑", "platform_stats")}
           ${kpi("在营站点", st.sites, "全平台", "站", "platform_stats")}
           ${kpi("设备", st.devices, "柜 " + st.cabinets + " · 电 " + st.batteries + " · 待绑 " + st.pendingInventory, "设", "platform_device_bind")}
-          ${kpi("套餐订单", st.packageOrders, "累计笔数", "订", "platform_stats")}
-          ${kpi("换电成功", st.swapOrders, "累计笔数", "换", "platform_stats")}
-          ${kpi("业务流水", "¥" + st.turnover.toLocaleString("zh-CN"), "套餐 + 渠道批发", "流", "platform_stats")}
-          ${kpi("平台营收", "¥" + st.platformRevenue.toLocaleString("zh-CN"), "C 端 1% + B 端计提", "收", "platform_stats")}
+          ${kpi("套餐订单", scale(st.packageOrders), rangeHint + " · 累计笔数", "订", "platform_stats")}
+          ${kpi("换电成功", scale(st.swapOrders), rangeHint + " · 累计笔数", "换", "platform_stats")}
+          ${kpi("业务流水", "¥" + scaleMoney(st.turnover).toLocaleString("zh-CN"), rangeHint + " · 套餐 + 渠道批发", "流", "platform_stats")}
+          ${kpi("平台营收", "¥" + scaleMoney(st.platformRevenue).toLocaleString("zh-CN"), rangeHint + " · C 端 1% + B 端计提", "收", "platform_stats")}
         </div>
         ${renderDataDrillPanel("platform")}
         <section class="panel">
@@ -6351,7 +6664,7 @@
                     : `额度池 ${c.poolCount} 个 · ${c.availableDays} / ${c.purchasedDays} 人天 · 月消耗 ${c.monthConsume}`;
                 return `<tr>
                 <td><strong>${c.name}</strong><br><small style="color:var(--muted)">${c.id}</small></td>
-                <td>${tag(c.settlementMode || "人天池")}</td>
+                <td>${settlementModeLabel(c.settlementMode || "人天池")}</td>
                 <td>${c.loginAccount}</td>
                 <td>${c.contactName}<br><small>${c.contactPhone}</small></td>
                 <td>${tag(c.status)}</td>
@@ -6853,76 +7166,51 @@
       }
       const e = currentEntity();
       const dev = operatorDeviceBreakdown(e.id);
-      const ownCabList = dev.ownCabList;
-      const online = ownCabList.filter(c => c.online).length;
-      const rate = ownCabList.length ? Math.round(online / ownCabList.length * 1000) / 10 : 0;
-      const leaseCabOnline = dev.leaseCabList.filter(c => c.online).length;
-      const leaseCabRate = dev.leaseCabList.length ? Math.round(leaseCabOnline / dev.leaseCabList.length * 1000) / 10 : 0;
-      const channelModes = channelContractModeSummary();
-      const os = packageOrders.filter(filterOwnRow);
+      const cabList = [...dev.ownCabList, ...dev.leaseCabList];
+      const batList = [...dev.ownBatList, ...dev.leaseBatList];
+      const cabOnline = cabList.filter(c => c.online).length;
+      const cabRate = cabList.length ? Math.round(cabOnline / cabList.length * 1000) / 10 : 0;
+      const batOnline = batList.filter(isBatteryOnline).length;
+      const batRate = batList.length ? Math.round(batOnline / batList.length * 1000) / 10 : 0;
+      const opSites = myOperatorSites();
+      const siteOpen = opSites.filter(s => s.status === "在营").length;
+      const siteBuilding = opSites.filter(s => s.status === "建设中").length;
+      const siteClosed = opSites.filter(s => s.status === "已停用").length;
+      const siteStatusSub = [
+        "在营 " + siteOpen,
+        siteBuilding ? "建设中 " + siteBuilding : "",
+        siteClosed ? "停用 " + siteClosed : ""
+      ].filter(Boolean).join(" · ");
       const us = users.filter(filterOwnRow);
       const activeUsers = us.filter(u => {
         const st = u.serviceState || "";
         return !u.pkg.includes("退款") && !u.pkg.includes("完结") && st !== "已冻结" && st !== "中途完结";
       }).length;
-      const ownCleared = operatorClearedBalance(e.id);
-      const monthDue = operatorFinanceMonthDue(e.id);
-      const withdrawable = operatorWithdrawableBalance(e.id);
-      const pendingWd = operatorPendingWithdrawTotal(e.id);
+      const pkgPurchase = packageOrders.filter(filterOwnRow).reduce((s, o) => s + (o.pay || 0), 0);
       const siteStatsPanel = renderOverviewSiteStats();
       const powerStatsPanel = renderOverviewPowerStats();
-      const siteNames = [...new Set(ownCabList.map(c => c.site))];
-      const credit = myOperatorCredit();
-      const interPending = myInterOpLedger().filter(r => r.status === "待日清").reduce((s, r) => {
-        const v = interOpRowView(r);
-        return v.direction === "平台代付" ? s + v.amount : s;
-      }, 0);
-      const feeAccrued = myPlatformFeeAccruals().reduce((s, r) => s + r.feeAmount, 0);
-      const feeOwed = myPlatformFeeBills().reduce((s, r) => s + r.owed, 0);
-      const soldPools = mySoldDayPools();
-      const pendingRows = myInterOpLedger().filter(r => r.status === "待日清");
-      let interReceivable = 0;
-      let interPayable = 0;
-      pendingRows.forEach(r => {
-        const v = interOpRowView(r);
-        if (v.direction === "平台代收") interReceivable += v.amount;
-        if (v.direction === "平台代付") interPayable += v.amount;
-      });
       return `
         ${ownScopeBanner()}
-        <div class="platform-price-banner" style="margin-bottom:14px">运营商 <strong>${e.name}</strong> · ${operatorScopeDeviceHint(e.id)}</div>
         <section class="panel overview-kpi-panel">
-          ${panelHead("经营概览", "设备、清分、渠道与跨网指标汇总", "overview_kpi_panel")}
+          ${panelHead("经营概览", "设备快照与经营指标", "overview_kpi_panel")}
           <div class="panel-body">
-            <div class="kpi-grid in-panel">
-              ${kpi("自有柜机", dev.ownCabList.length, "在线 " + online + " 台 · " + rate + "%", "柜", "overview_own_cab")}
-              ${kpi("自有电池", dev.ownBatList.length, "在册电池", "电", "overview_own_bat")}
-              ${kpi("租赁柜机", dev.leaseCabList.length, dev.leaseCabList.length ? "在线 " + leaseCabOnline + " 台 · " + leaseCabRate + "%" : "—", "租柜", "overview_lease_cab")}
-              ${kpi("租赁电池", dev.leaseBatList.length, "租赁协议关联", "租电", "overview_lease_bat")}
-              ${kpi("已清分金额", "¥" + ownCleared.toLocaleString("zh-CN"), "支付成功实时清分", "清", "overview_cleared")}
-              ${kpi("可提现余额", "¥" + withdrawable.toLocaleString("zh-CN"), monthDue > 0 ? "已扣本月待还 ¥" + monthDue.toLocaleString("zh-CN") : "已清分未提现", "提", "overview_withdrawable")}
-              ${kpi("提现待审", pendingWd > 0 ? "¥" + pendingWd.toLocaleString("zh-CN") : "无", "平台审核中", "审", "flows_withdraw_apply")}
-              ${kpi("活跃用户", scale(activeUsers), "去重骑手", "骑", "overview_users")}
-              ${kpi("跨网待日清", "¥" + interPending.toFixed(2), credit ? (credit.depositBalance > 0 ? "保证金 ¥" + credit.depositBalance.toLocaleString("zh-CN") : "信用可用 ¥" + credit.available.toFixed(0)) : "运营商往来账", "往", "overview_inter_pending")}
-              ${kpi("平台服务费", "¥" + feeAccrued.toFixed(2), feeOwed > 0 ? "欠费 ¥" + feeOwed.toFixed(2) : "本月计提", "服", "overview_platform_fee_kpi")}
-              ${kpi("渠道商-人天池、设备租赁、骑士卡", channelModes.total + " 家", channelModes.sub + (soldPools.length ? " · 人天池 " + soldPools.length + " 个" : ""), "渠", "overview_channel_summary")}
+            <div class="kpi-grid in-panel kpi-grid-3">
+              ${kpi("柜机", cabList.length, "在线 " + cabOnline + " 台 · " + cabRate + "%", "柜", "overview_cab_total")}
+              ${kpi("电池", batList.length, "在线 " + batOnline + " 块 · " + batRate + "%", "电", "overview_bat_total")}
+              ${kpi("站点", opSites.length, siteStatusSub || "暂无站点", "站", "overview_site_status")}
+            </div>
+            ${overviewRangeSelectHtml()}
+            <div class="kpi-grid in-panel kpi-grid-2">
+              ${kpi("套餐购买金额", "¥" + scaleMoney(pkgPurchase).toLocaleString("zh-CN"), overviewRangeLabel() + " · C 端实付合计", "购", "overview_pkg_pay")}
+              ${kpi("活跃用户", scale(activeUsers), overviewRangeLabel() + " · 去重骑手", "骑", "overview_users")}
             </div>
           </div>
         </section>
-        ${renderDataDrillPanel("operator")}
-        ${siteStatsPanel}
-        ${powerStatsPanel}
-        <section class="panel">
-          ${panelHead("跨运营商待结算", "待日清跨网设备服务费 汇总；运营商只见平台代收/代付", "inter_op")}
-          <div class="panel-body">
-            <div class="detail-grid">
-              <div class="detail-item"><span>待日清 · 平台代收（应收） ${noteBtn("inter_op_receivable")}</span><strong style="color:var(--green)">¥${interReceivable.toFixed(2)}</strong></div>
-              <div class="detail-item"><span>待日清 · 平台代付（应付） ${noteBtn("inter_op_payable")}</span><strong style="color:var(--orange)">¥${interPayable.toFixed(2)}</strong></div>
-              <div class="detail-item"><span>轧差净额 ${noteBtn("inter_op_net")}</span><strong>¥${(interReceivable - interPayable).toFixed(2)}</strong></div>
-              <div class="detail-item"><span>操作</span><button type="button" class="link-btn" data-view-jump="interOp">查看往来账</button></div>
-            </div>
-          </div>
-        </section>`;
+        <div class="overview-split-row overview-split-row-3">
+          ${renderDataDrillPanel("operator")}
+          ${powerStatsPanel}
+          ${siteStatsPanel}
+        </div>`;
     }
 
     function mySitePartners() {
@@ -7765,10 +8053,6 @@
               ${kpi("待付账单", pendingBills.length, "合计待付 ¥" + pendingAmount.toLocaleString("zh-CN", { minimumFractionDigits: 2 }), "单", "site_expenses_bill")}
               ${kpi("期间应付", "¥" + periodDue.toLocaleString("zh-CN", { minimumFractionDigits: 2 }), filterHint + " 账期合计", "应", "site_expenses_bill")}
               ${kpi("期间已付", "¥" + periodPaid.toLocaleString("zh-CN", { minimumFractionDigits: 2 }), "筛选期内支付流水", "付", "site_expenses_payment")}
-            </div>
-            <div class="tab-bar" style="margin-bottom:12px">
-              <button type="button" class="btn${tab === "sites" ? " primary" : ""}" data-site-expense-tab="sites">按站点</button>
-              <button type="button" class="btn${tab === "bills" ? " primary" : ""}" data-site-expense-tab="bills">全部账单</button>
             </div>
             ${tab === "sites" ? `
             <div class="orders-table-wrap">
@@ -9948,8 +10232,6 @@
 
     function renderPricing() {
       const tab = state.pricingTab;
-      const tabs = [["pkg", "个人套餐价"], ["quota", "人天批发价"], ["card", "渠道分销价"]];
-      const sidebar = tabSidebar(tabs, tab, "prtab");
       let body = "";
       if (tab === "pkg") {
         const rows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id);
@@ -10017,7 +10299,7 @@
           </div>
         </section>`;
       }
-      return `${ownScopeBanner()}${pageWithTabs(sidebar, body)}`;
+      return `${ownScopeBanner()}${body}`;
     }
 
     function renderChannelSales() {
@@ -10094,7 +10376,7 @@
               <tbody>${rows.map(c => `<tr>
                 <td>${c.id}</td>
                 <td>${c.channelName}<br><small style="color:var(--muted)">${c.channelId}</small></td>
-                <td>${tag(contractSettlementMode(c))}</td>
+                <td>${settlementModeLabel(contractSettlementMode(c))}</td>
                 <td>${contractPricingCell(c)}</td>
                 <td>${contractTermsCell(c)}</td>
                 <td>${c.validFrom} ~ ${c.validTo}</td>
@@ -10113,7 +10395,7 @@
               <tbody>${rows.map(c => {
                 if (!channelUsesCreditEval(c.channelId)) {
                   return `<tr>
-                    <td>${c.channelName}</td><td>${tag(contractSettlementMode(c))}</td>
+                    <td>${c.channelName}</td><td>${settlementModeLabel(contractSettlementMode(c))}</td>
                     <td colspan="4"><small style="color:var(--muted)">分销渠道不适用渠道信用（用户直购，无渠道统管押金）</small></td>
                     <td>—</td>
                   </tr>`;
@@ -10122,7 +10404,7 @@
                 const pending = channelDepositProofs.filter(p => p.channelId === c.channelId && p.status === "待审核").length;
                 const gap = prof ? (prof.gap || Math.max(0, prof.requiredDeposit - (prof.creditedAmount || 0))) : 0;
                 return `<tr>
-                  <td>${c.channelName}</td><td>${tag(contractSettlementMode(c))}</td>
+                  <td>${c.channelName}</td><td>${settlementModeLabel(contractSettlementMode(c))}</td>
                   <td>${prof ? prof.creditScore + " · " + prof.creditLevel : "—"}</td>
                   <td>¥${(prof?.creditLimit || 0).toLocaleString()}</td>
                   <td>${prof ? "应押 ¥" + prof.requiredDeposit.toLocaleString() + (gap > 0 ? `<br><small style="color:var(--warn)">缺口 ¥${gap.toLocaleString()}</small>` : "") : "—"}</td>
@@ -11323,7 +11605,7 @@
         const f = getPf();
         const sub = state.dayPoolConsumeSubTab || "rider";
         const subTabs = [["rider", "骑手日消耗"], ["swaps", "换电同步"], ["summary", "团队汇总"]];
-        const subSidebar = tabSidebar(subTabs, sub, "dpconsume-sub");
+        const subSidebar = innerTabSidebar(subTabs, sub, "dpconsume-sub");
         const exportBtn = isTeamAdminLogin() && employeeHasPerm("day_pool.export")
           ? `<button type="button" class="btn primary" id="btnExportOrgConsume">导出本团队 CSV</button>` : "";
         const teamFilterName = f.teamId !== "全部" ? (dayPoolTeams.find(t => t.id === f.teamId) || {}).name : null;
@@ -11353,7 +11635,7 @@
         });
         const consumeBanner = `<div class="perm-banner" style="margin-bottom:14px">${noteBtn("day_pool_consume")} <strong>渠道商说明</strong>：骑手当天<strong>未换电但持有电池</strong>也视为使用服务并确认 1 人天；<strong>不持电池且未换电</strong>则不产生消耗。</div>`;
         if (sub === "rider") {
-          body = `${consumeBanner}${pageWithTabs(subSidebar, `<section class="panel">
+          body = `${consumeBanner}${pageWithInnerTabs(subSidebar, `<section class="panel">
             ${panelHead("骑手日消耗明细", "每骑手每日 1 条；含换电次数与持有电池数", "day_pool_consume", exportBtn)}
             <div class="panel-body orders-table-wrap">
               <table>
@@ -11374,7 +11656,7 @@
             </div>
           </section>`)}`;
         } else if (sub === "swaps") {
-          body = `${consumeBanner}${pageWithTabs(subSidebar, `<section class="panel">
+          body = `${consumeBanner}${pageWithInnerTabs(subSidebar, `<section class="panel">
             ${panelHead("换电同步记录", "每次换电实时同步至渠道商", "day_pool_swap_sync")}
             <div class="panel-body orders-table-wrap">
               <table>
@@ -11391,7 +11673,7 @@
             </div>
           </section>`)}`;
         } else {
-          body = `${consumeBanner}${pageWithTabs(subSidebar, `<section class="panel">
+          body = `${consumeBanner}${pageWithInnerTabs(subSidebar, `<section class="panel">
             ${panelHead("团队每日汇总", "预占/确认/释放与换电、持电池勾稽", "day_pool_reserve")}
             <div class="panel-body orders-table-wrap">
               <table>
@@ -13045,10 +13327,18 @@
       syncTenantUi();
       renderGlobalHeader();
       updateScopeHint();
-      const pageMeta = meta[state.view] || [NAV_LABEL[state.view] || "—", ""];
+      let pageMeta = meta[state.view] || [NAV_LABEL[state.view] || "—", ""];
+      const l2 = getNavL2(state.view);
+      if (l2) {
+        const cur = state[l2.stateKey];
+        const hit = l2.tabs.find(([k]) => k === cur);
+        if (hit) pageMeta = [hit[1].replace(/\s*[!(].*$/, "").trim() || hit[1], pageMeta[1]];
+      }
       document.querySelector("#pageTitle").textContent = pageMeta[0];
       document.querySelector("#pageDesc").textContent = pageMeta[1];
-      document.querySelector("#pageModuleNote").innerHTML = renderPageModuleNote();
+      const p2 = phase2Meta();
+      const noteHtml = renderPageModuleNote();
+      document.querySelector("#pageModuleNote").innerHTML = (p2 ? phase2BadgeHtml() : "") + noteHtml;
       let body = "";
       try {
         body = renderCurrentViewHtml();
@@ -13056,7 +13346,7 @@
         console.error(e);
         body = `<section class="panel"><div class="panel-body"><p style="color:var(--red);margin:0 0 8px"><strong>页面渲染失败</strong>：${String(e.message || e)}</p><p style="font-size:13px;color:var(--muted);margin:0">请打开浏览器控制台查看详情；建议通过 <code>python3 main.py</code> 访问 <code>/prototype/index.html</code>。</p></div></section>`;
       }
-      document.querySelector("#views").innerHTML = `<div class="view active">${body}</div>`;
+      document.querySelector("#views").innerHTML = `<div class="view active">${phase2BannerHtml()}${body}</div>`;
       bindInteractiveActions(document);
       bindPageDynamicControls();
       if (state.detailSubId) openPackageDetail(state.detailSubId);
@@ -13071,7 +13361,9 @@
       const btn = e.target.closest("button[data-view]");
       if (!btn) return;
       state.view = btn.dataset.view;
-      state.cabinetDetailSn = null;
+      if (btn.dataset.navSub) setNavL2Key(btn.dataset.view, btn.dataset.navSub);
+      else if (btn.dataset.prtab) state.pricingTab = btn.dataset.prtab;
+      if (btn.dataset.view !== "devices") state.cabinetDetailSn = null;
       closeDrawer();
       closeEmployeeForm();
       render();
@@ -13234,14 +13526,49 @@
     });
 
     document.addEventListener("change", e => {
+      const drillEl = e.target.closest("[data-drill-swap]");
+      if (drillEl) {
+        const pf = getDrillSwapPf();
+        const key = drillEl.dataset.drillSwap;
+        pf[key] = drillEl.value;
+        if (key === "range") {
+          if (pf.range === "custom") {
+            const dates = drillSwapDateList({ ...pf, range: "7" });
+            if (!pf.dateFrom) pf.dateFrom = ymdLocal(dates[0]);
+            if (!pf.dateTo) pf.dateTo = ymdLocal(dates[dates.length - 1]);
+          }
+        }
+        if (key === "dateFrom" || key === "dateTo") {
+          pf.range = "custom";
+          const from = parseYmdLocal(pf.dateFrom);
+          const to = parseYmdLocal(pf.dateTo);
+          if (from && to) {
+            const span = Math.round((to - from) / 86400000) + 1;
+            if (span > 31) {
+              const clipped = new Date(to);
+              clipped.setDate(clipped.getDate() - 30);
+              pf.dateFrom = ymdLocal(clipped);
+              window.alert("自定义跨度最多 31 天，已自动截取最近 31 天");
+            }
+            if (to < from) pf.dateTo = pf.dateFrom;
+          }
+        }
+        render();
+        return;
+      }
+      const ovRange = e.target.closest("[data-overview-range]");
+      if (ovRange) {
+        if (!state.pf.overview) state.pf.overview = { ...(PF_DEFAULTS.overview || {}) };
+        state.pf.overview.range = ovRange.value;
+        render();
+        return;
+      }
       const el = e.target.closest("[data-power-pf]");
       if (!el || state.view !== "overview") return;
       const pp = getPowerPf();
       pp[el.dataset.powerPf] = el.value;
-      if (el.dataset.powerPf === "range") {
-        syncPowerRangeDates(pp);
-        render();
-      }
+      if (el.dataset.powerPf === "range") syncPowerRangeDates(pp);
+      render();
     });
     document.addEventListener("click", e => {
       if (!e.target.closest("[data-power-query]")) return;
