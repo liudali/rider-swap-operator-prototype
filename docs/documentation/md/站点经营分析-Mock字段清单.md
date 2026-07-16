@@ -12,15 +12,15 @@
 
 ```
 GET /api/v1/operators/{operatorId}/site-busyness
-  ?range=today|7d|30d   # 等待队列可实时；换电衍生指标可选
+  ?date=YYYY-MM-DD      # 统计日：高峰与小时分布
   &site_id=optional
 ```
 
-**响应**：`{ rows: SiteBusynessRow[], totals: SiteBusynessTotals, range, generated_at }`
+**响应**：`{ rows: SiteBusynessRow[], totals: SiteBusynessTotals, date, generated_at }`
 
 ---
 
-## 2. 表格展示字段（一期）
+## 2. 卡片 / 表格展示字段（一期）
 
 | # | 前端列名 | 字段键 | 类型 | Mock / 生产计算 |
 |---|----------|--------|------|-----------------|
@@ -30,8 +30,11 @@ GET /api/v1/operators/{operatorId}/site-busyness
 | 4 | 格口占用 | `slot_used` / `slot_total` / `slot_util_pct` | int | `slot_total=Σcabinet.slots`；`slot_used`=柜内电池数（见 §3.2） |
 | 5 | 柜内电池 | `batteries_in_cab` | int | 见 §3.1 |
 | 6 | 等待中 | `waiting_count` | int | IoT/排队：当前站点待换电骑手数（实时） |
-| 7 | 繁忙度 | `busy_level` | enum | `低` / `中` / `高`（见 §3.3） |
-| 8 | 站点状态 | `site_status` | enum | `sites.status`（在营/建设中等） |
+| 7 | 繁忙度 | `busy_level` | enum | `低` / `中` / `高`（见 §3.3，**实时**） |
+| 8 | 站点状态 | `site_status` | enum | `sites.status` |
+| 9 | 换电高峰 | `peak_windows` | string[] | 统计日小时聚合后的高峰段文案，如 `11:00–14:00` |
+| 10 | 最忙小时 | `hot_hour` / `hot_count` | int | `argmax(hourly_counts)` |
+| 11 | 小时分布 | `hourly_counts[0..23]` | int[] | Mock：`siteSwapHourly`；生产：换电成功单按完成小时 COUNT |
 
 ### 合计行 `totals`
 
@@ -81,6 +84,18 @@ else if (waitingCount >= 1 || slotUtilPct >= 60) busyLevel = '中'
 else busyLevel = '低'
 ```
 
+### 3.5 换电高峰 `peak_windows`（统计日）
+
+```javascript
+hourly[0..23] = COUNT(swap_success WHERE site_id AND date(completed_at)=date GROUP BY hour)
+max = max(hourly)
+thresh = max(2, ceil(max * 0.65))
+// 连续 hour ≥ thresh 合并为 [from, to]，展示为 HH:00–(to+1):00
+hot_hour = argmax(hourly)
+```
+
+**说明**：实时繁忙度与统计日高峰互补——前者看「现在堵不堵」，后者看「一天里何时最集中」，用于排班/备电。
+
 ---
 
 ## 4. 明确不做（本期）
@@ -91,6 +106,7 @@ else busyLevel = '低'
 | 站点收入列 | 不在总览表展示金额；租赁账单不做「站点收入覆盖」 |
 | 购/换站标记 | 运营商后台不对用户标注购套餐站或换电站 |
 | `purchase_site_id` 归因 | 收入摊销在**运营商主体**；不按站点分摊 |
+| 多日热力对比 | 本期单日切换；近 7 日热力矩阵二期 |
 
 ---
 
@@ -101,7 +117,8 @@ else busyLevel = '低'
 | `cabinets[]` | 柜机台数、格口总数、站点归属 |
 | `batteries[]` | 柜内电池、格口占用 |
 | `sites[]` | 地址、状态、`waitingCount` |
-| `state.pf.overview.site` | 站点筛选 |
+| `siteSwapHourly[]` | 站点×日×小时换电笔数（高峰与 24h 条） |
+| `state.pf.overviewSiteBusy.date` | 统计日 |
 
 ---
 
@@ -109,11 +126,13 @@ else busyLevel = '低'
 
 | 键 | 对应列/模块 |
 |----|-------------|
-| `overview_site_stats` | 表格模块 |
+| `overview_site_stats` | 卡片模块 |
 | `overview_site_slots` | 格口占用 |
 | `overview_site_cab_batteries` | 柜内电池 |
 | `overview_site_waiting` | 等待中 |
-| `overview_site_busy` | 繁忙度 |
+| `overview_site_busy` | 实时繁忙度 |
+| `overview_site_peak` | 换电高峰 |
+| `overview_site_busy_date` | 统计日 |
 | `overview_site_cabinets` | 柜机 |
 | `overview_site_status` | 站点状态 |
 
@@ -121,11 +140,11 @@ else busyLevel = '低'
 
 ## 7. 验收要点
 
-- [ ] 表格**无**服务用户数、换电笔数、收入金额列
-- [ ] 格口占用 = 已用/总数，与柜内电池数逻辑一致
-- [ ] 等待中为实时或近实时快照
-- [ ] 繁忙度与格口/等待阈值联动
-- [ ] 筛选单站点后仅一行且字段可复核
+- [ ] 表格/卡片**无**收入金额列
+- [ ] 实时繁忙度与格口/等待阈值联动
+- [ ] 每站展示统计日高峰段 + 24h 分布条 + 当日笔数/最忙小时
+- [ ] 切换统计日可刷新高峰（Mock 覆盖 2026-06-01～30）
+- [ ] 筛选单站点后仅该站且字段可复核
 
 ---
 

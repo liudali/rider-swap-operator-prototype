@@ -10,7 +10,14 @@
       platformUsersPageSize: 10,
       platformLeasingTab: "companies", depositTab: "pending", operatorCreditTab: "assignments",
       dayPoolTab: "pools", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider",
-      pricingTab: "pkg", channelSalesTab: "contracts", refundTab: "queue",
+      pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
+      channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
+      channelAssetsSubTab: "dayPool", channelAssetsPage: 1, channelAssetsPageSize: 5,
+      channelAssetsLedgerChannel: "全部", channelAssetsLedgerType: "全部",
+      channelAssetsLedgerDateFrom: "", channelAssetsLedgerDateTo: "",
+      channelAssetsLedgerPage: 1, channelAssetsLedgerPageSize: 8,
+      activationCodesBatch: "全部", activationCodesPage: 1, activationCodesPageSize: 10,
+      refundTab: "queue",
       employeeTab: "staff", pf: {},
       employeeForm: null, poolForm: null, pricingEditId: null, cardPricingEditId: null, quotaPricingEditId: null,
       operatorFormId: null, platformFeeRateEditId: null, leasingCompanyFormId: null, siteFormId: null, channelPartnerContractId: null, bindInventorySn: null,
@@ -19,6 +26,7 @@
       financeTab: "dashboard", financeSelectedAppId: "FDA-2606-01", financeAssetFilter: "全部", financeSelectedPackageId: "FAP-2606-01",
       channelLinkForm: null,
       siteExpenseTab: "sites",
+      siteManageTab: "info",
       sitePartnersTab: "profiles",
       sitePartnerId: null,
       detailSiteExpenseId: null,
@@ -55,7 +63,39 @@
       if (f.type === "textarea") {
         return `<label>${escProtoAttr(f.label)}<textarea name="${escProtoAttr(f.name)}" rows="${f.rows || 3}" ${req} ${ro}>${escProtoAttr(f.value || "")}</textarea></label>`;
       }
+      if (f.type === "checkboxgroup") {
+        const selected = new Set(Array.isArray(f.value) ? f.value : (f.value ? [f.value] : []));
+        const items = (f.options || []).map(o => {
+          const v = typeof o === "string" ? o : o.v;
+          const t = typeof o === "string" ? o : (o.t || o.v);
+          const disabled = !!(typeof o === "object" && o.disabled);
+          const reason = typeof o === "object" ? (o.disabledReason || "") : "";
+          return `<label class="proto-check-item${disabled ? " is-disabled" : ""}">
+            <input type="checkbox" name="${escProtoAttr(f.name)}" value="${escProtoAttr(v)}"
+              ${selected.has(v) && !disabled ? " checked" : ""}${disabled ? " disabled" : ""}>
+            <span class="proto-check-text"><strong>${escProtoAttr(t)}</strong>${disabled && reason ? `<small>${escProtoAttr(reason)}</small>` : `<small>${escProtoAttr(v)}</small>`}</span>
+          </label>`;
+        }).join("");
+        return `<div class="proto-field-block" data-proto-checkgroup="${escProtoAttr(f.name)}">
+          <span class="proto-field-label">${escProtoAttr(f.label)}</span>
+          <div class="proto-check-list">${items || `<span class="proto-check-empty">${escProtoAttr(f.emptyText || "暂无可选站点")}</span>`}</div>
+        </div>`;
+      }
       return `<label>${escProtoAttr(f.label)}<input name="${escProtoAttr(f.name)}" type="${f.type || "text"}" value="${escProtoAttr(f.value ?? "")}" ${req} ${ro}></label>`;
+    }
+
+    function readProtoFormData(form) {
+      const fd = new FormData(form);
+      const data = {};
+      for (const [k, v] of fd.entries()) {
+        if (Object.prototype.hasOwnProperty.call(data, k)) {
+          if (!Array.isArray(data[k])) data[k] = [data[k]];
+          data[k].push(v);
+        } else {
+          data[k] = v;
+        }
+      }
+      return data;
     }
 
     function closeProtoForm() {
@@ -97,7 +137,7 @@
       }
       const form = document.querySelector("#protoForm");
       if (!form.checkValidity()) { form.reportValidity(); return; }
-      const data = Object.fromEntries(new FormData(form).entries());
+      const data = readProtoFormData(form);
       const errEl = document.querySelector("#protoFormError");
       const result = protoFormState.onSubmit(data);
       if (typeof result === "string") {
@@ -656,6 +696,10 @@
         if (state.deviceTab === "battery") return "devices_battery";
         return "devices";
       }
+      if (state.view === "sites") {
+        if ((state.siteManageTab || "info") === "partners") return "sitePartners";
+        return "sites";
+      }
       return state.view;
     }
 
@@ -788,6 +832,80 @@
       return true;
     }
 
+    function genActivationCodeValue(order, serialNo) {
+      const prefix = (order.validityDays || 30) >= 30 ? "FN30" : (order.validityDays || 0) >= 7 ? "FN7D" : "FN1D";
+      const seed = (order.id + "-" + serialNo).replace(/[^A-Z0-9]/gi, "");
+      let h = 0;
+      for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+      const a = (h % 36 ** 4).toString(36).toUpperCase().padStart(4, "0");
+      const b = ((h >>> 8) % 36 ** 4).toString(36).toUpperCase().padStart(4, "0");
+      return `${prefix}-${a}-${b}`;
+    }
+
+    function syncActivationInventory(channelId) {
+      const codes = channelActivationCodes.filter(c => c.channelId === channelId);
+      const inventory = codes.filter(c => c.status === "未发放" || c.status === "已发放").length;
+      const redeemed = codes.filter(c => c.status === "已核销").length;
+      const pendingVoid = codes.filter(c => c.status === "待作废").length;
+      const contract = channelContracts.find(c => c.channelId === channelId);
+      if (contract) {
+        contract.codeInventory = inventory;
+        contract.codesRedeemed = redeemed;
+      }
+      const mode = channelSettlementModes.find(m => m.channelId === channelId);
+      if (mode) {
+        mode.codeInventory = inventory;
+        mode.codesRedeemed = redeemed;
+        mode.codesPendingVoid = pendingVoid;
+      }
+      const ch = platformChannels.find(p => p.id === channelId);
+      if (ch) {
+        ch.codeInventory = inventory;
+        ch.codesRedeemed = redeemed;
+      }
+    }
+
+    /** 按订单 qty 铸造码；幂等：同批次已有码则不再造 */
+    function mintActivationCodesForOrder(order) {
+      const existed = channelActivationCodes.filter(c => c.batchId === order.id);
+      if (existed.length > 0) {
+        order.codesMinted = existed.length;
+        order.mintStatus = "已发码";
+        syncActivationInventory(order.channelId);
+        return existed.length;
+      }
+      const skuName = String(order.skuName || "激活码").replace(/码$/, "") || "激活码";
+      for (let i = order.qty; i >= 1; i--) {
+        const serial = String(i).padStart(3, "0");
+        channelActivationCodes.unshift({
+          id: "CODE-" + order.id.replace(/^AC-/, "") + "-" + serial,
+          channelId: order.channelId,
+          code: genActivationCodeValue(order, i),
+          serialNo: i,
+          skuName,
+          validityDays: order.validityDays,
+          wholesalePrice: order.unitPrice,
+          status: "未发放",
+          batchId: order.id,
+          issuedTo: null,
+          issuedAt: null,
+          redeemedAt: null,
+          redeemedBy: null,
+          userId: null,
+          pkgOrderId: null,
+          voidReason: null,
+          voidRequestedAt: null,
+          voidRequestedBy: null,
+          voidConfirmedAt: null,
+          voidConfirmedBy: null
+        });
+      }
+      order.codesMinted = order.qty;
+      order.mintStatus = "已发码";
+      syncActivationInventory(order.channelId);
+      return order.qty;
+    }
+
     function confirmChannelActivationOrder(orderId) {
       const o = channelActivationOrders.find(x => x.id === orderId);
       if (!o || o.orderStatus !== "待确认到账") return false;
@@ -797,12 +915,141 @@
       o.payTime = now;
       o.confirmedBy = currentEntity().name;
       o.confirmedAt = now;
-      const contract = channelContracts.find(c => c.channelId === o.channelId);
-      if (contract) contract.codeInventory = (contract.codeInventory || 0) + o.qty;
-      const ch = platformChannels.find(p => p.id === o.channelId);
-      if (ch) ch.codeInventory = (ch.codeInventory || 0) + o.qty;
-      window.alert("演示：激活码批发单 " + orderId + " 已确认到账，库存 +" + o.qty);
+      const minted = mintActivationCodesForOrder(o);
+      window.alert("演示：激活码批发单 " + orderId + " 已确认到账，已按批次生成 " + minted + " 张激活码（编号 001–" + String(minted).padStart(3, "0") + "）");
       return true;
+    }
+
+    function nextActivationOrderId() {
+      const ym = new Date().toISOString().slice(0, 7).replace("-", "");
+      const prefix = "AC-" + ym.slice(0, 6) + "-";
+      const seq = channelActivationOrders
+        .map(o => o.id)
+        .filter(id => id.startsWith("AC-"))
+        .map(id => parseInt(id.slice(-3), 10))
+        .filter(n => !Number.isNaN(n));
+      const next = (seq.length ? Math.max(...seq) : 0) + 1;
+      return prefix + String(next).padStart(3, "0");
+    }
+
+    function submitActivationWholesaleOrder(data) {
+      if (!isActivationChannel()) return "当前渠道非激活码结算模式";
+      const contract = myChannelContracts()[0];
+      if (!contract) return "未找到签约运营商";
+      const qty = parseInt(data.qty, 10);
+      const unitPrice = parseFloat(data.unitPrice);
+      if (!qty || qty < 1) return "请填写采购数量";
+      if (contract.minCodes && qty < contract.minCodes) return "起购数量不少于 " + contract.minCodes + " 码";
+      if (!(unitPrice >= 0)) return "请填写批发单价";
+      const skuName = (data.skuName || contract.codeSkuName || "30天包月").trim();
+      const validityDays = parseInt(data.validityDays, 10) || contract.codeValidityDays || 30;
+      const amount = Math.round(qty * unitPrice * 100) / 100;
+      const id = nextActivationOrderId();
+      const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+      channelActivationOrders.unshift({
+        id,
+        channelId: currentEntity().id,
+        channelName: currentEntity().name,
+        operatorId: contract.operatorId,
+        operatorName: contract.operatorName || PAYEE_OPERATOR,
+        skuName: skuName.endsWith("码") ? skuName : skuName + "码",
+        qty,
+        unitPrice,
+        amount,
+        validityDays,
+        payChannel: "offline",
+        payMethod: "对公转账",
+        orderStatus: "待确认到账",
+        payStatus: "待付款",
+        createdAt: now,
+        payTime: null,
+        offlineVoucher: (data.voucher || "").trim() || "凭证待上传",
+        confirmedBy: null,
+        confirmedAt: null,
+        codesMinted: 0,
+        mintStatus: "未发码"
+      });
+      return {
+        successMessage: "批发申请已提交（" + id + "），请完成对公转账，待运营商确认到账后自动按单生成激活码。",
+        afterClose: () => render()
+      };
+    }
+
+    function openActivationWholesaleForm() {
+      const contract = myChannelContracts()[0];
+      if (!contract) {
+        showProtoToast("未找到签约信息");
+        return;
+      }
+      const defaultSku = contract.codeSkuName || "30天包月";
+      openProtoForm({
+        title: "申请激活码批发",
+        submitLabel: "提交申请",
+        fields: [
+          { name: "skuName", label: "套餐码", type: "select", options: [defaultSku, "30天包月", "7天体验", "1天体验"], value: defaultSku },
+          { name: "validityDays", label: "服务天数", type: "select", options: ["30", "7", "1"], value: String(contract.codeValidityDays || 30) },
+          { name: "qty", label: "采购数量（码）", value: String(contract.minCodes || 100), required: true },
+          { name: "unitPrice", label: "批发单价（元/码）", value: String(contract.wholesalePrice || 255), required: true },
+          { name: "voucher", label: "转账备注/凭证说明", value: "对公转账已提交", required: false }
+        ],
+        onSubmit: submitActivationWholesaleOrder
+      });
+    }
+
+    function markActivationCodeIssued(codeId, issuedTo) {
+      const c = channelActivationCodes.find(x => x.id === codeId);
+      if (!c) return "激活码不存在";
+      if (c.channelId !== currentEntity().id) return "无权操作他渠激活码";
+      if (c.status !== "未发放") return "仅「未发放」可标记发放";
+      const note = (issuedTo || "").trim();
+      if (!note) return "请填写发放对象/备注";
+      c.status = "已发放";
+      c.issuedTo = note;
+      c.issuedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+      syncActivationInventory(c.channelId);
+      return { successMessage: "已标记发放：" + c.code, afterClose: () => render() };
+    }
+
+    function requestActivationCodeVoid(codeId, reason) {
+      const c = channelActivationCodes.find(x => x.id === codeId);
+      if (!c) return "激活码不存在";
+      if (c.channelId !== currentEntity().id) return "无权操作他渠激活码";
+      if (!["未发放", "已发放"].includes(c.status)) return "当前状态不可申请作废";
+      const r = (reason || "").trim();
+      if (!r) return "请填写作废原因";
+      c.status = "待作废";
+      c.voidReason = r;
+      c.voidRequestedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+      c.voidRequestedBy = currentEntity().name;
+      syncActivationInventory(c.channelId);
+      return { successMessage: "已提交作废申请，待运营商确认（不作线上退款）", afterClose: () => render() };
+    }
+
+    function confirmActivationCodeVoid(codeId) {
+      const c = channelActivationCodes.find(x => x.id === codeId);
+      if (!c || c.status !== "待作废") return false;
+      const order = channelActivationOrders.find(o => o.id === c.batchId);
+      if (!isOperatorRole() || !order || order.operatorId !== currentEntity().id) {
+        showProtoToast("仅签约运营商可确认作废");
+        return false;
+      }
+      c.status = "已作废";
+      c.voidConfirmedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+      c.voidConfirmedBy = currentEntity().name;
+      syncActivationInventory(c.channelId);
+      showProtoToast("已确认作废 " + c.code + "（无退款）");
+      return true;
+    }
+
+    function myChannelActivationOrders() {
+      if (!isChannelRole()) return [];
+      return channelActivationOrders.filter(o => o.channelId === currentEntity().id);
+    }
+
+    function myOperatorPendingVoidCodes() {
+      if (!isOperatorRole()) return [];
+      const chIds = new Set(myChannelContracts().filter(c => contractSettlementMode(c) === "激活码").map(c => c.channelId));
+      return channelActivationCodes.filter(c => c.status === "待作废" && chIds.has(c.channelId));
     }
 
     function downloadCsv(filename, content) {
@@ -1670,6 +1917,38 @@
       render();
     }
 
+    /** 人天池余额不足：运营商看已售池；渠道商看自有池 */
+    function lowBalanceDayPoolsAlert() {
+      const list = isChannelRole() ? myDayPools() : (isOperatorRole() ? mySoldDayPools() : []);
+      return list.filter(p => p.status === "余额不足");
+    }
+
+    function navigateToLowBalancePools() {
+      closeUserMenu();
+      const pools = lowBalanceDayPoolsAlert();
+      const first = pools[0];
+      if (isChannelRole()) {
+        if (!canAccessView("dayPool")) {
+          window.alert("当前身份无「人天额度池」菜单");
+          return;
+        }
+        state.view = "dayPool";
+        state.dayPoolTab = "pools";
+        if (first) state.dayPoolSelectedId = first.id;
+      } else {
+        if (!canAccessView("channelSales")) {
+          window.alert("当前身份无「渠道管理」菜单");
+          return;
+        }
+        state.view = "channelSales";
+        state.channelSalesTab = "assets";
+        state.channelAssetsSubTab = "dayPool";
+        if (first) state.channelAssetsLedgerChannel = first.ownerId;
+      }
+      closeDrawer();
+      render();
+    }
+
     function logoutLogin() {
       closeUserMenu();
       applyLoginKey("entity:operator");
@@ -1688,7 +1967,13 @@
       const login = currentLoginSummary();
       const avatarChar = (login.displayName || "?").trim().charAt(0);
       const showAlerts = canAccessView("devices");
+      const lowPools = lowBalanceDayPoolsAlert();
+      const showBalanceWarn = lowPools.length > 0;
+      const balanceTip = lowPools.map(p => `${p.ownerName || ""} · ${p.name}`).filter(Boolean).join("；");
       el.innerHTML = `<div class="global-header-actions">
+        ${showBalanceWarn ? `<button type="button" class="balance-alert-link" id="btnBalanceAlerts" title="${escProtoAttr(balanceTip || "人天池余额不足")}">
+          余额不足${lowPools.length > 1 ? `<span class="alert-badge">${lowPools.length > 99 ? "99+" : lowPools.length}</span>` : ""}
+        </button>` : ""}
         ${showAlerts ? `<button type="button" class="device-alert-link" id="btnDeviceAlerts">
           设备报警${pending ? `<span class="alert-badge">${pending}</span>` : ""}
         </button>` : ""}
@@ -1708,6 +1993,7 @@
           </div>
         </div>
       </div>`;
+      document.querySelector("#btnBalanceAlerts")?.addEventListener("click", navigateToLowBalancePools);
       document.querySelector("#btnDeviceAlerts")?.addEventListener("click", navigateToDeviceAlerts);
       document.querySelector("#btnUserAvatar")?.addEventListener("click", e => {
         e.stopPropagation();
@@ -3647,7 +3933,7 @@
         return {
           short: "二期",
           label: "渠道商 · 激活码",
-          detail: "激活码批发 / 核销 / 结算整条渠道模式标为二期。一期不交付，原型仅演示。"
+          detail: "激活码：渠道申请批发 → 确认到账按单造码 → 标记发放 / 核销 / 作废审批。整条模式标为二期，一期不交付，原型演示闭环。"
         };
       }
       if (mode === "设备租赁") {
@@ -3727,13 +4013,13 @@
         return n ? " (" + n + ")" : "";
       };
       const map = {
-        pricing: { stateKey: "pricingTab", tabs: [["pkg", "个人套餐价"], ["deposit", "押金设置"], ["quota", "人天批发价"], ["card", "渠道分销价"]] },
-        channelSales: { stateKey: "channelSalesTab", tabs: [["contracts", "签约渠道"], ["orders", "服务订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]] },
+        pricing: { stateKey: "pricingTab", tabs: [["pkg", "个人套餐价"], ["deposit", "押金设置"], ["quota", "人天批发价"], ["card", "渠道分销价"], ["swapRange", "换电范围"]] },
+        channelSales: { stateKey: "channelSalesTab", tabs: [["contracts", "签约渠道"], ["orders", "渠道订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]] },
+        sites: { stateKey: "siteManageTab", tabs: [["info", "站点信息"], ["partners", "站点合伙人"]] },
         devices: { stateKey: "deviceTab", tabs: () => [["cabinet", "换电柜"], ["battery", "电池"], ["alerts", "设备告警" + alertBadge()], ["iccid", "ICCID"]] },
         flows: { stateKey: "flowTab", tabs: [["receipt", "资金实收"], ["accrual", "清分明细"], ["payout", "提现申请"]] },
         refundManage: { stateKey: "refundTab", tabs: () => [["queue", "退款申请" + refundBadge()], ["settings", "退款设置"]] },
         financeManage: { stateKey: "financeTab", tabs: [["dashboard", "工作台"], ["packages", "资产包"], ["ledger", "融资台账"], ["projects", "授信项目"], ["assets", "资产池"], ["repayments", "还款日历"]] },
-        sitePartners: { stateKey: "sitePartnersTab", tabs: [["profiles", "合伙人档案"], ["bindings", "分润绑定一览"], ["ledger", "分润明细"]] },
         siteExpenses: { stateKey: "siteExpenseTab", tabs: [["sites", "按站点"], ["bills", "全部账单"]] },
         leaseAgreements: { stateKey: "leaseAgreementsTab", tabs: [["contracts", "租赁协议"], ["deviceLists", "设备清单"]] },
         dayPool: {
@@ -3745,7 +4031,7 @@
           ])
         },
         depositManage: { stateKey: "depositTab", tabs: () => [["pending", "充值确认" + depBadge()], ["accounts", "账户总览"], ["ledger", "变动明细"]] },
-        operatorCreditEval: { stateKey: "operatorCreditTab", tabs: [["tierConfig", "档位配置"], ["assignments", "运营商定档"], ["logs", "变更记录"]] },
+        operatorCreditEval: { stateKey: "operatorCreditTab", tabs: [["tierConfig", "档位配置"], ["assignments", "运营商定档"], ["logs", "信用变更记录"]] },
         operators: {
           stateKey: "operatorsTab",
           tabs: () => {
@@ -3786,9 +4072,15 @@
       const prev = state[def.stateKey];
       state[def.stateKey] = tab;
       if (view === "platformUsers" && prev !== tab) state.platformUsersPage = 1;
+      if (view === "channelSales" && tab === "orders" && prev !== tab) state.channelOrdersPage = 1;
+      if (view === "channelSales" && tab === "assets" && prev !== tab) state.channelAssetsPage = 1;
     }
 
     function renderNav() {
+      if (state.view === "sitePartners") {
+        state.view = "sites";
+        state.siteManageTab = "partners";
+      }
       const items = getAllowedNavItems();
       if (!items.includes(state.view)) state.view = items[0];
       const identityP2 = isPhase2Identity();
@@ -3872,6 +4164,10 @@
         if (isPlatformRole()) return ["platform_scope", "platform_stats"];
         if (isLeasingRole()) return ["lease_panel", "finance_drawdown", "finance_pre_plan", "finance_confirm_flow"];
       }
+      if (view === "sites" && (state.siteManageTab || "info") === "partners") {
+        const partnerIds = VIEW_MODULE_NOTE.sitePartners;
+        return Array.isArray(partnerIds) ? partnerIds : (partnerIds ? [partnerIds] : []);
+      }
       const ids = VIEW_MODULE_NOTE[view];
       if (!ids) return [];
       return Array.isArray(ids) ? ids : [ids];
@@ -3926,6 +4222,12 @@
       return `<nav class="tab-sidebar" aria-label="子模块">${tabs.map(([k, label]) =>
         `<button type="button" class="${activeKey === k ? "active" : ""}" data-${dataAttr}="${k}">${label}</button>`
       ).join("")}</nav>`;
+    }
+
+    function panelTopTabs(tabs, activeKey, dataAttr) {
+      return `<div class="panel-top-tabs" role="tablist">${tabs.map(([k, label]) =>
+        `<button type="button" role="tab" class="panel-top-tab${activeKey === k ? " active" : ""}" aria-selected="${activeKey === k ? "true" : "false"}" data-${dataAttr}="${k}">${label}</button>`
+      ).join("")}</div>`;
     }
 
     function paginateList(rows, page, pageSize) {
@@ -4064,6 +4366,7 @@
 
     function getPowerPf() {
       if (!state.pf.overviewPower) state.pf.overviewPower = { ...PF_DEFAULTS.overviewPower };
+      if (state.pf.overviewPower.site == null) state.pf.overviewPower.site = "全部";
       return state.pf.overviewPower;
     }
 
@@ -4093,10 +4396,13 @@
 
     function overviewPowerStats() {
       const { from, to } = powerDateRange();
+      const pp = getPowerPf();
+      const siteFilter = pp.site || "全部";
       const eid = isPlatformRole() ? null : currentEntity().id;
       let rows = cabinetPowerDaily.filter(r => {
         if (eid && r.deviceOwnerId !== eid) return false;
         if (r.date < from || r.date > to) return false;
+        if (siteFilter !== "全部" && r.site !== siteFilter) return false;
         return true;
       });
       const siteMap = {};
@@ -4133,8 +4439,64 @@
       return "低";
     }
 
+    function getSiteBusyPf() {
+      if (!state.pf.overviewSiteBusy) state.pf.overviewSiteBusy = { ...PF_DEFAULTS.overviewSiteBusy };
+      if (!state.pf.overviewSiteBusy.date) state.pf.overviewSiteBusy.date = "2026-06-15";
+      return state.pf.overviewSiteBusy;
+    }
+
+    function siteHourlySwapCounts(siteName, date) {
+      const hours = Array(24).fill(0);
+      siteSwapHourly.forEach(r => {
+        if (r.site !== siteName || r.date !== date) return;
+        hours[r.hour] = (hours[r.hour] || 0) + (r.count || 0);
+      });
+      return hours;
+    }
+
+    function peakWindowsFromHours(hours) {
+      const max = Math.max(...hours, 0);
+      const dayTotal = hours.reduce((s, n) => s + n, 0);
+      if (max <= 0) {
+        return { peakLabel: "当日无换电", hotLabel: "—", dayTotal: 0, hours, peakHours: [] };
+      }
+      const thresh = Math.max(2, Math.ceil(max * 0.65));
+      const ranges = [];
+      let start = null;
+      for (let h = 0; h < 24; h++) {
+        if (hours[h] >= thresh) {
+          if (start == null) start = h;
+        } else if (start != null) {
+          ranges.push({ from: start, to: h - 1 });
+          start = null;
+        }
+      }
+      if (start != null) ranges.push({ from: start, to: 23 });
+      const fmt = (a, b) => (a === b ? `${String(a).padStart(2, "0")}:00` : `${String(a).padStart(2, "0")}:00–${String(b + 1).padStart(2, "0")}:00`);
+      const peakLabel = ranges.length ? ranges.map(r => fmt(r.from, r.to)).join(" · ") : `${String(hours.indexOf(max)).padStart(2, "0")}:00`;
+      const hotHour = hours.indexOf(max);
+      const hotLabel = `${String(hotHour).padStart(2, "0")}:00（${max} 笔）`;
+      return { peakLabel, hotLabel, dayTotal, hours, peakHours: ranges.flatMap(r => {
+        const arr = [];
+        for (let h = r.from; h <= r.to; h++) arr.push(h);
+        return arr;
+      }) };
+    }
+
+    function renderSiteHourBars(hours, peakHours) {
+      const max = Math.max(...hours, 1);
+      const peakSet = new Set(peakHours || []);
+      return `<div class="site-busy-hours" aria-hidden="true">${hours.map((n, h) => {
+        const pct = Math.round((n / max) * 100);
+        const cls = peakSet.has(h) ? "is-peak" : "";
+        return `<span class="site-busy-hour-bar ${cls}" style="--h:${pct}%" title="${String(h).padStart(2, "0")}:00 · ${n} 笔"></span>`;
+      }).join("")}</div>
+        <div class="site-busy-hour-axis"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>`;
+    }
+
     function siteBusinessStats() {
       const eid = currentEntity().id;
+      const date = getSiteBusyPf().date || "2026-06-15";
       const ownCabs = cabinets.filter(c => c.deviceOwnerId === eid);
       const siteNames = [...new Set(ownCabs.map(c => c.site))].sort();
       return siteNames.map(siteName => {
@@ -4150,6 +4512,7 @@
         const waiting = siteMeta.waitingCount ?? 0;
         const cabinetsOnline = cabinetsAtSite.filter(c => c.online).length;
         const cabinetsOffline = cabinetsAtSite.length - cabinetsOnline;
+        const peak = peakWindowsFromHours(siteHourlySwapCounts(siteName, date));
         return {
           siteName,
           siteId: siteMeta.id,
@@ -4163,7 +4526,9 @@
           slotPct,
           batteriesInCab,
           waiting,
-          busyLevel: siteBusyLevel(waiting, slotPct)
+          busyLevel: siteBusyLevel(waiting, slotPct),
+          date,
+          ...peak
         };
       }).filter(Boolean);
     }
@@ -4180,17 +4545,32 @@
     }
 
     function renderOverviewSiteStats() {
+      const pf = getSiteBusyPf();
       const rows = siteBusinessStats();
       const cards = rows.length
-        ? rows.map(r => `<article class="site-busy-card ${busyLevelClass(r.busyLevel)}" title="${r.siteName}">
-            <strong class="site-busy-name">${r.siteName}</strong>
-            <span class="site-busy-level">${r.busyLevel}</span>
+        ? rows.map(r => `<article class="site-busy-card site-busy-card-detail ${busyLevelClass(r.busyLevel)}" title="${r.siteName}">
+            <div class="site-busy-card-top">
+              <strong class="site-busy-name">${r.siteName}</strong>
+              <span class="site-busy-level" title="实时繁忙度">${r.busyLevel}</span>
+            </div>
+            <p class="site-busy-peak"><span>高峰</span><strong>${r.peakLabel}</strong></p>
+            ${renderSiteHourBars(r.hours, r.peakHours)}
+            <p class="site-busy-meta">当日 ${r.dayTotal} 笔 · 最忙 ${r.hotLabel}</p>
           </article>`).join("")
         : `<p class="site-busy-empty">暂无自有站点数据</p>`;
       return `<section class="panel overview-site-busy-panel">
-        ${panelHead("站点繁忙度", "", "overview_site_stats")}
-        <div class="panel-body">
-          <div class="site-busy-grid">${cards}</div>
+        ${panelHead("站点繁忙度", rows.length ? `共 ${rows.length} 站` : "", "overview_site_stats")}
+        <div class="panel-body site-busy-panel-body">
+          <div class="power-filter-bar power-filter-inline site-busy-filter-bar">
+            <label class="filter-inline">
+              <span>统计日 ${noteBtn("overview_site_busy_date")}</span>
+              <input type="date" data-site-busy-pf="date" value="${pf.date || "2026-06-15"}" min="2026-06-01" max="2026-06-30">
+            </label>
+            <span class="site-busy-filter-hint">${rows.length > 3 ? "站点较多时可上下滚动" : "实时等级 + 当日换电集中时段"}</span>
+          </div>
+          <div class="site-busy-scroll" tabindex="0" aria-label="站点繁忙度列表，可上下滚动">
+            <div class="site-busy-grid site-busy-grid-detail">${cards}</div>
+          </div>
         </div>
       </section>`;
     }
@@ -4200,6 +4580,7 @@
       const stats = overviewPowerStats();
       const avgPerCab = stats.cabinetCount ? stats.totalKwh / stats.cabinetCount : 0;
       const avgPerDay = stats.dayCount ? stats.totalKwh / stats.dayCount : 0;
+      const siteOpts = ownSiteOptions();
       const trendValues = stats.dailyTrend.map(d => Math.round(d.kwh * 1000) / 1000);
       const trendLabels = stats.dailyTrend.map(d => {
         const parts = String(d.date).split("-");
@@ -4231,11 +4612,9 @@
               <input type="date" data-power-pf="dateTo" value="${pp.dateTo || stats.to}">
             </label>
             <label class="filter-inline">
-              <span>快捷</span>
-              <select data-power-pf="range">
-                <option value="today"${pp.range === "today" ? " selected" : ""}>今日</option>
-                <option value="7"${pp.range === "7" ? " selected" : ""}>近 7 日</option>
-                <option value="30"${pp.range === "30" ? " selected" : ""}>近 30 日</option>
+              <span>站点筛选</span>
+              <select data-power-pf="site">
+                ${siteOpts.map(s => `<option value="${s}"${(pp.site || "全部") === s ? " selected" : ""}>${s === "全部" ? "所有站点" : s}</option>`).join("")}
               </select>
             </label>
           </div>
@@ -6088,7 +6467,7 @@
 
     function renderOperatorCreditEval() {
       const tab = state.operatorCreditTab || "assignments";
-      const tabs = [["tierConfig", "档位配置"], ["assignments", "运营商定档"], ["logs", "变更记录"]];
+      const tabs = [["tierConfig", "档位配置"], ["assignments", "运营商定档"], ["logs", "信用变更记录"]];
       const sidebar = tabSidebar(tabs, tab, "opcredtab");
       let body = "";
       if (tab === "tierConfig") {
@@ -6166,7 +6545,7 @@
         </section>`;
       } else {
         body = `<section class="panel">
-          ${panelHead("档位变更记录", "入网定档、升档、降档、年度复审", "operator_credit_eval")}
+          ${panelHead("信用变更记录", "入网定档、升档、降档、年度复审", "operator_credit_eval")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>时间</th><th>运营商</th><th>原档位</th><th>新档位</th><th>原因</th><th>操作人</th></tr></thead>
@@ -7543,21 +7922,28 @@
       const siteStatsPanel = renderOverviewSiteStats();
       const powerStatsPanel = renderOverviewPowerStats();
       return `<div class="overview-workplace">
-        <section class="panel overview-kpi-panel">
-          ${panelHead("经营概览", "设备快照与经营指标", "overview_kpi_panel")}
-          <div class="panel-body">
-            <div class="kpi-grid in-panel kpi-grid-3">
-              ${kpi("柜机", cabList.length, "在线 " + cabOnline + " 台 · " + cabRate + "%", "柜", "overview_cab_total")}
-              ${kpi("电池", batList.length, "在线 " + batOnline + " 块 · " + batRate + "%", "电", "overview_bat_total")}
-              ${kpi("站点", opSites.length, siteStatusSub || "暂无站点", "站", "overview_site_status")}
+        <div class="overview-split-row overview-split-row-metrics">
+          <section class="panel overview-kpi-panel">
+            ${panelHead("设备数据", "实时快照 · 不受统计范围影响", "overview_kpi_panel")}
+            <div class="panel-body">
+              <div class="kpi-grid in-panel kpi-grid-3">
+                ${kpi("柜机", cabList.length, "在线 " + cabOnline + " 台 · " + cabRate + "%", "柜", "overview_cab_total")}
+                ${kpi("电池", batList.length, "在线 " + batOnline + " 块 · " + batRate + "%", "电", "overview_bat_total")}
+                ${kpi("站点", opSites.length, siteStatusSub || "暂无站点", "站", "overview_site_status")}
+              </div>
             </div>
-            ${overviewRangeSelectHtml()}
-            <div class="kpi-grid in-panel kpi-grid-2">
-              ${kpi("套餐购买金额", "¥" + scaleMoney(pkgPurchase).toLocaleString("zh-CN"), overviewRangeLabel() + " · C 端实付合计", "购", "overview_pkg_pay")}
-              ${kpi("活跃用户", scale(activeUsers), overviewRangeLabel() + " · 去重骑手", "骑", "overview_users")}
+          </section>
+          <section class="panel overview-kpi-panel">
+            ${panelHead("套餐与用户", "随统计范围缩放", "overview_kpi_panel")}
+            <div class="panel-body">
+              ${overviewRangeSelectHtml("仅影响本卡套餐金额与活跃用户")}
+              <div class="kpi-grid in-panel kpi-grid-2">
+                ${kpi("套餐购买金额", "¥" + scaleMoney(pkgPurchase).toLocaleString("zh-CN"), overviewRangeLabel() + " · C 端实付合计", "购", "overview_pkg_pay")}
+                ${kpi("活跃用户", scale(activeUsers), overviewRangeLabel() + " · 去重骑手", "骑", "overview_users")}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
         <div class="overview-split-row overview-split-row-3">
           ${renderDataDrillPanel("operator")}
           ${powerStatsPanel}
@@ -7964,6 +8350,33 @@
         </section>`;
     }
 
+    function renderSiteManage() {
+      if ((state.siteManageTab || "info") === "partners") return renderSitePartners();
+      return renderSites();
+    }
+
+    function renderSwapRangeSettings() {
+      const canEdit = isEntityLogin() || employeeHasPerm("sites.edit") || employeeHasPerm("pricing.edit");
+      const policy = swapPolicyForOperator(currentEntity().id);
+      const credit = operatorCreditAccounts.find(a => a.operatorId === currentEntity().id);
+      const switchHtml = canEdit
+        ? `<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+                <input type="checkbox" data-swap-policy="crossNetworkEnabled" ${policy.crossNetworkEnabled ? "checked" : ""} style="margin-top:3px" />
+                <span><strong>允许跨网换电</strong><br><small style="color:var(--muted)">关闭后：向本运营商付费的用户不可在其他运营商换电；其他运营商用户也不可在本运营商站点换电</small></span>
+              </label>`
+        : `<p style="margin:0;font-size:13px">允许跨网换电：<strong>${policy.crossNetworkEnabled ? "已开启" : "已关闭"}</strong>（当前账号只读）</p>`;
+      return `<section class="panel">
+          ${panelHead("换电范围设置", "控制所属用户可换电的地理/主体范围", "swap_policy")}
+          <div class="panel-body">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px">同运营商内<strong>任意站点</strong>均可购套餐、换电；仅跨网受下方开关与信用额度约束。${noteBtn("swap_policy_cross_net")}</p>
+            <div style="display:grid;gap:12px;max-width:520px">
+              ${switchHtml}
+            </div>
+            ${credit && !credit.crossSwapEnabled ? `<p class="perm-banner" style="margin-top:14px">⚠ 平台已因信用额度用尽关闭本运营商用户的<strong>跨网换电</strong>（与上方开关无关，恢复额度后自动解除）。</p>` : ""}
+          </div>
+        </section>`;
+    }
+
     function renderSites() {
       const f = getPf();
       const ss = myOperatorSites().filter(s => {
@@ -7973,24 +8386,8 @@
         return true;
       });
       const canEditSites = isEntityLogin() || employeeHasPerm("sites.edit");
-      const policy = swapPolicyForOperator(currentEntity().id);
-      const credit = operatorCreditAccounts.find(a => a.operatorId === currentEntity().id);
-      const policyPanel = canEditSites ? `<section class="panel">
-          ${panelHead("换电范围设置", "控制所属用户可换电的地理/主体范围", "swap_policy")}
-          <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px">同运营商内<strong>任意站点</strong>均可购套餐、换电；仅跨网受下方开关与信用额度约束。${noteBtn("swap_policy_cross_net")}</p>
-            <div style="display:grid;gap:12px;max-width:520px">
-              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
-                <input type="checkbox" data-swap-policy="crossNetworkEnabled" ${policy.crossNetworkEnabled ? "checked" : ""} style="margin-top:3px" />
-                <span><strong>允许跨网换电</strong><br><small style="color:var(--muted)">关闭后：向本运营商付费的用户不可在其他运营商换电；其他运营商用户也不可在本运营商站点换电</small></span>
-              </label>
-            </div>
-            ${credit && !credit.crossSwapEnabled ? `<p class="perm-banner" style="margin-top:14px">⚠ 平台已因信用额度用尽关闭本运营商用户的<strong>跨网换电</strong>（与上方开关无关，恢复额度后自动解除）。</p>` : ""}
-          </div>
-        </section>` : "";
       return `
         ${ownScopeBanner()}
-        ${policyPanel}
         <section class="panel">
           ${panelHead("站点列表", "本运营商名下站点（含筹备中、无设备站点）", "sites_panel", canEditSites ? `<button type="button" class="btn primary" data-new-site>+ 新增站点</button>` : "")}
           <div class="panel-body">
@@ -10258,6 +10655,251 @@
       render();
     }
 
+    function myOperatorPriceZones() {
+      if (!isOperatorRole()) return [];
+      return operatorPriceZones.filter(z => z.operatorId === currentEntity().id);
+    }
+
+    function myOperatorSitesForPricing(city) {
+      return sites.filter(s => s.operatorId === currentEntity().id && (!city || s.city === city) && !s.channelDedicated);
+    }
+
+    function siteNameById(id) {
+      return sites.find(s => s.id === id)?.name || id;
+    }
+
+    function zoneBySiteId(siteId) {
+      const opId = currentEntity().id;
+      return operatorPriceZones.find(z =>
+        z.operatorId === opId && z.status === "启用" && (z.siteIds || []).includes(siteId)
+      ) || null;
+    }
+
+    /** 售价解析：区价 ?? 城市底价；价格不限高低 */
+    function resolvePkgRetailPrice(pkg, siteId, city) {
+      const opId = currentEntity().id;
+      const c = city || "上海";
+      const cityRow = operatorPkgPrices.find(r => r.operatorId === opId && r.city === c && r.pkg === pkg && r.status === "生效");
+      const cityPrice = cityRow?.retailPrice;
+      if (!siteId) return { price: cityPrice, source: "city", cityPrice, zone: null };
+      const zone = zoneBySiteId(siteId);
+      if (!zone) return { price: cityPrice, source: "city", cityPrice, zone: null };
+      const zp = operatorZonePkgPrices.find(p => p.zoneId === zone.id && p.pkg === pkg && p.status === "生效");
+      if (zp) return { price: zp.retailPrice, source: "zone", cityPrice, zone, zonePrice: zp.retailPrice };
+      return { price: cityPrice, source: "city", cityPrice, zone, zonePrice: null };
+    }
+
+    function selectedPriceZone() {
+      const list = myOperatorPriceZones();
+      const id = state.pricingSelectedZoneId;
+      return list.find(z => z.id === id) || list[0] || null;
+    }
+
+    /** 被其他价格分区占用的站点 → 分区名（当前编辑分区除外） */
+    function sitesOccupiedByOtherPriceZones(exceptZoneId) {
+      const map = new Map();
+      myOperatorPriceZones().forEach(z => {
+        if (z.id === exceptZoneId) return;
+        (z.siteIds || []).forEach(id => {
+          if (!map.has(id)) map.set(id, z.name);
+        });
+      });
+      return map;
+    }
+
+    function buildPriceZoneSiteField(city, exceptZoneId, selectedIds) {
+      const occupied = sitesOccupiedByOtherPriceZones(exceptZoneId);
+      const selected = new Set(selectedIds || []);
+      const options = myOperatorSitesForPricing(city).map(s => {
+        const takenBy = occupied.get(s.id);
+        if (takenBy) {
+          return {
+            v: s.id,
+            t: s.name,
+            disabled: true,
+            disabledReason: `已被「${takenBy}」占用，不可选`
+          };
+        }
+        return { v: s.id, t: `${s.name}（${s.status || "—"}）` };
+      });
+      return {
+        name: "siteIds",
+        label: "选择挂接站点",
+        type: "checkboxgroup",
+        value: [...selected].filter(id => !occupied.has(id)),
+        options,
+        emptyText: "该城市暂无可挂接站点",
+        required: false
+      };
+    }
+
+    function openPriceZoneForm(zoneId) {
+      const isNew = !zoneId || zoneId === "new";
+      const zone = isNew ? null : operatorPriceZones.find(z => z.id === zoneId);
+      if (!isNew && !zone) return;
+      const city = zone?.city || "上海";
+      const cityOpts = [...new Set(myOperatorSitesForPricing().map(s => s.city))];
+      const selectedIds = [...(zone?.siteIds || [])];
+      openProtoForm({
+        title: isNew ? "新建价格分区" : "编辑价格分区",
+        submitLabel: "保存",
+        fields: [
+          { name: "name", label: "分区名称", value: zone?.name || "偏远站区", required: true },
+          { name: "city", label: "城市", type: "select", options: cityOpts.length ? cityOpts : [city], value: city },
+          { name: "status", label: "状态", type: "select", options: ["启用", "停用"], value: zone?.status || "启用" },
+          buildPriceZoneSiteField(city, zone?.id, selectedIds),
+          { name: "remark", label: "备注", value: zone?.remark || "", required: false }
+        ],
+        onSubmit: (data) => {
+          const name = (data.name || "").trim();
+          if (!name) return "请填写分区名称";
+          const cityVal = data.city || city;
+          const raw = data.siteIds;
+          const ids = (Array.isArray(raw) ? raw : (raw ? [raw] : []))
+            .map(s => String(s).trim())
+            .filter(Boolean);
+          const occupied = sitesOccupiedByOtherPriceZones(zone?.id);
+          const stolen = ids.filter(id => occupied.has(id));
+          if (stolen.length) {
+            return "以下站点已被其他分区占用：" + stolen.map(id => siteNameById(id) + "（" + occupied.get(id) + "）").join("、");
+          }
+          const validIds = ids.filter(id =>
+            sites.some(s => s.id === id && s.operatorId === currentEntity().id && s.city === cityVal)
+          );
+          if (ids.length && validIds.length !== ids.length) return "存在无效或不属于该城市的站点";
+          const now = new Date().toISOString().slice(0, 10);
+          if (isNew) {
+            const id = "PZ-" + Date.now().toString(36).slice(-6).toUpperCase();
+            operatorPriceZones.push({
+              id, operatorId: currentEntity().id, city: cityVal, name,
+              status: data.status || "启用", siteIds: validIds,
+              remark: (data.remark || "").trim(), updatedAt: now
+            });
+            state.pricingSelectedZoneId = id;
+            return { successMessage: "已创建分区 " + name + "（" + validIds.length + " 个站点）", afterClose: () => render() };
+          }
+          zone.name = name;
+          zone.city = cityVal;
+          zone.status = data.status || zone.status;
+          zone.siteIds = validIds;
+          zone.remark = (data.remark || "").trim();
+          zone.updatedAt = now;
+          return { successMessage: "分区已更新（" + validIds.length + " 个站点）", afterClose: () => render() };
+        }
+      });
+      const form = document.querySelector("#protoForm");
+      const citySel = form?.querySelector('[name="city"]');
+      citySel?.addEventListener("change", () => {
+        const checked = [...form.querySelectorAll('input[name="siteIds"]:checked')].map(el => el.value);
+        const block = form.querySelector('[data-proto-checkgroup="siteIds"]');
+        if (!block) return;
+        const wrap = document.createElement("div");
+        wrap.innerHTML = renderProtoField(buildPriceZoneSiteField(citySel.value, zone?.id, checked));
+        block.replaceWith(wrap.firstElementChild);
+      });
+    }
+
+    function openZonePkgPriceForm(zoneId, pkg) {
+      const zone = operatorPriceZones.find(z => z.id === zoneId);
+      if (!zone) return;
+      const cityRow = operatorPkgPrices.find(r =>
+        r.operatorId === currentEntity().id && r.city === zone.city && r.pkg === pkg && r.status === "生效"
+      );
+      const zp = operatorZonePkgPrices.find(p => p.zoneId === zoneId && p.pkg === pkg);
+      openProtoForm({
+        title: "区价 · " + pkg,
+        submitLabel: "保存区价",
+        fields: [
+          { name: "zone", label: "分区", value: zone.name, readonly: true },
+          { name: "pkg", label: "套餐", value: pkg, readonly: true },
+          { name: "cityPrice", label: "城市底价（参考）", value: cityRow ? "¥" + cityRow.retailPrice : "—", readonly: true },
+          { name: "retailPrice", label: "分区零售价（元，可高于/低于底价）", value: zp ? String(zp.retailPrice) : (cityRow ? String(cityRow.retailPrice) : ""), required: true }
+        ],
+        onSubmit: (data) => {
+          const price = parseFloat(data.retailPrice);
+          if (!Number.isFinite(price) || price < 0) return "请填写有效价格";
+          const now = new Date().toISOString().slice(0, 10);
+          if (zp) {
+            zp.retailPrice = price;
+            zp.updatedAt = now;
+            zp.status = "生效";
+          } else {
+            operatorZonePkgPrices.push({
+              id: "OZ-P-" + Date.now().toString(36).slice(-5).toUpperCase(),
+              zoneId, operatorId: currentEntity().id, city: zone.city, pkg,
+              retailPrice: price, status: "生效", updatedAt: now
+            });
+          }
+          return { successMessage: "区价已保存 ¥" + price, afterClose: () => render() };
+        }
+      });
+    }
+
+    function deletePriceZone(zoneId) {
+      const zone = operatorPriceZones.find(z => z.id === zoneId);
+      if (!zone || zone.operatorId !== currentEntity().id) return false;
+      for (let i = operatorZonePkgPrices.length - 1; i >= 0; i--) {
+        if (operatorZonePkgPrices[i].zoneId === zoneId) operatorZonePkgPrices.splice(i, 1);
+      }
+      const idx = operatorPriceZones.findIndex(z => z.id === zoneId);
+      if (idx >= 0) operatorPriceZones.splice(idx, 1);
+      const remain = myOperatorPriceZones();
+      state.pricingSelectedZoneId = remain[0]?.id || null;
+      showProtoToast("已移除分区「" + zone.name + "」，挂接站点恢复城市底价");
+      return true;
+    }
+
+    /** 从分区移出站点 → 该站恢复城市底价（分区本身保留） */
+    function removeSiteFromPriceZone(zoneId, siteId) {
+      const zone = operatorPriceZones.find(z => z.id === zoneId);
+      if (!zone || zone.operatorId !== currentEntity().id) return false;
+      const before = zone.siteIds || [];
+      if (!before.includes(siteId)) return false;
+      zone.siteIds = before.filter(id => id !== siteId);
+      zone.updatedAt = new Date().toISOString().slice(0, 10);
+      showProtoToast("已将「" + siteNameById(siteId) + "」移出分区，恢复城市底价");
+      return true;
+    }
+
+    function openManageZoneSitesForm(zoneId) {
+      const zone = operatorPriceZones.find(z => z.id === zoneId);
+      if (!zone) return;
+      openProtoForm({
+        title: "管理挂接站点 · " + zone.name,
+        submitLabel: "保存",
+        fields: [
+          buildPriceZoneSiteField(zone.city, zone.id, zone.siteIds || []),
+          {
+            name: "hint",
+            label: "说明",
+            value: "取消勾选即移出分区，该站恢复城市底价；勾选可新挂入未被其他分区占用的站点。",
+            readonly: true,
+            required: false
+          }
+        ],
+        onSubmit: (data) => {
+          const raw = data.siteIds;
+          const ids = (Array.isArray(raw) ? raw : (raw ? [raw] : []))
+            .map(s => String(s).trim())
+            .filter(Boolean);
+          const occupied = sitesOccupiedByOtherPriceZones(zone.id);
+          const stolen = ids.filter(id => occupied.has(id));
+          if (stolen.length) {
+            return "以下站点已被其他分区占用：" + stolen.map(id => siteNameById(id)).join("、");
+          }
+          const validIds = ids.filter(id =>
+            sites.some(s => s.id === id && s.operatorId === currentEntity().id && s.city === zone.city)
+          );
+          zone.siteIds = validIds;
+          zone.updatedAt = new Date().toISOString().slice(0, 10);
+          return {
+            successMessage: "已更新挂接站点（" + validIds.length + " 个）；移出的站点恢复城市底价",
+            afterClose: () => render()
+          };
+        }
+      });
+    }
+
     function openPricingForm(id) {
       const isNew = !id || id === "new";
       const row = isNew ? null : operatorPkgPrices.find(r => r.id === id);
@@ -10680,24 +11322,106 @@
       const tab = state.pricingTab;
       let body = "";
       if (tab === "pkg") {
-        const rows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id);
+        const sub = state.pricingPkgSubTab || "city";
+        const topTabs = panelTopTabs([
+          ["city", "城市底价"],
+          ["zones", "价格分区"]
+        ], sub, "pricing-pkg-sub");
         const depCfg = myPersonalDepositSettings();
-        body = `<section class="panel">
-          ${panelHead("个人套餐零售价", "按城市+SKU 统一定价，<strong>不绑定站点</strong>；须保留<strong>1天+单次</strong>渠道兜底 SKU", "pricing_pkg", `<button type="button" class="btn primary" data-new-pricing-sku>+ 新增 SKU</button>`)}
-          <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_deposit")} 个人用户信用不足须实缴电池押金 <strong>¥${depCfg.amount}</strong>（「押金设置」可改）；免押达标则实收 ¥0。</p>
-            <table>
-              <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>渠道兜底</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
-              <tbody>${rows.map(r => `<tr>
-                <td>${r.city}</td><td>${r.pkg}</td>
-                <td>${r.validityHours ? r.validityHours + "h" : "按 SKU"}</td>
-                <td>${r.channelFallback ? tag("必选") : "—"}</td>
-                <td>¥${r.retailPrice}</td><td>${tag(r.status)}</td><td>${r.updatedAt}</td>
-                <td><button type="button" class="link-btn" data-edit-pricing="${r.id}">编辑</button></td>
-              </tr>`).join("")}</tbody>
-            </table>
-          </div>
-        </section>`;
+        if (sub === "zones") {
+          const zones = myOperatorPriceZones();
+          const zone = selectedPriceZone();
+          if (zone && state.pricingSelectedZoneId !== zone.id) state.pricingSelectedZoneId = zone.id;
+          const cityRows = operatorPkgPrices.filter(r =>
+            r.operatorId === currentEntity().id && (!zone || r.city === zone.city)
+          );
+          const zoneList = zones.map(z => {
+            const active = zone && z.id === zone.id;
+            const siteNames = (z.siteIds || []).map(siteNameById).join("、") || "未挂站";
+            return `<button type="button" class="panel-top-tab${active ? " active" : ""}" data-pricing-zone="${z.id}" style="margin:0">
+              ${z.name}${z.status !== "启用" ? "（停用）" : ""} · ${(z.siteIds || []).length} 站
+            </button><span style="font-size:11px;color:var(--muted);align-self:center">${siteNames}</span>`;
+          }).join("");
+          const priceRows = zone ? cityRows.map(r => {
+            const zp = operatorZonePkgPrices.find(p => p.zoneId === zone.id && p.pkg === r.pkg && p.status === "生效");
+            const eff = zp ? zp.retailPrice : r.retailPrice;
+            const diff = zp ? (eff - r.retailPrice) : null;
+            const diffHtml = diff == null
+              ? `<small style="color:var(--muted)">继承底价</small>`
+              : diff === 0
+                ? `<small style="color:var(--muted)">与底价相同</small>`
+                : diff < 0
+                  ? `<small style="color:var(--green)">比底价低 ¥${Math.abs(diff).toFixed(diff % 1 ? 1 : 0)}</small>`
+                  : `<small style="color:var(--warn)">比底价高 ¥${Math.abs(diff).toFixed(diff % 1 ? 1 : 0)}</small>`;
+            return `<tr>
+              <td>${r.pkg}${r.channelFallback ? `<br><small>${tag("兜底")}</small>` : ""}</td>
+              <td>¥${r.retailPrice}</td>
+              <td><strong>¥${eff}</strong><br>${diffHtml}</td>
+              <td>${tag(zp ? "区价" : "继承")}</td>
+              <td>${zp?.updatedAt || "—"}</td>
+              <td><button type="button" class="link-btn" data-edit-zone-price="${zone.id}" data-zone-pkg="${escProtoAttr(r.pkg)}">编辑区价</button></td>
+            </tr>`;
+          }).join("") : "";
+          const previewSite = zone?.siteIds?.[0];
+          const preview = previewSite && zone
+            ? (() => {
+              const sample = cityRows[0];
+              if (!sample) return "";
+              const res = resolvePkgRetailPrice(sample.pkg, previewSite, zone.city);
+              return `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_zone")} 解析示例：在 <strong>${siteNameById(previewSite)}</strong> 购买「${sample.pkg}」→ <strong>¥${res.price}</strong>（${res.source === "zone" ? "区价" : "城市底价"}）。购后<strong>全市可换电</strong>。</p>`;
+            })()
+            : `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_zone")} 站点挂入分区后，售价=区价 ?? 城市底价；区价可高于或低于底价。<strong>移除分区</strong>后挂接站点恢复城市底价。</p>`;
+          body = `<section class="panel panel-with-top-tabs">
+            ${topTabs}
+            ${panelHead("价格分区", "同城分区 · 站点挂区 · 任意 SKU 区价（可高可低）· 购后全市可换电", "pricing_zone", `<button type="button" class="btn primary" data-new-price-zone>+ 新建分区</button>${zone ? ` <button type="button" class="btn" data-edit-price-zone="${zone.id}">编辑分区</button> <button type="button" class="btn" data-manage-zone-sites="${zone.id}">管理站点</button> <button type="button" class="btn" data-del-price-zone="${zone.id}">移除分区</button>` : ""}`)}
+            <div class="panel-body orders-table-wrap">
+              ${preview}
+              <div style="display:flex;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px;align-items:center">${zoneList || "<span style='color:var(--muted);font-size:13px'>暂无分区，请先新建</span>"}</div>
+              ${zone ? `
+              <h3 style="margin:0 0 8px;font-size:14px">挂接站点 <small style="color:var(--muted);font-weight:400">移出后该站恢复城市底价</small></h3>
+              <table style="margin-bottom:16px">
+                <thead><tr><th>站点</th><th>城市</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody>${(zone.siteIds || []).length
+                  ? (zone.siteIds || []).map(sid => {
+                    const s = sites.find(x => x.id === sid);
+                    return `<tr>
+                      <td><strong>${s?.name || sid}</strong><br><small style="color:var(--muted)">${sid}</small></td>
+                      <td>${s?.city || zone.city}</td>
+                      <td>${s ? tag(s.status) : "—"}</td>
+                      <td><button type="button" class="link-btn" data-remove-zone-site="${zone.id}" data-site-id="${sid}">移出分区</button></td>
+                    </tr>`;
+                  }).join("")
+                  : `<tr><td colspan="4">暂无挂接站点 · <button type="button" class="link-btn" data-manage-zone-sites="${zone.id}">去添加</button></td></tr>`}
+                </tbody>
+              </table>
+              <h3 style="margin:0 0 8px;font-size:14px">分区售价</h3>
+              <table>
+                <thead><tr><th>套餐</th><th>城市底价</th><th>生效售价</th><th>来源</th><th>更新</th><th>操作</th></tr></thead>
+                <tbody>${priceRows || "<tr><td colspan='6'>请先配置城市底价 SKU</td></tr>"}</tbody>
+              </table>
+              ${zone.remark ? `<p style="font-size:12px;color:var(--muted);margin:12px 0 0">备注：${zone.remark}</p>` : ""}` : ""}
+            </div>
+          </section>`;
+        } else {
+          const rows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id);
+          body = `<section class="panel panel-with-top-tabs">
+            ${topTabs}
+            ${panelHead("城市底价（个人套餐）", "运营商×城市×SKU · 未挂分区的站点用此价；须保留<strong>1天+单次</strong>渠道兜底", "pricing_pkg", `<button type="button" class="btn primary" data-new-pricing-sku>+ 新增 SKU</button>`)}
+            <div class="panel-body orders-table-wrap">
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg")}${noteBtn("pricing_deposit")} 同城差异价请到「价格分区」。个人用户信用不足须实缴电池押金 <strong>¥${depCfg.amount}</strong>。</p>
+              <table>
+                <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>渠道兜底</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+                <tbody>${rows.map(r => `<tr>
+                  <td>${r.city}</td><td>${r.pkg}</td>
+                  <td>${r.validityHours ? r.validityHours + "h" : "按 SKU"}</td>
+                  <td>${r.channelFallback ? tag("必选") : "—"}</td>
+                  <td>¥${r.retailPrice}</td><td>${tag(r.status)}</td><td>${r.updatedAt}</td>
+                  <td><button type="button" class="link-btn" data-edit-pricing="${r.id}">编辑</button></td>
+                </tr>`).join("")}</tbody>
+              </table>
+            </div>
+          </section>`;
+        }
       } else if (tab === "deposit") {
         const cfg = myPersonalDepositSettings();
         body = `<section class="panel">
@@ -10790,14 +11514,16 @@
             </table>
           </div>
         </section>`;
+      } else if (tab === "swapRange") {
+        body = renderSwapRangeSettings();
       }
-      return `${ownScopeBanner()}${body}`;
+      return body;
     }
 
     function renderChannelSales() {
       if (state.channelSalesTab === "pools") state.channelSalesTab = "assets";
       const tab = state.channelSalesTab;
-      const tabs = [["contracts", "签约渠道"], ["orders", "服务订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]];
+      const tabs = [["contracts", "签约渠道"], ["orders", "渠道订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]];
       const sidebar = tabSidebar(tabs, tab, "cstab");
       let body = "";
       if (tab === "platformMarketing") {
@@ -10918,18 +11644,58 @@
           </div>
         </section>`;
       } else if (tab === "orders") {
+        const sub = state.channelOrdersSubTab || "day";
+        const subTabs = [
+          ["day", "人天批发订单"],
+          ["rent", "设备月租订单"],
+          ["act", "激活码批发订单"]
+        ];
+        const topTabs = panelTopTabs(subTabs, sub, "csorder-sub");
         const dayOrders = myOperatorDayOrders();
         const rentOrders = myOperatorRentOrders();
         const actOrders = myOperatorActivationOrders();
-        body = `
-          <section class="panel">
-            ${panelHead("人天批发订单", "PO- · 到账后额度池入账", "day_pool_purchase")}
-            <div class="panel-body orders-table-wrap">
-              <table>
-                <thead><tr>
-                  <th>采购单</th><th>渠道商</th><th>人天/金额</th><th>支付</th><th>订单状态</th><th>支付状态</th><th>完成</th><th>操作</th>
-                </tr></thead>
-                <tbody>${dayOrders.map(o => `<tr>
+        const pageSize = state.channelOrdersPageSize || 5;
+        let title = "人天批发订单";
+        let noteId = "day_pool_purchase";
+        let subHint = "PO- · 到账后额度池入账";
+        let thead = "";
+        let tbody = "";
+        let emptyCol = 8;
+        let pg;
+        if (sub === "rent") {
+          pg = paginateList(rentOrders, state.channelOrdersPage, pageSize);
+          state.channelOrdersPage = pg.page;
+          title = "设备月租订单";
+          noteId = "channel_settlement_rent";
+          subHint = "MO- · 到账后账期生效";
+          thead = `<tr><th>充值单</th><th>渠道商</th><th>账期</th><th>金额</th><th>覆盖设备</th><th>支付</th><th>状态</th><th>操作</th></tr>`;
+          tbody = pg.slice.map(o => `<tr>
+                  <td>${o.id}</td><td>${o.channelName}</td><td>${o.period || "—"}</td>
+                  <td>¥${o.amount.toLocaleString("zh-CN")}</td><td>${o.devicesCovered} 台</td>
+                  <td>${o.payMethod}${o.offlineVoucher ? `<br><small>${o.offlineVoucher}</small>` : ""}</td>
+                  <td>${tag(o.orderStatus)}</td>
+                  <td>${b2bOrderActionCell(o, "operator", "rent")}</td>
+                </tr>`).join("") || `<tr><td colspan='${emptyCol}'>暂无设备月租订单</td></tr>`;
+        } else if (sub === "act") {
+          pg = paginateList(actOrders, state.channelOrdersPage, pageSize);
+          state.channelOrdersPage = pg.page;
+          title = "激活码批发订单";
+          noteId = "channel_settlement_activation";
+          subHint = "AC- · 确认到账后按单造码（订单=批次）· 一码一用";
+          thead = `<tr><th>批发单（批次）</th><th>渠道商</th><th>套餐码</th><th>数量</th><th>金额</th><th>支付</th><th>状态</th><th>操作</th></tr>`;
+          tbody = pg.slice.map(o => `<tr>
+                  <td>${o.id}${o.codesMinted ? `<br><small style="color:var(--muted)">已发码 ${o.codesMinted}</small>` : ""}</td>
+                  <td>${o.channelName}</td><td>${o.skuName}<br><small>${o.validityDays} 天/码 · ¥${o.unitPrice}</small></td>
+                  <td>${o.qty} 码</td><td>¥${o.amount.toLocaleString("zh-CN")}</td>
+                  <td>${o.payMethod}${o.offlineVoucher ? `<br><small>${o.offlineVoucher}</small>` : ""}</td>
+                  <td>${tag(o.orderStatus)}${o.mintStatus ? `<br><small style="color:var(--muted)">${o.mintStatus}</small>` : ""}</td>
+                  <td>${b2bOrderActionCell(o, "operator", "act")}</td>
+                </tr>`).join("") || `<tr><td colspan='${emptyCol}'>暂无激活码批发订单</td></tr>`;
+        } else {
+          pg = paginateList(dayOrders, state.channelOrdersPage, pageSize);
+          state.channelOrdersPage = pg.page;
+          thead = `<tr><th>采购单</th><th>渠道商</th><th>人天/金额</th><th>支付</th><th>订单状态</th><th>支付状态</th><th>完成</th><th>操作</th></tr>`;
+          tbody = pg.slice.map(o => `<tr>
                   <td>${o.id}${o.poolId ? `<br><small>${o.poolId}</small>` : ""}</td>
                   <td>${o.channelName}</td>
                   <td>${o.days} 人天<br>¥${o.amount.toLocaleString("zh-CN")}</td>
@@ -10937,91 +11703,68 @@
                   <td>${tag(o.orderStatus)}</td><td>${tag(o.payStatus)}</td>
                   <td>${o.payTime || "—"}</td>
                   <td>${channelPoActionCell(o, "operator")}</td>
-                </tr>`).join("") || "<tr><td colspan='8'>暂无人天批发订单</td></tr>"}</tbody>
-              </table>
-            </div>
-          </section>
-          <section class="panel">
-            ${panelHead("设备月租订单", "MO- · 到账后账期生效", "channel_settlement_rent")}
-            <div class="panel-body orders-table-wrap">
-              <table>
-                <thead><tr>
-                  <th>充值单</th><th>渠道商</th><th>账期</th><th>金额</th><th>覆盖设备</th><th>支付</th><th>状态</th><th>操作</th>
-                </tr></thead>
-                <tbody>${rentOrders.map(o => `<tr>
-                  <td>${o.id}</td><td>${o.channelName}</td><td>${o.period || "—"}</td>
-                  <td>¥${o.amount.toLocaleString("zh-CN")}</td><td>${o.devicesCovered} 台</td>
-                  <td>${o.payMethod}${o.offlineVoucher ? `<br><small>${o.offlineVoucher}</small>` : ""}</td>
-                  <td>${tag(o.orderStatus)}</td>
-                  <td>${b2bOrderActionCell(o, "operator", "rent")}</td>
-                </tr>`).join("") || "<tr><td colspan='8'>暂无设备月租订单</td></tr>"}</tbody>
-              </table>
-            </div>
-          </section>
-          <section class="panel">
-            ${panelHead("激活码批发订单", "AC- · 到账后码库存入库 · 一码一用", "channel_settlement_activation")}
-            <div class="panel-body orders-table-wrap">
-              <table>
-                <thead><tr>
-                  <th>批发单</th><th>渠道商</th><th>套餐码</th><th>数量</th><th>金额</th><th>支付</th><th>状态</th><th>操作</th>
-                </tr></thead>
-                <tbody>${actOrders.map(o => `<tr>
-                  <td>${o.id}</td><td>${o.channelName}</td><td>${o.skuName}<br><small>${o.validityDays} 天/码</small></td>
-                  <td>${o.qty} 码</td><td>¥${o.amount.toLocaleString("zh-CN")}</td>
-                  <td>${o.payMethod}${o.offlineVoucher ? `<br><small>${o.offlineVoucher}</small>` : ""}</td>
-                  <td>${tag(o.orderStatus)}</td>
-                  <td>${b2bOrderActionCell(o, "operator", "act")}</td>
-                </tr>`).join("") || "<tr><td colspan='8'>暂无激活码批发订单</td></tr>"}</tbody>
-              </table>
-            </div>
-          </section>`;
+                </tr>`).join("") || `<tr><td colspan='${emptyCol}'>暂无人天批发订单</td></tr>`;
+        }
+        body = `<section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${panelHead(title, `${subHint} · 共 ${pg.total} 笔`, noteId)}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead>${thead}</thead>
+              <tbody>${tbody}</tbody>
+            </table>
+            ${renderTablePager(pg, "csorder-page")}
+          </div>
+        </section>`;
       } else {
+        const sub = state.channelAssetsSubTab || "dayPool";
+        const subTabs = [
+          ["dayPool", "人天池"],
+          ["card", "渠道分销"],
+          ["rent", "设备租赁"],
+          ["act", "激活码"]
+        ];
+        const topTabs = panelTopTabs(subTabs, sub, "csasset-sub");
         const pools = mySoldDayPools();
-        const ledgerRows = dayPoolLedger.filter(l => pools.some(p => p.id === l.poolId)).slice(0, 12);
+        const ledgerRows = dayPoolLedger.filter(l => pools.some(p => p.id === l.poolId));
         const cardContracts = myChannelContracts().filter(c => contractSettlementMode(c) === "卡差价");
         const rentContracts = myChannelContracts().filter(c => contractSettlementMode(c) === "设备租赁");
         const actContracts = myChannelContracts().filter(c => contractSettlementMode(c) === "激活码");
-        body = `
-          <section class="panel">
-            ${panelHead("已售额度池（人天池）", "一运营商一池；采购款到账即结清", "channel_sales", `${noteBtn("day_pool_one_per_operator")}${noteBtn("day_pool_b2b_settlement")}`)}
-            <div class="panel-body orders-table-wrap">
-              <table>
-                <thead><tr><th>额度池</th><th>购买方</th><th>总量</th><th>可用</th><th>已消耗</th><th>批发单价</th><th>状态</th><th>操作</th></tr></thead>
-                <tbody>${pools.map(p => `<tr>
-                  <td><strong>${p.name}</strong><br><small>${p.id}</small></td>
-                  <td>${p.ownerName}</td><td>${p.totalDays} 人天</td>
-                  <td>${p.availableDays}</td><td>${p.consumedDays}</td>
-                  <td>¥${p.wholesalePrice}/人天</td><td>${poolStatusTag(p.status)}</td>
-                  <td><button type="button" class="link-btn" data-pool-adjust="${p.id}">额度调整</button></td>
-                </tr>`).join("") || "<tr><td colspan='8'>暂无人天池额度池</td></tr>"}</tbody>
-              </table>
-            </div>
-          </section>
-          <section class="panel">
-            ${panelHead("渠道分销概况", "推广链接成交与佣金（无批发入库）", "channel_settlement_card")}
+        const pageSize = state.channelAssetsPageSize || 5;
+        let content = "";
+        if (sub === "card") {
+          const cardRows = cardContracts.flatMap(c =>
+            channelSalePackages.filter(s => s.channelId === c.channelId).map(s => {
+              const conv = channelLinkOrders.filter(o => o.channelId === c.channelId && o.skuId === s.skuId).length;
+              return { channelName: c.channelName, name: s.name, channelPrice: s.channelPrice, commissionPerOrder: s.commissionPerOrder, conv, status: s.status };
+            })
+          );
+          const pg = paginateList(cardRows, state.channelAssetsPage, pageSize);
+          state.channelAssetsPage = pg.page;
+          content = `${panelHead("渠道分销概况", `推广链接成交与佣金（无批发入库）· 共 ${pg.total} 条`, "channel_settlement_card")}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr><th>渠道商</th><th>SKU</th><th>专享价</th><th>佣金/单</th><th>链接成交</th><th>状态</th></tr></thead>
-                <tbody>${cardContracts.length ? cardContracts.flatMap(c =>
-                  channelSalePackages.filter(s => s.channelId === c.channelId).map(s => {
-                    const conv = channelLinkOrders.filter(o => o.channelId === c.channelId && o.skuId === s.skuId).length;
-                    return `<tr>
-                    <td>${c.channelName}</td><td>${s.name}</td>
+                <tbody>${pg.slice.map(s => `<tr>
+                    <td>${s.channelName}</td><td>${s.name}</td>
                     <td>¥${s.channelPrice}</td><td>¥${s.commissionPerOrder}</td>
-                    <td>${conv} 单</td>
+                    <td>${s.conv} 单</td>
                     <td>${tag(s.status)}</td>
-                  </tr>`;
-                  })
-                ).join("") : "<tr><td colspan='6'>暂无渠道分销签约</td></tr>"}</tbody>
+                  </tr>`).join("") || "<tr><td colspan='6'>暂无渠道分销签约</td></tr>"}</tbody>
               </table>
-            </div>
-          </section>
-          <section class="panel">
-            ${panelHead("设备租赁概况", "租赁设备 · 专属站点 · 白名单", "channel_settlement_rent", noteBtn("lease_dedicated_site"))}
+              ${renderTablePager(pg, "csasset-page")}
+            </div>`;
+        } else if (sub === "rent") {
+          const pg = paginateList(rentContracts, state.channelAssetsPage, pageSize);
+          state.channelAssetsPage = pg.page;
+          const deviceRows = rentContracts.flatMap(c =>
+            channelRentDevices.filter(d => d.channelId === c.channelId).map(d => ({ ...d, channelName: c.channelName }))
+          );
+          content = `${panelHead("设备租赁概况", `租赁设备 · 专属站点 · 白名单 · 共 ${pg.total} 家`, "channel_settlement_rent", noteBtn("lease_dedicated_site"))}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr><th>渠道商</th><th>专属站点</th><th>月租</th><th>设备</th><th>白名单</th><th>账期</th><th>操作</th></tr></thead>
-                <tbody>${rentContracts.map(c => {
+                <tbody>${pg.slice.map(c => {
                   const lease = channelLeaseSummary.find(p => p.channelId === c.channelId);
                   const devs = channelRentDevices.filter(d => d.channelId === c.channelId);
                   return `<tr>
@@ -11035,45 +11778,147 @@
                   </tr>`;
                 }).join("") || "<tr><td colspan='7'>暂无设备租赁签约渠道</td></tr>"}</tbody>
               </table>
+              ${renderTablePager(pg, "csasset-page")}
             </div>
-          </section>
-          <section class="panel">
-            ${panelHead("租赁设备明细（设备租赁）", "运营商维护 SN 与站点 · 月租见签约统一价", "channel_settlement_rent", `<button type="button" class="btn" data-add-lease-device>+ 绑定设备</button>`)}
+            ${panelHead("租赁设备明细", "运营商维护 SN 与站点 · 月租见签约统一价", "channel_settlement_rent", `<button type="button" class="btn" data-add-lease-device>+ 绑定设备</button>`)}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr><th>渠道商</th><th>SN</th><th>类型</th><th>站点</th><th>状态</th></tr></thead>
-                <tbody>${rentContracts.flatMap(c => channelRentDevices.filter(d => d.channelId === c.channelId).map(d =>
-                  `<tr><td>${c.channelName}</td><td>${d.sn}</td><td>${d.type}</td><td>${d.site}</td><td>${tag(d.status)}</td></tr>`
-                )).join("") || "<tr><td colspan='5'>暂无租赁设备</td></tr>"}</tbody>
+                <tbody>${deviceRows.map(d =>
+                  `<tr><td>${d.channelName}</td><td>${d.sn}</td><td>${d.type}</td><td>${d.site}</td><td>${tag(d.status)}</td></tr>`
+                ).join("") || "<tr><td colspan='5'>暂无租赁设备</td></tr>"}</tbody>
               </table>
-            </div>
-          </section>
-          <section class="panel">
-            ${panelHead("激活码概况", "批发库存 · 核销 · B 端 1% 计提", "channel_settlement_activation")}
+            </div>`;
+        } else if (sub === "act") {
+          const pg = paginateList(actContracts, state.channelAssetsPage, pageSize);
+          state.channelAssetsPage = pg.page;
+          const pendingVoids = myOperatorPendingVoidCodes();
+          content = `${panelHead("激活码概况", `确认到账按单造码 · 核销计提 · 共 ${pg.total} 家`, "channel_settlement_activation")}
             <div class="panel-body orders-table-wrap">
               <table>
-                <thead><tr><th>渠道商</th><th>套餐码</th><th>批发单价</th><th>库存</th><th>已核销</th><th>状态</th></tr></thead>
-                <tbody>${actContracts.map(c => `<tr>
+                <thead><tr><th>渠道商</th><th>套餐码</th><th>批发单价</th><th>可用库存</th><th>已核销</th><th>状态</th></tr></thead>
+                <tbody>${pg.slice.map(c => `<tr>
                   <td>${c.channelName}</td><td>${c.codeSkuName || "30天包月"} · ${c.codeValidityDays || 30}天</td>
                   <td>¥${c.wholesalePrice}/码</td><td>${c.codeInventory ?? "—"}</td><td>${c.codesRedeemed ?? "—"}</td>
                   <td>${tag(c.status)}</td>
                 </tr>`).join("") || "<tr><td colspan='6'>暂无激活码签约</td></tr>"}</tbody>
               </table>
+              ${renderTablePager(pg, "csasset-page")}
             </div>
-          </section>
-          <section class="panel">
-            ${panelHead("额度变动记录（人天池）", "采购入账 / 调账 / 分配 / 预占 / 确认", "day_pool_ledger")}
+            ${panelHead("待确认作废", `渠道发起 · 运营商确认 · 无线上退款 · ${pendingVoids.length} 张`, "channel_settlement_activation")}
             <div class="panel-body orders-table-wrap">
               <table>
-                <thead><tr><th>时间</th><th>额度池</th><th>类型</th><th>变动</th><th>余额后</th><th>关联单</th><th>说明</th></tr></thead>
-                <tbody>${ledgerRows.map(l => `<tr>
-                  <td>${l.time}</td><td>${l.poolId}</td><td>${tag(l.type)}</td>
+                <thead><tr><th>激活码</th><th>渠道商</th><th>批次 / 编号</th><th>套餐</th><th>原因</th><th>申请时间</th><th>操作</th></tr></thead>
+                <tbody>${pendingVoids.map(c => {
+                  const ch = actContracts.find(x => x.channelId === c.channelId);
+                  const serial = String(c.serialNo || 0).padStart(3, "0");
+                  return `<tr>
+                    <td><code>${c.code}</code></td>
+                    <td>${ch?.channelName || c.channelId}</td>
+                    <td>${c.batchId}<br><small style="color:var(--muted)">#${serial}</small></td>
+                    <td>${c.skuName} · ${c.validityDays}天</td>
+                    <td>${c.voidReason || "—"}</td>
+                    <td>${c.voidRequestedAt || "—"}</td>
+                    <td><button type="button" class="link-btn" data-confirm-act-void="${c.id}">确认作废</button></td>
+                  </tr>`;
+                }).join("") || "<tr><td colspan='7'>暂无待确认作废</td></tr>"}</tbody>
+              </table>
+            </div>`;
+        } else {
+          const pg = paginateList(pools, state.channelAssetsPage, pageSize);
+          state.channelAssetsPage = pg.page;
+          const poolById = Object.fromEntries(pools.map(p => [p.id, p]));
+          const channelOpts = [{ v: "全部", t: "全部渠道商" }].concat(
+            [...new Map(pools.map(p => [p.ownerId, p.ownerName])).entries()].map(([id, name]) => ({ v: id, t: name }))
+          );
+          const ledgerCh = state.channelAssetsLedgerChannel || "全部";
+          if (ledgerCh !== "全部" && !channelOpts.some(o => o.v === ledgerCh)) state.channelAssetsLedgerChannel = "全部";
+          const ledgerType = state.channelAssetsLedgerType || "全部";
+          const dateFrom = state.channelAssetsLedgerDateFrom || "";
+          const dateTo = state.channelAssetsLedgerDateTo || "";
+          const typeOpts = [{ v: "全部", t: "全部类型" }].concat(
+            [...new Set(ledgerRows.map(l => l.type).filter(Boolean))].sort().map(t => ({ v: t, t }))
+          );
+          if (ledgerType !== "全部" && !typeOpts.some(o => o.v === ledgerType)) state.channelAssetsLedgerType = "全部";
+          const ledgerDay = (t) => String(t || "").slice(0, 10);
+          const ledgerFiltered = ledgerRows
+            .map(l => {
+              const pool = poolById[l.poolId];
+              return {
+                ...l,
+                channelId: pool?.ownerId || "—",
+                channelName: pool?.ownerName || "—",
+                poolName: pool?.name || l.poolId
+              };
+            })
+            .filter(l => {
+              if ((state.channelAssetsLedgerChannel || "全部") !== "全部" && l.channelId !== state.channelAssetsLedgerChannel) return false;
+              if ((state.channelAssetsLedgerType || "全部") !== "全部" && l.type !== state.channelAssetsLedgerType) return false;
+              const d = ledgerDay(l.time);
+              if (dateFrom && d < dateFrom) return false;
+              if (dateTo && d > dateTo) return false;
+              return true;
+            })
+            .sort((a, b) => String(b.time).localeCompare(String(a.time)));
+          const ledgerPg = paginateList(ledgerFiltered, state.channelAssetsLedgerPage, state.channelAssetsLedgerPageSize || 8);
+          state.channelAssetsLedgerPage = ledgerPg.page;
+          content = `${panelHead("已售额度池（人天池）", `一运营商一池；采购款到账即结清 · 共 ${pg.total} 个`, "channel_sales", `${noteBtn("day_pool_one_per_operator")}${noteBtn("day_pool_b2b_settlement")}`)}
+            <div class="panel-body orders-table-wrap">
+              <table>
+                <thead><tr><th>额度池</th><th>渠道商</th><th>总量</th><th>可用</th><th>已消耗</th><th>批发单价</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody>${pg.slice.map(p => `<tr>
+                  <td><strong>${p.name}</strong><br><small>${p.id}</small></td>
+                  <td>${p.ownerName}</td><td>${p.totalDays} 人天</td>
+                  <td>${p.availableDays}</td><td>${p.consumedDays}</td>
+                  <td>¥${p.wholesalePrice}/人天</td><td>${poolStatusTag(p.status)}</td>
+                  <td>
+                    <button type="button" class="link-btn" data-pool-adjust="${p.id}">额度调整</button>
+                    · <button type="button" class="link-btn" data-csasset-ledger-ch="${p.ownerId}">查看变动</button>
+                  </td>
+                </tr>`).join("") || "<tr><td colspan='8'>暂无人天池额度池</td></tr>"}</tbody>
+              </table>
+              ${renderTablePager(pg, "csasset-page")}
+            </div>
+            ${panelHead("额度变动记录", "渠道商 / 时间 / 类型筛选 · 采购入账 / 调账 / 预占 / 确认", "day_pool_ledger")}
+            <div class="panel-body orders-table-wrap">
+              <div class="power-filter-bar power-filter-inline" style="margin-bottom:12px">
+                <label class="filter-inline">
+                  <span>渠道商</span>
+                  <select data-csasset-ledger-filter="channel">
+                    ${channelOpts.map(o => `<option value="${o.v}"${(state.channelAssetsLedgerChannel || "全部") === o.v ? " selected" : ""}>${o.t}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="filter-inline filter-inline-range">
+                  <span>起止时间</span>
+                  <input type="date" data-csasset-ledger-filter="dateFrom" value="${dateFrom}" min="2026-01-01" max="2026-12-31">
+                  <span class="range-sep">~</span>
+                  <input type="date" data-csasset-ledger-filter="dateTo" value="${dateTo}" min="2026-01-01" max="2026-12-31">
+                </label>
+                <label class="filter-inline">
+                  <span>类型</span>
+                  <select data-csasset-ledger-filter="type">
+                    ${typeOpts.map(o => `<option value="${o.v}"${ledgerType === o.v ? " selected" : ""}>${o.t}</option>`).join("")}
+                  </select>
+                </label>
+              </div>
+              <table>
+                <thead><tr><th>时间</th><th>渠道商</th><th>额度池</th><th>类型</th><th>变动</th><th>余额后</th><th>关联单</th><th>说明</th></tr></thead>
+                <tbody>${ledgerPg.slice.map(l => `<tr>
+                  <td>${l.time}</td>
+                  <td><strong>${l.channelName}</strong></td>
+                  <td>${l.poolName}<br><small style="color:var(--muted)">${l.poolId}</small></td>
+                  <td>${tag(l.type)}</td>
                   <td>${l.deltaDays > 0 ? "+" : ""}${l.deltaDays} 人天</td>
                   <td>${l.balanceAfter}</td><td>${l.ref || "—"}</td><td>${l.reason || "—"}</td>
-                </tr>`).join("") || "<tr><td colspan='7'>暂无变动记录</td></tr>"}</tbody>
+                </tr>`).join("") || "<tr><td colspan='8'>该筛选下暂无变动记录</td></tr>"}</tbody>
               </table>
-            </div>
-          </section>`;
+              ${renderTablePager(ledgerPg, "csasset-ledger-page")}
+            </div>`;
+        }
+        body = `<section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${content}
+        </section>`;
       }
       return `${ownScopeBanner()}${pageWithTabs(sidebar, body)}`;
     }
@@ -11282,26 +12127,89 @@
     }
 
     function renderActivationCodes() {
-      const cid = channelEntityId();
       const codes = myActivationCodes();
-      const rows = codes.map(c => `<tr>
-        <td><code>${c.code}</code></td><td>${c.skuName}</td><td>${c.validityDays} 天</td>
-        <td>${tag(c.status)}</td><td>${c.issuedTo || "—"}</td><td>${c.redeemedAt || "—"}</td><td>${c.batchId || "—"}</td>
-      </tr>`).join("");
-      const stats = { 未发放: 0, 已发放: 0, 已核销: 0, 已作废: 0 };
+      const orders = myChannelActivationOrders().slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      const stats = { 未发放: 0, 已发放: 0, 已核销: 0, 待作废: 0, 已作废: 0 };
       codes.forEach(c => { if (stats[c.status] != null) stats[c.status]++; });
+      const batchOpts = [{ v: "全部", t: "全部批次" }].concat(
+        [...new Set(codes.map(c => c.batchId).filter(Boolean))]
+          .sort((a, b) => String(b).localeCompare(String(a)))
+          .map(id => ({ v: id, t: id }))
+      );
+      const batch = state.activationCodesBatch || "全部";
+      if (batch !== "全部" && !batchOpts.some(o => o.v === batch)) state.activationCodesBatch = "全部";
+      const filtered = codes
+        .filter(c => (state.activationCodesBatch || "全部") === "全部" || c.batchId === state.activationCodesBatch)
+        .slice()
+        .sort((a, b) => {
+          const bc = String(b.batchId || "").localeCompare(String(a.batchId || ""));
+          if (bc) return bc;
+          return (a.serialNo || 0) - (b.serialNo || 0);
+        });
+      const pg = paginateList(filtered, state.activationCodesPage, state.activationCodesPageSize || 10);
+      state.activationCodesPage = pg.page;
+      const rows = pg.slice.map(c => {
+        const serial = String(c.serialNo || 0).padStart(3, "0");
+        let ops = "—";
+        if (c.status === "未发放") {
+          ops = `<button type="button" class="link-btn" data-act-issue="${c.id}">标记发放</button>
+            · <button type="button" class="link-btn" data-act-void-apply="${c.id}">申请作废</button>`;
+        } else if (c.status === "已发放") {
+          ops = `<button type="button" class="link-btn" data-act-void-apply="${c.id}">申请作废</button>`;
+        } else if (c.status === "待作废") {
+          ops = `<small style="color:var(--muted)">待运营商确认</small>`;
+        }
+        return `<tr>
+          <td><code>${c.code}</code></td>
+          <td><strong>${c.batchId || "—"}</strong><br><small style="color:var(--muted)">#${serial}</small></td>
+          <td>${c.skuName}<br><small style="color:var(--muted)">${c.validityDays} 天 · ¥${c.wholesalePrice}/码</small></td>
+          <td>${tag(c.status)}</td>
+          <td>${c.issuedTo || "—"}${c.issuedAt ? `<br><small style="color:var(--muted)">${c.issuedAt}</small>` : ""}</td>
+          <td>${c.redeemedAt || "—"}${c.status === "待作废" && c.voidReason ? `<br><small style="color:var(--muted)">作废：${c.voidReason}</small>` : ""}</td>
+          <td>${ops}</td>
+        </tr>`;
+      }).join("");
+      const orderRows = orders.map(o => `<tr>
+        <td>${o.id}</td>
+        <td>${o.skuName}<br><small style="color:var(--muted)">${o.validityDays} 天/码 · ¥${o.unitPrice}</small></td>
+        <td>${o.qty} 码</td>
+        <td>¥${o.amount.toLocaleString("zh-CN")}</td>
+        <td>${tag(o.orderStatus)}${o.mintStatus ? `<br><small style="color:var(--muted)">${o.mintStatus}${o.codesMinted ? " " + o.codesMinted + " 张" : ""}</small>` : ""}</td>
+        <td>${o.createdAt || "—"}${o.offlineVoucher ? `<br><small style="color:var(--muted)">${o.offlineVoucher}</small>` : ""}</td>
+      </tr>`).join("");
       return `${ownScopeBanner()}
         <div class="kpi-grid" style="margin-bottom:14px">
-          ${kpi("未发放", stats.未发放, "可发放", "码", "channel_settlement_activation")}
+          ${kpi("未发放", stats.未发放, "可标记发放", "码", "channel_settlement_activation")}
           ${kpi("已发放", stats.已发放, "待骑手核销", "发", "channel_settlement_activation")}
-          ${kpi("已核销", stats.已核销, "一码一用", "核", "channel_settlement_activation")}
-          ${kpi("已作废", stats.已作废, "不可再用", "废", "channel_settlement_activation")}
+          ${kpi("已核销", stats.已核销, "系统自动更新", "核", "channel_settlement_activation")}
+          ${kpi("待作废/已作废", stats.待作废 + " / " + stats.已作废, "渠道申请·运营商确认·无退款", "废", "channel_settlement_activation")}
         </div>
         <section class="panel">
-          ${panelHead("激活码库存", "一码一用 · 渠道自行发放 · 骑手不经平台付款", "channel_settlement_activation", `<button type="button" class="btn" data-mock-import-act>批量导入</button>`)}
+          ${panelHead("我的批发订单", "渠道申请 · 线下付款 · 运营商确认后按单造码", "channel_settlement_activation", `<button type="button" class="btn primary" data-act-wholesale-apply>申请批发</button>`)}
           <div class="panel-body orders-table-wrap">
-            <table><thead><tr><th>激活码</th><th>套餐</th><th>服务天数</th><th>状态</th><th>发放批次/对象</th><th>核销时间</th><th>采购单</th></tr></thead>
-            <tbody>${rows || "<tr><td colspan='7'>暂无激活码</td></tr>"}</tbody></table>
+            <table>
+              <thead><tr><th>批发单（批次）</th><th>套餐码</th><th>数量</th><th>金额</th><th>状态</th><th>申请时间</th></tr></thead>
+              <tbody>${orderRows || "<tr><td colspan='6'>暂无批发订单，请先申请批发</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel">
+          ${panelHead("激活码库存", "一码一用 · 批次=批发单 · 编号=批次内序号 · 不可导入造码", "channel_settlement_activation")}
+          <div class="panel-body orders-table-wrap">
+            <div class="power-filter-bar power-filter-inline" style="margin-bottom:12px">
+              <label class="filter-inline">
+                <span>批次</span>
+                <select data-act-code-filter="batch">
+                  ${batchOpts.map(o => `<option value="${o.v}"${(state.activationCodesBatch || "全部") === o.v ? " selected" : ""}>${o.t}</option>`).join("")}
+                </select>
+              </label>
+              <span style="font-size:12px;color:var(--muted)">共 ${pg.total} 张</span>
+            </div>
+            <table>
+              <thead><tr><th>激活码</th><th>批次 / 编号</th><th>套餐</th><th>状态</th><th>发放对象</th><th>核销/备注</th><th>操作</th></tr></thead>
+              <tbody>${rows || "<tr><td colspan='7'>暂无激活码（确认到账后自动生成）</td></tr>"}</tbody>
+            </table>
+            ${renderTablePager(pg, "actcode-page")}
           </div>
         </section>`;
     }
@@ -11419,11 +12327,11 @@
           <section class="panel">
             ${panelHead("结算规则", "激活码 · 参考人天池 B 端计提", "channel_settlement_activation")}
             <div class="panel-body"><ol style="margin:0;padding-left:20px;font-size:13px;color:var(--muted);line-height:1.8">
-              <li>渠道通过<strong>服务订单 AC-</strong>向运营商批发激活码；运营商<strong>手动确认到账</strong>后入库</li>
-              <li>渠道在「激活码」管理库存、发放；<strong>一码仅可核销一次</strong></li>
-              <li>骑手小程序输入激活码 → 开通对应套餐权益；<strong>用户不向平台/运营商在线付款</strong></li>
-              <li>平台 1%：<strong>核销成功时</strong>按「标准人天价 × 服务人天 × 运营商 B 端费率」向 U 计提（与人天池确认消耗同类，与批发单价无关）</li>
-              <li>换电权益与个人套餐相同；跨网费规则同其他用户</li>
+              <li>渠道在「激活码」<strong>申请批发单 AC-</strong>（线下对公）；运营商<strong>确认到账</strong>后系统<strong>按订单数量自动生成激活码</strong>（订单=批次，码带批次内编号）</li>
+              <li>渠道<strong>标记发放</strong>（记对象）；骑手核销后状态自动变为已使用；<strong>一码仅可核销一次</strong></li>
+              <li>骑手小程序输入激活码 → 开通对应套餐；<strong>用户不向平台/运营商在线付款</strong>；渠道站外自行推销</li>
+              <li><strong>不作线上退款</strong>；作废由渠道发起 → 运营商确认</li>
+              <li>平台 1%：<strong>核销成功时</strong>按「标准人天价 × 服务人天 × 运营商 B 端费率」向 U 计提（与批发单价无关）</li>
             </ol></div>
           </section>`;
       }
@@ -12539,7 +13447,85 @@
         };
       }
       root.querySelectorAll("[data-cstab]").forEach(btn => {
-        btn.onclick = () => { state.channelSalesTab = btn.dataset.cstab; render(); };
+        btn.onclick = () => {
+          state.channelSalesTab = btn.dataset.cstab;
+          if (btn.dataset.cstab === "orders") state.channelOrdersPage = 1;
+          if (btn.dataset.cstab === "assets") state.channelAssetsPage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-csorder-sub]").forEach(btn => {
+        btn.onclick = () => {
+          state.channelOrdersSubTab = btn.dataset.csorderSub;
+          state.channelOrdersPage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-csorder-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.csorderPage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.channelOrdersPage = p;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-csasset-sub]").forEach(btn => {
+        btn.onclick = () => {
+          state.channelAssetsSubTab = btn.dataset.csassetSub;
+          state.channelAssetsPage = 1;
+          state.channelAssetsLedgerPage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-csasset-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.csassetPage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.channelAssetsPage = p;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-csasset-ledger-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.csassetLedgerPage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.channelAssetsLedgerPage = p;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-csasset-ledger-filter]").forEach(el => {
+        const apply = () => {
+          const key = el.dataset.csassetLedgerFilter;
+          if (key === "channel") state.channelAssetsLedgerChannel = el.value;
+          else if (key === "type") state.channelAssetsLedgerType = el.value;
+          else if (key === "dateFrom") {
+            state.channelAssetsLedgerDateFrom = el.value;
+            if (state.channelAssetsLedgerDateTo && state.channelAssetsLedgerDateFrom
+              && state.channelAssetsLedgerDateTo < state.channelAssetsLedgerDateFrom) {
+              state.channelAssetsLedgerDateTo = state.channelAssetsLedgerDateFrom;
+            }
+          } else if (key === "dateTo") {
+            state.channelAssetsLedgerDateTo = el.value;
+            if (state.channelAssetsLedgerDateFrom && state.channelAssetsLedgerDateTo
+              && state.channelAssetsLedgerDateTo < state.channelAssetsLedgerDateFrom) {
+              state.channelAssetsLedgerDateFrom = state.channelAssetsLedgerDateTo;
+            }
+          } else return;
+          state.channelAssetsLedgerPage = 1;
+          render();
+        };
+        el.onchange = apply;
+      });
+      root.querySelectorAll("[data-csasset-ledger-ch]").forEach(btn => {
+        btn.onclick = () => {
+          state.channelAssetsSubTab = "dayPool";
+          state.channelAssetsLedgerChannel = btn.dataset.csassetLedgerCh;
+          state.channelAssetsLedgerPage = 1;
+          render();
+        };
       });
       root.querySelectorAll("[data-potab]").forEach(btn => {
         btn.onclick = () => { state.platformOrderTab = btn.dataset.potab; render(); };
@@ -12622,6 +13608,55 @@
       });
       root.querySelectorAll("[data-new-pricing-sku]").forEach(btn => {
         btn.onclick = () => openPricingForm("new");
+      });
+      root.querySelectorAll("[data-pricing-pkg-sub]").forEach(btn => {
+        btn.onclick = () => {
+          state.pricingPkgSubTab = btn.dataset.pricingPkgSub;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-pricing-zone]").forEach(btn => {
+        btn.onclick = () => {
+          state.pricingSelectedZoneId = btn.dataset.pricingZone;
+          state.pricingPkgSubTab = "zones";
+          render();
+        };
+      });
+      root.querySelectorAll("[data-new-price-zone]").forEach(btn => {
+        btn.onclick = () => openPriceZoneForm("new");
+      });
+      root.querySelectorAll("[data-edit-price-zone]").forEach(btn => {
+        btn.onclick = () => openPriceZoneForm(btn.dataset.editPriceZone);
+      });
+      root.querySelectorAll("[data-manage-zone-sites]").forEach(btn => {
+        btn.onclick = () => openManageZoneSitesForm(btn.dataset.manageZoneSites);
+      });
+      root.querySelectorAll("[data-remove-zone-site]").forEach(btn => {
+        btn.onclick = () => {
+          const zoneId = btn.dataset.removeZoneSite;
+          const siteId = btn.dataset.siteId;
+          openProtoConfirm({
+            title: "移出分区",
+            message: "将「" + siteNameById(siteId) + "」移出当前分区后，该站新购套餐恢复城市底价。确定？",
+            confirmLabel: "移出",
+            onConfirm: () => { if (removeSiteFromPriceZone(zoneId, siteId)) render(); }
+          });
+        };
+      });
+      root.querySelectorAll("[data-del-price-zone]").forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.dataset.delPriceZone;
+          const z = operatorPriceZones.find(x => x.id === id);
+          openProtoConfirm({
+            title: "移除价格分区",
+            message: "移除「" + (z?.name || id) + "」后，其挂接站点将恢复城市底价，区价配置一并删除。确定？",
+            confirmLabel: "移除分区",
+            onConfirm: () => { if (deletePriceZone(id)) render(); }
+          });
+        };
+      });
+      root.querySelectorAll("[data-edit-zone-price]").forEach(btn => {
+        btn.onclick = () => openZonePkgPriceForm(btn.dataset.editZonePrice, btn.dataset.zonePkg);
       });
       root.querySelectorAll("[data-new-card-pricing]").forEach(btn => {
         btn.onclick = () => openCardPricingForm("new");
@@ -13095,8 +14130,66 @@
       root.querySelectorAll("[data-create-dedicated-site]").forEach(btn => {
         btn.onclick = () => showProtoToast("演示：可在「签约渠道 → 编辑」中选择「+ 新建专属站点」并填写站点名称。");
       });
-      root.querySelectorAll("[data-mock-import-act]").forEach(btn => {
-        btn.onclick = () => showProtoToast("演示：批量导入激活码");
+      root.querySelectorAll("[data-act-wholesale-apply]").forEach(btn => {
+        btn.onclick = () => openActivationWholesaleForm();
+      });
+      root.querySelectorAll("[data-act-code-filter]").forEach(el => {
+        el.onchange = () => {
+          if (el.dataset.actCodeFilter === "batch") {
+            state.activationCodesBatch = el.value;
+            state.activationCodesPage = 1;
+            render();
+          }
+        };
+      });
+      root.querySelectorAll("[data-actcode-page]").forEach(btn => {
+        btn.onclick = () => {
+          const p = parseInt(btn.dataset.actcodePage, 10);
+          if (!Number.isNaN(p)) { state.activationCodesPage = p; render(); }
+        };
+      });
+      root.querySelectorAll("[data-act-issue]").forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.dataset.actIssue;
+          const c = channelActivationCodes.find(x => x.id === id);
+          openProtoForm({
+            title: "标记发放",
+            submitLabel: "确认发放",
+            fields: [
+              { name: "code", label: "激活码", value: c?.code || id, readonly: true },
+              { name: "batch", label: "批次 / 编号", value: (c?.batchId || "—") + " #" + String(c?.serialNo || 0).padStart(3, "0"), readonly: true },
+              { name: "issuedTo", label: "发放对象 / 备注", value: c?.issuedTo || "", required: true }
+            ],
+            onSubmit: (data) => markActivationCodeIssued(id, data.issuedTo)
+          });
+        };
+      });
+      root.querySelectorAll("[data-act-void-apply]").forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.dataset.actVoidApply;
+          const c = channelActivationCodes.find(x => x.id === id);
+          openProtoForm({
+            title: "申请作废（无退款）",
+            submitLabel: "提交申请",
+            fields: [
+              { name: "code", label: "激活码", value: c?.code || id, readonly: true },
+              { name: "batch", label: "批次 / 编号", value: (c?.batchId || "—") + " #" + String(c?.serialNo || 0).padStart(3, "0"), readonly: true },
+              { name: "reason", label: "作废原因", type: "textarea", value: "", required: true }
+            ],
+            onSubmit: (data) => requestActivationCodeVoid(id, data.reason)
+          });
+        };
+      });
+      root.querySelectorAll("[data-confirm-act-void]").forEach(btn => {
+        btn.onclick = () => {
+          const id = btn.dataset.confirmActVoid;
+          openProtoConfirm({
+            title: "确认作废",
+            message: "确认作废该激活码？确认后不可再用，且不作线上退款。",
+            confirmLabel: "确认作废",
+            onConfirm: () => { if (confirmActivationCodeVoid(id)) render(); }
+          });
+        };
       });
       root.querySelectorAll("[data-simulate-online-pay]").forEach(btn => {
         btn.onclick = () => {
@@ -13822,7 +14915,7 @@
       overview: renderOverview,
       pricing: renderPricing,
       channelSales: renderChannelSales,
-      sites: renderSites,
+      sites: renderSiteManage,
       sitePartners: renderSitePartners,
       siteExpenses: renderSiteExpenses,
       partnerOverview: renderPartnerOverview,
@@ -13902,7 +14995,8 @@
       }
       document.querySelector("#pageTitle").textContent = pageMeta[0];
       const hidePageChrome = (state.view === "overview" && (isOperatorRole() || isPlatformRole()))
-        || (state.view === "platformUsers" && isPlatformRole());
+        || (state.view === "platformUsers" && isPlatformRole())
+        || state.view === "pricing";
       const pageDescEl = document.querySelector("#pageDesc");
       pageDescEl.textContent = hidePageChrome ? "" : pageMeta[1];
       pageDescEl.style.display = hidePageChrome || !pageMeta[1] ? "none" : "";
@@ -14138,6 +15232,13 @@
       if (ovRange) {
         if (!state.pf.overview) state.pf.overview = { ...(PF_DEFAULTS.overview || {}) };
         state.pf.overview.range = ovRange.value;
+        render();
+        return;
+      }
+      const busyEl = e.target.closest("[data-site-busy-pf]");
+      if (busyEl && state.view === "overview") {
+        const bp = getSiteBusyPf();
+        bp[busyEl.dataset.siteBusyPf] = busyEl.value;
         render();
         return;
       }
