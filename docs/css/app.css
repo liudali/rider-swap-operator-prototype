@@ -535,6 +535,18 @@
     }
     .panel-sub-orders .panel-head { background: linear-gradient(90deg, #ecfdf5, #fff); }
     .orders-table-wrap { overflow-x: auto; }
+    .quota-price-table tr.quota-row-default td {
+      background: #ecfdf5;
+      border-top: 1px solid #a7f3d0;
+      border-bottom: 1px solid #a7f3d0;
+    }
+    .quota-price-table tr.quota-row-default td:first-child {
+      box-shadow: inset 3px 0 0 var(--brand);
+    }
+    .quota-default-badge {
+      display: inline-block; padding: 1px 6px; margin-right: 4px; border-radius: 4px;
+      font-size: 11px; font-weight: 700; color: #fff; background: var(--brand); vertical-align: middle;
+    }
     .cab-list-table { min-width: 1280px; font-size: 12px; }
     .cab-list-table th, .cab-list-table td { vertical-align: top; padding: 10px 8px; }
     .cab-asset-cell { font-size: 12px; line-height: 1.55; color: var(--muted); }
@@ -604,6 +616,12 @@
       grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
       margin-top: 0;
       margin-bottom: 0;
+    }
+    .overview-split-row-metrics-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .overview-expense-panel .overview-expense-filter {
+      margin-bottom: 10px;
     }
     .overview-workplace > .overview-split-row-metrics {
       margin-bottom: 0;

@@ -152,21 +152,21 @@
     };
     const NAV = {
       platform: ["overview", "platformUsers", "platformOrders", "platformDevices", "platformChannels", "platformMarketing", "platformFlows", "platformAccounts", "operators", "platformLeasing", "operatorCreditEval", "orderAudit", "depositManage", "l1Pricing"],
-      operator: ["overview", "pricing", "channelSales", "sites", "siteExpenses", "devices", "financeManage", "orderPackage", "orderSwap", "orderFreeze", "orderAudit", "refundManage", "flows", "depositAccount", "interOp", "platformFee", "employees", "users", "accounts"],
+      operator: ["overview", "pricing", "channelSales", "sites", "devices", "financeManage", "orderService", "flows", "platformService", "employees", "users", "accounts"],
       channel: ["overview", "channelSettlement", "dayPool", "channelCredit", "employees"],
       leasing: ["overview", "employees", "financeDrawdown", "accounts"],
       sitePartner: ["partnerOverview", "partnerBindings", "partnerLedger", "partnerWithdraw", "partnerAccount"]
     };
     const NAV_LABEL = {
       overview: "总览", employees: "员工", sites: "站点管理", sitePartners: "站点合伙人", siteExpenses: "站点支出", devices: "我的设备",
-      orderPackage: "套餐购买订单", orderSwap: "换电订单", orderFreeze: "服务冻结", orderAudit: "变更记录", refundManage: "退款管理",
+      orderService: "订单与服务", orderPackage: "套餐购买订单", orderSwap: "换电订单", orderFreeze: "服务冻结", orderAudit: "变更记录", refundManage: "退款管理",
       flows: "我的流水", users: "用户",
       leaseAgreements: "协议与设备", leaseCollect: "租金收缴", leaseRent: "月租金",
       financeManage: "融资管理", financeDrawdown: "放款申请",
       accounts: "收款账户", dayPool: "人天额度池", channelSettlement: "结算模式说明", channelCredit: "渠道信用额度",
       channelLinks: "套餐与链接", channelOrders: "购卡记录", commissionStatement: "佣金对账", rentPool: "月租账单", rentDevices: "租赁设备", leaseBatteryHold: "电池持有", leaseWhitelist: "白名单用户", leasePkgPricing: "白名单套餐", channelInterOp: "跨网往来账",
       activationCodes: "激活码", activationRecords: "核销记录",
-      pricing: "平台设置", channelSales: "渠道管理", depositAccount: "服务保证金账户", interOp: "运营商往来账", platformFee: "平台服务费",
+      pricing: "平台设置", channelSales: "渠道管理", platformService: "平台服务", depositAccount: "服务保证金账户", interOp: "运营商往来账", platformFee: "平台服务费",
       operators: "运营商管理", platformLeasing: "租赁公司", operatorCreditEval: "运营商信用评估", depositManage: "保证金管理", deviceBinding: "设备绑定", l1Pricing: "平台统价",
       platformUsers: "用户管理", platformOrders: "订单管理", platformDevices: "设备管理",
       platformChannels: "渠道商管理", platformMarketing: "平台营销", platformFlows: "流水管理", platformAccounts: "平台账户",
@@ -180,11 +180,11 @@
       "overview.view": ["overview"],
       "sites.view": ["sites"], "sites.edit": ["sites"],
       "site_partners.view": ["sites"], "site_partners.edit": ["sites"],
-      "site_expenses.view": ["siteExpenses"], "site_expenses.edit": ["siteExpenses"],
+      "site_expenses.view": ["sites"], "site_expenses.edit": ["sites"],
       "devices.view": ["devices"], "devices.edit": ["devices"],
-      "orders.view": ["orderPackage", "orderSwap", "orderFreeze", "orderAudit"],
-      "orders.audit": ["orderPackage", "orderFreeze"],
-      "refunds.view": ["refundManage"], "refunds.audit": ["refundManage"],
+      "orders.view": ["orderService", "orderPackage", "orderSwap", "orderFreeze", "orderAudit"],
+      "orders.audit": ["orderService", "orderPackage", "orderFreeze"],
+      "refunds.view": ["orderService", "refundManage"], "refunds.audit": ["orderService", "refundManage"],
       "flows.view": ["flows"],
       "users.view": ["users"],
       "employees.view": ["employees"], "employees.edit": ["employees"],
@@ -206,29 +206,30 @@
       "lease_battery.view": ["leaseBatteryHold", "orderAudit"],
       "pricing.view": ["pricing"], "pricing.edit": ["pricing"],
       "channel_sales.view": ["channelSales"],
-      "inter_op.view": ["interOp", "depositAccount"],
-      "deposit.view": ["depositAccount"],
-      "platform_fee.view": ["platformFee"],
+      "inter_op.view": ["platformService"],
+      "deposit.view": ["platformService"],
+      "platform_fee.view": ["platformService"],
       "activation_codes.view": ["activationCodes", "activationRecords", "orderAudit"]
     };
 
 
     const meta = {
       overview: ["总览", "设备四类 KPI + 经营汇总；站点繁忙度（实时等级 + 按日换电高峰时段）与用电量汇总统计。"],
-      sites: ["站点管理", "站点信息与站点合伙人；分润配置。"],
-      sitePartners: ["站点合伙人", "个人/公司合伙人档案；一站多位、一人多站；在「站点管理 → 站点信息」中按站配置比例。"],
+      sites: ["站点管理", "站点信息、场费电费、站点支出与站点合伙人。"],
+      sitePartners: ["站点合伙人", "按个人/公司建档并完成开户；一站多位、一人多站；在「站点管理」中按站配置比例。"],
       partnerOverview: ["总览", "累计分润、本月分润、绑定站点；只读查看运营商为您配置的站点与比例。"],
-      partnerBindings: ["我的站点", "各绑定站点的当前分润比例与待生效规则（只读）。"],
+      partnerBindings: ["我的站点", "各绑定站点的当前分润比例（只读）。"],
       partnerLedger: ["分润明细", "个人用户 C 端确认收入产生的分润切分行。"],
-      partnerWithdraw: ["提现结算", "向运营商发起提现/代付申请；审核后打款至收款账户。"],
-      partnerAccount: ["收款账户", "档案中的收款账户信息（只读）。"],
-      siteExpenses: ["站点支出", "按站点管理场地费、电费、付费周期、周期账单及支付记录；维护场地所有人与收款方式。"],
-      devices: ["我的设备", "仅展示与维护本人（本主体）拥有的换电柜、电池。"],
-      orderPackage: ["套餐购买订单", "个人用户购买包月/次卡；含待退款状态。"],
-      orderSwap: ["换电订单", "换电行为记录，含权益来源与三元组。"],
-      orderFreeze: ["服务冻结", "个人套餐冻结/解冻记录；满足条件时系统自动生效，无需审核。"],
-      refundManage: ["退款管理", "C 端退订/中途完结退款统一入口：申请队列、审核确认、退款设置与完整追溯。"],
-      orderAudit: ["变更记录", "订单/服务生命周期审计：冻结、消耗、换电、退款等跨模块时间线（C-02）。"],
+      partnerWithdraw: ["提现结算", "须已开户；向运营商发起提现/代付申请；审核后打款至开户账户。"],
+      partnerAccount: ["收款账户", "按个人/公司类型展示开户资料；待开户可自助补齐。"],
+      siteExpenses: ["站点支出", "跨站点全部周期账单与支付记录；按站配置见「场费电费」。"],
+      devices: ["我的设备", "换电柜/电池台账；二期含流转导出、运维记录、电柜组成、端口操作。"],
+      orderService: ["订单与服务", "二级：套餐购买订单 / 换电订单 / 服务冻结 / 变更记录 / 退款管理。"],
+      orderPackage: ["套餐购买订单", "已并入「订单与服务」；个人用户购买包月/次卡；含待退款状态。"],
+      orderSwap: ["换电订单", "已并入「订单与服务」；换电行为与三元组；个人套餐不展示应分（支付已清分）。"],
+      orderFreeze: ["服务冻结", "已并入「订单与服务」；个人套餐冻结/解冻记录；满足条件时系统自动生效。"],
+      refundManage: ["退款管理", "已并入「订单与服务」；C 端退订/中途完结退款：申请队列、审核确认、退款设置。"],
+      orderAudit: ["变更记录", "已并入「订单与服务」（运营商）；订单/服务生命周期审计时间线（C-02）。"],
       flows: ["我的流水", "C 端支付成功实时清分；提现须平台审核；本页展示资金实收、清分明细与提现申请。"],
       employees: ["员工", "运营员工维护与功能权限配置。"],
       users: ["用户", ""],
@@ -239,12 +240,13 @@
       financeDrawdown: ["放款申请", "资方视角：录入主体授信、尽调审查、登记放款、还款工单确认。"],
       activationCodes: ["激活码", "渠道申请批发 → 确认到账按单造码；标记发放；一码一用；作废需运营商确认（无退款）。"],
       activationRecords: ["核销记录", "激活码核销成功记录；触发平台向运营商 B 端 1% 计提（与人天池确认消耗同类费率）。"],
-      accounts: ["收款账户管理", "本主体进件商户：骑手收款、分账、租金收付等用途。"],
+      accounts: ["收款账户管理", "进件子商户须绑定对公结算账户：提现/分账打款至此对公户；含开户名、开户行、账号。"],
       dayPool: ["人天额度池", "渠道商向签约运营商购买人天额度，登记骑手并分配/收回；换电时按日预占与确认消耗。"],
       pricing: ["平台设置", ""],
       channelSales: ["渠道管理", "签约渠道商、渠道订单与渠道权益；维护各渠道权益与定价。"],
-      interOp: ["运营商往来账", "跨站跨网设备服务费经平台代收/代付；支持今日/昨日/近7天/近30天统计与趋势图；日清优先划扣保证金。"],
-      depositAccount: ["服务保证金账户", "查看平台清分专户（对外称服务保证金）、提交对公充值申请、查询到账与变动明细。"],
+      interOp: ["运营商往来账", "已并入「平台服务 → 运营商往来」页内 Tab：概况 / 跨网服务费明细 / 日清账单 / 周月汇总。"],
+      depositAccount: ["服务保证金账户", "页内 Tab：账户概况 / 充值申请 / 变动明细。"],
+      platformService: ["平台服务", "二级：服务保证金账户 / 平台服务费 / 运营商往来（页内：概况/明细/日清/周月）。"],
       channelSettlement: ["渠道结算模式", "人天池 / 渠道分销（骑士卡） / 设备租赁 / 激活码四种结算模式演示。"],
       channelCredit: ["渠道信用额度", "平台评估信用抵扣押金；运营商可调整额度；渠道提交打款凭证由运营商审核。"],
       commissionStatement: ["佣金对账", "按<strong>自然月</strong>汇总链接购卡笔数、实付与佣金。开启<strong>佣金及时到付</strong>时展示已即时分账明细；未开启则为线下待结。"],
@@ -255,7 +257,7 @@
       leaseWhitelist: ["白名单用户", "扁平名单 · 无团队 · 渠道自行维护；区分<strong>白名单免费</strong>与<strong>白名单付费</strong>（须购白名单套餐）。"],
       leasePkgPricing: ["白名单套餐", "渠道自定 SKU 与零售价；<strong>仅白名单用户</strong>可购；款项进入<strong>本渠道收款账户</strong>。"],
       channelInterOp: ["渠道跨网往来账", "设备租赁渠道开通跨网后，骑手在他网换电的跨网设备服务费经平台代收代付。"],
-      platformFee: ["平台服务费", "按运营商配置的抽成比例计提；B 端确认消耗向额度售卖方 U 代扣；优先划扣保证金。"],
+      platformFee: ["平台服务费", "页内 Tab：费用总览 / C 端支付分账 / B 端消耗计提。"],
       operators: ["运营商管理", "二级：运营商列表 / 提现审核 / 运营商平台服务费。主体维护、账户汇总、准入档位；服务费 C/B 比例分主体配置。"],
       platformLeasing: ["租赁公司", "平台维护设备租赁公司与运营商绑定关系；绑定后租赁公司方可向该运营商发起签约。"],
       operatorCreditEval: ["运营商信用评估", "准入档位制（A/B/C/D）：档位配置、入网定档、升降档与变更记录；约束信用额度封顶。"],
@@ -311,7 +313,7 @@
       channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。卡差价：按渠道×SKU 配置专享价与佣金；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。平台仅查询监管。" },
       day_pool_one_per_operator: { title: "一运营商一池", content: "渠道商 × 运营商 = <strong>唯一</strong> `DayPool`。向第二家运营商签约才新增池；增购、赠送、退款、分配、预占/确认等均写入<strong>额度变动记录</strong>，不新建第二池。" },
       day_pool_b2b_settlement: { title: "B2B 资金与平台计提", content: "渠道<strong>采购/到账时</strong>批发款已是运营商收入（在线 T+0/T+1 或线下确认）。骑手<strong>确认消耗</strong>仅扣池余额，<strong>不向运营商二次打款</strong>；平台按标准人天价 × 1% 向额度售卖方计提（见「平台服务费」）。" },
-      inter_op: { title: "运营商往来账", content: "跨站换电时 U 经平台代付柜机费+电池费；日清优先划扣平台保证金。顶部可选<strong>今日/昨日/近7天/近30天</strong>，KPI 与明细、日账单、趋势图联动。运营商只见平台代收/代付，不见对手方。" },
+      inter_op: { title: "运营商往来账", content: "归属「平台服务 → 运营商往来」页内 Tab：概况 / 跨网服务费明细 / 日清账单 / 周月汇总。跨站换电时 U 经平台代付柜机费+电池费；日清优先划扣平台保证金。概况支持<strong>今日/昨日/近7天/近30天</strong>；明细可筛站点/状态/方向/换电单。运营商只见平台代收/代付，不见对手方。" },
       inter_op_case3: { title: "案例 #3", content: "个人用户 U 在 C 柜换 B 电池：U 经平台代付 ¥0.5 柜机费 + ¥0.1 电池费（U→B，已确认）；双方不见对手方信息。" },
       inter_op_privacy: { title: "平台代收代付", content: "运营商互不可见对方主体；往来账仅展示「平台代收」「平台代付」及金额，内部三元组由平台清分。" },
       inter_op_pricing: { title: "跨网使用费单价", content: "平台统一管控（暂定）：柜机 ¥0.5/次，电池 ¥0.1/次。运营商后台只读，变更由平台发布。" },
@@ -342,7 +344,10 @@
       overview_site_busy_date: { title: "统计日", content: "模块内独立日期；默认演示日 2026-06-15。切换后刷新各站当日小时分布与高峰段。" },
       overview_power_stats: { title: "用电量统计", content: "模块内独立<strong>起止时间</strong>与<strong>站点筛选</strong>（默认所有站点）；变更即刷新。展示汇总 KPI 与日用电趋势折线图。" },
       overview_power_kwh: { title: "用电量", content: "单位 kWh；来源为柜机每日上报的充电/待机消耗合计（Mock：cabinetPowerDaily）。" },
-      site_expenses_panel: { title: "站点支出", content: "按站点维护<strong>场地费</strong>、<strong>电费</strong>（按量/包月）、<strong>付费周期</strong>（月/季/年结）、场地所有人与<strong>收款方式</strong>；每个周期生成账单，可登记支付记录。" },
+      overview_site_expense: { title: "站点支出", content: "总览卡片：按<strong>月</strong>与<strong>站点</strong>汇总。<strong>场费</strong>跨月账期按账期比例分摊（如季付 1/3）；<strong>电费按当月时间消耗计算</strong>（按量=柜机日用电×单价，包月=固定月费）。" },
+      overview_site_expense_venue: { title: "场费", content: "跨月账期按账期月数等分（如季付当月 = 场费×1/3）。" },
+      overview_site_expense_elec: { title: "电费", content: "按当月时间消耗计算：<strong>按量</strong>取柜机日用电合计×站点单价；<strong>包月</strong>取配置固定月费。与账单账期分摊无关。" },
+      site_expenses_panel: { title: "场费电费", content: "在<strong>站点管理 → 场费电费</strong>按站点维护<strong>场地费</strong>、<strong>电费</strong>（按量/包月）、<strong>付费周期</strong>、场地所有人与<strong>收款方式</strong>；周期账单可登记支付。跨站汇总见同级「站点支出」。" },
       site_expenses_venue: { title: "场地费", content: "与场地方约定的固定场地使用费；按付费周期出账。" },
       site_expenses_electricity: { title: "电费", content: "按量：期间用电量 × 单价；包月：固定金额。用电量可引用 IoT 统计或手工录入。" },
       site_expenses_cycle: { title: "付费周期", content: "月结 / 季结 / 年结；决定账单账期粒度与应付日。" },
@@ -351,16 +356,22 @@
       site_expenses_bill: { title: "周期账单", content: "账期内场地费 + 电费合计；状态：待支付 / 部分支付 / 已结清。" },
       site_expenses_time: { title: "时间筛选", content: "按<strong>账期起止</strong>与筛选范围求交集过滤账单与 KPI；快捷范围切换时同步起止日期；自定义日期点击「查询」生效。" },
       site_expenses_payment: { title: "支付记录", content: "针对账单的实付登记：时间、金额、方式、流水号、经办人。「期间已付」= 筛选期内支付流水合计。" },
-      site_partner_panel: { title: "站点合伙人", content: "合伙人类型可为<strong>个人</strong>或<strong>公司</strong>。一站可绑<strong>多位</strong>合伙人，一位合伙人可绑<strong>多站</strong>；各绑定单独设 R%。本站合伙人比例合计不超过 99%（与平台 1% 合计 100%）。<br>在<strong>站点管理</strong>中为各站配置合伙人；本页维护档案与分润明细。" },
-      site_partner_binding: { title: "站点合伙人设置", content: "在<strong>站点 → 合伙人设置</strong>中为该站添加/调整合伙人及本站比例。一站可多位合伙人；变更<strong>次日 0:00</strong>生效。渠道专属站默认不参与。" },
+      site_partner_panel: { title: "站点合伙人", content: "运营商建档时选定类型（<strong>个人</strong>/<strong>公司</strong>），类型锁定后按类型完成<strong>开户资料绑定</strong>方可绑站与提现。一站可绑多位、一人可多站；本站合伙人比例合计 ≤99%。" },
+      site_partner_binding: { title: "站点合伙人设置", content: "在<strong>站点 → 合伙人设置</strong>中为该站添加/调整合伙人及本站比例。仅<strong>已开户</strong>合伙人可绑定。添加 / 调比例 / 解绑均<strong>立即生效</strong>，并写入变更记录。渠道专属站默认不参与。" },
+      site_partner_change_log: { title: "合伙人变更记录", content: "记录本站合伙人的<strong>添加、调比例、解绑</strong>：操作时间、操作人、变更前后比例。变更立即生效，已发生的分润明细不回溯。" },
+      site_partner_open_account: { title: "合伙人开户", content: "运营商建档时锁定<strong>个人/公司</strong>类型；开户须按类型绑定资料：个人=实名+身份证+个人卡；公司=证照+法人+对公户。未开户不可绑站、不可提现。" },
       site_partner_split: { title: "分润明细", content: "仅<strong>个人用户</strong> C 端确认收入参与切分：平台 1% + 合伙人 R% + 运营商余量（吸收尾差）。渠道人天、设备租赁白名单不参与。" },
-      partner_portal: { title: "合伙人门户", content: "站点合伙人<strong>独立登录</strong>视角：只读查看运营商配置的绑定站点与比例、分润明细；提现向<strong>运营商</strong>申请，审核后代付/对公结算。" },
-      partner_bindings_readonly: { title: "比例只读", content: "分润比例由运营商在「站点管理 → 合伙人」配置；变更<strong>次日 0:00</strong>生效。本页展示当前与待生效值。" },
-      partner_withdraw: { title: "提现结算", content: "累计分润达可提现余额后可申请；<strong>运营商</strong>审核后打款至收款账户。与运营商向平台提现（平台审核）流程不同。" },
+      partner_portal: { title: "合伙人门户", content: "站点合伙人<strong>独立登录</strong>视角：只读查看运营商配置的绑定站点与比例、分润明细；待开户时可自助补齐开户资料；提现向<strong>运营商</strong>申请，审核后代付/对公结算。" },
+      partner_bindings_readonly: { title: "比例只读", content: "分润比例由运营商在「站点管理 → 合伙人」配置；变更<strong>立即生效</strong>。本页只读当前生效比例。" },
+      partner_withdraw: { title: "提现结算", content: "须<strong>已开户</strong>。累计分润达可提现余额后可申请；<strong>运营商</strong>审核后打款至开户收款账户。与运营商向平台提现（平台审核）流程不同。" },
       overview_power_site: { title: "站点用电", content: "Σ 该站点下所有柜机在筛选期内的日用电量；柜机数为去重 SN 数。" },
       overview_power_cabinet: { title: "单柜用电", content: "单台柜机在筛选期内的累计用电；可跳转「我的设备 → 换电柜」查看实时读数。" },
-      sites_panel: { title: "站点信息", content: "运营商负责站点 CRUD 与设备分配；入口在「站点管理 → 站点信息」。换电范围见「平台设置 → 换电范围」。" },
-      devices_cab: { title: "换电柜管理", content: "列表字段对齐 IoT 台账。<strong>仅换电柜</strong>可绑定/变更站点；电池与站点无绑定关系。已绑定站点的柜机可执行<strong>移柜</strong>至本运营商其他在营站点；操作含电柜组成、编辑、移柜、查看详情。" },
+      sites_panel: { title: "站点信息", content: "运营商负责站点 CRUD 与设备分配；入口在「站点管理 → 站点信息」。可维护<strong>定位坐标</strong>（经度/纬度，非必填，成对填写）。换电范围见「平台设置 → 换电范围」。" },
+      devices_cab: { title: "换电柜管理", content: "列表字段对齐 IoT 台账。<strong>仅换电柜</strong>可绑定/变更站点；电池与站点无绑定关系。已绑定站点的柜机可执行<strong>移柜</strong>。<br><span class='badge-p2'>二期</span>：导出电池流转记录、运维操作记录、电柜组成、详情·端口状态·操作 — 一期不交付，原型可浏览。" },
+      devices_cab_compose: { title: "电柜组成（二期）", content: "【二期】模块清单与格口快照；含隔口开关、上下电演示。一期不交付。" },
+      devices_cab_port_ops: { title: "端口状态 · 操作（二期）", content: "【二期】详情页端口状态可只读浏览；开门/刷新/补电/通断电等<strong>操作</strong>属二期。一期不交付，原型仅演示入口。" },
+      devices_cab_bat_flow: { title: "导出电池流转记录（二期）", content: "【二期】按时间范围导出电池入柜/出柜/流转 CSV。一期不交付。" },
+      devices_cab_ops_log: { title: "运维操作记录（二期）", content: "【二期】远程运维指令与结果流水。一期不交付，原型可浏览演示表。" },
       devices_move_cab: { title: "移柜", content: "前提：柜机已绑定站点（<code>cabinets.site</code> 对应运营商在营站点）。将柜机从 A 站迁至 B 站，同步更新投放地址与城市；<strong>不迁移电池</strong>（电池位置仍随柜内格口/流转记录，与站点无绑定）。移柜留痕 Mock。" },
       devices_bat: { title: "电池", content: "归属站点的电池 SN、电量与健康度；补电与调拨在运维流程处理（原型仅占位）。" },
       orders_pkg: { title: "套餐购买订单", content: "骑手支付购买的包月/次卡订单，定义服务有效期与额度。支持中途完结退款、冻结/解冻。一笔套餐在有效期内可产生多笔换电订单。" },
@@ -379,9 +390,9 @@
       platform_users_info: { title: "用户信息", content: "全平台用户列表：服务运营商、类型、电池押金状态、套餐/权益、持有电池等。" },
       platform_users_deposit_stats: { title: "用户押金统计", content: "按运营商汇总实付在押、免押人数、渠道担保、退押中金额；只读，不参与平台/合伙人清分。" },
       pricing_deposit: { title: "押金设置", content: "面向<strong>个人套餐用户</strong>：当芝麻信用/微信支付分等<strong>不足以免押</strong>时，须缴纳的电池押金金额。<br>· 运营商「定价管理 → 押金设置」配置<br>· 与套餐零售价独立；购套餐同笔收取<br>· 信用达标免押则实收 ¥0（仍须还电）<br>· 渠道人天/设备租赁白名单不适用（押金责任在渠道）" },
-      orders_swap: { title: "换电订单", content: "以表格列出换电单；须区分权益来源：**个人套餐**与**渠道人天**。每笔记录三元组：用户归属运营商 U、柜机归属运营商 C、电池归属运营商 B。U 向 C 付柜机服务费、向 B 付电池服务费（C/B 与 U 相同时不产生该项费用）。" },
+      orders_swap: { title: "换电订单", content: "列出换电单；权益来源：<strong>个人套餐</strong>（支付时已清分，本表不展示应分）、<strong>渠道人天</strong>、<strong>激活码（二期）</strong>（按天/次确认消耗，类人天）。每笔记录三元组 U/C/B 与跨网设备服务费。" },
       orders_swap_triplet: { title: "运营商三元组与 跨网设备服务费", content: "换电成功时 IoT 上报 userOwner/cabinetOwner/batteryOwner。应付方恒为 userOwner：C≠U 时代付柜机费 ¥0.5/次；B≠U 时代付电池费 ¥0.1/次；经平台保证金/信用额度日清。运营商往来账只见平台代收/代付。" },
-      orders_swap_entitlement: { title: "权益来源", content: "个人套餐：骑手自费购买的包月/次卡，换电计入套餐使用次数，产生套餐应分。渠道人天：骑手为渠道商登记成员，换电消耗渠道额度池人天（预占→确认），不产生个人套餐应分，可能触发平台 1% 消耗计提。" },
+      orders_swap_entitlement: { title: "权益来源与消耗", content: "<strong>个人套餐</strong>：骑手在线购套餐，款在<strong>支付成功</strong>时已清分；换电仅履约，不记应分/消耗。<br><strong>渠道人天</strong>：换电消耗额度池人天（预占→确认）。<br><strong>激活码（二期）</strong>：渠道线下批发码，骑手输码开通；换电按<strong>天/次</strong>确认消耗并向运营商结算（类人天），不产生 C 端应分金额。" },
       orders_swap_log: { title: "换电进度", content: "与骑手端一致的四步柜门交互：① N号柜门已打开 → ② 请放入电池并关闭柜门（提示确认插好）→ ③ M号柜门已打开 → ④ 请取出电池并关闭柜门。N/M 取还电/取电格口。" },
       orders_usage: { title: "有效期内使用情况", content: "在套餐 valid_from～valid_to 内汇总：已换电次数、涉及站点、换电明细列表。次卡展示剩余次数；包月展示剩余天数与期内换电次数。" },
       accrual_swap: { title: "换电清分", content: "C 端支付成功后<strong>实时清分</strong>至平台/运营商；换电记录关联清分状态为已清分。" },
@@ -389,7 +400,7 @@
       arch_b: { title: "架构 B · 运营商收款", content: "骑手 C 端支付进入<strong>运营商</strong>微信/支付宝子商户；支付成功时 1% 分账至平台商户。人天池/激活码渠道无 C 端收款账户；<strong>渠道分销</strong>在运营商开启「佣金及时到付」且渠道进件后，佣金随支付<strong>即时分账</strong>至渠道子商户。" },
       flows_receipt: { title: "资金实收", content: "骑手套餐/自费支付进入<strong>运营商</strong>进件商户的实收流水；<strong>退款亦由运营商子商户原路出款</strong>。" },
       flows_accrual: { title: "清分明细", content: "C 端支付成功后的分账明细：平台 1%、运营商净额；开启<strong>佣金及时到付</strong>的骑士卡链接订单另含渠道佣金分账；含退款冲正记录。" },
-      flows_payout: { title: "提现申请", content: "运营商从可提现余额发起申请 → 平台审核 → 通过后打款至<strong>收款账户</strong>默认子商户结算卡。<br>可提现余额已扣除本月融资待还预留。<strong>渠道商-设备租赁</strong>不适用本流程（白名单套餐款进渠道子商户）。" },
+      flows_payout: { title: "提现申请", content: "运营商从可提现余额发起申请 → 平台审核 → 通过后打款至<strong>收款账户</strong>默认子商户绑定的<strong>对公结算账户</strong>。<br>可提现余额已扣除本月融资待还预留。<strong>未绑定对公不可提现</strong>。<strong>渠道商-设备租赁</strong>不适用本流程（白名单套餐款进渠道子商户）。" },
       flows_withdraw_apply: { title: "发起提现", content: "申请金额不得超过当前可提现余额；提交后状态为「待审核」，平台在流水管理审核。" },
       platform_withdraw_review: { title: "运营商提现审核", content: "平台审核运营商提现申请：通过后代付/提现至运营商绑定账户；驳回须填写原因。<br>仅适用于<strong>运营商</strong>经营收入子商户，不含渠道商-设备租赁。" },
       orders_pkg_pay: { title: "收款主体", content: "架构 B 下 C 端套餐支付进入<strong>运营商</strong>进件商户（演示：绿色出行）。渠道商无收款账户；B 端采购款付至运营商。" },
@@ -429,8 +440,9 @@
       lease_contracts: { title: "租赁协议", content: "资方维护：承租方、设备清单、月租金、押金、租期类型（固定/滚动）、还款日。变更后须运营商重新确认，次月 1 日生效。" },
       lease_repay: { title: "还款计划", content: "按期应还/已还金额与状态；逾期标红。" },
       lease_panel: { title: "资金方后台", content: "设备租赁公司（融资租赁方）登录后审核<strong>平台已绑定</strong>运营商提交的放款申请、确认预还款计划与放款金额；合作运营商名单来源于<strong>平台管理员</strong>维护的绑定关系。" },
-      accounts_panel: { title: "收款账户管理", content: "架构 B：C 端套餐款进<strong>运营商子商户</strong>（微信/支付宝进件）；品牌 OP 账户用于 B2B/对公/保证金。须与资金实收商户号一致。" },
-      accounts: { title: "进件账户摘要", content: "运营商/资金方在微信、支付宝的进件子商户号摘要；用于骑手套餐收款、租金收付等。完整账户在「收款账户」菜单维护。" },
+      accounts_panel: { title: "收款账户管理", content: "架构 B：C 端套餐款进<strong>运营商子商户</strong>（微信/支付宝进件）；每个进件账户须绑定<strong>对公结算账户</strong>（户名/开户行/账号）。平台审核提现后打款至默认子商户绑定的对公户。B2B/对公通道账户本身即对公户。" },
+      accounts_corp_bind: { title: "绑定对公账户", content: "字段：对公户名、开户行、对公账号、联行号（选填）。未绑定对公不可发起提现。变更后新提现按新账户打款，历史申请不变。" },
+      accounts: { title: "进件账户摘要", content: "运营商/资金方在微信、支付宝的进件子商户号摘要；完整进件与对公绑定在「收款账户」菜单维护。" },
       device_ownership: { title: "设备权属", content: "自有：产权归本渠道商。租赁：产权归出租方，本主体为承租运营方，须履约租金计划。" },
 
       channel_settlement_card: { title: "渠道分销（骑士卡）", content: "渠道为<strong>推广销售渠道</strong>：用户经推广链接/二维码进入<strong>运营商小程序</strong>，24h 内购套餐享<strong>渠道专享价</strong>。<br><strong>本月成交</strong>=筛选月 channelLinkOrders 笔数；<strong>本月应结佣</strong>=Σ commission；<strong>推广链接</strong>点击/成交=各 link 累计 clicks/conversions。" },
@@ -496,23 +508,24 @@
     };
 
     const VIEW_MODULE_NOTE = {
-      overview: ["scope", "overview_sites", "overview_online", "overview_orders", "overview_net", "overview_site_stats", "overview_power_stats"],
+      overview: ["scope", "overview_sites", "overview_online", "overview_orders", "overview_net", "overview_site_expense", "overview_site_stats", "overview_power_stats"],
       pricing: ["pricing_pkg", "pricing_zone", "pricing_quota", "pricing_card", "pricing_deposit", "swap_policy", "swap_policy_cross_net", "platform_standard_day_price"],
       channelSales: ["channel_sales", "channel_partner_manage", "channel_partner_rights", "day_pool_one_per_operator", "day_pool_b2b_settlement"],
-      sites: ["sites_panel", "site_partner_binding"],
-      sitePartners: ["site_partner_panel", "site_partner_binding", "site_partner_split"],
-      partnerOverview: ["partner_portal"],
+      sites: ["sites_panel", "site_expenses_panel", "site_partner_binding", "site_partner_change_log"],
+      sitePartners: ["site_partner_panel", "site_partner_open_account", "site_partner_binding", "site_partner_change_log", "site_partner_split"],
+      partnerOverview: ["partner_portal", "site_partner_open_account"],
       partnerBindings: ["partner_bindings_readonly", "site_partner_binding"],
       partnerLedger: ["site_partner_split", "partner_portal"],
-      partnerWithdraw: ["partner_withdraw"],
-      partnerAccount: ["partner_portal"],
+      partnerAccount: ["partner_portal", "site_partner_open_account"],
+      partnerWithdraw: ["partner_withdraw", "site_partner_open_account"],
       siteExpenses: ["site_expenses_panel", "site_expenses_venue", "site_expenses_electricity", "site_expenses_cycle", "site_expenses_landlord", "site_expenses_pay_method", "site_expenses_bill", "site_expenses_payment", "site_expenses_time"],
-      devices: ["devices_cab", "devices_bat", "devices_move_cab", "platform_operator_device_gate", "device_ownership"],
+      devices: ["devices_cab", "devices_cab_compose", "devices_cab_port_ops", "devices_cab_bat_flow", "devices_cab_ops_log", "devices_bat", "devices_move_cab", "platform_operator_device_gate", "device_ownership"],
       leaseAgreements: ["lease_agreements", "lease_device_lists", "lease_device_replace", "lease_confirm"],
       leaseCollect: ["lease_collect", "lease_offline_ticket", "lease_manual_pay"],
       leaseRent: ["lease_rent_monthly", "lease_cover_gap", "lease_manual_pay", "lease_offline_ticket"],
       financeManage: ["finance_scope", "finance_dashboard", "finance_operator_credit", "finance_asset_package", "finance_ledger", "finance_projects", "finance_assets", "finance_agreement", "finance_repayments", "finance_repay_ticket", "finance_due_diligence", "finance_disburse", "finance_penalty"],
       financeDrawdown: ["finance_drawdown", "finance_operator_credit", "finance_due_diligence", "finance_disburse", "finance_pre_plan", "finance_repay_ticket", "finance_penalty"],
+      orderService: ["orders_pkg", "orders_swap", "orders_freeze", "module_order_audit", "refund_manage"],
       orderPackage: ["orders_pkg", "orders_deposit", "orders_deposit_waiver", "arch_b", "payout_pkg"],
       orderSwap: ["orders_swap", "orders_swap_triplet", "orders_swap_entitlement", "orders_swap_log"],
       orderFreeze: ["orders_freeze"],
@@ -521,10 +534,11 @@
       flows: ["flows_receipt", "flows_accrual", "flows_payout", "arch_b", "platform_no_share"],
       interOp: ["inter_op", "inter_op_pricing", "inter_op_clearing", "operator_deposit", "operator_credit"],
       depositAccount: ["deposit_recharge", "operator_deposit", "operator_credit", "operator_credit_eval"],
+      platformService: ["deposit_recharge", "operator_deposit", "platform_fee", "inter_op", "inter_op_clearing"],
       platformFee: ["platform_fee", "platform_fee_trigger", "platform_operator_fee_rate", "platform_standard_day_price"],
       employees: ["employees_panel", "employees_perms", "employee_login_scope"],
       users: ["users_panel", "rider_battery_deposit", "orders_deposit_waiver"],
-      accounts: ["accounts_panel", "arch_b"],
+      accounts: ["accounts_panel", "accounts_corp_bind", "arch_b"],
       dayPool: ["day_pool_panel", "day_pool_reserve", "day_pool_consume", "day_pool_team", "day_pool_identity", "day_pool_b2b_refund", "entitlement_api"],
       channelCredit: ["module_channel_credit"],
       channelLinks: ["module_channel_links", "channel_settlement_card", "pricing_card"],
@@ -553,25 +567,49 @@
 
 
     const sites = [
-      { id: "ST-SH-01", name: "浦东骑手驿站", city: "上海", address: "上海市浦东新区张杨路1588号", type: "配送站", cabinets: 3, batteries: 36, status: "在营", operatorId: "OP-SX", waitingCount: 2 },
-      { id: "ST-SH-02", name: "世博换电服务点", city: "上海", address: "上海市浦东新区世博大道1368号", type: "配送站", cabinets: 1, batteries: 12, status: "在营", operatorId: "OP-SX", waitingCount: 0 },
-      { id: "ST-SH-04", name: "陆家嘴分站", city: "上海", address: "上海市浦东新区世纪大道88号", type: "写字楼", cabinets: 2, batteries: 24, status: "在营", operatorId: "OP-LJZ", waitingCount: 1 },
-      { id: "ST-SH-JD", name: "京东物流专属站", city: "上海", address: "上海市浦东新区康桥路888号", type: "渠道专属", cabinets: 4, batteries: 24, status: "在营", operatorId: "OP-SX", channelId: "CH-RENT", channelDedicated: true, publicOpen: false, visibilityMode: "whitelist_only", waitingCount: 1 },
-      { id: "ST-SH-05", name: "张江筹备站", city: "上海", address: "上海市浦东新区张江路2000号", type: "配送站", cabinets: 0, batteries: 0, status: "建设中", operatorId: "OP-SX", waitingCount: 0 },
-      { id: "ST-SH-LG", name: "临港偏远站", city: "上海", address: "上海市浦东新区临港大道1888号", type: "配送站", cabinets: 2, batteries: 18, status: "在营", operatorId: "OP-SX", waitingCount: 0, remoteHint: true }
+      { id: "ST-SH-01", name: "浦东骑手驿站", city: "上海", address: "上海市浦东新区张杨路1588号", lng: 121.5275, lat: 31.2304, type: "配送站", cabinets: 3, batteries: 36, status: "在营", operatorId: "OP-SX", waitingCount: 2 },
+      { id: "ST-SH-02", name: "世博换电服务点", city: "上海", address: "上海市浦东新区世博大道1368号", lng: 121.4892, lat: 31.1901, type: "配送站", cabinets: 1, batteries: 12, status: "在营", operatorId: "OP-SX", waitingCount: 0 },
+      { id: "ST-SH-04", name: "陆家嘴分站", city: "上海", address: "上海市浦东新区世纪大道88号", lng: 121.5056, lat: 31.2397, type: "写字楼", cabinets: 2, batteries: 24, status: "在营", operatorId: "OP-LJZ", waitingCount: 1 },
+      { id: "ST-SH-JD", name: "京东物流专属站", city: "上海", address: "上海市浦东新区康桥路888号", lng: 121.589, lat: 31.142, type: "渠道专属", cabinets: 4, batteries: 24, status: "在营", operatorId: "OP-SX", channelId: "CH-RENT", channelDedicated: true, publicOpen: false, visibilityMode: "whitelist_only", waitingCount: 1 },
+      { id: "ST-SH-05", name: "张江筹备站", city: "上海", address: "上海市浦东新区张江路2000号", lng: null, lat: null, type: "配送站", cabinets: 0, batteries: 0, status: "建设中", operatorId: "OP-SX", waitingCount: 0 },
+      { id: "ST-SH-LG", name: "临港偏远站", city: "上海", address: "上海市浦东新区临港大道1888号", lng: 121.923, lat: 30.893, type: "配送站", cabinets: 2, batteries: 18, status: "在营", operatorId: "OP-SX", waitingCount: 0, remoteHint: true }
     ];
 
     const sitePartners = [
-      { id: "SP-01", operatorId: "OP-SX", partnerType: "个人", name: "王场地方", phone: "138****8801", bankAccount: "6217 **** 1234 · 工商银行", status: "启用" },
-      { id: "SP-02", operatorId: "OP-SX", partnerType: "公司", name: "上海李物业有限公司", contactName: "李经理", phone: "139****8802", bankAccount: "3100 **** 5678 · 建设银行对公", status: "启用" },
-      { id: "SP-03", operatorId: "OP-SX", partnerType: "公司", name: "浦东场地运营公司", contactName: "张总", phone: "021-5888****", bankAccount: "6222 **** 9900 · 招商银行对公", status: "启用" }
+      {
+        id: "SP-01", operatorId: "OP-SX", partnerType: "个人", name: "王场地方", phone: "138****8801",
+        idNo: "310***********1234", bankAccountName: "王场地方", bankName: "工商银行",
+        bankAccount: "6217 **** 1234", bankAccountLabel: "6217 **** 1234 · 工商银行",
+        accountStatus: "已开户", openedAt: "2026-01-01", status: "启用"
+      },
+      {
+        id: "SP-02", operatorId: "OP-SX", partnerType: "公司", name: "上海李物业有限公司",
+        contactName: "李经理", phone: "139****8802", licenseNo: "91310000MA1K******",
+        legalName: "李某某", bankAccountName: "上海李物业有限公司", bankName: "建设银行",
+        bankAccount: "3100 **** 5678", bankAccountLabel: "3100 **** 5678 · 建设银行对公",
+        accountStatus: "已开户", openedAt: "2026-02-01", status: "启用"
+      },
+      {
+        id: "SP-03", operatorId: "OP-SX", partnerType: "公司", name: "浦东场地运营公司",
+        contactName: "张总", phone: "021-5888****", bankAccount: "—", bankAccountLabel: "—",
+        accountStatus: "待开户", openedAt: null, status: "启用"
+      }
     ];
 
     const sitePartnerBindings = [
       { id: "SPB-01", siteId: "ST-SH-01", operatorId: "OP-SX", partnerId: "SP-01", partnerName: "王场地方", partnerType: "个人", ratePct: 25, pendingRatePct: null, effectiveAt: "2026-01-01", status: "生效" },
       { id: "SPB-02", siteId: "ST-SH-01", operatorId: "OP-SX", partnerId: "SP-02", partnerName: "上海李物业有限公司", partnerType: "公司", ratePct: 5, pendingRatePct: null, effectiveAt: "2026-02-01", status: "生效" },
-      { id: "SPB-03", siteId: "ST-SH-02", operatorId: "OP-SX", partnerId: "SP-01", partnerName: "王场地方", partnerType: "个人", ratePct: 20, pendingRatePct: 25, pendingEffectiveAt: "2026-06-12 00:00", status: "生效" },
+      { id: "SPB-03", siteId: "ST-SH-02", operatorId: "OP-SX", partnerId: "SP-01", partnerName: "王场地方", partnerType: "个人", ratePct: 25, pendingRatePct: null, effectiveAt: "2026-05-01", status: "生效" },
       { id: "SPB-04", siteId: "ST-SH-05", operatorId: "OP-SX", partnerId: "SP-02", partnerName: "上海李物业有限公司", partnerType: "公司", ratePct: 15, pendingRatePct: null, effectiveAt: "2026-03-01", status: "生效" }
+    ];
+
+    /** 站点合伙人绑定变更记录：添加 / 调比例 / 解绑 · 立即生效留痕 */
+    const sitePartnerBindingLogs = [
+      { id: "SPBL-001", time: "2026-01-01 10:00", siteId: "ST-SH-01", siteName: "浦东骑手驿站", operatorId: "OP-SX", bindingId: "SPB-01", partnerId: "SP-01", partnerName: "王场地方", action: "添加", beforeRatePct: null, afterRatePct: 25, by: "绿色出行管理员", remark: "开站配置" },
+      { id: "SPBL-002", time: "2026-02-01 11:20", siteId: "ST-SH-01", siteName: "浦东骑手驿站", operatorId: "OP-SX", bindingId: "SPB-02", partnerId: "SP-02", partnerName: "上海李物业有限公司", action: "添加", beforeRatePct: null, afterRatePct: 5, by: "绿色出行管理员", remark: "" },
+      { id: "SPBL-003", time: "2026-05-01 09:00", siteId: "ST-SH-02", siteName: "世博换电服务点", operatorId: "OP-SX", bindingId: "SPB-03", partnerId: "SP-01", partnerName: "王场地方", action: "添加", beforeRatePct: null, afterRatePct: 20, by: "绿色出行管理员", remark: "" },
+      { id: "SPBL-004", time: "2026-06-11 16:30", siteId: "ST-SH-02", siteName: "世博换电服务点", operatorId: "OP-SX", bindingId: "SPB-03", partnerId: "SP-01", partnerName: "王场地方", action: "调比例", beforeRatePct: 20, afterRatePct: 25, by: "绿色出行管理员", remark: "立即生效" },
+      { id: "SPBL-005", time: "2026-03-01 14:00", siteId: "ST-SH-05", siteName: "张江筹备站", operatorId: "OP-SX", bindingId: "SPB-04", partnerId: "SP-02", partnerName: "上海李物业有限公司", action: "添加", beforeRatePct: null, afterRatePct: 15, by: "绿色出行管理员", remark: "" }
     ];
 
     const sitePartnerSplitLines = [
@@ -706,19 +744,23 @@
     function buildCabinetPowerDaily() {
       const seen = new Set();
       const seeds = [];
-      cabinets.forEach((c, i) => {
+      cabinets.forEach((c) => {
         if (!c.deviceOwnerId || c.usedPowerKwh == null || seen.has(c.sn)) return;
         seen.add(c.sn);
         seeds.push({ sn: c.sn, site: c.site, deviceOwnerId: c.deviceOwnerId, base: 0.018 + (seeds.length % 4) * 0.004 });
       });
       const rows = [];
-      for (let d = 1; d <= 30; d++) {
-        const date = `2026-06-${String(d).padStart(2, "0")}`;
-        seeds.forEach((c, i) => {
-          const jitter = ((d + i * 3) % 7) * 0.002;
-          rows.push({ date, sn: c.sn, site: c.site, deviceOwnerId: c.deviceOwnerId, kwh: +(c.base + jitter).toFixed(3) });
-        });
-      }
+      [3, 4, 5, 6].forEach(month => {
+        const daysInMonth = new Date(2026, month, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const date = `2026-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          seeds.forEach((c, i) => {
+            const jitter = ((d + i * 3 + month) % 7) * 0.002;
+            const season = month === 6 ? 1.05 : month === 5 ? 1 : month === 4 ? 0.92 : 0.88;
+            rows.push({ date, sn: c.sn, site: c.site, deviceOwnerId: c.deviceOwnerId, kwh: +((c.base + jitter) * season).toFixed(3) });
+          });
+        }
+      });
       return rows;
     }
     const cabinetPowerDaily = buildCabinetPowerDaily();
@@ -796,6 +838,14 @@
         electricityMode: "按量", electricityUnitPrice: 1.2, electricityFixedAmount: null,
         paymentCycle: "月结", payMethod: "对公转账", payeeName: "—", payAccount: "—",
         remark: "筹备中 · 待完善收款信息"
+      },
+      {
+        siteId: "ST-SH-LG", operatorId: "OP-SX",
+        landlordName: "临港开发集团", landlordPhone: "021-6828****", landlordContact: "陈主管",
+        venueFeeAmount: 2200, venueFeeUnit: "月",
+        electricityMode: "按量", electricityUnitPrice: 1.05, electricityFixedAmount: null,
+        paymentCycle: "月结", payMethod: "微信", payeeName: "临港开发集团场地部", payAccount: "微信号 LG-场地收款",
+        remark: "偏远站 · 电费按柜机抄表结算"
       }
     ];
 
@@ -817,12 +867,31 @@
         ]
       },
       {
+        id: "SEB-2604-01", siteId: "ST-SH-01", operatorId: "OP-SX",
+        periodStart: "2026-04-01", periodEnd: "2026-04-30",
+        venueFee: 3500, electricityKwh: 78.26, electricityFee: 90.00, totalAmount: 3590.00,
+        status: "已结清", dueDate: "2026-05-10",
+        payments: [
+          { id: "SEP-260430", payTime: "2026-05-06 11:10", amount: 2000, method: "对公转账", ref: "202605061110001", operator: "王会计", remark: "4月场地费首期" },
+          { id: "SEP-260509", payTime: "2026-05-09 16:40", amount: 1590, method: "对公转账", ref: "202605091640002", operator: "王会计", remark: "4月尾款+电费" }
+        ]
+      },
+      {
         id: "SEB-2606-02", siteId: "ST-SH-02", operatorId: "OP-SX",
         periodStart: "2026-06-01", periodEnd: "2026-06-30",
-        venueFee: 2800, electricityKwh: 18.6, electricityFee: 600, totalAmount: 3400,
+        venueFee: 2800, electricityKwh: null, electricityFee: 600, totalAmount: 3400,
         status: "已结清", dueDate: "2026-07-10",
         payments: [
           { id: "SEP-260602", payTime: "2026-06-12 10:05", amount: 3400, method: "对公转账", ref: "202606121005002", operator: "王会计", remark: "6月包月电费含在账单内" }
+        ]
+      },
+      {
+        id: "SEB-2605-02", siteId: "ST-SH-02", operatorId: "OP-SX",
+        periodStart: "2026-05-01", periodEnd: "2026-05-31",
+        venueFee: 2800, electricityKwh: null, electricityFee: 600, totalAmount: 3400,
+        status: "已结清", dueDate: "2026-06-10",
+        payments: [
+          { id: "SEP-260518", payTime: "2026-05-18 14:22", amount: 3400, method: "支付宝", ref: "202605181422088", operator: "王会计", remark: "5月场地+包月电" }
         ]
       },
       {
@@ -832,6 +901,40 @@
         status: "部分支付", dueDate: "2026-07-15",
         payments: [
           { id: "SEP-260603", payTime: "2026-06-20 09:30", amount: 8000, method: "对公转账", ref: "202606200930003", operator: "王会计", remark: "Q2 场地费首期" }
+        ]
+      },
+      {
+        id: "SEB-2603-03", siteId: "ST-SH-JD", operatorId: "OP-SX",
+        periodStart: "2026-01-01", periodEnd: "2026-03-31",
+        venueFee: 12000, electricityKwh: 210.5, electricityFee: 227.34, totalAmount: 12227.34,
+        status: "已结清", dueDate: "2026-04-15",
+        payments: [
+          { id: "SEP-260410", payTime: "2026-04-10 10:00", amount: 12227.34, method: "对公转账", ref: "202604101000010", operator: "王会计", remark: "Q1 场地+电费一次结清" }
+        ]
+      },
+      {
+        id: "SEB-2606-04", siteId: "ST-SH-LG", operatorId: "OP-SX",
+        periodStart: "2026-06-01", periodEnd: "2026-06-30",
+        venueFee: 2200, electricityKwh: 62.4, electricityFee: 65.52, totalAmount: 2265.52,
+        status: "待支付", dueDate: "2026-07-12",
+        payments: []
+      },
+      {
+        id: "SEB-2605-04", siteId: "ST-SH-LG", operatorId: "OP-SX",
+        periodStart: "2026-05-01", periodEnd: "2026-05-31",
+        venueFee: 2200, electricityKwh: 58.1, electricityFee: 61.01, totalAmount: 2261.01,
+        status: "部分支付", dueDate: "2026-06-12",
+        payments: [
+          { id: "SEP-260528", payTime: "2026-05-28 18:05", amount: 1200, method: "微信", ref: "WX202605281805", operator: "王会计", remark: "5月场地费预付" }
+        ]
+      },
+      {
+        id: "SEB-2604-04", siteId: "ST-SH-LG", operatorId: "OP-SX",
+        periodStart: "2026-04-01", periodEnd: "2026-04-30",
+        venueFee: 2200, electricityKwh: 55.0, electricityFee: 57.75, totalAmount: 2257.75,
+        status: "已结清", dueDate: "2026-05-12",
+        payments: [
+          { id: "SEP-260508", payTime: "2026-05-08 09:40", amount: 2257.75, method: "现金", ref: "现金收据-LG-0401", operator: "现场运维", remark: "临港站现金结清" }
         ]
       }
     ];
@@ -1212,8 +1315,38 @@
         userOwnerId: "OP-SX", userOwnerName: "绿色出行",
         cabinetOwnerId: "OP-BJ", cabinetOwnerName: "滨江联营",
         batteryOwnerId: "OP-LJZ", batteryOwnerName: "陆家嘴联营",
-        deviceOwnerId: "OP-BJ", time: "2026-06-09 16:00", status: "成功", alloc: 9.96, accrual: "已清分"
+        deviceOwnerId: "OP-BJ", time: "2026-06-09 16:00", status: "成功"
       },
+      {
+        id: "SW-ACT-0612", subId: "SUB-ACT-001", entitlementType: "激活码",
+        activationCodeId: "CODE-001", activationCode: "FN30-A8K2-M9P7", codeId: "CODE-001",
+        channelId: "CH-ACT", channelName: "蜂鸟激活码渠道", skuName: "30天包月",
+        user: "U-ACT-01", phone: "138****5001", site: "浦东骑手驿站", siteId: "ST-SH-01", city: "上海",
+        cabinet: { sn: "CAB-22018", slots: 12, online: true }, slotIn: 3, slotOut: 7,
+        batIn: { sn: "BAT-SH-1001", soc: 22, health: "正常" }, batOut: { sn: "BAT-SH-0901", soc: 95, health: "正常" },
+        deviceOwnerId: "OP-SX", time: "2026-06-12 10:15", status: "成功",
+        poolConsume: "已确认消耗", dayQuota: 1, consumeUnit: "天"
+      },
+      {
+        id: "SW-ACT-0613", subId: "SUB-ACT-001", entitlementType: "激活码",
+        activationCodeId: "CODE-001", activationCode: "FN30-A8K2-M9P7", codeId: "CODE-001",
+        channelId: "CH-ACT", channelName: "蜂鸟激活码渠道", skuName: "30天包月",
+        user: "U-ACT-01", phone: "138****5001", site: "世博换电服务点", siteId: "ST-SH-02", city: "上海",
+        cabinet: { sn: "CAB-22021", slots: 12, online: true }, slotIn: 2, slotOut: 5,
+        batIn: { sn: "BAT-SH-1021", soc: 18, health: "正常" }, batOut: { sn: "BAT-SH-0922", soc: 97, health: "正常" },
+        deviceOwnerId: "OP-SX", time: "2026-06-13 08:40", status: "成功",
+        poolConsume: "已确认消耗", dayQuota: 1, consumeUnit: "天"
+      },
+      {
+        id: "SW-ACT-0609", subId: "SUB-ACT-002", entitlementType: "激活码",
+        activationCodeId: "CODE-004", activationCode: "FN7D-D2N9-Q1S3", codeId: "CODE-004",
+        channelId: "CH-ACT", channelName: "蜂鸟激活码渠道", skuName: "7天体验",
+        user: "U-ACT-02", phone: "139****5002", site: "浦东骑手驿站", siteId: "ST-SH-01", city: "上海",
+        cabinet: { sn: "CAB-22019", slots: 12, online: true }, slotIn: 4, slotOut: 1,
+        batIn: { sn: "BAT-SH-1002", soc: 25, health: "正常" }, batOut: { sn: "BAT-SH-0888", soc: 94, health: "正常" },
+        deviceOwnerId: "OP-SX", time: "2026-06-09 11:20", status: "成功",
+        poolConsume: "已确认消耗", dayQuota: 1, consumeUnit: "天"
+      }
     ];
 
     const swapOrderLogs = {
@@ -1232,7 +1365,7 @@
         { t: "12:05:35", kind: "user", type: "用户操作", text: "骑手取走电池 BAT-SH-0901，点击「已完成换电」" },
         { t: "12:05:36", kind: "req", type: "请求", text: "App → POST /api/v1/swap/complete → 200，订单状态=成功" },
         { t: "12:05:37", kind: "dev", type: "设备反馈", text: "格口 #7 门磁=关；BMS SN=BAT-SH-0901 SOC=96%" },
-        { t: "12:05:37", kind: "req", type: "请求", text: "支付成功实时清分至平台/运营商" },
+        { t: "12:05:37", kind: "req", type: "请求", text: "换电完成；个人套餐权益履约（应分已在购套餐支付时清分，本单不记应分）" },
         { t: "12:05:37", kind: "req", type: "请求", text: "三元组 U=OP-SX C=OP-SX B=OP-LJZ；跨网电池服务费 ¥0.1（U→B 平台代付）" }
       ],
       "SW-CHANNEL-CROSS": [
@@ -1657,18 +1790,30 @@
     ];
 
     const paymentAccounts = [
-      { id: "PA-OP-WX", entityId: "OP-SX", operatorId: "OP-SX", channel: "微信支付", mchName: PAYEE_OPERATOR, mchNo: PAYEE_MCH.wx, purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: true },
-      { id: "PA-OP-ALI", entityId: "OP-SX", operatorId: "OP-SX", channel: "支付宝", mchName: PAYEE_OPERATOR, mchNo: PAYEE_MCH.ali, purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: false },
-      { id: "PA-OP-RENT", entityId: "OP-SX", operatorId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8821", purpose: "对公转账（租金等）", accountScope: "b2b", status: "已绑定", default: false },
-      { id: "PA-OP-FEE", entityId: "OP-SX", operatorId: "OP-SX", channel: "预存户", mchName: PAYEE_OPERATOR, mchNo: "FEE-PREPAY-001", purpose: "平台服务费预存", accountScope: "internal", status: "已开通", default: false },
-      { id: "PA-OP-B2B", entityId: "OP-SX", operatorId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8822", purpose: "渠道批发收款", accountScope: "b2b", status: "已开通", default: false },
-      { id: "PA-LJZ-WX", entityId: "OP-LJZ", operatorId: "OP-LJZ", channel: "微信支付", mchName: "陆家嘴联营", mchNo: "2088999***", purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: true },
-      { id: "PA-LEASE-WX", entityId: "LEASE-HD", channel: "微信支付", mchName: ENT.leasing.name, mchNo: "1900000999***", purpose: "租金收款", status: "已开通", default: true },
-      { id: "PA-LEASE-CORP", entityId: "LEASE-HD", channel: "对公账户", mchName: ENT.leasing.name, mchNo: "1219****3366", purpose: "租金收款（对公入账）", status: "已开通", default: true },
-      { id: "PA-CH-RENT-WX", entityId: "CH-RENT", channel: "微信支付", mchName: "京东物流租赁渠道", mchNo: "1678901234***", purpose: "白名单套餐收款", status: "已开通", default: true },
-      { id: "PA-CH-RENT-ALI", entityId: "CH-RENT", channel: "支付宝", mchName: "京东物流租赁渠道", mchNo: "2088123456789012", purpose: "白名单套餐收款", status: "已开通", default: false },
-      { id: "PA-CH-CARD-WX", entityId: "CH-CARD", channel: "微信支付", mchName: "骑士卡渠道", mchNo: "1678123456***", purpose: "链接购卡佣金分账", accountScope: "commission_split", status: "已开通", default: true },
-      { id: "PA-CH-CARD-ALI", entityId: "CH-CARD", channel: "支付宝", mchName: "骑士卡渠道", mchNo: "2088123999***", purpose: "链接购卡佣金分账", accountScope: "commission_split", status: "已开通", default: false }
+      { id: "PA-OP-WX", entityId: "OP-SX", operatorId: "OP-SX", channel: "微信支付", mchName: PAYEE_OPERATOR, mchNo: PAYEE_MCH.wx, purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: true,
+        bankAccountName: "上海绿色出行科技有限公司", bankName: "招商银行上海分行营业部", bankAccount: "1219 **** **** 8820", bankCode: "308290003113", corpBoundAt: "2026-01-08" },
+      { id: "PA-OP-ALI", entityId: "OP-SX", operatorId: "OP-SX", channel: "支付宝", mchName: PAYEE_OPERATOR, mchNo: PAYEE_MCH.ali, purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: false,
+        bankAccountName: "", bankName: "", bankAccount: "", bankCode: "", corpBoundAt: null },
+      { id: "PA-OP-RENT", entityId: "OP-SX", operatorId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8821", purpose: "对公转账（租金等）", accountScope: "b2b", status: "已绑定", default: false,
+        bankAccountName: "上海绿色出行科技有限公司", bankName: "建设银行浦东分行", bankAccount: "3100 **** **** 8821", bankCode: "105290037017", corpBoundAt: "2026-01-10" },
+      { id: "PA-OP-FEE", entityId: "OP-SX", operatorId: "OP-SX", channel: "预存户", mchName: PAYEE_OPERATOR, mchNo: "FEE-PREPAY-001", purpose: "平台服务费预存", accountScope: "internal", status: "已开通", default: false,
+        bankAccountName: "", bankName: "", bankAccount: "", bankCode: "", corpBoundAt: null },
+      { id: "PA-OP-B2B", entityId: "OP-SX", operatorId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8822", purpose: "渠道批发收款", accountScope: "b2b", status: "已开通", default: false,
+        bankAccountName: "上海绿色出行科技有限公司", bankName: "建设银行浦东分行", bankAccount: "3100 **** **** 8822", bankCode: "105290037017", corpBoundAt: "2026-02-01" },
+      { id: "PA-LJZ-WX", entityId: "OP-LJZ", operatorId: "OP-LJZ", channel: "微信支付", mchName: "陆家嘴联营", mchNo: "2088999***", purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: true,
+        bankAccountName: "上海陆家嘴联营能源有限公司", bankName: "工商银行陆家嘴支行", bankAccount: "1001 **** **** 3344", bankCode: "102290026399", corpBoundAt: "2026-03-01" },
+      { id: "PA-LEASE-WX", entityId: "LEASE-HD", channel: "微信支付", mchName: ENT.leasing.name, mchNo: "1900000999***", purpose: "租金收款", status: "已开通", default: true,
+        bankAccountName: ENT.leasing.name, bankName: "交通银行上海分行", bankAccount: "3100 **** **** 7788", bankCode: "301290000007", corpBoundAt: "2025-11-01" },
+      { id: "PA-LEASE-CORP", entityId: "LEASE-HD", channel: "对公账户", mchName: ENT.leasing.name, mchNo: "1219****3366", purpose: "租金收款（对公入账）", status: "已开通", default: true,
+        bankAccountName: ENT.leasing.name, bankName: "交通银行上海分行", bankAccount: "1219 **** **** 3366", bankCode: "301290000007", corpBoundAt: "2025-11-01" },
+      { id: "PA-CH-RENT-WX", entityId: "CH-RENT", channel: "微信支付", mchName: "京东物流租赁渠道", mchNo: "1678901234***", purpose: "白名单套餐收款", status: "已开通", default: true,
+        bankAccountName: "京东物流（上海）有限公司", bankName: "招商银行上海分行", bankAccount: "7559 **** **** 1001", bankCode: "308290003113", corpBoundAt: "2026-04-01" },
+      { id: "PA-CH-RENT-ALI", entityId: "CH-RENT", channel: "支付宝", mchName: "京东物流租赁渠道", mchNo: "2088123456789012", purpose: "白名单套餐收款", status: "已开通", default: false,
+        bankAccountName: "", bankName: "", bankAccount: "", bankCode: "", corpBoundAt: null },
+      { id: "PA-CH-CARD-WX", entityId: "CH-CARD", channel: "微信支付", mchName: "骑士卡渠道", mchNo: "1678123456***", purpose: "链接购卡佣金分账", accountScope: "commission_split", status: "已开通", default: true,
+        bankAccountName: "上海骑士卡网络科技有限公司", bankName: "宁波银行上海分行", bankAccount: "7001 **** **** 5566", bankCode: "313290000017", corpBoundAt: "2026-05-01" },
+      { id: "PA-CH-CARD-ALI", entityId: "CH-CARD", channel: "支付宝", mchName: "骑士卡渠道", mchNo: "2088123999***", purpose: "链接购卡佣金分账", accountScope: "commission_split", status: "已开通", default: false,
+        bankAccountName: "", bankName: "", bankAccount: "", bankCode: "", corpBoundAt: null }
     ];
 
     const users = [
@@ -2457,6 +2602,7 @@
       drillSwap: { operatorId: "全部", site: "全部", range: "7", dateFrom: "", dateTo: "" },
       overviewPower: { dateFrom: "2026-06-01", dateTo: "2026-06-15", range: "30", site: "全部" },
       overviewSiteBusy: { date: "2026-06-15" },
+      overviewExpense: { month: "2026-06", siteId: "全部" },
       siteExpenses: { dateFrom: "2026-06-01", dateTo: "2026-06-30", range: "month" },
       sites: { siteName: "", city: "全部", status: "全部" },
       sitePartners: { keyword: "", siteId: "全部" },
@@ -2469,7 +2615,7 @@
       orders_service: { type: "全部", status: "全部", phone: "", orderId: "" },
       orderFreeze: { orderId: "", phone: "", type: "全部", status: "全部" },
       flows_receipt: { orderId: "", flowType: "全部", timeFrom: "", timeTo: "" },
-      flows_accrual: { orderId: "", settle: "全部" },
+      flows_accrual: { type: "全部", dateFrom: "", dateTo: "", orderId: "", settle: "全部" },
       flows_payout: { status: "全部", period: "" },
       users: { userId: "", phone: "", site: "全部", serviceState: "全部", pkgService: "全部", depositKind: "全部" },
       employees: { keyword: "", roleType: "全部", status: "全部" },
@@ -2486,6 +2632,14 @@
       dayPool_exceptions: { type: "全部", status: "全部" },
       dayPool_ledger: { poolId: "全部", type: "全部" },
       operators: { keyword: "", status: "全部", city: "全部" },
+      interOp: { range: "7" },
+      interOp_ledger: { type: "全部", dateFrom: "", dateTo: "", range: "7", site: "全部", status: "全部", direction: "全部", swapId: "" },
+      interOp_daily: { type: "全部", dateFrom: "", dateTo: "", range: "7", status: "全部" },
+      interOp_period: { type: "全部", dateFrom: "", dateTo: "", status: "全部" },
+      platformFee_cEnd: { type: "全部", dateFrom: "", dateTo: "", status: "全部" },
+      platformFee_bEnd: { type: "全部", dateFrom: "", dateTo: "", status: "全部" },
+      depositAccount_ledger: { type: "全部", dateFrom: "", dateTo: "" },
+      depositManage_ledger: { type: "全部", dateFrom: "", dateTo: "", operatorId: "全部" },
       operators_list: { keyword: "", status: "全部", city: "全部" },
       operators_withdrawReview: { operatorId: "全部", status: "全部" },
       operators_feeRate: { keyword: "", status: "全部" },
@@ -2512,7 +2666,7 @@
       platformMarketing_statements: { month: "2026-06", operatorId: "全部", status: "全部" },
       platformFlows_userPay: { orderId: "", flowType: "全部", operatorId: "全部" },
       platformFlows_interOp: { operatorId: "全部", dateFrom: "", dateTo: "" },
-      platformFlows_platformFee: { operatorId: "全部", trigger: "全部" },
+      platformFlows_platformFee: { operatorId: "全部", trigger: "全部", dateFrom: "", dateTo: "" },
       platformAccounts: { month: "2026-06" },
       refundManage: { refundId: "", orderId: "", phone: "", type: "全部", status: "全部", applyFrom: "", applyTo: "" },
       orderAudit: { keyword: "", eventType: "全部", dateFrom: "", dateTo: "" }

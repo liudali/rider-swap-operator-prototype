@@ -1,0 +1,31 @@
+---
+description: 外卖原型改动后必须同步文档并写入变更记录
+globs:
+  - prototype/**
+  - docs/**
+  - scripts/sync-pages.sh
+alwaysApply: false
+---
+
+# 原型 ↔ 文档同步（外卖）
+
+完成任何 `prototype/` 或 `prototype/mobile/` 改动后，**在同一任务内**必须：
+
+1. **更新文档**（按改动范围择一或多份）：
+   - 功能/规则 → `docs/PRD.md`
+   - 验收 → `docs/acceptance-criteria.md`
+   - 流程/结构 → `docs/功能结构与业务流程.md`
+   - 决策 → `docs/需求评审决策记录.md`
+
+2. **同步并记日志**（不可省略 `-l`）：
+   ```bash
+   cd 原型-外卖
+   ./scripts/sync-pages.sh -l "一句话：模块 + 做了什么"
+   ```
+
+3. **推送**（用户要求上线或交付时）：
+   ```bash
+   ./scripts/sync-pages.sh -c -p -m "更新原型：与 -l 说明一致"
+   ```
+
+禁止只改 `prototype/index.html` 不同步 `docs/`、不写入 `docs/原型变更记录.md`。

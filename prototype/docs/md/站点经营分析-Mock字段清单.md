@@ -205,3 +205,37 @@ dailyTrend = groupBy(rows, 'date').sum('kwh')
 - [ ] 顶栏切换站点后 KPI / 趋势 / 两表联动刷新
 - [ ] 按柜机明细可跳转换电柜详情页
 - [ ] 空态：筛选无数据时 KPI 为 0、表格提示「暂无数据」
+
+---
+
+## 9. 站点支出（总览卡片）
+
+### 9.1 数据源
+
+| Mock 变量 | 关键字段 | 用途 |
+|-----------|----------|------|
+| `siteExpenseProfiles[]` | `siteId`, `venueFeeAmount`, `electricityMode`, `electricityUnitPrice`, `electricityFixedAmount`, `paymentCycle`, `landlord*`, `payMethod`, `payeeName`, `payAccount` | 站点费用配置 |
+| `siteExpenseBills[]` | `periodStart`, `periodEnd`, `venueFee`, `electricityKwh`, `electricityFee`, `totalAmount`, `status`, `dueDate`, `payments[]` | 周期账单与支付记录 |
+| `cabinetPowerDaily[]` | `site`, `date`, `kwh` | 按量电费的当月实际用电 |
+| `state.pf.overviewExpense` | `month`, `siteId` | 总览卡片筛选 |
+
+### 9.2 计算口径
+
+```javascript
+venueFeeInMonth = bill.venueFee / monthsBetween(bill.periodStart, bill.periodEnd)
+electricityFeeInMonth =
+  profile.electricityMode === '按量'
+    ? sum(cabinetPowerDaily in selectedMonthAndSite) * profile.electricityUnitPrice
+    : profile.electricityFixedAmount
+```
+
+- 场费：选中月落在账期内时，按账期自然月数等分；季付即当月 `1/3`。
+- 电费：按所选月的实际时间消耗计算，不按账单账期等分；包月取固定月费。
+- 已支付：仅汇总支付时间落在所选月的 `payments.amount`；部分支付保留未付余额。
+
+### 9.3 状态与边界
+
+- 筛选：月份必选，站点可选“全部”。
+- 空态：无账单/配置时 KPI 为 0，并提示“暂无站点支出数据”。
+- 错误态：按量模式缺单价或包月模式缺固定金额时禁止保存；账期起日晚于止日时禁止提交。
+- 权限：运营商可配置与登记支付；站点合伙人只读本人绑定站点分润，不可见运营商站点成本。
