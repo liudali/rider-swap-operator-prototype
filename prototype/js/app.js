@@ -9,7 +9,7 @@
       platformUsersPage: 1,
       platformUsersPageSize: 10,
       platformLeasingTab: "companies", depositTab: "pending", operatorCreditTab: "assignments",
-      dayPoolTab: "pools", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider",
+      dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider",
       pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
       channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
       channelAssetsSubTab: "dayPool", channelAssetsPage: 1, channelAssetsPageSize: 5,
@@ -643,7 +643,7 @@
         (employeeStore[entityId] || []).forEach(e => {
           if (e.status !== "启用") return;
           const host = entityNameById(entityId);
-          const prefix = entityId === ENT.platform.id ? "" : "【二期】";
+          const prefix = "【二期】";
           if (e.roleType === "staff") {
             const option = `<option value="emp:${e.id}">${prefix}${e.name} · ${e.jobTitle || "员工"}（${host}）</option>`;
             if (entityId === ENT.platform.id) adminOpts += option;
@@ -656,11 +656,11 @@
       const partnerOpts = sitePartners.filter(p => p.status === "启用").map(p => {
         const op = entityNameById(p.operatorId);
         const type = p.partnerType || "个人";
-        return `<option value="entity:${p.id}">站点合伙人 · ${p.name}（${type} · ${op}）</option>`;
+        return `<option value="entity:${p.id}">【二期】站点合伙人 · ${p.name}（${type} · ${op}）</option>`;
       }).join("");
       return `<optgroup label="经营主体">${entityOpts}</optgroup>
-        <optgroup label="站点合伙人">${partnerOpts || "<option disabled>—</option>"}</optgroup>
-        <optgroup label="管理员登录">${adminOpts || "<option disabled>—</option>"}</optgroup>
+        <optgroup label="站点合伙人（二期）">${partnerOpts || "<option disabled>—</option>"}</optgroup>
+        <optgroup label="管理员登录（二期）">${adminOpts || "<option disabled>—</option>"}</optgroup>
         <optgroup label="员工登录（二期）">${staffOpts || "<option disabled>—</option>"}</optgroup>`;
     }
 
@@ -727,7 +727,10 @@
         return "platformService";
       }
       if (state.view === "depositManage" && (state.depositTab || "pending") === "ledger") return "depositManage_ledger";
-      if (state.view === "dayPool") return "dayPool_" + state.dayPoolTab;
+      if (state.view === "dayPool") {
+        if (state.dayPoolTab === "pools" && state.dayPoolPoolsSubTab === "ledger") return "dayPool_ledger";
+        return "dayPool_" + state.dayPoolTab;
+      }
       if (state.view === "platformUsers") return "platformUsers_" + state.platformUsersTab;
       if (state.view === "platformOrders") return "platformOrders_" + state.platformOrderTab;
       if (state.view === "operators") return "operators_" + (state.operatorsTab || "list");
@@ -4215,15 +4218,34 @@
       return `<div class="own-scope-banner">${noteBtn("own_data")} 当前仅展示 <strong>${e.name}</strong>（${e.id}）名下设备经营数据。${leaseHint}${empHint}</div>`;
     }
 
-    /** 原型二期范围标记（可浏览，不作为一期交付） */
+    /**
+     * 一期菜单边界见 decisions/decision-041.md。
+     * 清单未写的一级菜单整页标二期；页内未写的二级 Tab 见 PHASE2_TABS。
+     * 骑手端 C 端不在本 NAV 内，仍属一期。
+     */
     const PHASE2_VIEWS = new Set([
+      "overview",
       "employees",
-      "financeManage", "financeDrawdown", "platformLeasing",
+      "orderAudit",
+      "financeManage", "financeDrawdown", "platformLeasing", "operatorCreditEval",
       "leaseAgreements", "leaseCollect", "leaseRent",
       "activationCodes", "activationRecords",
       "leasePkgPricing", "rentPool", "rentDevices", "leaseBatteryHold", "leaseWhitelist", "channelInterOp",
-      "platformMarketing"
+      "platformMarketing",
+      "channelSettlement", "channelCredit",
+      "partnerOverview", "partnerBindings", "partnerLedger", "partnerWithdraw", "partnerAccount"
     ]);
+
+    /** 一级菜单内、清单未覆盖的二级 Tab */
+    const PHASE2_TABS = {
+      sites: new Set(["fees", "bills", "partners"]),
+      orderService: new Set(["freeze", "audit"]),
+      platformUsers: new Set(["depositStats", "serviceChange"]),
+      dayPool: new Set(["retail", "exceptions"]),
+      l1Pricing: new Set(["sms"]),
+      channelSales: new Set(["platformMarketing"]),
+      devices: new Set(["alerts", "iccid"])
+    };
 
     function phase2ChannelMode() {
       if (!isChannelRole()) return null;
@@ -4233,7 +4255,7 @@
     }
 
     function isPhase2Identity() {
-      return isLeasingRole() || !!phase2ChannelMode();
+      return isLeasingRole() || !!phase2ChannelMode() || state.role === "sitePartner";
     }
 
     /** 运营商渠道管理下的「平台营销」Tab 亦属二期 */
@@ -4241,11 +4263,21 @@
       return state.view === "channelSales" && state.channelSalesTab === "platformMarketing";
     }
 
+    function isPhase2Tab(view, tab) {
+      if (isPhase2View(view)) return true;
+      const set = PHASE2_TABS[view];
+      return !!(set && set.has(tab));
+    }
+
     function isPhase2View(view) {
       const v = view || state.view;
-      if (v === "employees" && isPlatformRole()) return false;
       if (PHASE2_VIEWS.has(v)) return true;
       if (v === "channelSales" && state.channelSalesTab === "platformMarketing") return true;
+      /* 骑士卡一期仅：套餐与链接 / 购卡记录 / 佣金对账；收款账户等未写 → 二期 */
+      if (isChannelRole()) {
+        const mode = contractSettlementMode(channelProfile());
+        if ((mode === "卡差价" || mode === "渠道分销") && v === "accounts") return true;
+      }
       return false;
     }
 
@@ -4293,11 +4325,20 @@
           detail: "设备租赁公司侧放款/尽调确认，与运营商融资管理同一链路，标为二期。"
         };
       }
-      if (state.view === "employees" && !isPlatformRole()) {
+      if (state.view === "employees") {
         return {
           short: "二期",
-          label: "员工模块",
-          detail: "运营商 / 渠道商 / 资方等「员工」账号与权限管理整块标为二期。一期不交付，原型仅演示。"
+          label: isPlatformRole() ? "平台 · 管理员管理" : "员工模块",
+          detail: isPlatformRole()
+            ? "平台管理员人员与菜单权限（decision-041：清单未列 → 二期）。一期不交付，原型可浏览。"
+            : "运营商 / 渠道商 / 资方等「员工」账号与权限管理整块标为二期。一期不交付，原型仅演示。"
+        };
+      }
+      if (state.view === "overview") {
+        return {
+          short: "二期",
+          label: "总览",
+          detail: "decision-041：一期菜单清单未列总览 → 二期。原型可浏览 KPI，一期验收不测。"
         };
       }
       if (state.view === "platformMarketing" || isPhase2ChannelMarketingTab()) {
@@ -4395,7 +4436,7 @@
           tabs: () => (isOrgAdminLogin() ? [["consume", "消耗明细"]] : [
             ["pools", "额度池"], ["teams", "骑手团队"], ["riders", "骑手登记"], ["allocations", "额度分配"],
             ["rules", "额度使用规则"], ["consume", "消耗明细"], ["retail", "零售价"],
-            ["exceptions", "异常记录"], ["ledger", "额度明细"]
+            ["exceptions", "异常记录"]
           ])
         },
         depositManage: { stateKey: "depositTab", tabs: () => [["pending", "充值确认" + depBadge()], ["accounts", "账户总览"], ["ledger", "变动明细"]] },
@@ -4492,7 +4533,7 @@
           const cur = state[l2.stateKey] || tabKeys[0];
           const l1Cls = ["nav-l1", on ? "parent-active" : "", viewP2 ? "nav-phase2" : ""].filter(Boolean).join(" ");
           const children = l2.tabs.map(([tab, label]) => {
-            const tabP2 = viewP2 || (k === "channelSales" && tab === "platformMarketing");
+            const tabP2 = viewP2 || isPhase2Tab(k, tab);
             const cls = ["nav-l2", on && cur === tab ? "active" : "", tabP2 ? "nav-phase2" : ""].filter(Boolean).join(" ");
             const tabMark = (!viewP2 && tabP2) ? phase2BadgeHtml() : "";
             return `<button type="button" class="${cls}" data-view="${k}" data-nav-sub="${tab}">${label}${tabMark}</button>`;
@@ -13984,7 +14025,34 @@
         </section>`;
     }
 
+    function renderDayPoolLedgerPanel() {
+      const f = getPf();
+      const rows = dayPoolLedger.filter(r => {
+        if (!myDayPools().some(p => p.id === r.poolId)) return false;
+        if (f.poolId !== "全部" && r.poolId !== f.poolId) return false;
+        if (f.type !== "全部" && !r.type.includes(f.type.replace("预占", "资格预占").replace("确认消耗", "确认消耗").replace("释放", "释放"))) return false;
+        return true;
+      });
+      return `<section class="panel">
+        ${panelHead("额度明细账本", "购买/分配/收回/预占/消耗全链路留痕；余额不得为负", "day_pool_ledger")}
+        <div class="panel-body orders-table-wrap">
+          <table>
+            <thead><tr><th>时间</th><th>额度池</th><th>类型</th><th>变动（人天）</th><th>余额后</th><th>操作人</th><th>关联</th><th>原因</th></tr></thead>
+            <tbody>${rows.map(r => `<tr>
+              <td>${r.time}</td><td>${r.poolId}</td><td>${r.type}</td>
+              <td>${r.deltaDays > 0 ? "+" : ""}${r.deltaDays === 0 ? "冻结→消耗" : r.deltaDays}</td>
+              <td>${r.balanceAfter}</td><td>${r.operator}</td><td>${r.ref}</td><td>${r.reason}</td>
+            </tr>`).join("") || "<tr><td colspan='8'>当前筛选条件下暂无额度变动</td></tr>"}</tbody>
+          </table>
+        </div>
+      </section>`;
+    }
+
     function renderDayPool() {
+      if (state.dayPoolTab === "ledger") {
+        state.dayPoolTab = "pools";
+        state.dayPoolPoolsSubTab = "ledger";
+      }
       syncTeamRiderCounts();
       if (isOrgAdminLogin()) state.dayPoolTab = "consume";
       const teamBanner = isTeamAdminLogin() ? (() => {
@@ -13992,6 +14060,7 @@
         return `<div class="perm-banner" style="margin-bottom:14px">团队管理员 · <strong>${team ? team.name : "—"}</strong>：仅可查看本团队消耗明细并导出（只读，不可登记/调额）。</div>`;
       })() : "";
       const pools = myDayPools().filter(p => {
+        if (state.dayPoolTab === "pools" && state.dayPoolPoolsSubTab === "ledger") return true;
         const f = getPf();
         if (!matchKw(p.id, f.poolId) && !matchKw(p.name, f.poolId)) return false;
         if (f.status !== "全部" && p.status !== f.status) return false;
@@ -14004,13 +14073,18 @@
       const tabs = isOrgAdminLogin() ? [["consume", "消耗明细"]] : [
         ["pools", "额度池"], ["teams", "骑手团队"], ["riders", "骑手登记"], ["allocations", "额度分配"],
         ["rules", "额度使用规则"], ["consume", "消耗明细"], ["retail", "零售价"],
-        ["exceptions", "异常记录"], ["ledger", "额度明细"]
+        ["exceptions", "异常记录"]
       ];
       const sidebar = tabSidebar(tabs, tab, "dptab");
 
       let body = "";
       if (tab === "pools") {
-        body = `<section class="panel">
+        const poolSubTab = state.dayPoolPoolsSubTab || "list";
+        const poolSubSidebar = innerTabSidebar([["list", "额度池列表"], ["ledger", "额度明细"]], poolSubTab, "dppools-sub");
+        if (poolSubTab === "ledger") {
+          body = `${poolSubSidebar}${renderDayPoolLedgerPanel()}`;
+        } else {
+          body = `${poolSubSidebar}<section class="panel">
           ${panelHead("额度池列表", "一运营商一池；增购入账同一池，见额度明细", "day_pool_panel", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="purchase">增购人天额度</button>` : "")}
           <div class="panel-body orders-table-wrap">
             <table>
@@ -14058,6 +14132,7 @@
               </div>
             </div>
           </section>`;
+        }
         }
       } else if (tab === "teams") {
         const f = getPf();
@@ -14343,27 +14418,6 @@
             </table>
           </div>
         </section>`;
-      } else if (tab === "ledger") {
-        const f = getPf();
-        const rows = dayPoolLedger.filter(r => {
-          if (!myDayPools().some(p => p.id === r.poolId)) return false;
-          if (f.poolId !== "全部" && r.poolId !== f.poolId) return false;
-          if (f.type !== "全部" && !r.type.includes(f.type.replace("预占", "资格预占").replace("确认消耗", "确认消耗").replace("释放", "释放"))) return false;
-          return true;
-        });
-        body = `<section class="panel">
-          ${panelHead("额度明细账本", "购买/分配/收回/预占/消耗全链路留痕；余额不得为负", "day_pool_ledger")}
-          <div class="panel-body orders-table-wrap">
-            <table>
-              <thead><tr><th>时间</th><th>额度池</th><th>类型</th><th>变动（人天）</th><th>余额后</th><th>操作人</th><th>关联</th><th>原因</th></tr></thead>
-              <tbody>${rows.map(r => `<tr>
-                <td>${r.time}</td><td>${r.poolId}</td><td>${r.type}</td>
-                <td>${r.deltaDays > 0 ? "+" : ""}${r.deltaDays === 0 ? "冻结→消耗" : r.deltaDays}</td>
-                <td>${r.balanceAfter}</td><td>${r.operator}</td><td>${r.ref}</td><td>${r.reason}</td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
-            </table>
-          </div>
-        </section>`;
       }
 
       const warnPool = pools.find(p => p.balancePct < 20);
@@ -14603,6 +14657,9 @@
       });
       root.querySelectorAll("[data-dptab]").forEach(btn => {
         btn.onclick = () => { state.dayPoolTab = btn.dataset.dptab; render(); };
+      });
+      root.querySelectorAll("[data-dppools-sub]").forEach(btn => {
+        btn.onclick = () => { state.dayPoolPoolsSubTab = btn.dataset.dppoolsSub; render(); };
       });
       root.querySelectorAll("[data-dpconsume-sub]").forEach(btn => {
         btn.onclick = () => { state.dayPoolConsumeSubTab = btn.dataset.dpconsumeSub; render(); };
