@@ -210,6 +210,40 @@
     .service-card p { font-size: 12px; opacity: .9; }
     .service-card.warn { background: linear-gradient(135deg, #f59e0b, #d97706); }
     .service-card.channel { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+    .service-card.done { background: linear-gradient(135deg, #8a94a6, #5c6575); }
+    .story-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .story-tabs button {
+      flex: 1; padding: 8px 6px; border-radius: 8px; border: 1px solid var(--border);
+      background: #fff; font-size: 12px; cursor: pointer; color: var(--muted);
+    }
+    .story-tabs button.active { background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; }
+    .mainline-steps {
+      list-style: none; margin: 0 0 10px; padding: 0; max-height: 280px; overflow-y: auto;
+      border: 1px solid var(--border); border-radius: 8px;
+    }
+    .mainline-steps li {
+      padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 12px;
+      cursor: pointer; display: flex; gap: 8px; align-items: flex-start;
+    }
+    .mainline-steps li:last-child { border-bottom: none; }
+    .mainline-steps li.active { background: #eef3ff; color: var(--blue); font-weight: 600; }
+    .mainline-steps li .sid { flex-shrink: 0; font-weight: 700; min-width: 32px; }
+    .mainline-hint {
+      font-size: 11px; color: var(--muted); line-height: 1.5; margin: 0 0 10px;
+      min-height: 32px; background: #f8fafc; border-radius: 8px; padding: 8px;
+    }
+    .mainline-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+    .mainline-actions button {
+      flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+      background: #fff; font-size: 13px; cursor: pointer;
+    }
+    .mainline-actions button.primary { background: var(--blue); color: #fff; border: none; }
+    .supplement-details {
+      border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px;
+    }
+    .supplement-details summary {
+      cursor: pointer; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text);
+    }
     .btn-gold {
       background: var(--gold); color: var(--gold-text); border: none;
       padding: 10px 18px; border-radius: 20px; font-size: 14px; font-weight: 600;
@@ -351,50 +385,68 @@
 <body>
   <div class="workspace">
     <aside class="demo-panel">
-      <h2>演示控制台</h2>
-      <p style="color:var(--muted);margin-bottom:10px">切换骑手身份，体验不同权益与拦截规则。</p>
-      <label>登录身份</label>
-      <select id="demoRole">
-        <option value="guest">未登录</option>
-        <option value="personal" selected>个人套餐 · 张骑手 U1028</option>
-        <option value="personal_cross3">个人跨网·案例3 · U1028</option>
-        <option value="cooling_refund">冷静期退款 · 李骑手 U2188（开通第3天）</option>
-        <option value="channel">渠道人天 · 孙骑手 U2110（分配即开通·已预占）</option>
-        <option value="channel_fail">渠道预占失败 · 赵骑手 U2103（自费兜底）</option>
-        <option value="channel_cross3">渠道跨网·案例3 · 王骑手 U2088</option>
-        <option value="lease_whitelist">设备租赁白名单 · 付费已购 U4001</option>
-        <option value="lease_whitelist_new">设备租赁白名单 · 付费未购 U4003</option>
-        <option value="lease_whitelist_free">设备租赁白名单 · 免费 U4005</option>
-        <option value="lease_suspended">渠道停服·持电池 · 张配送 U4001</option>
-        <option value="lease_suspended_nobat">渠道停服·未持电池 · 王夜配 U4003</option>
-        <option value="lease_blocked">非白名单拦截 · 路人 U9999</option>
-        <option value="card_link_guest">骑士卡链接 · 未登录（刚扫码进入）</option>
-        <option value="card_link_kyc">骑士卡链接 · 已登录未实名（24h 归因中）</option>
-        <option value="card_link_attr">骑士卡链接 · 已实名（24h 渠道专享价）</option>
-        <option value="none">已登录 · 未开通服务</option>
-        <option value="geo_ambiguous">冷启动 · 定位两 OP 接近</option>
-        <option value="frozen">个人套餐 · 已冻结</option>
-        <option value="pending_pickup">个人套餐 · 解冻待领电池</option>
-      </select>
-      <label>扫码站点</label>
-      <select id="demoSite">
-        <option value="ST-SH-01">浦东骑手驿站（OP-SX）</option>
-        <option value="ST-SH-02">世博换电服务点（OP-SX）</option>
-        <option value="ST-SH-04">陆家嘴分站（跨运营商 · OP-LJZ）</option>
-        <option value="ST-SH-JD">京东物流专属站（设备租赁·OP-SX）</option>
-        <option value="ST-BJ-01">滨江换电站（案例3·U/C/B三方·跨网¥0.6）</option>
-      </select>
-      <label style="margin-top:10px">定位场景（方案乙）</label>
-      <select id="demoGeo">
-        <option value="auto_unique">自动命中 · 最近 OP-SX（1.2km）</option>
-        <option value="ambiguous">两 OP 接近 · 需手动选择</option>
-        <option value="denied">用户拒绝定位</option>
-        <option value="no_nearby">15km 内无在营站</option>
-      </select>
-      <label style="margin-top:10px">OP-SX 换电范围（演示开关）</label>
-      <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="policyCrossNet" checked /> 允许跨网换电</label>
-      <p style="font-size:11px;color:var(--muted);margin:8px 0 0">设备租赁专属站仅对白名单用户在地图展示（切换身份后看重绘）。</p>
-      <button type="button" class="primary" id="applyDemo">应用并重绘</button>
+      <h2>主线导览</h2>
+      <p style="color:var(--muted);margin-bottom:10px;font-size:12px">个人套餐 P01–P09 · 人天池 C01–C08。二期身份收入补充场景。</p>
+      <div class="story-tabs">
+        <button type="button" data-story="personal" class="active">个人套餐</button>
+        <button type="button" data-story="channel">人天池</button>
+      </div>
+      <ol id="mainlineSteps" class="mainline-steps"></ol>
+      <p id="mainlineHint" class="mainline-hint"></p>
+      <div class="mainline-actions">
+        <button type="button" id="btnMainlinePrev">上一步</button>
+        <button type="button" class="primary" id="btnMainlineNext">下一步</button>
+      </div>
+      <details class="supplement-details">
+        <summary>补充场景</summary>
+        <label>场景身份</label>
+        <select id="demoRole">
+          <optgroup label="主线相关">
+            <option value="guest">未登录</option>
+            <option value="personal" selected>个人套餐 · 张骑手 U1028</option>
+            <option value="none">已登录 · 未开通服务</option>
+            <option value="pending_pickup">个人套餐 · 解冻待领电池</option>
+            <option value="frozen">个人套餐 · 已冻结</option>
+            <option value="cooling_refund">冷静期退款 · 李骑手 U2188</option>
+            <option value="channel">渠道人天 · 孙骑手 U2110</option>
+            <option value="channel_fail">渠道预占失败 · 赵骑手 U2103</option>
+            <option value="channel_resign">渠道离职回池 · 孙骑手 U2110</option>
+          </optgroup>
+          <optgroup label="个人 / 人天池异常">
+            <option value="personal_cross3">个人跨网·案例3 · U1028</option>
+            <option value="channel_cross3">渠道跨网·案例3 · 王骑手 U2088</option>
+            <option value="geo_ambiguous">冷启动 · 定位两 OP 接近</option>
+          </optgroup>
+          <optgroup label="⋯ 二期">
+            <option value="lease_whitelist">⋯ 二期 · 设备租赁白名单 · 付费已购</option>
+            <option value="lease_whitelist_new">⋯ 二期 · 设备租赁 · 付费未购</option>
+            <option value="lease_whitelist_free">⋯ 二期 · 设备租赁 · 免费</option>
+            <option value="lease_suspended">⋯ 二期 · 渠道停服·持电池</option>
+            <option value="lease_suspended_nobat">⋯ 二期 · 渠道停服·未持电池</option>
+            <option value="lease_blocked">⋯ 二期 · 非白名单拦截</option>
+            <option value="card_link_guest">⋯ 二期 · 骑士卡链接 · 未登录</option>
+            <option value="card_link_kyc">⋯ 二期 · 骑士卡链接 · 未实名</option>
+            <option value="card_link_attr">⋯ 二期 · 骑士卡链接 · 专享价</option>
+          </optgroup>
+        </select>
+        <label>扫码站点</label>
+        <select id="demoSite">
+          <option value="ST-SH-01">浦东骑手驿站（OP-SX）</option>
+          <option value="ST-SH-02">世博换电服务点（OP-SX）</option>
+          <option value="ST-SH-04">陆家嘴分站（跨运营商 · OP-LJZ）</option>
+          <option value="ST-SH-JD">⋯ 二期 · 京东物流专属站</option>
+          <option value="ST-BJ-01">滨江换电站（案例3·跨网¥0.6）</option>
+        </select>
+        <label style="margin-top:10px">定位场景（方案乙）</label>
+        <select id="demoGeo">
+          <option value="auto_unique">自动命中 · 最近 OP-SX（1.2km）</option>
+          <option value="ambiguous">两 OP 接近 · 需手动选择</option>
+          <option value="denied">用户拒绝定位</option>
+          <option value="no_nearby">15km 内无在营站</option>
+        </select>
+        <label style="margin-top:10px;display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="policyCrossNet" checked /> 允许跨网换电</label>
+        <button type="button" class="primary" id="applyDemo">应用补充场景</button>
+      </details>
       <p style="margin-top:14px"><a href="../index.html">← 返回运营商后台原型</a></p>
       <p style="margin-top:6px"><a id="navDocsLink" href="../docs/index.html">📄 产品文档（全部）</a></p>
     </aside>
@@ -504,24 +556,33 @@
         <div class="form-row"><label>消息通知</label><input type="checkbox" checked /> 换电结果通知</div>
         <div class="form-row"><label>演示身份</label>
           <select id="settingsRole" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border)">
-            <option value="guest">未登录</option>
-            <option value="personal">个人套餐</option>
-            <option value="personal_cross3">个人跨网·案例3</option>
-            <option value="cooling_refund">冷静期退款·U2188</option>
-            <option value="channel">渠道人天</option>
-            <option value="channel_fail">渠道预占失败·U2103</option>
-            <option value="channel_cross3">渠道跨网·案例3</option>
-            <option value="lease_whitelist">设备租赁·付费已购</option>
-            <option value="lease_whitelist_new">设备租赁·付费未购</option>
-            <option value="lease_whitelist_free">设备租赁·白名单免费</option>
-            <option value="lease_suspended">渠道停服·持电池</option>
-            <option value="lease_suspended_nobat">渠道停服·未持电池</option>
-            <option value="lease_blocked">非白名单拦截</option>
-            <option value="card_link_guest">骑士卡链接·未登录</option>
-            <option value="card_link_kyc">骑士卡链接·未实名</option>
-            <option value="card_link_attr">骑士卡链接·渠道专享价</option>
-            <option value="none">未开通</option>
-            <option value="frozen">已冻结 · U1041</option>
+            <optgroup label="主线相关">
+              <option value="guest">未登录</option>
+              <option value="personal">个人套餐</option>
+              <option value="none">未开通</option>
+              <option value="pending_pickup">解冻待领电池</option>
+              <option value="frozen">已冻结 · U1041</option>
+              <option value="cooling_refund">冷静期退款·U2188</option>
+              <option value="channel">渠道人天</option>
+              <option value="channel_fail">渠道预占失败·U2103</option>
+              <option value="channel_resign">渠道离职回池</option>
+            </optgroup>
+            <optgroup label="异常">
+              <option value="personal_cross3">个人跨网·案例3</option>
+              <option value="channel_cross3">渠道跨网·案例3</option>
+              <option value="geo_ambiguous">定位两 OP 接近</option>
+            </optgroup>
+            <optgroup label="⋯ 二期">
+              <option value="lease_whitelist">⋯ 设备租赁·付费已购</option>
+              <option value="lease_whitelist_new">⋯ 设备租赁·付费未购</option>
+              <option value="lease_whitelist_free">⋯ 设备租赁·白名单免费</option>
+              <option value="lease_suspended">⋯ 渠道停服·持电池</option>
+              <option value="lease_suspended_nobat">⋯ 渠道停服·未持电池</option>
+              <option value="lease_blocked">⋯ 非白名单拦截</option>
+              <option value="card_link_guest">⋯ 骑士卡链接·未登录</option>
+              <option value="card_link_kyc">⋯ 骑士卡链接·未实名</option>
+              <option value="card_link_attr">⋯ 骑士卡链接·渠道专享价</option>
+            </optgroup>
           </select>
         </div>
         <button type="button" class="btn-block" id="btnLogout" style="margin-top:16px;background:#f0f2f5;color:var(--text)">退出登录</button>
@@ -622,6 +683,13 @@
         kyc: true, entitlement: "渠道人天", pkg: "人天额度", daysLeft: null, swapUsed: 2,
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601", demoCase3: true, holdsBattery: true
       },
+      channel_resign: {
+        loggedIn: true, phone: "136****2110", name: "孙骑手", userId: "U2110",
+        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 0, swapUsed: 0,
+        status: "已离职", operator: "OP-SX", homeSite: "ST-SH-02",
+        channel: "顺丰同城渠道", team: "世博车队", poolId: "QP-2601",
+        holdsBattery: true, channelResigned: true, currentBatterySn: "BAT-SF-2110"
+      },
       none: {
         loggedIn: true, phone: "188****1850", name: "新用户", userId: "U0001",
         kyc: false, entitlement: null, status: "未开通"
@@ -691,11 +759,42 @@
       }
     };
 
+    const MAINLINE = {
+      personal: {
+        story: "personal",
+        steps: [
+          { id: "P01", title: "登录授权", role: "guest", hint: "● 勾选协议后微信一键登录", autoOpen: "mine" },
+          { id: "P02", title: "实名认证", role: "none", hint: "● 填写姓名与身份证；未实名不可购套餐", autoOpen: "kyc" },
+          { id: "P03", title: "确定服务运营商", role: "none", geo: "auto_unique", hint: "●/◆ 扫柜优先，其次定位匹配运营商", autoOpen: "mine" },
+          { id: "P04", title: "购买套餐", role: "none", geo: "auto_unique", hint: "● 方案 B SKU + Mock 支付；支付进运营商子商户", autoOpen: "pkg" },
+          { id: "P05", title: "首次领取电池", role: "pending_pickup", hint: "● 解冻/开通后首次为领取电池（非换电）", autoOpen: "scan" },
+          { id: "P06", title: "日常换电", role: "personal", hint: "● 扫码换电主路径；写入换电订单", autoOpen: "scan" },
+          { id: "P07", title: "续费", role: "personal", hint: "● 续费原运营商，不重新定位", autoOpen: "pkg" },
+          { id: "P08", title: "冻结与解冻", role: "frozen", hint: "●/◆ 须先还电；解冻后待领电池并顺延有效期", autoOpen: "mine" },
+          { id: "P09", title: "退款/退租/完结", role: "cooling_refund", hint: "● 冷静期申请退款（须还电）；等待运营商审核", autoOpen: "mine" }
+        ]
+      },
+      channel: {
+        story: "channel",
+        steps: [
+          { id: "C01", title: "登录授权", role: "guest", hint: "● 登录后进入渠道成员态，不引导购主套餐", autoOpen: "mine" },
+          { id: "C02", title: "权益到账", role: "channel", hint: "◆ 渠道/团队/池/剩余人天只读展示（前置■已完成）", autoOpen: "mine" },
+          { id: "C03", title: "今日预占", role: "channel", hint: "◆ 服务卡展示「今日已预占」方可换电", autoOpen: "mine" },
+          { id: "C04", title: "首次领取电池", role: "channel", hint: "● 未持电池时可扫码领取；校验走人天权益", autoOpen: "scan" },
+          { id: "C05", title: "日常换电与确认消耗", role: "channel", hint: "●/◆ 换电成功后展示「今日已确认 · 不重复扣」", autoOpen: "scan" },
+          { id: "C06", title: "额度异常与自费兜底", role: "channel_fail", hint: "! 预占失败：1天/单次自费，不扣渠道池", autoOpen: "scan" },
+          { id: "C07", title: "离职/移除", role: "channel_resign", hint: "■→只读 服务终止；持电池仅可还电", autoOpen: "mine" },
+          { id: "C08", title: "还电与回池完结", role: "channel_resign", hint: "●/◆ 还电后剩余人天回池，不向骑手退款", autoOpen: "scan" }
+        ]
+      }
+    };
+
     let state = {
       role: "personal",
       scanSite: "ST-SH-01",
       orderTab: "swap",
       selectedPkg: "month",
+      mainline: { story: "personal", stepId: "P06" },
       swapOrders: [
         { id: "SW2605241201", site: "浦东骑手驿站", time: "2026-05-24 12:05", status: "成功", type: "个人套餐", userId: "U1028" },
         { id: "SW2605241188", site: "浦东骑手驿站", time: "2026-05-24 08:30", status: "成功", type: "个人套餐", userId: "U1028" }
@@ -742,15 +841,138 @@
       });
       const hiddenDedicated = Object.keys(SITES).filter(id => SITES[id].channelDedicated && !canSeeDedicatedSite(u, SITES[id]));
       if (u.whitelist && dedicatedPins.length) {
-        legend.textContent = "地图含 1 个渠道专属站（仅白名单可见）";
+        legend.textContent = "图例：蓝钉=可换电站 · 含 1 个渠道专属站（白名单）";
       } else if (hiddenDedicated.length) {
-        legend.textContent = "渠道专属站已对当前身份隐藏";
+        legend.textContent = "图例：蓝钉=可换电站 · 专属站已隐藏（⋯二期）";
       } else {
-        legend.textContent = "";
+        legend.textContent = "图例：蓝色钉 = 可换电站 · 扫一扫换电";
       }
     }
 
     function user() { return USERS[state.role] || USERS.guest; }
+
+    function mainlineSteps() {
+      return (MAINLINE[state.mainline.story] || MAINLINE.personal).steps;
+    }
+
+    function renderMainlineSteps() {
+      const host = document.getElementById("mainlineSteps");
+      const hint = document.getElementById("mainlineHint");
+      if (!host) return;
+      const steps = mainlineSteps();
+      const cur = state.mainline.stepId;
+      host.innerHTML = steps.map(s =>
+        `<li data-step="${s.id}" class="${s.id === cur ? "active" : ""}"><span class="sid">${s.id}</span><span>${s.title}</span></li>`
+      ).join("");
+      host.querySelectorAll("[data-step]").forEach(el => {
+        el.onclick = () => applyMainlineStep(el.dataset.step);
+      });
+      document.querySelectorAll("[data-story]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.story === state.mainline.story);
+      });
+      const step = steps.find(s => s.id === cur);
+      if (hint) hint.textContent = step ? (step.id + " · " + (step.hint || step.title)) : "补充场景模式：步骤高亮已清除";
+    }
+
+    function prepareStepRole(step) {
+      const u = USERS[step.role];
+      if (!u) return;
+      if (step.id === "P02" || step.id === "P03") {
+        u.kyc = step.id === "P03" ? true : false;
+        u.entitlement = null;
+        u.status = "未开通";
+      }
+      if (step.id === "P04") {
+        u.kyc = true;
+        u.entitlement = null;
+        u.status = "未开通";
+      }
+      if (step.id === "C04" && step.role === "channel") {
+        u.holdsBattery = false;
+        u.pendingPickup = true;
+        u.todayEligibility = "已预占";
+        u.status = "服务中";
+      }
+      if (step.id === "C05" && step.role === "channel") {
+        u.holdsBattery = true;
+        u.pendingPickup = false;
+        u.todayEligibility = "已预占";
+        u.status = "服务中";
+        u.preOccupyFail = false;
+      }
+      if (step.id === "C08" && step.role === "channel_resign") {
+        u.holdsBattery = false;
+        u.channelResigned = true;
+        u.status = "已完结";
+        u.remainingDays = 0;
+      }
+      if (step.id === "C07" && step.role === "channel_resign") {
+        u.holdsBattery = true;
+        u.channelResigned = true;
+        u.status = "已离职";
+      }
+    }
+
+    function applyMainlineStep(stepId, opts) {
+      const openUi = !opts || opts.openUi !== false;
+      const steps = mainlineSteps();
+      const step = steps.find(s => s.id === stepId);
+      if (!step) return;
+      state.mainline.stepId = stepId;
+      prepareStepRole(step);
+      state.role = step.role;
+      if (step.scanSite) {
+        state.scanSite = step.scanSite;
+        document.getElementById("demoSite").value = step.scanSite;
+      }
+      if (step.geo) {
+        state.geoScenario = step.geo;
+        document.getElementById("demoGeo").value = step.geo;
+      } else {
+        state.geoScenario = document.getElementById("demoGeo").value || "auto_unique";
+      }
+      document.getElementById("demoRole").value = step.role;
+      resetSessionContext();
+      if (step.role === "none" || step.id === "P03" || step.id === "P04") {
+        const geo = geoResolve();
+        if (geo.auto) setSessionOperator(geo.operatorId, "geo_auto", geo.nearestSiteId, geo.distanceM);
+      }
+      closeOverlay("overlayScan");
+      closeOverlay("overlayPkg");
+      closeOverlay("overlayKyc");
+      closeOverlay("overlayOpPick");
+      renderMainlineSteps();
+      renderMine();
+      renderOrders();
+      renderMapPins();
+      if (openUi) {
+        if (step.autoOpen === "pkg") {
+          switchTab("mine");
+          const u = user();
+          if (u.loggedIn && !u.kyc) openOverlay("overlayKyc");
+          else openPurchaseFlow();
+        } else if (step.autoOpen === "scan") {
+          switchTab("home");
+          startScan();
+        } else if (step.autoOpen === "kyc") {
+          switchTab("mine");
+          openOverlay("overlayKyc");
+        } else if (step.autoOpen === "mine") {
+          switchTab("mine");
+        }
+        toast("主线 " + step.id + " · " + step.title);
+      }
+    }
+
+    function goMainline(delta) {
+      const steps = mainlineSteps();
+      let idx = steps.findIndex(s => s.id === state.mainline.stepId);
+      if (idx < 0) idx = delta > 0 ? -1 : 0;
+      const next = idx + delta;
+      if (next < 0) { toast("已到起点"); return; }
+      if (next >= steps.length) { toast("已到终点"); return; }
+      applyMainlineStep(steps[next].id);
+    }
 
     function resetSessionContext() {
       state.session.contextOperatorId = null;
@@ -1048,10 +1270,19 @@
           if (state.role === "card_link_guest") {
             state.role = "card_link_kyc";
             document.getElementById("demoRole").value = "card_link_kyc";
-          } else {
-            state.role = "none";
-            document.getElementById("demoRole").value = "none";
+            renderMine();
+            toast("登录成功，请完成实名认证");
+            return;
           }
+          if (state.mainline.story === "channel") {
+            applyMainlineStep("C02");
+            toast("登录成功 · 渠道权益已到账");
+            return;
+          }
+          state.role = "none";
+          document.getElementById("demoRole").value = "none";
+          if (state.mainline.stepId === "P01") state.mainline.stepId = "P02";
+          renderMainlineSteps();
           renderMine();
           toast("登录成功，请完成实名认证");
         };
@@ -1062,7 +1293,11 @@
       const attrBanner = u.channelAttr && u.status === "未开通"
         ? `<div class="channel-attr-banner">🟡 ${u.channelAttr.channelName} · ${u.channelAttr.expiresLabel} 内购套餐享渠道专享价</div>`
         : "";
-      if (u.status === "未开通") {
+      if (u.status === "已完结" || (u.channelResigned && !u.holdsBattery && u.status !== "已离职")) {
+        card = `<div class="service-card done"><div><h3>服务已完结</h3><p>${u.channel || ""} · 剩余人天已回池 · 不向骑手退款</p></div></div>`;
+      } else if (u.channelResigned || u.status === "已离职") {
+        card = `<div class="service-card done"><div><h3>服务已终止（离职）</h3><p>${u.channel || ""} · ${u.holdsBattery ? "请还电入柜后完结" : "剩余人天已回池"}</p><p style="font-size:11px;margin-top:6px;opacity:.85">不向骑手退款 · 仅可还电不可出电</p></div>${u.holdsBattery ? `<button type="button" class="btn-gold" data-action="scan">扫码还电</button>` : ""}</div>`;
+      } else if (u.status === "未开通") {
         card = `${attrBanner}<div class="service-card"><div><h3>暂未开通服务</h3><p>${u.kyc ? "选择套餐开通换电服务。" : "请先完成实名认证，再购买套餐。"}</p></div><button type="button" class="btn-gold" data-action="buy">${u.kyc ? "服务购买" : "实名认证"}</button></div>`;
       } else if (u.status === "已冻结") {
         card = `<div class="service-card warn"><div><h3>服务已冻结</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 未持有电池</p><p style="font-size:11px;margin-top:6px;opacity:.85">符合解冻条件可立即解除；解冻后首次须领取电池</p></div><button type="button" class="btn-gold" data-action="unfreeze">解除冻结</button></div>`;
@@ -1110,11 +1345,11 @@
           <div class="section-title">常用功能</div>
           <div class="grid-4">
             <button type="button" class="grid-item" data-action="scan"><span class="gi">⊞</span>扫码换电</button>
-            <button type="button" class="grid-item" data-action="buy"><span class="gi">🛒</span>购买套餐</button>
+            ${!(u.entitlement === "渠道人天" && !u.preOccupyFail) ? `<button type="button" class="grid-item" data-action="buy"><span class="gi">🛒</span>购买套餐</button>` : ""}
             <button type="button" class="grid-item" data-action="coupon"><span class="gi orange">🎫</span>我的优惠券</button>
             <button type="button" class="grid-item" data-action="service"><span class="gi">📞</span>客服电话</button>
             <button type="button" class="grid-item" data-action="return"><span class="gi">🔋</span>电池退还</button>
-            <button type="button" class="grid-item" data-action="freeze"><span class="gi">❄</span>申请冻结</button>
+            ${u.entitlement === "个人套餐" ? `<button type="button" class="grid-item" data-action="freeze"><span class="gi">❄</span>申请冻结</button>` : ""}
             ${u.coolingPeriod && !u.refundApplied ? `<button type="button" class="grid-item" data-action="cooling_refund"><span class="gi">↩</span>冷静期退款</button>` : ""}
             <button type="button" class="grid-item" data-action="kyc"><span class="gi">✓</span>实名认证</button>
           </div>
@@ -1235,6 +1470,10 @@
       return u.entitlement === "设备租赁白名单" && u.whitelist && u.channelSuspended === true;
     }
 
+    function isChannelResigned(u) {
+      return !!(u.channelResigned || u.status === "已离职" || u.status === "已完结");
+    }
+
     function startScan() {
       const u = user();
       const site = SITES[state.scanSite];
@@ -1250,8 +1489,12 @@
         return;
       }
       if (u.status === "已冻结") { toast("服务已冻结，请先解除冻结"); return; }
+      if (isChannelResigned(u) && !u.holdsBattery) {
+        toast("服务已完结，剩余人天已回池");
+        return;
+      }
       const pickupMode = u.pendingPickup && !u.holdsBattery;
-      const suspended = isLeaseChannelSuspended(u);
+      const suspended = isLeaseChannelSuspended(u) || (isChannelResigned(u) && u.holdsBattery);
       const body = document.getElementById("scanBody");
       body.innerHTML = `
         <div class="scan-box">
@@ -1259,7 +1502,7 @@
           <p style="color:var(--muted);font-size:13px">${pickupMode ? "对准换电柜二维码 · 领取电池" : "对准换电柜二维码"}</p>
           <p style="font-size:12px;margin-top:8px;color:var(--blue)">当前柜机：${site.name}</p>
           ${pickupMode ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">解冻后首次服务须<strong>领取电池</strong>（出电，非换电）</p>` : ""}
-          ${suspended && u.holdsBattery ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">渠道已停用：可取<strong>还电</strong>，不可<strong>出电</strong></p>` : ""}
+          ${suspended && u.holdsBattery ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">${isChannelResigned(u) ? "离职回池：可" : "渠道已停用：可"}取<strong>还电</strong>，不可<strong>出电</strong></p>` : ""}
           ${pickupMode
             ? `<button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟领取电池</button>`
             : suspended && u.holdsBattery
@@ -1366,6 +1609,10 @@
         runPickupBattery(site);
         return;
       }
+      if (isChannelResigned(u)) {
+        showScanResult(false, "服务已终止（离职），仅可还电入柜，不可出电", site);
+        return;
+      }
       if (u.leaseBlocked) {
         showScanResult(false, u.blockReason || "非授权用户，请联系渠道管理员", site);
         return;
@@ -1408,34 +1655,41 @@
 
     function runReturnBattery(site) {
       const u = user();
-      if (!isLeaseChannelSuspended(u) || !u.holdsBattery) {
+      const resign = isChannelResigned(u);
+      if ((!isLeaseChannelSuspended(u) && !resign) || !u.holdsBattery) {
         showScanResult(false, "当前无法还电", site);
         return;
       }
       const id = "RT" + Date.now().toString().slice(-8);
-      const batSn = u.currentBatterySn || "BAT-JD-050";
+      const batSn = u.currentBatterySn || (resign ? "BAT-SF-2110" : "BAT-JD-050");
       u.holdsBattery = false;
       u.currentBatterySn = null;
+      if (resign) {
+        u.status = "已完结";
+        u.remainingDays = 0;
+      }
       state.returnOrders.unshift({
         id, site: site.name, battery: batSn, time: new Date().toLocaleString("zh-CN"),
-        status: "已归还", userId: u.userId, note: "渠道停服期间还电入柜"
+        status: "已归还", userId: u.userId,
+        note: resign ? "离职还电 · 剩余人天已回池" : "渠道停服期间还电入柜"
       });
-      showReturnResult(site, id, batSn);
+      showReturnResult(site, id, batSn, resign);
     }
 
-    function showReturnResult(site, returnId, batSn) {
+    function showReturnResult(site, returnId, batSn, resign) {
       document.getElementById("scanBody").innerHTML = `
         <div class="result-ok">
           <div class="big">✓</div>
           <h3 style="margin-bottom:8px">还电成功</h3>
           <p style="font-size:13px;color:var(--muted);line-height:1.7">
             单号 ${returnId}<br>${site.name}<br>已归还 ${batSn} · 格口已关闭<br>
-            <small>渠道停服期间仅支持还电，暂不可取新电池</small>
+            <small>${resign ? "✓ 剩余人天已回池 · 不向骑手退款 · 服务完结" : "渠道停服期间仅支持还电，暂不可取新电池"}</small>
           </p>
           <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
         </div>`;
       document.getElementById("scanBody").querySelector("[data-close-scan]").onclick = () => {
         closeOverlay("overlayScan");
+        renderMine();
         renderHome();
       };
     }
@@ -1488,19 +1742,23 @@
       document.getElementById("scanBody").querySelector("[data-close-scan]").onclick = () => closeOverlay("overlayScan");
     }
 
-    function showScanResult(ok, msg, site, swapId, triplet) {
-      const l1Line = triplet && triplet.l1Fee > 0
-        ? `<br>跨网设备服务费 ¥${triplet.l1Fee.toFixed(2)}（U→C/B 平台代付）`
-        : triplet ? `<br>跨网设备服务费：无（运营商归属相同）` : "";
-      const tripletLine = triplet
-        ? `<br><small>用户运营商 ${triplet.userOp} · 柜机 ${triplet.cabOp} · 电池 ${triplet.batOp}</small>`
-        : "";
+    function showScanResult(ok, msg, site, swapId, _triplet) {
+      const u = user();
+      let dayLine = "";
+      if (ok && u.entitlement === "渠道人天") {
+        if (msg && String(msg).includes("自费兜底")) {
+          dayLine = `<br><small>✓ 渠道兜底自费 · 不扣渠道池</small>`;
+        } else {
+          u.todayEligibility = "已确认消耗";
+          dayLine = `<br><small>✓ 今日人天：已确认消耗（同日不重复扣）</small>`;
+        }
+      }
       document.getElementById("scanBody").innerHTML = ok ? `
         <div class="result-ok">
           <div class="big">✓</div>
           <h3 style="margin-bottom:8px">${msg}</h3>
           <p style="font-size:13px;color:var(--muted);line-height:1.7">
-            单号 ${swapId}<br>${site.name}<br>换出电池 SOC 96% · 健康正常${tripletLine}${l1Line}
+            单号 ${swapId}<br>${site.name}<br>换出电池 SOC 96% · 健康正常${dayLine}
           </p>
           <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
         </div>` : `
@@ -1576,15 +1834,18 @@
       toast("已退出登录");
     };
     document.getElementById("settingsRole").onchange = function() {
+      state.mainline.stepId = null;
       state.role = this.value;
       document.getElementById("demoRole").value = this.value;
       closeOverlay("overlaySettings");
+      renderMainlineSteps();
       renderMine();
       renderOrders();
       renderMapPins();
     };
 
     document.getElementById("applyDemo").onclick = () => {
+      state.mainline.stepId = null;
       state.role = document.getElementById("demoRole").value;
       state.scanSite = state.role === "personal_cross3" ? "ST-BJ-01" : document.getElementById("demoSite").value;
       if (state.role === "personal_cross3") document.getElementById("demoSite").value = "ST-BJ-01";
@@ -1595,12 +1856,26 @@
         setSessionOperator("OP-SX", "launch");
       }
       OPERATOR_POLICY["OP-SX"].crossNetworkEnabled = document.getElementById("policyCrossNet").checked;
+      renderMainlineSteps();
       renderMine();
       renderOrders();
       renderMapPins();
-      toast("已切换演示身份 · 定位场景：" + document.getElementById("demoGeo").selectedOptions[0].text);
+      toast("已切换补充场景 · " + document.getElementById("demoRole").selectedOptions[0].text);
     };
 
+    document.getElementById("btnMainlineNext").onclick = () => goMainline(1);
+    document.getElementById("btnMainlinePrev").onclick = () => goMainline(-1);
+    document.querySelectorAll("[data-story]").forEach(btn => {
+      btn.onclick = () => {
+        state.mainline.story = btn.dataset.story;
+        const first = MAINLINE[state.mainline.story].steps[0].id;
+        applyMainlineStep(first, { openUi: false });
+        switchTab(state.mainline.story === "personal" ? "mine" : "mine");
+        toast("已切换故事线 · " + (state.mainline.story === "personal" ? "个人套餐" : "人天池"));
+      };
+    });
+
+    applyMainlineStep(state.mainline.stepId || "P06", { openUi: false });
     switchTab("home");
     renderMine();
     renderMapPins();

@@ -4685,10 +4685,18 @@
     }
 
     function panelTopTabs(tabs, activeKey, dataAttr) {
-      return `<div class="panel-top-tabs" role="tablist">${tabs.map(([k, label]) =>
-        `<button type="button" role="tab" class="panel-top-tab${activeKey === k ? " active" : ""}" aria-selected="${activeKey === k ? "true" : "false"}" data-${dataAttr}="${k}">${label}</button>`
+      return `<div class="panel-top-tabs" role="tablist">${tabs.map(([k, label, p2]) =>
+        `<button type="button" role="tab" class="panel-top-tab${activeKey === k ? " active" : ""}${p2 ? " nav-phase2" : ""}" aria-selected="${activeKey === k ? "true" : "false"}" data-${dataAttr}="${k}">${label}${p2 ? phase2BadgeHtml() : ""}</button>`
       ).join("")}</div>`;
     }
+
+    /** 个人套餐城市底价可选 SKU（暂定 · decision-041 补充） */
+    const PERSONAL_PKG_SKU_PRESETS = [
+      { pkg: "包月30天", pkgType: "monthly", validityHours: null, channelFallback: false, retailPrice: 299 },
+      { pkg: "7天套餐", pkgType: "weekly", validityHours: null, channelFallback: false, retailPrice: 89 },
+      { pkg: "1天套餐", pkgType: "daily", validityHours: 24, channelFallback: true, retailPrice: 29 },
+      { pkg: "单次换电", pkgType: "single", validityHours: 24, channelFallback: true, retailPrice: 9.9 }
+    ];
 
     function paginateList(rows, page, pageSize) {
       const size = Math.max(1, pageSize || 10);
@@ -12042,10 +12050,13 @@
       if (!isNew && !row) return;
       state.pricingEditId = isNew ? "new" : id;
       const cities = ["上海", "杭州"];
+      const skuOptionsHtml = (selected) => PERSONAL_PKG_SKU_PRESETS.map(p =>
+        `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-fallback="${p.channelFallback ? 1 : 0}" data-price="${p.retailPrice}"${selected === p.pkg ? " selected" : ""}>${p.pkg}</option>`
+      ).join("");
       if (isNew) {
         document.querySelector("#pricingFormTitle").textContent = "新增 SKU · 个人套餐";
         document.querySelector("#pricingForm").innerHTML = `
-          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">按城市+SKU 统一定价，不绑定站点；1天/单次为渠道兜底必选 SKU。</p>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">套餐名称仅可从固定列表选择（暂定：包月30天 / 7天套餐 / 1天套餐 / 单次换电）；1天/单次为渠道兜底必选。</p>
           <label>城市<select name="city">${cities.map(c => `<option>${c}</option>`).join("")}</select></label>
           <label>套餐 SKU<select name="pkgPreset" id="pricingPkgPreset"></select></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="299" required /></label>
@@ -12053,21 +12064,18 @@
           <label>状态<select name="status"><option selected>生效</option><option>停用</option></select></label>`;
         const syncPreset = () => {
           const city = document.querySelector("#pricingForm [name=city]")?.value || "上海";
-          const presets = [
-            { pkg: "包月30天", pkgType: "monthly", validityHours: null, channelFallback: false, retailPrice: 299 },
-            { pkg: "7天套餐", pkgType: "weekly", validityHours: null, channelFallback: false, retailPrice: 89 },
-            { pkg: "1天套餐", pkgType: "daily", validityHours: 24, channelFallback: true, retailPrice: 29 },
-            { pkg: "单次换电", pkgType: "single", validityHours: 24, channelFallback: true, retailPrice: 9.9 },
-            { pkg: "次卡10次", pkgType: "times", validityHours: null, channelFallback: false, retailPrice: 89 },
-            { pkg: "30天畅换", pkgType: "monthly", validityHours: null, channelFallback: false, retailPrice: 329 }
-          ].filter(p => !operatorPkgPrices.some(r => r.operatorId === currentEntity().id && r.city === city && r.pkg === p.pkg));
+          const presets = PERSONAL_PKG_SKU_PRESETS.filter(p =>
+            !operatorPkgPrices.some(r => r.operatorId === currentEntity().id && r.city === city && r.pkg === p.pkg)
+          );
           const sel = document.querySelector("#pricingPkgPreset");
           if (!sel) return;
           if (!presets.length) {
-            sel.innerHTML = `<option value="">（该城市 SKU 已配齐）</option>`;
+            sel.innerHTML = `<option value="">（该城市可选 SKU 已配齐）</option>`;
             return;
           }
-          sel.innerHTML = presets.map(p => `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-fallback="${p.channelFallback ? 1 : 0}" data-price="${p.retailPrice}">${p.pkg}</option>`).join("");
+          sel.innerHTML = presets.map(p =>
+            `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-fallback="${p.channelFallback ? 1 : 0}" data-price="${p.retailPrice}">${p.pkg}</option>`
+          ).join("");
           const first = presets[0];
           document.querySelector("#pricingForm [name=retailPrice]").value = first.retailPrice;
           document.querySelector("#pricingForm [name=channelFallback]").value = first.channelFallback ? "1" : "0";
@@ -12081,10 +12089,14 @@
           document.querySelector("#pricingForm [name=channelFallback]").value = opt.dataset.fallback || "0";
         });
       } else {
+        const allowed = PERSONAL_PKG_SKU_PRESETS.some(p => p.pkg === row.pkg);
         document.querySelector("#pricingFormTitle").textContent = "编辑零售价 · " + row.pkg;
         document.querySelector("#pricingForm").innerHTML = `
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">套餐名称不可改（仅可选固定 SKU）；本页只改零售价与状态。</p>
           <label>城市<input name="city" value="${row.city}" readonly /></label>
-          <label>套餐<input name="pkg" value="${row.pkg}" readonly /></label>
+          <label>套餐<select name="pkg" id="pricingPkgEdit" disabled>${allowed
+            ? skuOptionsHtml(row.pkg)
+            : `<option selected>${row.pkg}</option>`}</select></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="${row.retailPrice}" required /></label>
           <label>渠道兜底<input value="${row.channelFallback ? "是（必选）" : "否"}" readonly /></label>
           <label>状态<select name="status"><option ${row.status === "生效" ? "selected" : ""}>生效</option><option ${row.status === "停用" ? "selected" : ""}>停用</option></select></label>`;
@@ -12468,7 +12480,7 @@
         const sub = state.pricingPkgSubTab || "city";
         const topTabs = panelTopTabs([
           ["city", "城市底价"],
-          ["zones", "价格分区"]
+          ["zones", "价格分区", true]
         ], sub, "pricing-pkg-sub");
         const depCfg = myPersonalDepositSettings();
         if (sub === "zones") {
@@ -12516,6 +12528,7 @@
             : `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_zone")} 站点挂入分区后，售价=区价 ?? 城市底价；区价可高于或低于底价。<strong>移除分区</strong>后挂接站点恢复城市底价。</p>`;
           body = `<section class="panel panel-with-top-tabs">
             ${topTabs}
+            <div class="phase2-banner" role="status" style="margin:12px 16px 0">${phase2BadgeHtml()}<div><strong>价格分区 · 二期</strong> — decision-041 补充：一期不交付；原型可浏览同城分区与区价。</div></div>
             ${panelHead("价格分区", "同城分区 · 站点挂区 · 任意 SKU 区价（可高可低）· 购后全市可换电", "pricing_zone", `<button type="button" class="btn primary" data-new-price-zone>+ 新建分区</button>${zone ? ` <button type="button" class="btn" data-edit-price-zone="${zone.id}">编辑分区</button> <button type="button" class="btn" data-manage-zone-sites="${zone.id}">管理站点</button> <button type="button" class="btn" data-del-price-zone="${zone.id}">移除分区</button>` : ""}`)}
             <div class="panel-body orders-table-wrap">
               ${preview}
