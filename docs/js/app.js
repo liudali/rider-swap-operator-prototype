@@ -639,9 +639,9 @@
           if (e.status !== "启用") return;
           const host = entityNameById(entityId);
           if (e.roleType === "staff") {
-            staffOpts += `<option value="emp:${e.id}">${e.name} · ${e.jobTitle || "员工"}（${host}）</option>`;
+            staffOpts += `<option value="emp:${e.id}">【二期】${e.name} · ${e.jobTitle || "员工"}（${host}）</option>`;
           } else if (e.roleType === "team_admin") {
-            staffOpts += `<option value="emp:${e.id}">${e.name} · 团队管理员（${e.jobTitle || "团队"} · ${host}）</option>`;
+            staffOpts += `<option value="emp:${e.id}">【二期】${e.name} · 团队管理员（${e.jobTitle || "团队"} · ${host}）</option>`;
           }
         });
       });
