@@ -151,7 +151,7 @@
       sitePartner: { name: "站点合伙人", type: "站点合伙人", tree: "绑定站点分润 · 明细查询 · 提现结算（只读配置）" }
     };
     const NAV = {
-      platform: ["overview", "platformUsers", "platformOrders", "platformDevices", "platformChannels", "platformMarketing", "platformFlows", "platformAccounts", "operators", "platformLeasing", "operatorCreditEval", "orderAudit", "depositManage", "l1Pricing"],
+      platform: ["overview", "platformUsers", "platformOrders", "platformDevices", "platformChannels", "platformMarketing", "platformFlows", "platformAccounts", "operators", "platformLeasing", "operatorCreditEval", "orderAudit", "depositManage", "l1Pricing", "employees"],
       operator: ["overview", "pricing", "channelSales", "sites", "devices", "financeManage", "orderService", "flows", "platformService", "employees", "users", "accounts"],
       channel: ["overview", "channelSettlement", "dayPool", "channelCredit", "employees"],
       leasing: ["overview", "employees", "financeDrawdown", "accounts"],
@@ -174,7 +174,7 @@
       partnerWithdraw: "提现结算", partnerAccount: "收款账户"
     };
 
-    const ENTITY_ROLE = { "OP-SX": "operator", "CH-SF": "channel", "CH-CARD": "channel", "CH-RENT": "channel", "CH-ACT": "channel", "LEASE-HD": "leasing", "LEASE-HS": "leasing", "OP-HZ": "operator" };
+    const ENTITY_ROLE = { [ENT.platform.id]: "platform", "OP-SX": "operator", "CH-SF": "channel", "CH-CARD": "channel", "CH-RENT": "channel", "CH-ACT": "channel", "LEASE-HD": "leasing", "LEASE-HS": "leasing", "OP-HZ": "operator" };
 
     const PERM_VIEW_MAP = {
       "overview.view": ["overview"],
@@ -209,7 +209,24 @@
       "inter_op.view": ["platformService"],
       "deposit.view": ["platformService"],
       "platform_fee.view": ["platformService"],
-      "activation_codes.view": ["activationCodes", "activationRecords", "orderAudit"]
+      "activation_codes.view": ["activationCodes", "activationRecords", "orderAudit"],
+      "platform.overview": ["overview"],
+      "platform.users": ["platformUsers"],
+      "platform.orders": ["platformOrders"],
+      "platform.devices": ["platformDevices"],
+      "platform.channels": ["platformChannels"],
+      "platform.marketing": ["platformMarketing"],
+      "platform.flows": ["platformFlows"],
+      "platform.accounts": ["platformAccounts"],
+      "platform.operators": ["operators"],
+      "platform.operator_withdraw": ["operators"],
+      "platform.operator_fee": ["operators"],
+      "platform.leasing": ["platformLeasing"],
+      "platform.operator_credit": ["operatorCreditEval"],
+      "platform.audit": ["orderAudit"],
+      "platform.deposit": ["depositManage"],
+      "platform.pricing": ["l1Pricing"],
+      "platform.admins": ["employees"]
     };
 
 
@@ -668,7 +685,57 @@
       { id: "activation_codes.view", label: "激活码管理" }
     ];
 
+    const PLATFORM_ADMIN_PERMISSIONS = [
+      { id: "platform.overview", label: "总览" },
+      { id: "platform.users", label: "用户管理" },
+      { id: "platform.orders", label: "订单管理" },
+      { id: "platform.devices", label: "设备管理" },
+      { id: "platform.channels", label: "渠道管理" },
+      { id: "platform.marketing", label: "平台营销（二期）" },
+      { id: "platform.flows", label: "流水管理" },
+      { id: "platform.accounts", label: "平台账户" },
+      { id: "platform.operators", label: "运营商治理" },
+      { id: "platform.operator_withdraw", label: "运营商提现审核" },
+      { id: "platform.operator_fee", label: "运营商平台服务费" },
+      { id: "platform.leasing", label: "租赁公司（二期）" },
+      { id: "platform.operator_credit", label: "运营商信用评估" },
+      { id: "platform.audit", label: "变更记录" },
+      { id: "platform.deposit", label: "保证金管理" },
+      { id: "platform.pricing", label: "平台统价" },
+      { id: "platform.admins", label: "管理员管理" }
+    ];
+
+    const PLATFORM_ADMIN_TEMPLATES = {
+      super: { label: "超级管理员", permissions: PLATFORM_ADMIN_PERMISSIONS.map(p => p.id) },
+      operations: {
+        label: "运营管理员",
+        permissions: ["platform.overview", "platform.users", "platform.orders", "platform.devices", "platform.channels", "platform.operators", "platform.audit", "platform.pricing"]
+      },
+      finance: {
+        label: "财务管理员",
+        permissions: ["platform.overview", "platform.flows", "platform.accounts", "platform.operator_withdraw", "platform.operator_fee", "platform.deposit"]
+      },
+      custom: { label: "自定义", permissions: [] }
+    };
+
     const employeeStore = {
+      [ENT.platform.id]: [
+        {
+          id: "ADM-PLAT-001", roleType: "staff", name: "平台超级管理员", phone: "138****0001",
+          jobTitle: "超级管理员", adminTemplate: "super", status: "启用",
+          permissions: PLATFORM_ADMIN_TEMPLATES.super.permissions, lastLoginAt: "2026-07-17 10:00", protected: true
+        },
+        {
+          id: "ADM-PLAT-002", roleType: "staff", name: "平台运营管理员", phone: "138****0002",
+          jobTitle: "运营管理员", adminTemplate: "operations", status: "启用",
+          permissions: PLATFORM_ADMIN_TEMPLATES.operations.permissions, lastLoginAt: "2026-07-16 18:20", protected: false
+        },
+        {
+          id: "ADM-PLAT-003", roleType: "staff", name: "平台财务管理员", phone: "138****0003",
+          jobTitle: "财务管理员", adminTemplate: "finance", status: "启用",
+          permissions: PLATFORM_ADMIN_TEMPLATES.finance.permissions, lastLoginAt: "2026-07-17 08:45", protected: false
+        }
+      ],
       "OP-SX": [
         { id: "EMP-SX-01", roleType: "staff", name: "李小运维", phone: "137****2001", jobTitle: "站点运维", status: "启用", permissions: ["devices.view", "devices.edit", "orders.view", "users.view", "sites.view"] },
         { id: "EMP-SX-02", roleType: "staff", name: "王会计", phone: "136****2002", jobTitle: "财务助理", status: "启用", permissions: ["flows.view", "accounts.view", "orders.view", "refunds.view", "refunds.audit", "platform_fee.view", "inter_op.view", "deposit.view", "site_expenses.view", "site_expenses.edit"] }

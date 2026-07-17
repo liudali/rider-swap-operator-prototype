@@ -532,6 +532,10 @@
     function isEntityLogin() { return !state.loginEmployeeId; }
     function isStaffLogin() { const e = currentEmployee(); return e && e.roleType === "staff"; }
     function isTeamAdminLogin() { const e = currentEmployee(); return e && e.roleType === "team_admin"; }
+    function isPlatformAdminEmployee(employee) {
+      const e = employee || currentEmployee();
+      return !!e && e.entityId === ENT.platform.id;
+    }
     function isOrgAdminLogin() { return isTeamAdminLogin(); }
     function teamAdminScopeTeamId() {
       const e = currentEmployee();
@@ -633,15 +637,19 @@
           const prefix = p2 ? "【二期】" : "";
           return `<option value="entity:${ch.id}">${prefix}渠道商 · ${ch.name}（${ch.settlementMode}）</option>`;
         }).join("");
+      let adminOpts = "";
       let staffOpts = "";
       Object.keys(employeeStore).forEach(entityId => {
         (employeeStore[entityId] || []).forEach(e => {
           if (e.status !== "启用") return;
           const host = entityNameById(entityId);
+          const prefix = entityId === ENT.platform.id ? "" : "【二期】";
           if (e.roleType === "staff") {
-            staffOpts += `<option value="emp:${e.id}">【二期】${e.name} · ${e.jobTitle || "员工"}（${host}）</option>`;
+            const option = `<option value="emp:${e.id}">${prefix}${e.name} · ${e.jobTitle || "员工"}（${host}）</option>`;
+            if (entityId === ENT.platform.id) adminOpts += option;
+            else staffOpts += option;
           } else if (e.roleType === "team_admin") {
-            staffOpts += `<option value="emp:${e.id}">【二期】${e.name} · 团队管理员（${e.jobTitle || "团队"} · ${host}）</option>`;
+            staffOpts += `<option value="emp:${e.id}">${prefix}${e.name} · 团队管理员（${e.jobTitle || "团队"} · ${host}）</option>`;
           }
         });
       });
@@ -652,7 +660,8 @@
       }).join("");
       return `<optgroup label="经营主体">${entityOpts}</optgroup>
         <optgroup label="站点合伙人">${partnerOpts || "<option disabled>—</option>"}</optgroup>
-        <optgroup label="员工登录">${staffOpts || "<option disabled>—</option>"}</optgroup>`;
+        <optgroup label="管理员登录">${adminOpts || "<option disabled>—</option>"}</optgroup>
+        <optgroup label="员工登录（二期）">${staffOpts || "<option disabled>—</option>"}</optgroup>`;
     }
 
     function currentEntity() {
@@ -1927,7 +1936,7 @@
       if (emp) {
         return {
           displayName: emp.name,
-          roleLabel: "员工登录 · " + (emp.jobTitle || "运营"),
+          roleLabel: (isPlatformAdminEmployee(emp) ? "管理员登录 · " : "员工登录 · ") + (emp.jobTitle || "运营"),
           entity: entityNameById(emp.entityId),
           account: emp.phone || emp.id,
           loginAt: "演示会话"
@@ -4169,10 +4178,12 @@
     function employeeLoginBanner() {
       const emp = currentEmployee();
       if (!emp) return "";
-      const permLabels = employeePerms().map(pid => EMP_PERMISSIONS.find(x => x.id === pid)?.label || pid).join("、");
-      const scope = `数据范围：所属主体 ${entityNameById(emp.entityId)} 名下经营数据`;
+      const permissionOptions = employeePermissionOptions();
+      const permLabels = employeePerms().map(pid => permissionOptions.find(x => x.id === pid)?.label || pid).join("、");
+      const platformAdmin = isPlatformAdminEmployee(emp);
+      const scope = platformAdmin ? "数据范围：全平台；菜单按当前账号授权展示" : `数据范围：所属主体 ${entityNameById(emp.entityId)} 名下经营数据`;
       return `<div class="perm-banner">${noteBtn("employee_login")} ${noteBtn("employee_login_scope")}
-        当前登录 <strong>${emp.name}</strong>（运营员工 · ${emp.id}）· ${scope}
+        当前登录 <strong>${emp.name}</strong>（${platformAdmin ? "平台管理员" : "运营员工"} · ${emp.id}）· ${scope}
         <br>可见模块：${permLabels || "—"}</div>`;
     }
 
@@ -4232,6 +4243,7 @@
 
     function isPhase2View(view) {
       const v = view || state.view;
+      if (v === "employees" && isPlatformRole()) return false;
       if (PHASE2_VIEWS.has(v)) return true;
       if (v === "channelSales" && state.channelSalesTab === "platformMarketing") return true;
       return false;
@@ -4281,11 +4293,11 @@
           detail: "设备租赁公司侧放款/尽调确认，与运营商融资管理同一链路，标为二期。"
         };
       }
-      if (state.view === "employees") {
+      if (state.view === "employees" && !isPlatformRole()) {
         return {
           short: "二期",
           label: "员工模块",
-          detail: "各角色（平台 / 运营商 / 渠道商 / 资方等）「员工」账号与权限管理整块标为二期。一期不交付，原型仅演示。"
+          detail: "运营商 / 渠道商 / 资方等「员工」账号与权限管理整块标为二期。一期不交付，原型仅演示。"
         };
       }
       if (state.view === "platformMarketing" || isPhase2ChannelMarketingTab()) {
@@ -4298,11 +4310,19 @@
       if (isPhase2View(state.view)) {
         return {
           short: "二期",
-          label: (NAV_LABEL[state.view] || "模块") + " · 二期范围",
+          label: navLabel(state.view) + " · 二期范围",
           detail: "本模块属于二期范围。一期不交付，原型仅演示。"
         };
       }
       return null;
+    }
+
+    function employeeModuleLabel() {
+      return isPlatformRole() ? "管理员" : "员工";
+    }
+
+    function navLabel(view) {
+      return view === "employees" ? employeeModuleLabel() : (NAV_LABEL[view] || view);
     }
 
     function phase2BadgeHtml(extraClass) {
@@ -4384,11 +4404,11 @@
           stateKey: "operatorsTab",
           tabs: () => {
             const n = pendingOperatorWithdrawReviewCount();
-            return [
-              ["list", "运营商列表"],
-              ["withdrawReview", "运营商提现审核" + (n ? " (" + n + ")" : "")],
-              ["feeRate", "运营商平台服务费"]
-            ];
+            const tabs = [];
+            if (isEntityLogin() || employeeHasPerm("platform.operators")) tabs.push(["list", "运营商列表"]);
+            if (isEntityLogin() || employeeHasPerm("platform.operator_withdraw")) tabs.push(["withdrawReview", "运营商提现审核" + (n ? " (" + n + ")" : "")]);
+            if (isEntityLogin() || employeeHasPerm("platform.operator_fee")) tabs.push(["feeRate", "运营商平台服务费"]);
+            return tabs;
           }
         },
         l1Pricing: {
@@ -4478,7 +4498,7 @@
             return `<button type="button" class="${cls}" data-view="${k}" data-nav-sub="${tab}">${label}${tabMark}</button>`;
           }).join("");
           return `<div class="nav-group${on ? " open" : ""}">
-            <button type="button" class="${l1Cls}" data-view="${k}" data-nav-sub="${cur}">${NAV_LABEL[k] || k}${p2Mark}</button>
+            <button type="button" class="${l1Cls}" data-view="${k}" data-nav-sub="${cur}">${navLabel(k)}${p2Mark}</button>
             <div class="nav-l2-wrap">${children}</div>
           </div>`;
         }
@@ -4494,7 +4514,7 @@
           : k === "refundManage" && pendingRefundCount() > 0 ? " !"
           : k === "partnerWithdraw" && partnerPendingWithdrawTotal() > 0 ? " !"
           : "";
-        return `<button type="button" class="${cls}" data-view="${k}">${NAV_LABEL[k]}${p2Mark}${badge}</button>`;
+        return `<button type="button" class="${cls}" data-view="${k}">${navLabel(k)}${p2Mark}${badge}</button>`;
       }).join("");
     }
 
@@ -4504,7 +4524,7 @@
       const emp = currentEmployee();
       if (emp) {
         document.querySelector("#tenantName").textContent = emp.name;
-        document.querySelector("#tenantType").textContent = "员工登录 · " + (emp.jobTitle || "运营");
+        document.querySelector("#tenantType").textContent = (isPlatformAdminEmployee(emp) ? "管理员登录 · " : "员工登录 · ") + (emp.jobTitle || "运营");
         document.querySelector("#treeHint").textContent = "所属：" + entityNameById(emp.entityId);
       } else {
         const r = ROLE[state.role] || ROLE.operator;
@@ -11130,28 +11150,64 @@
       document.querySelector("#employeeModal").classList.remove("open");
     }
 
-    function permCheckboxes(selected) {
+    function isPlatformAdminManagement() {
+      return isPlatformRole();
+    }
+
+    function employeePermissionOptions() {
+      return isPlatformAdminManagement() ? PLATFORM_ADMIN_PERMISSIONS : EMP_PERMISSIONS;
+    }
+
+    function platformAdminTemplateLabel(templateId) {
+      return PLATFORM_ADMIN_TEMPLATES[templateId]?.label || "自定义";
+    }
+
+    function permCheckboxes(selected, disabled) {
       const sel = selected || [];
-      const perms = EMP_PERMISSIONS;
+      const perms = employeePermissionOptions();
       return `<div class="perm-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
         ${perms.map(p => `<label style="display:flex;align-items:center;gap:6px;font-size:13px">
-          <input type="checkbox" name="perm" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""}> ${p.label}
+          <input type="checkbox" name="perm" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""} ${disabled ? "disabled" : ""}> ${p.label}
         </label>`).join("")}
       </div>`;
+    }
+
+    function applyAdminTemplateToForm(templateId) {
+      const template = PLATFORM_ADMIN_TEMPLATES[templateId];
+      if (!template || templateId === "custom") return;
+      const selected = new Set(template.permissions);
+      document.querySelectorAll("#employeeForm input[name=perm]").forEach(input => {
+        input.checked = selected.has(input.value);
+      });
     }
 
     function openEmployeeForm(mode, roleType, id) {
       const isEdit = mode === "edit";
       const entity = isEdit ? employeeById(id) : {};
+      const platformAdmin = isPlatformAdminManagement();
+      const protectedAdmin = platformAdmin && !!entity.protected;
       state.employeeForm = { mode, roleType: "staff", id: id || null };
-      document.querySelector("#employeeFormTitle").textContent = (isEdit ? "编辑" : "新增") + "运营员工";
-      const fields = `
-          <label>姓名<input name="name" required value="${entity.name || ""}"></label>
-          <label>手机号<input name="phone" value="${entity.phone || ""}"></label>
+      document.querySelector("#employeeFormTitle").textContent = (isEdit ? "编辑" : "新增") + (platformAdmin ? "管理员" : "运营员工");
+      const commonFields = `
+          <label>姓名<input name="name" required value="${entity.name || ""}" ${protectedAdmin ? "disabled" : ""}></label>
+          <label>手机号<input name="phone" required value="${entity.phone || ""}" ${protectedAdmin ? "disabled" : ""}></label>`;
+      const fields = platformAdmin ? `
+          ${commonFields}
+          <label>角色模板<select name="adminTemplate" id="adminTemplateSelect" ${protectedAdmin ? "disabled" : ""}>
+            ${Object.entries(PLATFORM_ADMIN_TEMPLATES).filter(([key]) => key !== "super" || protectedAdmin).map(([key, tpl]) => `<option value="${key}" ${(entity.adminTemplate || "operations") === key ? "selected" : ""}>${tpl.label}</option>`).join("")}
+          </select></label>
+          <label>状态<select name="status" ${protectedAdmin ? "disabled" : ""}><option ${(entity.status || "启用") === "启用" ? "selected" : ""}>启用</option><option ${entity.status === "停用" ? "selected" : ""}>停用</option></select></label>
+          ${protectedAdmin ? `<p class="form-span-2" style="font-size:12px;color:var(--warn);margin:0">超级管理员受保护：不可修改权限、不可停用。</p>` : ""}
+          <fieldset style="border:0;padding:0;margin:0"><legend style="font-size:13px;color:var(--muted)">菜单权限 ${noteBtn("employees_perms")}</legend>${permCheckboxes(entity.permissions || PLATFORM_ADMIN_TEMPLATES.operations.permissions, protectedAdmin)}</fieldset>` : `
+          ${commonFields}
           <label>岗位<input name="jobTitle" value="${entity.jobTitle || ""}"></label>
           <label>状态<select name="status"><option ${(entity.status || "启用") === "启用" ? "selected" : ""}>启用</option><option ${entity.status === "停用" ? "selected" : ""}>停用</option></select></label>
           <fieldset style="border:0;padding:0;margin:0"><legend style="font-size:13px;color:var(--muted)">功能权限 ${noteBtn("employees_perms")}</legend>${permCheckboxes(entity.permissions)}</fieldset>`;
       document.querySelector("#employeeForm").innerHTML = fields;
+      const templateSelect = document.querySelector("#adminTemplateSelect");
+      if (templateSelect && !protectedAdmin) {
+        templateSelect.addEventListener("change", () => applyAdminTemplateToForm(templateSelect.value));
+      }
       document.querySelector("#employeeMask").classList.add("open");
       document.querySelector("#employeeModal").classList.add("open");
     }
@@ -11159,20 +11215,49 @@
     function saveEmployeeForm() {
       const f = state.employeeForm;
       if (!f) return;
-      const fd = new FormData(document.querySelector("#employeeForm"));
+      const employeeForm = document.querySelector("#employeeForm");
+      if (!employeeForm.checkValidity()) {
+        employeeForm.reportValidity();
+        return;
+      }
+      const fd = new FormData(employeeForm);
       const data = Object.fromEntries(fd.entries());
+      data.name = (data.name || "").trim();
+      data.phone = (data.phone || "").trim();
+      if (!data.name || !data.phone) return showProtoToast("姓名和手机号不能为空");
       const eid = currentEntity().id;
       if (!employeeStore[eid]) employeeStore[eid] = [];
       const isEdit = f.mode === "edit";
       const perms = fd.getAll("perm");
+      const existing = isEdit ? employeeStore[eid].find(x => x.id === f.id) : null;
+      const platformAdmin = isPlatformAdminManagement();
+      if (platformAdmin) {
+        if (existing?.protected) return showProtoToast("超级管理员不可修改");
+        if (data.adminTemplate === "super") return showProtoToast("不可新增超级管理员");
+        const duplicatePhone = employeeStore[eid].some(x => x.id !== f.id && x.phone === data.phone);
+        if (duplicatePhone) return showProtoToast("该手机号已存在");
+        if (!perms.length) return showProtoToast("至少选择一个菜单权限");
+        if (state.loginEmployeeId === f.id && data.status === "停用") return showProtoToast("不可停用当前登录账号");
+      }
+      let adminTemplate = data.adminTemplate || "custom";
+      if (platformAdmin && adminTemplate !== "custom") {
+        const templatePerms = PLATFORM_ADMIN_TEMPLATES[adminTemplate]?.permissions || [];
+        const sameTemplate = [...perms].sort().join("|") === [...templatePerms].sort().join("|");
+        if (!sameTemplate) adminTemplate = "custom";
+      }
       const row = {
-          id: f.id || "EMP-" + Date.now(),
+          id: f.id || (platformAdmin ? "ADM-PLAT-" : "EMP-") + Date.now().toString().slice(-6),
           roleType: "staff",
           name: data.name,
           phone: data.phone,
-          jobTitle: data.jobTitle,
+          jobTitle: platformAdmin ? platformAdminTemplateLabel(adminTemplate) : data.jobTitle,
           status: data.status,
-          permissions: perms
+          permissions: perms,
+          ...(platformAdmin ? {
+            adminTemplate,
+            lastLoginAt: existing?.lastLoginAt || "尚未登录",
+            protected: false
+          } : {})
         };
       if (isEdit) {
         const idx = employeeStore[eid].findIndex(x => x.id === f.id);
@@ -11185,10 +11270,13 @@
     }
 
     function renderEmployees() {
-      if (isStaffLogin() && !employeeHasPerm("employees.view")) {
-        return `${ownScopeBanner()}<p class="scope-hint">当前员工账号无「员工管理」权限。</p>`;
+      const platformAdmin = isPlatformAdminManagement();
+      const viewPermission = platformAdmin ? "platform.admins" : "employees.view";
+      const editPermission = platformAdmin ? "platform.admins" : "employees.edit";
+      if (isStaffLogin() && !employeeHasPerm(viewPermission)) {
+        return `${ownScopeBanner()}<p class="scope-hint">当前账号无「${employeeModuleLabel()}管理」权限。</p>`;
       }
-      const canEdit = isEntityLogin() || employeeHasPerm("employees.edit");
+      const canEdit = isEntityLogin() || employeeHasPerm(editPermission);
       const f = getPf();
       const filterRow = (e) => {
         if (e.roleType !== "staff") return false;
@@ -11199,6 +11287,34 @@
       };
       const rows = myEmployees().filter(filterRow);
       const staffCount = myStaff().length;
+      if (platformAdmin) {
+        const enabledCount = myStaff().filter(e => e.status === "启用").length;
+        const templateCount = new Set(myStaff().map(e => e.adminTemplate || "custom")).size;
+        const permissionOptions = employeePermissionOptions();
+        return `
+          ${ownScopeBanner()}
+          <div class="kpi-grid">
+            ${kpi("管理员总数", staffCount, "平台内部账号", "人", "employees_panel")}
+            ${kpi("启用账号", enabledCount, "可登录后台", "人", "employees_panel")}
+            ${kpi("角色模板", templateCount, "含自定义权限", "类", "employees_perms")}
+          </div>
+          <section class="panel">
+            ${panelHead("管理员列表", "角色模板 + 可自定义菜单权限 · 一期", "employees_panel", canEdit ? `<button type="button" class="btn primary" data-employee-add-staff>新增管理员</button>` : "")}
+            <div class="panel-body orders-table-wrap">
+              <table>
+                <thead><tr><th>姓名 / 手机号</th><th>角色模板</th><th>状态</th><th>权限摘要</th><th>最后登录</th><th>操作</th></tr></thead>
+                <tbody>${rows.map(e => `<tr>
+                  <td><strong>${e.name}</strong><br><small>${e.phone || "—"} · ${e.id}</small></td>
+                  <td>${tag(platformAdminTemplateLabel(e.adminTemplate))}</td>
+                  <td>${tag(e.status)}</td>
+                  <td><small>${(e.permissions || []).slice(0, 4).map(pid => permissionOptions.find(x => x.id === pid)?.label || pid).join("、")}${(e.permissions || []).length > 4 ? "…" : ""}</small></td>
+                  <td>${e.lastLoginAt || "尚未登录"}</td>
+                  <td class="row-actions">${e.protected ? `<span style="color:var(--muted)">受保护</span>` : canEdit ? `<button type="button" class="link-btn" data-employee-edit="${e.id}">编辑</button>` : "—"}</td>
+                </tr>`).join("") || "<tr><td colspan='6'>暂无管理员，请新增管理员并配置菜单权限</td></tr>"}</tbody>
+              </table>
+            </div>
+          </section>`;
+      }
 
       return `
         ${ownScopeBanner()}
@@ -16125,7 +16241,10 @@
       syncTenantUi();
       renderGlobalHeader();
       updateScopeHint();
-      let pageMeta = meta[state.view] || [NAV_LABEL[state.view] || "—", ""];
+      let pageMeta = meta[state.view] || [navLabel(state.view) || "—", ""];
+      if (state.view === "employees") {
+        pageMeta = [employeeModuleLabel(), isPlatformRole() ? "平台管理员维护与菜单权限配置。" : pageMeta[1]];
+      }
       const l2 = getNavL2(state.view);
       if (l2) {
         const cur = state[l2.stateKey];
@@ -16267,7 +16386,6 @@
     document.querySelector("#closeEmployeeForm").addEventListener("click", closeEmployeeForm);
     document.querySelector("#cancelEmployeeForm").addEventListener("click", closeEmployeeForm);
     document.querySelector("#employeeMask").addEventListener("click", closeEmployeeForm);
-    document.querySelector("#saveEmployeeForm").addEventListener("click", saveEmployeeForm);
     document.querySelector("#employeeForm").addEventListener("submit", e => { e.preventDefault(); saveEmployeeForm(); });
     document.querySelector("#closePoolForm").addEventListener("click", closePoolForm);
     document.querySelector("#cancelPoolForm").addEventListener("click", closePoolForm);
