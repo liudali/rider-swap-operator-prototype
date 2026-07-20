@@ -118,18 +118,21 @@
       if (submitBtn) submitBtn.textContent = "确定";
     }
 
-    function openProtoForm({ title, fields, submitLabel, onSubmit }) {
+    function openProtoForm({ title, fields, html, submitLabel, onSubmit, afterOpen, modalWidth }) {
       protoFormState = { onSubmit, phase: "form" };
       document.querySelector("#protoFormTitle").textContent = title || "填写信息";
       document.querySelector("#submitProtoForm").textContent = submitLabel || "确定";
       document.querySelector("#protoFormSuccess").hidden = true;
       document.querySelector("#protoFormError").hidden = true;
       document.querySelector("#cancelProtoForm")?.removeAttribute("hidden");
+      const modal = document.querySelector("#protoFormModal");
+      if (modal) modal.style.width = modalWidth || "min(480px,calc(100vw - 32px))";
       const form = document.querySelector("#protoForm");
       form.style.display = "";
-      form.innerHTML = (fields || []).map(renderProtoField).join("");
+      form.innerHTML = html || (fields || []).map(renderProtoField).join("");
       document.querySelector("#protoFormMask").classList.add("open");
       document.querySelector("#protoFormModal").classList.add("open");
+      if (typeof afterOpen === "function") afterOpen(form);
     }
 
     function submitProtoForm() {
@@ -3231,6 +3234,11 @@
       rf.pkgRefund = pkgRefund;
       rf.depositRefund = depositRefund || 0;
       rf.totalRefund = Math.round((pkgRefund + (depositRefund || 0)) * 100) / 100;
+      if (!isDepositOnlyRefund(rf)) {
+        rf.platformFeeRefund = Math.round((pkgRefund || 0) * 0.01 * 100) / 100;
+      } else {
+        rf.platformFeeRefund = 0;
+      }
       if (note) rf.operatorNote = note;
       rf.status = "已退款";
       rf.processedTime = new Date().toISOString().slice(0, 16).replace("T", " ");
@@ -3256,49 +3264,164 @@
       }
     }
 
+    function applyRefundReject(rf, reason) {
+      rf.status = "已驳回";
+      rf.rejectReason = reason;
+      rf.processedTime = new Date().toISOString().slice(0, 16).replace("T", " ");
+      rf.processedBy = currentEmployee()?.name || currentEntity().name;
+      const sc = serviceChangeRequests.find(x => x.id === rf.scId);
+      if (sc) sc.status = "已驳回";
+    }
+
+    /** 处理退款弹窗：可退口径 + 快捷策略 + 实退录入（全类型统一） */
+    function refundProcessCaps(rf) {
+      const pkg = packageOrders.find(p => p.id === rf.orderId);
+      const depositOnly = isDepositOnlyRefund(rf);
+      let purchaseDays = null;
+      let refundableDays = null;
+      if (pkg?.validFrom && pkg?.validTo) {
+        const start = new Date(pkg.validFrom.replace(/-/g, "/"));
+        const end = new Date(pkg.validTo.replace(/-/g, "/"));
+        purchaseDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
+        if (rf.usedDays != null) refundableDays = Math.max(0, purchaseDays - Number(rf.usedDays));
+        else if (rf.coolingPeriod && typeof calcCoolingSuggestedRefund === "function") {
+          const c = calcCoolingSuggestedRefund(pkg);
+          if (c && typeof c === "object") {
+            purchaseDays = c.totalDays;
+            refundableDays = c.remaining;
+          }
+        }
+      }
+      const maxPkg = depositOnly ? 0 : Number(rf.suggestedRefund ?? rf.pkgRefund) || 0;
+      const maxDep = depositOnly
+        ? (Number(rf.depositRefund) || Number(pkg?.depositPaid) || 0)
+        : (Number(rf.depositRefund) || Number(pkg?.depositPaid) || 0);
+      const emergencySwaps = Number(rf.emergencySwaps) || Number(pkg?.emergencySwapsPurchased) || 0;
+      return {
+        pkg, depositOnly, purchaseDays, refundableDays, emergencySwaps,
+        maxPkg, maxDep,
+        defaultPkg: depositOnly ? 0 : Number(rf.suggestedRefund ?? rf.pkgRefund) || 0,
+        defaultDep: Number(rf.depositRefund) || 0
+      };
+    }
+
     function promptApproveRefund(rfId) {
       const rf = refundRequests.find(x => x.id === rfId);
       if (!rf || rf.status !== "待审核") return;
       if (!canAuditRefund()) return;
-      if (isDepositOnlyRefund(rf)) {
-        openProtoForm({
-          title: "确认押金退还",
-          fields: [
-            { name: "depositRefund", label: "退押金（元）", value: String(rf.depositRefund || 0) },
-            { name: "note", label: "审核说明（可选）", value: rf.operatorNote || "" }
-          ],
-          submitLabel: "确认退押",
-          onSubmit: (data) => {
-            const dep = parseFloat(data.depositRefund);
-            if (Number.isNaN(dep) || dep < 0) return "请填写有效押金退款金额";
-            applyRefundApproval(rf, 0, dep || 0, (data.note || "").trim());
-            return { successMessage: "已确认退押 ¥" + rf.totalRefund + "，系统将原路执行；套餐服务不受影响", afterClose: () => render() };
+      openRefundProcessForm(rf);
+    }
+
+    function openRefundProcessForm(rf) {
+      const caps = refundProcessCaps(rf);
+      const fmtDay = (n) => (n == null ? "—" : n + " 天");
+      const html = `
+        <div class="refund-process" data-refund-mode="manual">
+          <div class="refund-process-meta">
+            <div><span>类型</span><strong>${escProtoAttr(rf.type)}</strong></div>
+            <div><span>套餐</span><strong>${escProtoAttr(rf.pkgName || "—")}</strong></div>
+            <div><span>购买时长</span><strong>${fmtDay(caps.purchaseDays)}</strong></div>
+            <div><span>可退时长</span><strong>${fmtDay(caps.refundableDays)}</strong></div>
+            <div><span>购买紧急快换次数</span><strong>${caps.emergencySwaps} 次</strong></div>
+            <div><span>可退订单金额</span><strong>¥ ${caps.maxPkg.toFixed(2)}</strong></div>
+            <div><span>可退押金金额</span><strong>¥ ${caps.maxDep.toFixed(2)}</strong></div>
+          </div>
+          <div class="refund-process-presets" role="group" aria-label="退款策略">
+            <button type="button" class="refund-preset active" data-refund-preset="manual">手动填写退款金额</button>
+            <button type="button" class="refund-preset" data-refund-preset="full">退还全部金额</button>
+            <button type="button" class="refund-preset" data-refund-preset="deposit">仅退还押金</button>
+            <button type="button" class="refund-preset" data-refund-preset="reject">拒绝退款</button>
+          </div>
+          <div class="refund-process-amounts" data-refund-amounts>
+            <label>实退押金金额<input name="depositRefund" type="number" step="0.01" min="0" max="${caps.maxDep}" value="${caps.defaultDep}" /></label>
+            <label>实退订单金额<input name="pkgRefund" type="number" step="0.01" min="0" max="${caps.maxPkg}" value="${caps.defaultPkg}" ${caps.depositOnly ? "readonly" : ""} /></label>
+          </div>
+          <div class="refund-process-reject" data-refund-reject hidden>
+            <label>拒绝原因<textarea name="rejectReason" rows="2" placeholder="请填写拒绝原因">${escProtoAttr(rf.rejectReason || "")}</textarea></label>
+          </div>
+          <p class="refund-process-hint">${caps.depositOnly
+            ? "押金退还不完结套餐；实退订单金额固定为 0。"
+            : "实退金额不得超过上方可退口径；确认后原路退至用户支付渠道。"}</p>
+        </div>`;
+      openProtoForm({
+        title: "处理退款",
+        html,
+        submitLabel: "确认退款",
+        modalWidth: "min(560px,calc(100vw - 32px))",
+        afterOpen: (form) => {
+          const root = form.querySelector(".refund-process");
+          const amounts = form.querySelector("[data-refund-amounts]");
+          const rejectBox = form.querySelector("[data-refund-reject]");
+          const depInput = form.querySelector('[name="depositRefund"]');
+          const pkgInput = form.querySelector('[name="pkgRefund"]');
+          const submitBtn = document.querySelector("#submitProtoForm");
+          const setMode = (mode) => {
+            root.dataset.refundMode = mode;
+            form.querySelectorAll("[data-refund-preset]").forEach(b => {
+              b.classList.toggle("active", b.dataset.refundPreset === mode);
+            });
+            const isReject = mode === "reject";
+            amounts.hidden = isReject;
+            rejectBox.hidden = !isReject;
+            submitBtn.textContent = isReject ? "确认拒绝" : "确认退款";
+            if (mode === "full") {
+              depInput.value = caps.maxDep;
+              pkgInput.value = caps.maxPkg;
+              depInput.readOnly = false;
+              if (!caps.depositOnly) pkgInput.readOnly = false;
+            } else if (mode === "deposit") {
+              depInput.value = caps.maxDep;
+              pkgInput.value = 0;
+              depInput.readOnly = false;
+              if (!caps.depositOnly) pkgInput.readOnly = false;
+            } else if (mode === "manual") {
+              depInput.readOnly = false;
+              if (!caps.depositOnly) pkgInput.readOnly = false;
+            }
+          };
+          form.querySelectorAll("[data-refund-preset]").forEach(btn => {
+            btn.onclick = () => setMode(btn.dataset.refundPreset);
+          });
+        },
+        onSubmit: (data) => {
+          const mode = document.querySelector(".refund-process")?.dataset.refundMode || "manual";
+          if (mode === "reject") {
+            const reason = (data.rejectReason || "").trim();
+            if (!reason) return "请填写拒绝原因";
+            applyRefundReject(rf, reason);
+            return { successMessage: "已拒绝退款", afterClose: () => render() };
           }
-        });
-        return;
-      }
-      if (rf.coolingPeriod || rf.type === "冷静期退款") {
-        openProtoForm({
-          title: "确认冷静期退款",
-          fields: [
-            { name: "pkgRefund", label: "退套餐费（元）", value: String(rf.suggestedRefund ?? rf.pkgRefund) },
-            { name: "depositRefund", label: "退押金（元）", value: String(rf.depositRefund || 0) },
-            { name: "note", label: "调整说明（可选）", value: rf.operatorNote || "" }
-          ],
-          submitLabel: "确认退款",
-          onSubmit: (data) => {
-            const pkg = parseFloat(data.pkgRefund);
-            const dep = parseFloat(data.depositRefund);
-            if (Number.isNaN(pkg) || pkg < 0) return "请填写有效套餐退款金额";
-            if (Number.isNaN(dep) || dep < 0) return "请填写有效押金退款金额";
-            applyRefundApproval(rf, pkg, dep || 0, (data.note || "").trim());
-            return { successMessage: "已确认退款 ¥" + rf.totalRefund + "，系统将原路执行", afterClose: () => render() };
-          }
-        });
-        return;
-      }
-      applyRefundApproval(rf, rf.pkgRefund, rf.depositRefund, null);
-      render();
+          const dep = parseFloat(data.depositRefund);
+          const pkg = parseFloat(data.pkgRefund);
+          if (Number.isNaN(dep) || dep < 0) return "请填写有效实退押金金额";
+          if (Number.isNaN(pkg) || pkg < 0) return "请填写有效实退订单金额";
+          if (dep > caps.maxDep + 1e-9) return "实退押金不得超过可退押金 ¥" + caps.maxDep.toFixed(2);
+          if (pkg > caps.maxPkg + 1e-9) return "实退订单金额不得超过可退订单金额 ¥" + caps.maxPkg.toFixed(2);
+          if (caps.depositOnly && pkg > 0) return "押金退还不可退订单金额";
+          if (dep === 0 && pkg === 0) return "实退合计须大于 0";
+          applyRefundApproval(rf, pkg, dep, null);
+          const msg = caps.depositOnly
+            ? "已确认退押 ¥" + rf.totalRefund + "，系统将原路执行；套餐服务不受影响"
+            : "已确认退款 ¥" + rf.totalRefund + "，系统将原路执行";
+          return { successMessage: msg, afterClose: () => render() };
+        }
+      });
+    }
+
+    function promptRejectRefund(rfId) {
+      const rf = refundRequests.find(x => x.id === rfId);
+      if (!rf || rf.status !== "待审核") return;
+      if (!canAuditRefund()) return;
+      openProtoForm({
+        title: "驳回退款",
+        fields: [{ name: "reason", label: "驳回原因", value: "仍持有电池，请先还电" }],
+        onSubmit: (data) => {
+          const reason = (data.reason || "").trim();
+          if (!reason) return "请填写驳回原因";
+          applyRefundReject(rf, reason);
+          return { afterClose: () => render() };
+        }
+      });
     }
 
     function myRefundRequests() {
@@ -10747,7 +10870,7 @@
               <div><strong>${s.label}</strong>${s.time ? `<br><small style="color:var(--muted)">${s.time}</small>` : ""}${s.state === "fail" && rf.rejectReason ? `<br><small style="color:var(--red)">${rf.rejectReason}</small>` : ""}</div>
             </div>`).join("")}</div>
             ${rf.status === "待审核" && canAuditRefund() ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn primary" data-approve-refund="${rf.id}">${isDepositOnlyRefund(rf) ? "确认退押" : rf.coolingPeriod ? "确认退款（可改金额）" : "确认退款"}</button>
+              <button type="button" class="btn primary" data-approve-refund="${rf.id}">处理退款</button>
               <button type="button" class="btn" data-reject-refund="${rf.id}">驳回</button>
             </div>${isDepositOnlyRefund(rf) ? `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">${noteBtn("deposit_refund_mode")} 仅退押金，套餐继续有效；确认后原路退运营商子商户实收。</p>` : rf.coolingPeriod ? `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">${noteBtn("refund_cooling_period")} 冷静期退款须运营商确认实退金额，系统仅提供建议值。</p>` : ""}` : rf.status === "待审核" ? `<p class="perm-banner" style="margin:12px 0 0">待有「退款确认操作」权限的员工审核</p>` : ""}
           </div>
@@ -11079,7 +11202,7 @@
               </tr></thead>
               <tbody>${rows.length ? rows.map(r => {
                 const auditBtns = r.status === "待审核" && auditPerm
-                  ? `<button type="button" class="link-btn" data-approve-refund="${r.id}">确认退款</button>
+                  ? `<button type="button" class="link-btn" data-approve-refund="${r.id}">处理退款</button>
                      <button type="button" class="link-btn" data-reject-refund="${r.id}">驳回</button>`
                   : r.status === "待审核" ? `<small style="color:var(--muted)">待授权</small>` : "";
                 const actions = `<button type="button" class="link-btn" data-open-refund="${r.id}">详情</button>${auditBtns ? " " + auditBtns : ""}`;
@@ -15740,26 +15863,7 @@
         btn.onclick = () => promptApproveRefund(btn.dataset.approveRefund);
       });
       root.querySelectorAll("[data-reject-refund]").forEach(btn => {
-        btn.onclick = () => {
-          const rf = refundRequests.find(x => x.id === btn.dataset.rejectRefund);
-          if (!rf || rf.status !== "待审核") return;
-          if (!canAuditRefund()) return;
-          openProtoForm({
-            title: "驳回退款",
-            fields: [{ name: "reason", label: "驳回原因", value: "仍持有电池，请先还电" }],
-            onSubmit: (data) => {
-              const reason = (data.reason || "").trim();
-              if (!reason) return "请填写驳回原因";
-              rf.status = "已驳回";
-              rf.rejectReason = reason;
-              rf.processedTime = new Date().toISOString().slice(0, 16).replace("T", " ");
-              rf.processedBy = currentEmployee()?.name || currentEntity().name;
-              const sc = serviceChangeRequests.find(x => x.id === rf.scId);
-              if (sc) sc.status = "已驳回";
-              return { afterClose: () => render() };
-            }
-          });
-        };
+        btn.onclick = () => promptRejectRefund(btn.dataset.rejectRefund);
       });
       root.querySelectorAll("[data-view-jump]").forEach(btn => {
         btn.onclick = () => {

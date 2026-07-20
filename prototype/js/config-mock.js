@@ -394,7 +394,7 @@
       orders_pkg: { title: "套餐购买订单", content: "骑手支付购买的包月/次卡订单，定义服务有效期与额度。支持中途完结退款、冻结/解冻。一笔套餐在有效期内可产生多笔换电订单。" },
       orders_service_change: { title: "服务变更", content: "骑手发起的<strong>中途完结</strong>及<strong>冻结/解冻</strong>记录。中途完结进入退款流程；冻结/解冻在个人用户满足条件时<strong>系统自动生效</strong>，本后台只读查询。" },
       orders_early_end: { title: "退款追溯", content: "退款详情抽屉展示<strong>进度步骤</strong>、关联<strong>服务变更单/套餐单</strong>及<strong>支付与退款流水</strong>、清分冲正；与列表审核操作在同一模块完成。" },
-      refund_manage: { title: "退款管理", content: "C 端退订/中途完结/冷静期/<strong>押金退还</strong>统一入口。套餐退款与押金退还可<strong>分别</strong>设置自动/手动。<strong>支付渠道按比例原路退</strong>：退套餐费时<strong>平台 C 端 1% 同步按比例冲正退还</strong>（见 decision-008）。押金不参与 1%，退押无平台费冲正。" },
+      refund_manage: { title: "退款管理", content: "C 端退订/中途完结/冷静期/<strong>押金退还</strong>统一入口。待审单点「处理退款」：展示可退口径，快捷策略（手动/全部/仅押金/拒绝），录入实退押金与实退订单金额（≤可退）。套餐退款与押金退还可<strong>分别</strong>设置自动/手动。<strong>支付渠道按比例原路退</strong>：退套餐费时<strong>平台 C 端 1% 同步按比例冲正退还</strong>（见 decision-008）。押金不参与 1%，退押无平台费冲正。" },
       refund_platform_fee: { title: "平台费退还", content: "微信/支付宝等通道退款按分账比例回退。<br>· 退套餐费 R 时：平台费退还 ≈ R × C 端费率（或 原平台费 × R/原实付）<br>· 清分明细记「平台费冲正」<br>· <strong>押金</strong>未参与分账 → 退押不冲平台费<br>· 废止旧口径「平台 1% 不退」（D24）在 C 端原路退场景的适用" },
       refund_cooling_period: { title: "3 天冷静期", content: "自<strong>支付成功/开通服务</strong>起 <strong>3 个自然日</strong>内，用户可申请退款。<br>建议应退套餐费 = 实付 ×（总天数 − 已使用天数）÷ 总天数；押金按还电规则另计。<br><strong>默认须运营商审核</strong>；确认退款时可修改实退金额。<br>超过 3 天：不享受冷静期强制退款权益；平台不主动退还，用户可尝试中途完结（须符合 SKU 规则）。" },
       refund_mode_auto: { title: "套餐退款 · 自动", content: "开启后，符合 §5.2.1 SKU 规则（<strong>不含冷静期</strong>）且已还电 → 系统自动原路退。<strong>冷静期申请始终须人工确认</strong>（不受自动模式影响）。" },
