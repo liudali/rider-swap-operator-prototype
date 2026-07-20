@@ -2417,9 +2417,20 @@
     };
 
     let depositRechargeOrders = [
+      { id: "DR-20260720-010", operatorId: "OP-HZ", amount: 8000, transferRef: "20260720556677", payerAccount: "6222****3301", transferDate: "2026-07-20", status: "待确认", submitTime: "2026-07-20 09:15", confirmTime: null, confirmedBy: null, remark: "新入网首期保证金" },
+      { id: "DR-20260719-009", operatorId: "OP-SX", amount: 2000, transferRef: "20260719443322", payerAccount: "3100****8821", transferDate: "2026-07-19", status: "待确认", submitTime: "2026-07-19 14:30", confirmTime: null, confirmedBy: null, remark: "跨网余额不足预警补充" },
+      { id: "DR-20260718-008", operatorId: "OP-BJ", amount: 6000, transferRef: "20260718998877", payerAccount: "6217****5501", transferDate: "2026-07-18", status: "待确认", submitTime: "2026-07-18 11:00", confirmTime: null, confirmedBy: null, remark: "7月保证金补缴" },
+      { id: "DR-20260717-007", operatorId: "OP-LJZ", amount: 5000, transferRef: "20260717887766", payerAccount: "2088999***", transferDate: "2026-07-17", status: "待确认", submitTime: "2026-07-17 10:20", confirmTime: null, confirmedBy: null, remark: "恢复跨网服务" },
+      { id: "DR-20260716-006", operatorId: "OP-SX", amount: 3000, transferRef: "20260716776655", payerAccount: "3100****8821", transferDate: "2026-07-16", status: "已确认", submitTime: "2026-07-16 09:00", confirmTime: "2026-07-16 14:30", confirmedBy: "平台财务", remark: "7月追加" },
+      { id: "DR-20260714-005", operatorId: "OP-BJ", amount: 4000, transferRef: "20260714665544", payerAccount: "6217****5501", transferDate: "2026-07-14", status: "已确认", submitTime: "2026-07-14 15:00", confirmTime: "2026-07-14 17:00", confirmedBy: "平台财务", remark: "日清划扣后补充" },
+      { id: "DR-20260712-004", operatorId: "OP-LJZ", amount: 2000, transferRef: "20260712554433", payerAccount: "2088999***", transferDate: "2026-07-12", status: "已驳回", submitTime: "2026-07-12 11:30", confirmTime: "2026-07-12 16:00", confirmedBy: "平台财务", remark: "续费", rejectReason: "转账金额与申请不一致" },
+      { id: "DR-20260710-003", operatorId: "OP-HZ", amount: 3000, transferRef: "20260710443322", payerAccount: "6222****3301", transferDate: "2026-07-10", status: "已确认", submitTime: "2026-07-10 10:00", confirmTime: "2026-07-10 15:30", confirmedBy: "平台财务", remark: "试运营保证金" },
+      { id: "DR-20260611-002", operatorId: "OP-SX", amount: 5000, transferRef: "20260611098765", payerAccount: "3100****8821", transferDate: "2026-06-11", status: "已确认", submitTime: "2026-06-11 09:30", confirmTime: "2026-06-11 14:00", confirmedBy: "平台财务", remark: "补足跨网清分" },
       { id: "DR-20260608-001", operatorId: "OP-SX", amount: 10000, transferRef: "20260608123456", payerAccount: "3100****8821", transferDate: "2026-06-08", status: "已确认", submitTime: "2026-06-08 10:20", confirmTime: "2026-06-08 15:00", confirmedBy: "平台财务", remark: "首期保证金" },
-      { id: "DR-20260611-002", operatorId: "OP-SX", amount: 5000, transferRef: "20260611098765", payerAccount: "3100****8821", transferDate: "2026-06-11", status: "待确认", submitTime: "2026-06-11 09:30", confirmTime: null, confirmedBy: null, remark: "补足跨网清分" },
-      { id: "DR-20260610-003", operatorId: "OP-LJZ", amount: 3000, transferRef: "20260610111222", payerAccount: "2088999***", transferDate: "2026-06-10", status: "已驳回", submitTime: "2026-06-10 11:00", confirmTime: "2026-06-10 16:00", confirmedBy: "平台财务", remark: "续费", rejectReason: "转账金额与申请不一致" }
+      { id: "DR-20260605-000", operatorId: "OP-LJZ", amount: 8000, transferRef: "20260605332211", payerAccount: "2088999***", transferDate: "2026-06-05", status: "已确认", submitTime: "2026-06-05 09:45", confirmTime: "2026-06-05 16:20", confirmedBy: "平台财务", remark: "入网保证金" },
+      { id: "DR-20260601-A01", operatorId: "OP-BJ", amount: 5000, transferRef: "20260601221100", payerAccount: "6217****5501", transferDate: "2026-06-01", status: "已确认", submitTime: "2026-06-01 08:30", confirmTime: "2026-06-01 11:00", confirmedBy: "平台财务", remark: "入网保证金" },
+      { id: "DR-20260528-A02", operatorId: "OP-SX", amount: 15000, transferRef: "20260528110099", payerAccount: "3100****8821", transferDate: "2026-05-28", status: "已确认", submitTime: "2026-05-28 10:00", confirmTime: "2026-05-28 14:30", confirmedBy: "平台财务", remark: "季度预缴" },
+      { id: "DR-20260520-A03", operatorId: "OP-LJZ", amount: 2000, transferRef: "20260520009988", payerAccount: "2088999***", transferDate: "2026-05-20", status: "已驳回", submitTime: "2026-05-20 11:00", confirmTime: "2026-05-20 15:00", confirmedBy: "平台财务", remark: "日常补充", rejectReason: "付款户与注册不符" }
     ];
 
     let depositLedger = [

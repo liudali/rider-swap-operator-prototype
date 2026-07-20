@@ -8,7 +8,7 @@
       platformUsersTab: "info",
       platformUsersPage: 1,
       platformUsersPageSize: 10,
-      platformLeasingTab: "companies", depositTab: "pending", operatorCreditTab: "assignments",
+      platformLeasingTab: "companies", depositTab: "pending", depositRechargeSubTab: "waiting", depositRechargePendingPage: 1, depositRechargeProcessedPage: 1, operatorCreditTab: "assignments",
       dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider",
       pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
       channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
@@ -7698,13 +7698,20 @@
       const recv = platformClearingReceiveAccount;
       let body = "";
       if (tab === "pending") {
-        const pending = depositRechargeOrders.filter(o => o.status === "待确认");
-        body = `<section class="panel">
-          ${panelHead("待确认充值", "核对银行到账后确认入账", "deposit_manage")}
-          <div class="panel-body orders-table-wrap">
+        const sub = state.depositRechargeSubTab || "waiting";
+        const pendingRows = depositRechargeOrders.filter(o => o.status === "待确认");
+        const processedRows = depositRechargeOrders.filter(o => o.status !== "待确认");
+        const subTabs = panelTopTabs([
+          ["waiting", "待确认 (" + pendingRows.length + ")"],
+          ["processed", "已处理 (" + processedRows.length + ")"]
+        ], sub, "dep-recharge-sub");
+        let subBody = "";
+        if (sub === "waiting") {
+          const pg = paginateList(pendingRows, state.depositRechargePendingPage, 10);
+          subBody = `<div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>单号</th><th>运营商</th><th>金额</th><th>转账日</th><th>流水号</th><th>付款户</th><th>提交时间</th><th>备注</th><th>操作</th></tr></thead>
-              <tbody>${pending.map(o => `<tr>
+              <tbody>${pg.slice.map(o => `<tr>
                 <td>${o.id}</td>
                 <td>${operatorNameById(o.operatorId)}<br><small>${o.operatorId}</small></td>
                 <td><strong>¥${o.amount.toLocaleString("zh-CN")}</strong></td>
@@ -7716,20 +7723,28 @@
                 </td>
               </tr>`).join("") || "<tr><td colspan='9'>暂无待确认申请</td></tr>"}</tbody>
             </table>
-          </div>
-        </section>
-        <section class="panel">
-          ${panelHead("近期已处理", "已确认 / 已驳回", "deposit_manage")}
-          <div class="panel-body orders-table-wrap">
+            ${renderTablePager(pg, "dep-pending-page")}
+          </div>`;
+        } else {
+          const pg = paginateList(processedRows, state.depositRechargeProcessedPage, 10);
+          subBody = `<div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>单号</th><th>运营商</th><th>金额</th><th>状态</th><th>处理时间</th><th>处理人</th></tr></thead>
-              <tbody>${depositRechargeOrders.filter(o => o.status !== "待确认").slice(0, 8).map(o => `<tr>
-                <td>${o.id}</td><td>${operatorNameById(o.operatorId)}</td>
+              <thead><tr><th>单号</th><th>运营商</th><th>金额</th><th>状态</th><th>转账日</th><th>流水号</th><th>提交时间</th><th>处理时间</th><th>处理人</th><th>备注</th></tr></thead>
+              <tbody>${pg.slice.map(o => `<tr>
+                <td>${o.id}</td><td>${operatorNameById(o.operatorId)}<br><small>${o.operatorId}</small></td>
                 <td>¥${o.amount.toLocaleString("zh-CN")}</td><td>${tag(o.status)}</td>
-                <td>${o.confirmTime || "—"}</td><td>${o.confirmedBy || "—"}</td>
-              </tr>`).join("") || "<tr><td colspan='6'>暂无</td></tr>"}</tbody>
+                <td>${o.transferDate}</td><td>${o.transferRef}</td>
+                <td>${o.submitTime}</td><td>${o.confirmTime || "—"}</td><td>${o.confirmedBy || "—"}</td>
+                <td>${o.status === "已驳回" && o.rejectReason ? `<span style="color:var(--red)">${o.rejectReason}</span>` : (o.remark || "—")}</td>
+              </tr>`).join("") || "<tr><td colspan='10'>暂无已处理记录</td></tr>"}</tbody>
             </table>
-          </div>
+            ${renderTablePager(pg, "dep-processed-page")}
+          </div>`;
+        }
+        body = `<section class="panel panel-with-top-tabs">
+          ${panelHead("充值确认", "核对银行到账后确认 / 驳回", "deposit_manage")}
+          ${subTabs}
+          ${subBody}
         </section>`;
       } else if (tab === "accounts") {
         body = `<section class="panel">
@@ -15817,7 +15832,16 @@
         };
       });
       root.querySelectorAll("[data-depstab]").forEach(btn => {
-        btn.onclick = () => { state.depositTab = btn.dataset.depstab; render(); };
+        btn.onclick = () => { state.depositTab = btn.dataset.depstab; state.depositRechargeSubTab = "waiting"; render(); };
+      });
+      root.querySelectorAll("[data-dep-recharge-sub]").forEach(btn => {
+        btn.onclick = () => { state.depositRechargeSubTab = btn.dataset.depRechargeSub; render(); };
+      });
+      root.querySelectorAll("[data-dep-pending-page]").forEach(btn => {
+        btn.onclick = () => { state.depositRechargePendingPage = Number(btn.dataset.depPendingPage); render(); };
+      });
+      root.querySelectorAll("[data-dep-processed-page]").forEach(btn => {
+        btn.onclick = () => { state.depositRechargeProcessedPage = Number(btn.dataset.depProcessedPage); render(); };
       });
       if (root === document) {
       const submitDepBtn = document.querySelector("#submitDepositRecharge");
