@@ -2,7 +2,7 @@
       role: "operator", loginKey: "entity:operator", channelEntityId: "CH-SF", leasingEntityId: "LEASE-HD", loginEmployeeId: null,
       view: "overview",
       deviceTab: "cabinet", orderTab: "package", flowTab: "receipt",
-      platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "ledger", platformChannelTab: "list", platformMarketingTab: "campaigns",
+      platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "ledger", platformDeviceOpenImportModal: false, platformChannelTab: "list", platformMarketingTab: "campaigns",
       operatorsTab: "list",
       l1PricingTab: "crossNet",
       platformUsersTab: "info",
@@ -36,7 +36,7 @@
       sitePartnerId: null,
       detailSiteExpenseId: null,
       detailSitePartnersId: null,
-      detailSubId: null, detailSwapId: null, detailLeaseId: null, detailOperatorId: null, detailRefundId: null,
+      detailSubId: null, detailSwapId: null, detailSubFromSwapId: null, detailLeaseId: null, detailOperatorId: null, detailRefundId: null,
       cabinetDetailSn: null
     };
 
@@ -754,7 +754,7 @@
       }
       if (state.view === "l1Pricing") return "l1Pricing_" + (state.l1PricingTab || "crossNet");
       if (state.view === "platformFlows") return "platformFlows_" + state.platformFlowTab;
-      if (state.view === "platformDevices") return "platformDevices_" + state.platformDeviceTab;
+      if (state.view === "platformDevices") return "platformDevices_ledger";
       if (state.view === "platformChannels") return "platformChannels_list";
       if (state.view === "platformMarketing") return "platformMarketing_" + state.platformMarketingTab;
       if (state.view === "deviceBinding") return "platformDevices_ledger";
@@ -3212,6 +3212,7 @@
       if (!operatorPersonalDepositSettings[eid]) {
         operatorPersonalDepositSettings[eid] = {
           amount: 99, enabled: true, scope: "个人套餐",
+          wechatPayScoreMin: 650, zhimaScoreMin: 650,
           note: "信用不足时实缴；达标免押则实收 ¥0",
           updatedAt: new Date().toISOString().slice(0, 10),
           updatedBy: entityNameById(eid)
@@ -3221,6 +3222,8 @@
       if (s.amount == null || Number.isNaN(Number(s.amount))) s.amount = 99;
       if (s.enabled == null) s.enabled = true;
       if (!s.scope) s.scope = "个人套餐";
+      if (s.wechatPayScoreMin == null || Number.isNaN(Number(s.wechatPayScoreMin))) s.wechatPayScoreMin = 650;
+      if (s.zhimaScoreMin == null || Number.isNaN(Number(s.zhimaScoreMin))) s.zhimaScoreMin = 650;
       return s;
     }
 
@@ -4594,7 +4597,6 @@
         platformUsers: { stateKey: "platformUsersTab", tabs: [["info", "用户信息"], ["depositStats", "用户押金统计"], ["serviceChange", "服务变更"]] },
         platformLeasing: { stateKey: "platformLeasingTab", tabs: [["companies", "租赁公司"], ["bindings", "租赁关系绑定"]] },
         platformOrders: { stateKey: "platformOrderTab", tabs: [["package", "套餐购买订单"], ["swap", "换电订单"], ["channel", "渠道商订单"]] },
-        platformDevices: { stateKey: "platformDeviceTab", tabs: [["ledger", "设备台账"], ["import", "批量导入"]] },
         platformMarketing: { stateKey: "platformMarketingTab", tabs: [["campaigns", "活动管理"], ["agreements", "运营商签约"], ["links", "链接与二维码"], ["pending", "成交订单"], ["settlements", "券核销结算"], ["statements", "营销对账"]] },
         platformFlows: { stateKey: "platformFlowTab", tabs: [["userPay", "用户支付记录"], ["interOp", "运营商之间"], ["platformFee", "平台提成"]] }
       };
@@ -7091,10 +7093,150 @@
 
     function openBindForm(sn) {
       state.view = "platformDevices";
-      state.platformDeviceTab = "import";
+      state.platformDeviceTab = "ledger";
+      state.platformDeviceOpenImportModal = true;
       closeBindForm();
       render();
-      window.alert("演示：请在「批量导入」填写「SN,运营商ID」完成归属（类型/参数由 IoT 回填）");
+      window.alert("演示：请在「批量导入」弹窗中选择运营商并填写/上传设备 SN（类型/参数由 IoT 回填）");
+    }
+
+    /** 解析 SN 列表：换行 / 逗号 / 制表符分隔 */
+    function parseDeviceSnList(raw) {
+      return [...new Set(String(raw || "").split(/[\n\r,，\t]+/).map(s => s.trim()).filter(Boolean))];
+    }
+
+    /** 表格文件文本 → SN 列表（取首列；首行若为 SN 表头则跳过） */
+    function parseDeviceSnFileText(text) {
+      const lines = String(text || "").trim().split(/\r?\n/).filter(l => l.trim());
+      if (!lines.length) return [];
+      const firstCell = lines[0].split(/[,，\t]/)[0].trim();
+      const start = /^(sn|设备\s*sn|设备序列号|序列号)$/i.test(firstCell) ? 1 : 0;
+      const sns = [];
+      for (let i = start; i < lines.length; i++) {
+        const col = lines[i].split(/[,，\t]/)[0].trim();
+        if (col) sns.push(col);
+      }
+      return [...new Set(sns)];
+    }
+
+    function runDeviceSnImport(operatorId, sns) {
+      let ok = 0;
+      const fails = [];
+      sns.forEach(sn => {
+        const res = assignDeviceFromIot(sn, operatorId);
+        if (res.ok) ok++;
+        else fails.push(sn + "（" + res.reason + "）");
+      });
+      return { ok, fails };
+    }
+
+    let deviceImportParsedSns = [];
+
+    function openDeviceImportModal() {
+      const opOpts = platformOperators
+        .filter(o => o.status === "在营")
+        .map(o => `<option value="${escProtoAttr(o.id)}">${escProtoAttr(o.name)}（${o.id}）</option>`)
+        .join("");
+      const iotCount = platformDeviceInventory.length;
+      deviceImportParsedSns = [];
+      const html = `<div class="device-import" data-import-mode="manual">
+          <p class="refund-process-hint" style="margin:0">${noteBtn("platform_devices_import")}${noteBtn("platform_device_bind")}
+            先选归属运营商，再录入 SN。类型/城市/规格由 IoT 按 SN 回填；导入即进台账（无待绑定）。演示 IoT 可查 ${iotCount} 台。</p>
+          <label>归属运营商
+            <select name="operatorId" required>
+              <option value="">请选择运营商</option>
+              ${opOpts}
+            </select>
+          </label>
+          <div class="refund-process-presets" role="group" aria-label="导入方式">
+            <button type="button" class="refund-preset active" data-import-mode-btn="manual">手工录入（少量）</button>
+            <button type="button" class="refund-preset" data-import-mode-btn="file">表格导入（大量）</button>
+          </div>
+          <div data-import-manual>
+            <label>设备 SN（每行一个）
+              <textarea name="snText" rows="5" placeholder="CAB-NEW-003&#10;BAT-NEW-002" required></textarea>
+            </label>
+          </div>
+          <div data-import-file hidden>
+            <label>SN 列表表格（CSV / TXT，首列 SN）
+              <input type="file" name="snFile" accept=".csv,.txt,text/csv,text/plain" />
+            </label>
+            <p class="refund-process-hint" data-import-file-hint style="margin:0">尚未选择文件。模板仅需一列 SN。</p>
+            <button type="button" class="link-btn" data-device-import-template style="justify-self:start">下载 SN 模板</button>
+          </div>
+        </div>`;
+      openProtoForm({
+        title: "批量导入设备",
+        html,
+        submitLabel: "确认导入",
+        modalWidth: "min(560px,calc(100vw - 32px))",
+        afterOpen: (form) => {
+          const root = form.querySelector(".device-import");
+          const manualBox = form.querySelector("[data-import-manual]");
+          const fileBox = form.querySelector("[data-import-file]");
+          const snText = form.querySelector('[name="snText"]');
+          const snFile = form.querySelector('[name="snFile"]');
+          const fileHint = form.querySelector("[data-import-file-hint]");
+          const setMode = (mode) => {
+            root.dataset.importMode = mode;
+            form.querySelectorAll("[data-import-mode-btn]").forEach(b => {
+              b.classList.toggle("active", b.dataset.importModeBtn === mode);
+            });
+            const isFile = mode === "file";
+            manualBox.hidden = isFile;
+            fileBox.hidden = !isFile;
+            if (snText) snText.required = !isFile;
+            if (snFile) snFile.required = false;
+          };
+          form.querySelectorAll("[data-import-mode-btn]").forEach(btn => {
+            btn.onclick = () => setMode(btn.dataset.importModeBtn);
+          });
+          form.querySelector("[data-device-import-template]")?.addEventListener("click", () => {
+            downloadCsv("device-sn-template.csv", "SN\nCAB-NEW-003\nBAT-NEW-002\nCAB-NEW-004");
+          });
+          snFile?.addEventListener("change", () => {
+            deviceImportParsedSns = [];
+            const file = snFile.files && snFile.files[0];
+            if (!file) {
+              if (fileHint) fileHint.textContent = "尚未选择文件。模板仅需一列 SN。";
+              return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+              deviceImportParsedSns = parseDeviceSnFileText(String(reader.result || ""));
+              if (fileHint) {
+                fileHint.textContent = deviceImportParsedSns.length
+                  ? `已解析 ${deviceImportParsedSns.length} 个 SN（${file.name}）`
+                  : `未能从「${file.name}」解析到 SN，请确认首列为 SN`;
+              }
+            };
+            reader.onerror = () => {
+              deviceImportParsedSns = [];
+              if (fileHint) fileHint.textContent = "文件读取失败，请重试或改用手工录入";
+            };
+            reader.readAsText(file);
+          });
+          setMode("manual");
+        },
+        onSubmit: (data) => {
+          const mode = document.querySelector(".device-import")?.dataset.importMode || "manual";
+          const operatorId = (data.operatorId || "").trim();
+          if (!operatorId) return "请选择运营商";
+          const sns = mode === "file" ? deviceImportParsedSns.slice() : parseDeviceSnList(data.snText || "");
+          if (!sns.length) {
+            return mode === "file" ? "请先选择含 SN 列表的表格文件" : "请填写至少一个设备 SN";
+          }
+          const { ok, fails } = runDeviceSnImport(operatorId, sns);
+          const msg = "成功导入 " + ok + " 台" + (fails.length
+            ? "；失败 " + fails.length + "：" + fails.slice(0, 5).join("、") + (fails.length > 5 ? "…" : "")
+            : "");
+          if (!ok && fails.length) return msg;
+          return {
+            successMessage: "演示：" + msg + "，已进入设备台账",
+            afterClose: () => render()
+          };
+        }
+      });
     }
 
     function closeBindForm() {
@@ -7878,7 +8020,8 @@
 
     function renderDeviceBinding() {
       state.view = "platformDevices";
-      state.platformDeviceTab = "import";
+      state.platformDeviceTab = "ledger";
+      state.platformDeviceOpenImportModal = true;
       return renderPlatformDevices();
     }
 
@@ -8204,27 +8347,10 @@
     }
 
     function renderPlatformDevices() {
-      const tab = state.platformDeviceTab;
-      const tabDefs = [["ledger", "设备台账"], ["import", "批量导入"]];
-      const sidebar = tabSidebar(tabDefs, tab, "pdtab");
-      if (tab === "import") {
-        const iotCount = platformDeviceInventory.length;
-        return `${ownScopeBanner()}${pageWithTabs(sidebar, `<section class="panel">
-            ${panelHead("批量导入设备", "SN + 运营商ID · 类型/参数由 IoT 回填", "platform_devices_import")}
-            <div class="panel-body">
-              <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("platform_device_bind")}${noteBtn("platform_devices_import")}
-                <strong>模板字段</strong>：SN、运营商ID。类型、城市、规格等按 SN 自动从物联网平台拉取；导入即归属运营商并进入「设备台账」（无待绑定队列）。演示 IoT 可查 ${iotCount} 台。</div>
-              <form id="deviceImportForm" class="form-grid" style="max-width:640px">
-                <label style="grid-column:1/-1">粘贴列表（每行：SN,运营商ID）
-                  <textarea id="deviceImportText" rows="8" placeholder="CAB-NEW-003,OP-SX&#10;BAT-NEW-002,OP-LJZ"></textarea>
-                </label>
-              </form>
-              <div style="display:flex;gap:8px;margin-top:12px">
-                <button type="button" class="btn primary" id="deviceImportBtn">导入（演示）</button>
-                <button type="button" class="link-btn" id="deviceImportTemplate">下载模板</button>
-              </div>
-            </div>
-          </section>`)}`;
+      /* 兼容旧深链 platformDeviceTab=import → 打开批量导入弹窗 */
+      if (state.platformDeviceTab === "import") {
+        state.platformDeviceTab = "ledger";
+        state.platformDeviceOpenImportModal = true;
       }
       const f = getPf();
       const rows = allPlatformDeviceRows().filter(r => {
@@ -8233,10 +8359,11 @@
         if (f.keyword && !matchKw(r.sn, f.keyword)) return false;
         return true;
       });
-      return `${ownScopeBanner()}${pageWithTabs(sidebar, `<section class="panel">
-          ${panelHead("全平台设备台账", `共 ${rows.length} 台`, "platform_devices_import")}
+      return `${ownScopeBanner()}<section class="panel">
+          ${panelHead("全平台设备台账", `共 ${rows.length} 台`, "platform_device_bind",
+            `<button type="button" class="btn primary" data-open-device-import>批量导入</button>`)}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_operator_device_gate")} 归属运营商后，方可在「我的设备」维护并分配至站点。新设备请走「批量导入」。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_operator_device_gate")}${noteBtn("platform_devices_import")} 归属运营商后，方可在「我的设备」维护并分配至站点。新设备请点击「批量导入」：先选运营商，再手工填 SN 或上传 SN 表格。</p>
             <table>
               <thead><tr><th>SN</th><th>类型</th><th>规格</th><th>归属运营商</th><th>城市</th><th>站点</th><th>状态</th><th>归属日</th></tr></thead>
               <tbody>${rows.map(r => `<tr>
@@ -8247,7 +8374,7 @@
               </tr>`).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
             </table>
           </div>
-        </section>`)}`;
+        </section>`;
     }
 
     function renderPlatformChannels() {
@@ -10701,7 +10828,7 @@
       }
       if (pkgMap[s.subId]) {
         return `<span class="tag">个人套餐</span>
-          <br><button type="button" class="link-btn" data-open-sub="${s.subId}">${s.subId}</button>`;
+          <br><button type="button" class="link-btn" data-open-sub-from-swap="${s.subId}" data-from-swap="${s.id}">${s.subId}</button>`;
       }
       return `<span class="tag risk">个人套餐</span><br><span style="color:var(--red)">未关联套餐</span>`;
     }
@@ -10760,10 +10887,11 @@
       const pkg = packageOrders.find(p => p.id === s.subId);
       const cab = s.cabinet || {};
       const subLink = pkg
-        ? `<button type="button" class="link-btn" data-open-sub="${s.subId}">${s.subId}</button>`
+        ? `<button type="button" class="link-btn" data-open-sub-from-swap="${s.subId}" data-from-swap="${s.id}">${s.subId}</button>`
         : `<span style="color:var(--red)">未关联套餐</span>`;
       state.detailSwapId = swapId;
       state.detailSubId = null;
+      state.detailSubFromSwapId = null;
       state.detailLeaseId = null;
       document.querySelector("#drawerTitle").textContent = "换电订单 · " + s.id;
       document.querySelector("#drawerSub").textContent = `${s.time} · ${s.user} · ${s.status}${s.failReason ? " · " + s.failReason : ""}`;
@@ -10792,6 +10920,7 @@
           <div class="detail-item"><span>换出电池</span><strong>${s.batOut ? `${s.batOut.sn} · SOC ${s.batOut.soc}% · ${s.batOut.health}` : "—"}</strong></div>
           <div class="detail-item"><span>订单状态</span><strong>${tag(s.status)}</strong></div>
         </div>
+        ${!isChannelDaySwap(s) && !isActivationSwap(s) ? linkedPackageSummaryHtml(pkg) : ""}
         ${swapTripletDetailHtml(s)}
         ${renderSwapLogTimeline(s, true)}
       `;
@@ -10917,13 +11046,8 @@
       bindDrawerActions();
     }
 
-    function openPackageDetail(subId) {
-      const p = packageOrders.find(x => x.id === subId);
-      if (!p) return;
-
-      document.querySelector("#drawerTitle").textContent = "套餐订单 · " + p.id;
-      document.querySelector("#drawerSub").textContent = `${p.pkg} · ${p.user} · ${p.status}`;
-      document.querySelector("#drawerBody").innerHTML = `
+    function packageDetailBodyHtml(p) {
+      return `
         <div class="detail-grid">
           <div class="detail-item"><span>设备归属</span><strong>${p.deviceOwnerName || "—"}</strong></div>
           <div class="detail-item"><span>实付金额</span><strong>¥${p.pay}</strong></div>
@@ -10945,8 +11069,50 @@
         ${pkgFreezeSection(p)}
         ${pkgResumePickupSection(p)}
         ${pkgRefundSection(p)}`;
+    }
+
+    function linkedPackageSummaryHtml(p) {
+      if (!p) return "";
+      return `<section class="panel" style="margin:16px 0 0;box-shadow:none;border:1px solid var(--line)">
+        ${panelHead("关联个人套餐", p.id + " · 在本页展示，不跳转套餐购买订单", "orders_pkg")}
+        <div class="panel-body" style="padding-top:0">
+          <div class="detail-grid">
+            <div class="detail-item"><span>套餐</span><strong>${p.pkg}</strong></div>
+            <div class="detail-item"><span>服务状态</span><strong>${serviceStateCell(p)}</strong></div>
+            <div class="detail-item"><span>实付金额</span><strong>¥${p.pay}</strong></div>
+            <div class="detail-item"><span>电池押金</span>${packageDepositDetailHtml(p)}</div>
+            <div class="detail-item"><span>有效期</span><strong>${p.validFrom} ~ ${p.validTo}</strong></div>
+            <div class="detail-item"><span>清分状态</span><strong>${tag(p.payout || "—")}</strong></div>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin:12px 0 0">套餐款在<strong>支付成功</strong>时已清分；本换电单仅履约，不记应分/消耗。
+            <button type="button" class="link-btn" data-open-sub-inline="${p.id}">展开套餐明细</button></p>
+        </div>
+      </section>`;
+    }
+
+    function openPackageDetail(subId, opts = {}) {
+      const p = packageOrders.find(x => x.id === subId);
+      if (!p) return;
+      const fromSwapId = opts.fromSwapId || null;
+      /* 从换电订单进入：保持停留在换电 Tab，不切到套餐购买订单 */
+      if (fromSwapId && isOperatorRole()) {
+        state.view = "orderService";
+        state.orderServiceTab = "swap";
+        state.orderTab = "swap";
+      }
+      const backBtn = fromSwapId
+        ? `<p style="margin:0 0 12px"><button type="button" class="link-btn" data-open-swap="${fromSwapId}">← 返回换电单 ${fromSwapId}</button></p>`
+        : "";
+      document.querySelector("#drawerTitle").textContent = fromSwapId
+        ? "关联套餐 · " + p.id
+        : "套餐订单 · " + p.id;
+      document.querySelector("#drawerSub").textContent = fromSwapId
+        ? `换电权益来源 · ${p.pkg} · ${p.user} · ${p.status}`
+        : `${p.pkg} · ${p.user} · ${p.status}`;
+      document.querySelector("#drawerBody").innerHTML = backBtn + packageDetailBodyHtml(p);
       state.detailSubId = subId;
-      state.detailSwapId = null;
+      state.detailSubFromSwapId = fromSwapId;
+      state.detailSwapId = fromSwapId || null;
       state.detailLeaseId = null;
       document.querySelector("#drawerMask").classList.add("open");
       document.querySelector("#orderDrawer").classList.add("open");
@@ -10958,6 +11124,7 @@
     function closeDrawer() {
       state.detailSubId = null;
       state.detailSwapId = null;
+      state.detailSubFromSwapId = null;
       state.detailLeaseId = null;
       state.detailOperatorId = null;
       state.detailRefundId = null;
@@ -12733,15 +12900,17 @@
         }
       } else if (tab === "deposit") {
         const cfg = myPersonalDepositSettings();
+        const wxMin = Number(cfg.wechatPayScoreMin) || 650;
+        const zhimaMin = Number(cfg.zhimaScoreMin) || 650;
         body = `<section class="panel">
-          ${panelHead("押金设置", "个人套餐 · 信用不足须缴纳的电池押金数额", "pricing_deposit")}
+          ${panelHead("押金设置", "个人套餐 · 信用门槛 + 不足时须缴电池押金数额", "pricing_deposit")}
           <div class="panel-body">
             <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("pricing_deposit")}${noteBtn("rider_battery_deposit")}${noteBtn("orders_deposit_waiver")}
-              适用对象：<strong>个人套餐用户</strong> · 信用免押失败时实缴 · 购套餐<strong>同笔支付</strong>进运营商子商户 · 不参与清分</div>
+              适用对象：<strong>个人套餐用户</strong> · 微信支付分或芝麻信用<strong>任一路达标</strong>可免押 · 均未达标则实缴 · 购套餐<strong>同笔支付</strong>进运营商子商户 · 不参与清分</div>
             <div class="detail-grid" style="margin-bottom:16px">
               <div class="detail-item"><span>适用用户</span><strong>个人套餐</strong><br><small style="color:var(--muted)">渠道人天 / 设备租赁白名单不适用</small></div>
-              <div class="detail-item"><span>触发条件</span><strong>信用不足不免押</strong><br><small style="color:var(--muted)">芝麻 / 微信支付分等未达标</small></div>
-              <div class="detail-item"><span>免押达标</span><strong>实收 ¥0</strong><br><small style="color:var(--muted)">仍须遵守还电与退押规则</small></div>
+              <div class="detail-item"><span>触发条件</span><strong>信用未达门槛</strong><br><small style="color:var(--muted)">支付分 &lt; ${wxMin} 且 芝麻 &lt; ${zhimaMin}</small></div>
+              <div class="detail-item"><span>免押达标</span><strong>实收 ¥0</strong><br><small style="color:var(--muted)">支付分 ≥ ${wxMin} 或 芝麻 ≥ ${zhimaMin}</small></div>
               <div class="detail-item"><span>最近更新</span><strong>${cfg.updatedAt || "—"}</strong><br><small style="color:var(--muted)">${cfg.updatedBy || "—"}</small></div>
             </div>
             <form id="personalDepositForm" class="detail-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:end">
@@ -12756,20 +12925,30 @@
                   <option value="0" ${cfg.enabled === false ? "selected" : ""}>关闭（本运营商暂不收个人押金）</option>
                 </select>
               </label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+                <span>微信支付分免押门槛</span>
+                <input name="wechatPayScoreMin" type="number" min="0" max="950" step="1" required value="${wxMin}" style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
+                <small style="color:var(--muted)">≥ 该分可免押 · 常见 550～750</small>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+                <span>芝麻信用免押门槛</span>
+                <input name="zhimaScoreMin" type="number" min="0" max="950" step="1" required value="${zhimaMin}" style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
+                <small style="color:var(--muted)">≥ 该分可免押 · 与支付分任一路达标即可</small>
+              </label>
               <label class="form-span-2" style="display:flex;flex-direction:column;gap:6px;font-size:13px;grid-column:1/-1">
                 <span>说明（对内）</span>
                 <input name="note" value="${(cfg.note || "").replace(/"/g, "&quot;")}" placeholder="可选" style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
               </label>
               <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button type="submit" class="btn primary" data-save-personal-deposit>保存押金设置</button>
-                <small style="color:var(--muted)">[假设] 保存后对新购套餐立即生效；在途订单沿用下单时数额</small>
+                <small style="color:var(--muted)">[假设] 保存后对新购套餐立即生效；在途订单沿用下单时数额与门槛</small>
               </div>
             </form>
             <table style="margin-top:20px">
               <thead><tr><th>场景</th><th>用户动作</th><th>押金应收</th></tr></thead>
               <tbody>
-                <tr><td>信用达标（免押）</td><td>购个人套餐</td><td><strong>¥0</strong>（信用免押）</td></tr>
-                <tr><td>信用不足</td><td>购个人套餐</td><td><strong>¥${cfg.enabled === false ? 0 : cfg.amount}</strong>（实付 · 同笔）</td></tr>
+                <tr><td>微信支付分 ≥ ${wxMin}（或芝麻 ≥ ${zhimaMin}）</td><td>购个人套餐</td><td><strong>¥0</strong>（信用免押）</td></tr>
+                <tr><td>支付分 &lt; ${wxMin} 且 芝麻 &lt; ${zhimaMin}</td><td>购个人套餐</td><td><strong>¥${cfg.enabled === false ? 0 : cfg.amount}</strong>（实付 · 同笔）</td></tr>
                 <tr><td>渠道人天 / 租赁白名单</td><td>开服务</td><td>不适用 · 渠道担保</td></tr>
               </tbody>
             </table>
@@ -14855,6 +15034,18 @@
           const cfg = myPersonalDepositSettings();
           cfg.amount = Math.round(amount * 100) / 100;
           cfg.enabled = String(fd.get("enabled")) !== "0";
+          const wxMin = parseInt(fd.get("wechatPayScoreMin"), 10);
+          const zhimaMin = parseInt(fd.get("zhimaScoreMin"), 10);
+          if (Number.isNaN(wxMin) || wxMin < 0 || wxMin > 950) {
+            window.alert("请填写有效的微信支付分门槛（0～950）");
+            return;
+          }
+          if (Number.isNaN(zhimaMin) || zhimaMin < 0 || zhimaMin > 950) {
+            window.alert("请填写有效的芝麻信用门槛（0～950）");
+            return;
+          }
+          cfg.wechatPayScoreMin = wxMin;
+          cfg.zhimaScoreMin = zhimaMin;
           cfg.note = String(fd.get("note") || "").trim();
           cfg.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
           cfg.updatedBy = currentEmployee()?.name || currentEntity().name;
@@ -14971,11 +15162,11 @@
       root.querySelectorAll("[data-potab]").forEach(btn => {
         btn.onclick = () => { state.platformOrderTab = btn.dataset.potab; render(); };
       });
+      root.querySelectorAll("[data-open-device-import]").forEach(btn => {
+        btn.onclick = () => openDeviceImportModal();
+      });
       root.querySelectorAll("[data-pftab]").forEach(btn => {
         btn.onclick = () => { state.platformFlowTab = btn.dataset.pftab; render(); };
-      });
-      root.querySelectorAll("[data-pdtab]").forEach(btn => {
-        btn.onclick = () => { state.platformDeviceTab = btn.dataset.pdtab; render(); };
       });
       root.querySelectorAll("[data-pctab]").forEach(btn => {
         btn.onclick = () => { state.platformChannelTab = btn.dataset.pctab; render(); };
@@ -15003,32 +15194,6 @@
       root.querySelectorAll("[data-pm-confirm-agreement]").forEach(btn => {
         btn.onclick = () => { confirmPlatformMarketingAgreement(btn.dataset.pmConfirmAgreement); showProtoToast("已确认参与平台营销活动"); render(); };
       });
-      if (root === document) {
-      const importBtn = document.querySelector("#deviceImportBtn");
-      if (importBtn) {
-        importBtn.onclick = () => {
-          const raw = (document.querySelector("#deviceImportText")?.value || "").trim();
-          if (!raw) { window.alert("请粘贴「SN,运营商ID」列表"); return; }
-          let ok = 0;
-          const fails = [];
-          raw.split("\n").forEach(line => {
-            const parts = line.split(/[,，\t]/).map(s => s.trim()).filter(Boolean);
-            if (parts.length < 2 || !parts[0]) return;
-            const sn = parts[0];
-            const operatorId = parts[1];
-            const res = assignDeviceFromIot(sn, operatorId);
-            if (res.ok) ok++;
-            else fails.push(sn + "（" + res.reason + "）");
-          });
-          state.platformDeviceTab = "ledger";
-          const msg = "演示：成功导入 " + ok + " 台" + (fails.length ? "；失败 " + fails.length + "：" + fails.slice(0, 5).join("、") + (fails.length > 5 ? "…" : "") : "，已进入设备台账");
-          window.alert(msg);
-          render();
-        };
-      }
-      const tplBtn = document.querySelector("#deviceImportTemplate");
-      if (tplBtn) tplBtn.onclick = () => downloadCsv("device-import-template.csv", "SN,运营商ID\nCAB-NEW-003,OP-SX\nBAT-NEW-002,OP-LJZ");
-      }
       root.querySelectorAll("[data-select-pool]").forEach(el => {
         el.onclick = e => {
           if (e.target.closest("[data-pool-form]")) return;
@@ -15904,6 +16069,12 @@
       root.querySelectorAll("[data-open-sub]").forEach(btn => {
         btn.onclick = () => openPackageDetail(btn.dataset.openSub);
       });
+      root.querySelectorAll("[data-open-sub-from-swap]").forEach(btn => {
+        btn.onclick = () => openPackageDetail(btn.dataset.openSubFromSwap, { fromSwapId: btn.dataset.fromSwap || state.detailSwapId });
+      });
+      root.querySelectorAll("[data-open-sub-inline]").forEach(btn => {
+        btn.onclick = () => openPackageDetail(btn.dataset.openSubInline, { fromSwapId: state.detailSwapId });
+      });
       root.querySelectorAll("[data-open-swap]").forEach(btn => {
         btn.onclick = () => openSwapDetail(btn.dataset.openSwap);
       });
@@ -16525,12 +16696,16 @@
       document.querySelector("#views").innerHTML = `<div class="view active">${phase2BannerHtml()}${body}</div>`;
       bindInteractiveActions(document);
       bindPageDynamicControls();
-      if (state.detailSubId) openPackageDetail(state.detailSubId);
+      if (state.detailSubId) openPackageDetail(state.detailSubId, { fromSwapId: state.detailSubFromSwapId });
       else if (state.detailRefundId) openUserRefundDetail(state.detailRefundId);
       else if (state.detailSwapId) openSwapDetail(state.detailSwapId);
       else if (state.detailLeaseId) openLeaseDetail(state.detailLeaseId);
       else if (state.detailOperatorId) openOperatorDetail(state.detailOperatorId);
       bindNotes();
+      if (state.platformDeviceOpenImportModal) {
+        state.platformDeviceOpenImportModal = false;
+        openDeviceImportModal();
+      }
     }
 
     document.querySelector("#nav").addEventListener("click", e => {
