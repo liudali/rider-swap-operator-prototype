@@ -144,14 +144,14 @@
     };
 
     const ROLE = {
-      platform: { name: ENT.platform.name, type: "平台管理员", tree: "用户/订单/设备/渠道/流水 · 运营商治理 · 跨网统价" },
+      platform: { name: ENT.platform.name, type: "平台管理员", tree: "用户/订单/设备/流水 · 运营商治理（含渠道监管）· 跨网统价" },
       operator: { name: ENT.operator.name, type: "运营商", tree: "换电运营 · 定价 · 渠道管理 · 设备订单流水" },
       channel: { name: ENT.channel.name, type: "渠道商", tree: "单运营商签约 · 三种结算模式 · 渠道信用额度 · 团队登记" },
       leasing: { name: ENT.leasing.name, type: "设备租赁公司", tree: "放款申请确认 · 授信与还款跟踪 · 须平台绑定运营商" },
       sitePartner: { name: "站点合伙人", type: "站点合伙人", tree: "绑定站点分润 · 明细查询 · 提现结算（只读配置）" }
     };
     const NAV = {
-      platform: ["overview", "platformUsers", "platformOrders", "platformDevices", "platformChannels", "platformMarketing", "platformFlows", "platformAccounts", "operators", "platformLeasing", "operatorCreditEval", "orderAudit", "depositManage", "l1Pricing", "employees"],
+      platform: ["overview", "platformUsers", "platformOrders", "platformDevices", "platformMarketing", "platformFlows", "platformAccounts", "operators", "platformLeasing", "operatorCreditEval", "orderAudit", "depositManage", "l1Pricing", "employees"],
       operator: ["overview", "pricing", "channelSales", "sites", "devices", "financeManage", "orderService", "flows", "platformService", "employees", "users", "accounts"],
       channel: ["overview", "channelSettlement", "dayPool", "channelCredit", "employees"],
       leasing: ["overview", "employees", "financeDrawdown", "accounts"],
@@ -214,7 +214,7 @@
       "platform.users": ["platformUsers"],
       "platform.orders": ["platformOrders"],
       "platform.devices": ["platformDevices"],
-      "platform.channels": ["platformChannels"],
+      "platform.channels": ["operators"],
       "platform.marketing": ["platformMarketing"],
       "platform.flows": ["platformFlows"],
       "platform.accounts": ["platformAccounts"],
@@ -275,7 +275,7 @@
       leasePkgPricing: ["白名单套餐", "渠道自定 SKU 与零售价；<strong>仅白名单用户</strong>可购；款项进入<strong>本渠道收款账户</strong>。"],
       channelInterOp: ["渠道跨网往来账", "设备租赁渠道开通跨网后，骑手在他网换电的跨网设备服务费经平台代收代付。"],
       platformFee: ["平台服务费", "页内 Tab：费用总览 / C 端支付分账 / B 端消耗计提。"],
-      operators: ["运营商管理", "二级：运营商列表 / 提现审核 / 运营商平台服务费。主体维护、账户汇总、准入档位；服务费 C/B 比例分主体配置。"],
+      operators: ["运营商管理", "二级：运营商列表 / 提现审核 / 平台服务费 / 渠道商管理。主体维护、账户汇总、准入档位；渠道商全平台只读监管。"],
       platformLeasing: ["租赁公司", "平台维护设备租赁公司与运营商绑定关系；绑定后租赁公司方可向该运营商发起签约。"],
       operatorCreditEval: ["运营商信用评估", "准入档位制（A/B/C/D）：档位配置、入网定档、升降档与变更记录；约束信用额度封顶。"],
       depositManage: ["保证金管理", "平台清分专户、运营商对公充值确认、保证金/信用额度调整（≤档位封顶）与变动账本。"],
@@ -284,7 +284,7 @@
       platformUsers: ["用户管理", "二级菜单：用户信息 / 用户押金统计 / 服务变更。"],
       platformOrders: ["订单管理", "全平台套餐购买、换电与渠道批发订单查询与追溯。"],
       platformDevices: ["设备管理", "全量设备台账；批量导入（SN+运营商ID，类型/参数由 IoT 按 SN 回填）。"],
-      platformChannels: ["渠道商管理", "全平台渠道商查询与监管；主体由签约运营商创建维护，平台只读。"],
+      platformChannels: ["渠道商管理", "已并入「运营商管理 → 渠道商管理」；全平台渠道商查询与监管；主体由签约运营商创建维护，平台只读。"],
       platformMarketing: ["平台营销", "【二期】立减券获客；购时锁 OP；款进运营商（不代收）；券面价差默认运营商让利；1% + 营销服务费协议结算。一期不交付，原型仅演示。"],
       platformFlows: ["流水管理", "用户支付记录、运营商间跨网清分、平台提成。"],
       platformAccounts: ["平台账户", "智格平台技术服务费收款商户；<strong>账户余额/冻结为当前实时状态</strong>；提成与营收构成按月汇总。"]
@@ -567,7 +567,7 @@
       leaseWhitelist: ["lease_whitelist", "lease_whitelist_access", "channel_settlement_rent", "lease_whitelist_pkg"],
       leasePkgPricing: ["lease_whitelist_pkg", "lease_whitelist_access", "channel_settlement_rent"],
       channelInterOp: ["channel_inter_op", "channel_lease_crossnet", "inter_op_privacy"],
-      operators: ["platform_operators", "operator_credit_eval", "accounts", "platform_withdraw_review", "platform_operator_fee_rate"],
+      operators: ["platform_operators", "operator_credit_eval", "accounts", "platform_withdraw_review", "platform_operator_fee_rate", "platform_channels", "channel_partner_manage", "channel_no_receipt"],
       operatorCreditEval: ["operator_credit_eval"],
       depositManage: ["deposit_manage", "deposit_recharge", "operator_deposit", "operator_credit"],
       deviceBinding: ["platform_device_bind", "platform_operator_device_gate", "platform_devices_import"],
@@ -690,7 +690,7 @@
       { id: "platform.users", label: "用户管理" },
       { id: "platform.orders", label: "订单管理" },
       { id: "platform.devices", label: "设备管理" },
-      { id: "platform.channels", label: "渠道管理" },
+      { id: "platform.channels", label: "渠道商管理（运营商管理下）" },
       { id: "platform.marketing", label: "平台营销（二期）" },
       { id: "platform.flows", label: "流水管理" },
       { id: "platform.accounts", label: "平台账户" },

@@ -745,7 +745,10 @@
       }
       if (state.view === "platformUsers") return "platformUsers_" + state.platformUsersTab;
       if (state.view === "platformOrders") return "platformOrders_" + state.platformOrderTab;
-      if (state.view === "operators") return "operators_" + (state.operatorsTab || "list");
+      if (state.view === "operators") {
+        if ((state.operatorsTab || "list") === "channels") return "platformChannels_list";
+        return "operators_" + (state.operatorsTab || "list");
+      }
       if (state.view === "l1Pricing") return "l1Pricing_" + (state.l1PricingTab || "crossNet");
       if (state.view === "platformFlows") return "platformFlows_" + state.platformFlowTab;
       if (state.view === "platformDevices") return "platformDevices_" + state.platformDeviceTab;
@@ -4457,6 +4460,7 @@
             if (isEntityLogin() || employeeHasPerm("platform.operators")) tabs.push(["list", "运营商列表"]);
             if (isEntityLogin() || employeeHasPerm("platform.operator_withdraw")) tabs.push(["withdrawReview", "运营商提现审核" + (n ? " (" + n + ")" : "")]);
             if (isEntityLogin() || employeeHasPerm("platform.operator_fee")) tabs.push(["feeRate", "运营商平台服务费"]);
+            if (isEntityLogin() || employeeHasPerm("platform.channels")) tabs.push(["channels", "渠道商管理"]);
             return tabs;
           }
         },
@@ -4515,6 +4519,10 @@
         state.view = "platformService";
         state.platformServiceTab = "interOverview";
         if (!["overview", "ledger", "daily", "period"].includes(t)) state.interOpTab = "overview";
+      }
+      if (state.view === "platformChannels") {
+        state.view = "operators";
+        state.operatorsTab = "channels";
       }
       if (isOperatorRole() && ["orderPackage", "orderSwap", "orderFreeze", "orderAudit", "refundManage"].includes(state.view)) {
         const map = {
@@ -4635,6 +4643,10 @@
         const key = keyMap[tab] || "orderService";
         const ids = VIEW_MODULE_NOTE[key];
         return Array.isArray(ids) ? ids : (ids ? [ids] : []);
+      }
+      if (view === "operators" && (state.operatorsTab || "list") === "channels") {
+        const chIds = VIEW_MODULE_NOTE.platformChannels;
+        return Array.isArray(chIds) ? chIds : (chIds ? [chIds] : []);
       }
       const ids = VIEW_MODULE_NOTE[view];
       if (!ids) return [];
@@ -6279,12 +6291,13 @@
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
-          ${panelHead("进件账户摘要", "骑手收款子商户（演示）", "accounts")}
+          ${panelHead("进件账户摘要", "运营商在「收款账户」自行开户后回写（只读）", "accounts")}
           <div class="panel-body" style="padding-top:0">
             <div class="detail-grid">
               <div class="detail-item"><span>微信子商户</span><strong>${op.mchWx || "—"}</strong></div>
               <div class="detail-item"><span>支付宝子商户</span><strong>${op.mchAli || "—"}</strong></div>
             </div>
+            ${!(op.mchWx || op.mchAli) ? `<p style="font-size:12px;color:var(--muted);margin:12px 0 0">尚未开户。平台创建运营商时不配置子商户号；由运营商补充主体信息完成进件。</p>` : ""}
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
@@ -6331,9 +6344,8 @@
         <label>联系电话<input name="contactPhone" value="${op?.contactPhone || ""}" /></label>
         <label>邮箱<input name="email" type="email" value="${op?.email || ""}" /></label>
         <label>地址<input name="address" value="${op?.address || ""}" /></label>
-        <label>微信子商户号<input name="mchWx" value="${op?.mchWx || ""}" placeholder="1900000***" /></label>
-        <label>支付宝子商户号<input name="mchAli" value="${op?.mchAli || ""}" placeholder="2088***" /></label>
-        <label>备注<textarea name="remark" rows="2">${op?.remark || ""}</textarea></label>`;
+        <label>备注<textarea name="remark" rows="2">${op?.remark || ""}</textarea></label>
+        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">微信/支付宝子商户号不在此配置；运营商登录后于「收款账户」自行提交主体信息完成开户。</p>`;
       document.querySelector("#operatorModal").classList.add("open");
       document.querySelector("#operatorMask").classList.add("open");
     }
@@ -6518,7 +6530,7 @@
           id, name: data.name, city: data.city, status: data.status,
           contactName: data.contactName, contactPhone: data.contactPhone, email: data.email,
           address: data.address, onboardDate: new Date().toISOString().slice(0, 10),
-          mchWx: data.mchWx, mchAli: data.mchAli, remark: data.remark
+          mchWx: "", mchAli: "", remark: data.remark
         });
         operatorCreditAccounts.push({ operatorId: id, depositBalance: 0, creditLimit: 0, used: 0, available: 0, crossSwapEnabled: false, owed: 0 });
         operatorCreditProfiles.push({ operatorId: id, tierCode: null, status: "待定档", assignedAt: null, assignedBy: null, nextReviewAt: null, assignReason: null });
@@ -6530,7 +6542,13 @@
         };
       } else {
         const op = platformOperators.find(o => o.id === state.operatorFormId);
-        if (op) Object.assign(op, data);
+        if (op) {
+          Object.assign(op, {
+            name: data.name, city: data.city, status: data.status,
+            contactName: data.contactName, contactPhone: data.contactPhone, email: data.email,
+            address: data.address, remark: data.remark
+          });
+        }
       }
       closeOperatorForm();
       state.view = "operators";
@@ -7627,6 +7645,7 @@
 
     function renderOperators() {
       const tab = state.operatorsTab || "list";
+      if (tab === "channels") return renderPlatformChannels();
       if (tab === "feeRate") {
         const f = getPf();
         const rows = platformOperators.filter(op => {
@@ -16341,6 +16360,8 @@
             desc = "本运营商名下站点信息；含筹备中、无设备站点。";
           } else if (state.view === "sites" && cur === "partners") {
             desc = "个人/公司合伙人档案、分润绑定与变更记录。";
+          } else if (state.view === "operators" && cur === "channels") {
+            desc = "全平台渠道商只读监管；主体由签约运营商创建维护，平台不可新增。";
           } else if (state.view === "platformService" && cur === "deposit") {
             const d = state.depositAccountTab || "overview";
             desc = d === "recharge"
