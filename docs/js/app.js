@@ -406,11 +406,23 @@
     function platformAccountForMonth(month) {
       const row = platformAccountMonthly.find(m => m.month === month) || platformAccountMonthly[0];
       if (!row) {
-        return { month, balance: platformMerchantAccount.balance, frozen: platformMerchantAccount.frozen,
-          cEndSplit: 0, bEndAccrual: 0, l1Clearing: 0, payCount: 0, consumeFeeCount: 0, interOpCount: 0, total: 0 };
+        return { month, cEndSplit: 0, bEndAccrual: 0, l1Clearing: 0, payCount: 0, consumeFeeCount: 0, interOpCount: 0, total: 0 };
       }
       const total = Math.round((row.cEndSplit + row.bEndAccrual) * 100) / 100;
       return { ...row, total };
+    }
+
+    function platformAccountMonthBarHtml() {
+      const month = selectedPlatformAccountMonth();
+      const opts = platformAccountMonths()
+        .map(m => `<option value="${m}"${m === month ? " selected" : ""}>${m}</option>`).join("");
+      return `<div class="overview-range-bar" aria-label="统计月份">
+        <div class="field">
+          <label>统计月份</label>
+          <select data-platform-account-month>${opts}</select>
+        </div>
+        <p class="overview-range-hint">仅影响下方月提成、支付笔数与营收构成；账户余额与冻结为当前实时状态</p>
+      </div>`;
     }
 
     function isLeaseChannel() {
@@ -3091,11 +3103,7 @@
           return [{ v: "全部", t: "全部月份" }].concat(months.map(m => ({ v: m, t: m })));
         }}
       ],
-      platformAccounts: [
-        { key: "month", label: "统计月份", type: "select", options: () =>
-          platformAccountMonthly.map(m => ({ v: m.month, t: m.month })).sort((a, b) => b.v.localeCompare(a.v))
-        }
-      ]
+      /* platformAccounts：统计月份下沉到余额/冻结下方，顶部不再展示 */
     };
 
     const PF_CONFIRM_KEYS = new Set(["users"]);
@@ -4655,7 +4663,7 @@
       return `<article class="kpi">
         <div class="kpi-head"><span>${label}</span><span class="kpi-head-actions">${noteBtn(noteId)}<span class="kpi-icon">${icon}</span></span></div>
         <div class="kpi-value">${value}</div>
-        <div class="kpi-sub">${sub}</div>
+        ${sub ? `<div class="kpi-sub">${sub}</div>` : ""}
       </article>`;
     }
 
@@ -8408,23 +8416,15 @@
       const monthLabel = month.replace("-", "年") + "月";
       return `
         ${ownScopeBanner()}
-        <div class="kpi-grid" style="grid-template-columns:repeat(4,minmax(120px,1fr))">
-          ${kpi("账户余额", "¥" + a.balance.toLocaleString("zh-CN"), month + " 月末 · 可提现", "余", "platform_account")}
-          ${kpi("冻结", "¥" + a.frozen.toLocaleString("zh-CN"), month + " · 处理中", "冻", "platform_account")}
+        <div class="kpi-grid" style="grid-template-columns:repeat(2,minmax(120px,1fr))">
+          ${kpi("账户余额", "¥" + base.balance.toLocaleString("zh-CN"), "", "余", "platform_account")}
+          ${kpi("冻结", "¥" + base.frozen.toLocaleString("zh-CN"), "结算中", "冻", "platform_account")}
+        </div>
+        ${platformAccountMonthBarHtml()}
+        <div class="kpi-grid" style="grid-template-columns:repeat(2,minmax(120px,1fr))">
           ${kpi(monthLabel + "提成", "¥" + a.total.toLocaleString("zh-CN"), "C 端+B 端", "收", "platform_fee")}
           ${kpi(monthLabel + "支付笔数", a.payCount, "套餐/自费", "笔", "platform_flows")}
         </div>
-        <section class="panel">
-          ${panelHead("平台收款商户", ENT.platform.name, "platform_account")}
-          <div class="panel-body">
-            <div class="detail-grid">
-              <div class="detail-item"><span>微信商户号</span><strong>${base.wxMch}</strong></div>
-              <div class="detail-item"><span>支付宝商户号</span><strong>${base.aliMch}</strong></div>
-              <div class="detail-item"><span>结算银行</span><strong>${base.settleBank}</strong></div>
-              <div class="detail-item"><span>结算账号</span><strong>${base.settleAccount}</strong></div>
-            </div>
-          </div>
-        </section>
         <section class="panel">
           ${panelHead(monthLabel + "营收构成", "技术服务费 1%", "platform_fee")}
           <div class="panel-body">
@@ -8437,6 +8437,17 @@
                 <tr><td><strong>合计</strong></td><td>平台技术服务费营收</td><td>—</td><td><strong class="fee-platform">¥${a.total}</strong></td></tr>
               </tbody>
             </table>
+          </div>
+        </section>
+        <section class="panel">
+          ${panelHead("平台收款商户", ENT.platform.name, "platform_account")}
+          <div class="panel-body">
+            <div class="detail-grid">
+              <div class="detail-item"><span>微信商户号</span><strong>${base.wxMch}</strong></div>
+              <div class="detail-item"><span>支付宝商户号</span><strong>${base.aliMch}</strong></div>
+              <div class="detail-item"><span>结算银行</span><strong>${base.settleBank}</strong></div>
+              <div class="detail-item"><span>结算账号</span><strong>${base.settleAccount}</strong></div>
+            </div>
           </div>
         </section>`;
     }
@@ -16605,6 +16616,13 @@
       if (ovRange) {
         if (!state.pf.overview) state.pf.overview = { ...(PF_DEFAULTS.overview || {}) };
         state.pf.overview.range = ovRange.value;
+        render();
+        return;
+      }
+      const platAcctMonth = e.target.closest("[data-platform-account-month]");
+      if (platAcctMonth) {
+        if (!state.pf.platformAccounts) state.pf.platformAccounts = { ...(PF_DEFAULTS.platformAccounts || {}) };
+        state.pf.platformAccounts.month = platAcctMonth.value;
         render();
         return;
       }

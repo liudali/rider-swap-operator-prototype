@@ -287,7 +287,7 @@
       platformChannels: ["渠道商管理", "全平台渠道商查询与监管；主体由签约运营商创建维护，平台只读。"],
       platformMarketing: ["平台营销", "【二期】立减券获客；购时锁 OP；款进运营商（不代收）；券面价差默认运营商让利；1% + 营销服务费协议结算。一期不交付，原型仅演示。"],
       platformFlows: ["流水管理", "用户支付记录、运营商间跨网清分、平台提成。"],
-      platformAccounts: ["平台账户", "智格平台技术服务费收款商户、余额与<strong>按月</strong>营收汇总。"]
+      platformAccounts: ["平台账户", "智格平台技术服务费收款商户；<strong>账户余额/冻结为当前实时状态</strong>；提成与营收构成按月汇总。"]
     };
 
     const MODULE_NOTES = {
@@ -516,7 +516,7 @@
       platform_marketing_collect: { title: "运营商收款", content: "用户经 ch=PLATFORM 链接购套餐，须已锁定运营商；实付款进<strong>该运营商</strong>子商户；支付分账 1%。立减额由运营商让利（无平台补贴）。" },
       platform_marketing_payout: { title: "券核销与营销费", content: "立减合计 = 运营商让利记账；另计应付营销服务费。<strong>无</strong>用户款拨付、无平台补贴出账。月度对账供运营商确认营销费。" },
       platform_flows: { title: "平台流水视角", content: "用户支付：C 端套餐/自费流水及 1% 平台分账。运营商之间：跨网柜机/电池费经平台代收代付的日清流水。平台提成：B 端确认消耗计提 + C 端支付分账汇总。" },
-      platform_account: { title: "平台收款账户", content: "智格平台 1% 技术服务费统一进入平台商户（微信/支付宝分账 + B 端代扣）；本页展示平台商户余额与营收，非运营商经营账户。" },
+      platform_account: { title: "平台收款账户", content: "智格平台 1% 技术服务费统一进入平台商户（微信/支付宝分账 + B 端代扣）。<strong>账户余额、冻结</strong>为商户当前实时状态，不受统计月份影响；月提成与营收构成随月份切换。非运营商经营账户。" },
       module_order_audit: { title: "变更记录", content: "统一<strong>变更记录</strong>（C-02/D-A1）：跨模块时间线，记录订单/服务生命周期事件（冻结、消耗、换电、退款等）。用于客诉、对账与监管；<strong>非新订单列表</strong>。渠道仅见本渠道成员事件；运营商见本主体订单；平台全平台只读。" },
       module_channel_credit: { title: "渠道信用额度", content: "平台按在册骑手与设备标准评估<strong>信用额度</strong>，用于抵扣渠道应押总额；运营商可调整额度上限。渠道线下打款后提交凭证，由<strong>运营商审核</strong>。分级抵扣规则按信用评分映射抵扣比例。与运营商准入档位（A/B/C/D）独立。" },
       module_channel_links: { title: "套餐与链接", content: "渠道可售套餐由运营商签约配置（正式价/专享价/佣金只读）。渠道可为同一套餐创建<strong>多条推广链接</strong>，填写<strong>链接用途</strong>；每条可<strong>生成二维码</strong>（内容与链接一致）。链接直达<strong>签约运营商小程序</strong>；用户点击后 <strong>24h</strong> 内购买授权 SKU 均享渠道专享价。" },
@@ -2530,9 +2530,9 @@
     };
 
     const platformAccountMonthly = [
-      { month: "2026-06", balance: 28560.42, frozen: 120, cEndSplit: 45.20, bEndAccrual: 12.75, l1Clearing: 0, payCount: 128, consumeFeeCount: 42, interOpCount: 8 },
-      { month: "2026-05", balance: 27200.18, frozen: 95, cEndSplit: 41.80, bEndAccrual: 11.40, l1Clearing: 0, payCount: 118, consumeFeeCount: 39, interOpCount: 7 },
-      { month: "2026-04", balance: 25890.00, frozen: 60, cEndSplit: 36.20, bEndAccrual: 9.85, l1Clearing: 0, payCount: 105, consumeFeeCount: 35, interOpCount: 5 }
+      { month: "2026-06", cEndSplit: 45.20, bEndAccrual: 12.75, l1Clearing: 0, payCount: 128, consumeFeeCount: 42, interOpCount: 8 },
+      { month: "2026-05", cEndSplit: 41.80, bEndAccrual: 11.40, l1Clearing: 0, payCount: 118, consumeFeeCount: 39, interOpCount: 7 },
+      { month: "2026-04", cEndSplit: 36.20, bEndAccrual: 9.85, l1Clearing: 0, payCount: 105, consumeFeeCount: 35, interOpCount: 5 }
     ];
 
     /** 运营商自主换电范围（可与平台信用额度停跨网叠加） */
