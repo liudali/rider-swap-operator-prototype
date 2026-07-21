@@ -9,7 +9,7 @@
       platformUsersPage: 1,
       platformUsersPageSize: 10,
       platformLeasingTab: "companies", depositTab: "pending", depositRechargeSubTab: "waiting", depositRechargePendingPage: 1, depositRechargeProcessedPage: 1, operatorCreditTab: "assignments",
-      dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider",
+      dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider", dayPoolRiderFocus: null,
       pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
       channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
       channelAssetsSubTab: "dayPool", channelAssetsPage: 1, channelAssetsPageSize: 5,
@@ -741,7 +741,12 @@
         if (t === "deposit" && state.depositAccountTab === "ledger") return "depositAccount_ledger";
         return "platformService";
       }
-      if (state.view === "depositManage" && (state.depositTab || "pending") === "ledger") return "depositManage_ledger";
+      if (state.view === "depositManage") {
+        const dt = state.depositTab || "pending";
+        if (dt === "ledger") return "depositManage_ledger";
+        if (dt === "pending") return "depositManage_pending";
+        return "depositManage";
+      }
       if (state.view === "dayPool") {
         if (state.dayPoolTab === "pools" && state.dayPoolPoolsSubTab === "ledger") return "dayPool_ledger";
         return "dayPool_" + state.dayPoolTab;
@@ -2001,6 +2006,16 @@
       return list.filter(p => p.status === "余额不足");
     }
 
+    /** 渠道商：在职且剩余人天=0（个人无额度或预占失败等导致今日无可用额度） */
+    function zeroQuotaActiveRidersAlert() {
+      if (!isChannelRole()) return [];
+      return dayPoolRiders.filter(r =>
+        r.status === "在职"
+        && (r.remainingDays || 0) === 0
+        && myDayPools().some(p => p.id === r.poolId)
+      );
+    }
+
     function navigateToLowBalancePools() {
       closeUserMenu();
       const pools = lowBalanceDayPoolsAlert();
@@ -2012,6 +2027,7 @@
         }
         state.view = "dayPool";
         state.dayPoolTab = "pools";
+        state.dayPoolRiderFocus = null;
         if (first) state.dayPoolSelectedId = first.id;
       } else {
         if (!canAccessView("channelSales")) {
@@ -2025,6 +2041,24 @@
       }
       closeDrawer();
       render();
+    }
+
+    function navigateToZeroQuotaRiders() {
+      closeUserMenu();
+      if (!isChannelRole() || !canAccessView("dayPool")) {
+        showProtoToast("当前身份无「人天额度池」菜单");
+        return;
+      }
+      const already = state.view === "dayPool" && state.dayPoolTab === "riders" && state.dayPoolRiderFocus === "zeroQuota";
+      state.view = "dayPool";
+      state.dayPoolTab = "riders";
+      state.dayPoolRiderFocus = "zeroQuota";
+      closeDrawer();
+      render();
+      requestAnimationFrame(() => {
+        document.querySelector("#dayPoolRiderList")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      showProtoToast(already ? "已定位到零额度骑手名单" : "已打开在职零额度骑手名单");
     }
 
     function logoutLogin() {
@@ -2048,9 +2082,16 @@
       const lowPools = lowBalanceDayPoolsAlert();
       const showBalanceWarn = lowPools.length > 0;
       const balanceTip = lowPools.map(p => `${p.ownerName || ""} · ${p.name}`).filter(Boolean).join("；");
+      const zeroRiders = zeroQuotaActiveRidersAlert();
+      const showZeroQuotaWarn = zeroRiders.length > 0;
+      const zeroTip = zeroRiders.slice(0, 5).map(r => `${r.name}（${r.gateReason || r.failReason || "剩余0人天"}）`).join("；")
+        + (zeroRiders.length > 5 ? "…" : "");
       el.innerHTML = `<div class="global-header-actions">
         ${showBalanceWarn ? `<button type="button" class="balance-alert-link" id="btnBalanceAlerts" title="${escProtoAttr(balanceTip || "人天池余额不足")}">
           余额不足${lowPools.length > 1 ? `<span class="alert-badge">${lowPools.length > 99 ? "99+" : lowPools.length}</span>` : ""}
+        </button>` : ""}
+        ${showZeroQuotaWarn ? `<button type="button" class="balance-alert-link" id="btnZeroQuotaRiders" title="${escProtoAttr(zeroTip || "在职骑手剩余人天为0")}">
+          骑手零额度<span class="alert-badge">${zeroRiders.length > 99 ? "99+" : zeroRiders.length}</span>
         </button>` : ""}
         ${showAlerts ? `<button type="button" class="device-alert-link" id="btnDeviceAlerts">
           设备报警${pending ? `<span class="alert-badge">${pending}</span>` : ""}
@@ -2072,6 +2113,7 @@
         </div>
       </div>`;
       document.querySelector("#btnBalanceAlerts")?.addEventListener("click", navigateToLowBalancePools);
+      document.querySelector("#btnZeroQuotaRiders")?.addEventListener("click", navigateToZeroQuotaRiders);
       document.querySelector("#btnDeviceAlerts")?.addEventListener("click", navigateToDeviceAlerts);
       document.querySelector("#btnUserAvatar")?.addEventListener("click", e => {
         e.stopPropagation();
@@ -2669,8 +2711,8 @@
 
     function eligibilityTag(el) {
       const map = {
-        "已确认消耗": "tag", "已预占": "tag warn", "预占失败": "tag risk", "待首换": "tag warn",
-        "待首换开通": "tag warn", "已回池": "tag neutral", "不可用": "tag risk"
+        "已确认消耗": "tag", "已预占": "tag warn", "预占失败": "tag risk", "待还电": "tag risk",
+        "待首换": "tag warn", "待首换开通": "tag warn", "已回池": "tag neutral", "不可用": "tag risk"
       };
       const cls = (map[el] || "tag neutral").replace("tag ", "");
       return `<span class="tag ${cls}">${el}</span>`;
@@ -2817,6 +2859,11 @@
         { key: "dateTo", label: "日止", type: "date" },
         { key: "operatorId", label: "运营商", type: "select", options: () => platformOperatorOptions() }
       ],
+      depositManage_pending: [
+        { key: "operatorId", label: "运营商", type: "select", options: () => platformOperatorOptions() },
+        { key: "dateFrom", label: "日起", type: "date" },
+        { key: "dateTo", label: "日止", type: "date" }
+      ],
       sites: [
         { key: "siteName", label: "站点名称", placeholder: "模糊搜索" },
         { key: "city", label: "城市", type: "select", options: [{ v: "全部", t: "全部城市" }, { v: "上海", t: "上海" }] },
@@ -2952,7 +2999,7 @@
       dayPool_riders: [
         { key: "teamId", label: "团队", type: "select", options: () => [{ v: "全部", t: "全部团队" }].concat(myChannelTeams().map(t => ({ v: t.id, t: t.name }))) },
         { key: "keyword", label: "骑手手机/姓名", placeholder: "" },
-        { key: "quotaStatus", label: "额度状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "使用中", t: "使用中" }, { v: "未分配", t: "未分配" }, { v: "已收回", t: "已收回" }] }
+        { key: "quotaStatus", label: "额度状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "使用中", t: "使用中" }, { v: "未分配", t: "未分配" }, { v: "已用尽", t: "已用尽" }, { v: "已收回", t: "已收回" }] }
       ],
       dayPool_allocations: [
         { key: "poolId", label: "额度池", type: "select", options: () => [{ v: "全部", t: "全部" }].concat(myDayPools().map(p => ({ v: p.id, t: p.id }))) },
@@ -7297,8 +7344,8 @@
       l1UnifiedPricing.status = document.querySelector("#l1Status")?.value || l1UnifiedPricing.status;
       l1UnifiedPricing.updatedAt = new Date().toISOString().slice(0, 10);
       l1UnifiedPricing.updatedBy = "平台管理员";
+      showProtoToast("演示：跨网设备服务费统价已更新，新清分将按新单价计算");
       render();
-      window.alert("演示：跨网设备服务费统价已更新，新清分将按新单价计算");
     }
 
     function savePlatformStandardDayPriceForm() {
@@ -7311,8 +7358,88 @@
         if (a.trigger === "确认消耗" || a.poolId) a.basePrice = platformAccrualDayPrice();
       });
       refreshPlatformFeeAccruals();
+      showProtoToast("演示：人天标准日值已更新。B 端计提基数与新签约默认批发价将按 ¥" + platformStandardDayPrice.price + "/人天 展示");
       render();
-      window.alert("演示：人天标准日值已更新。B 端计提基数与新签约默认批发价将按 ¥" + platformStandardDayPrice.price + "/人天 展示");
+    }
+
+    function openL1CityOverrideForm(editId) {
+      const row = editId ? l1CityOverrides.find(r => r.id === editId) : null;
+      openProtoForm({
+        title: row ? "编辑城市覆盖价" : "添加城市覆盖价",
+        fields: [
+          { name: "city", label: "城市", value: row?.city || "", required: true },
+          { name: "cabinetFee", label: "柜机服务费（元/次）", type: "number", value: String(row?.cabinetFee ?? l1UnifiedPricing.cabinetFee) },
+          { name: "batteryFee", label: "电池服务费（元/次）", type: "number", value: String(row?.batteryFee ?? l1UnifiedPricing.batteryFee) },
+          { name: "status", label: "状态", type: "select", value: row?.status || "覆盖生效", options: ["覆盖生效", "沿用全网", "停用"], optionLabels: { "覆盖生效": "覆盖生效", "沿用全网": "沿用全网", "停用": "停用" } }
+        ],
+        submitLabel: "保存",
+        onSubmit: (data) => {
+          const city = (data.city || "").trim();
+          if (!city) return "请填写城市";
+          const cabinetFee = parseFloat(data.cabinetFee);
+          const batteryFee = parseFloat(data.batteryFee);
+          if (Number.isNaN(cabinetFee) || cabinetFee < 0) return "请填写有效柜机费";
+          if (Number.isNaN(batteryFee) || batteryFee < 0) return "请填写有效电池费";
+          const today = new Date().toISOString().slice(0, 10);
+          if (row) {
+            row.city = city;
+            row.cabinetFee = cabinetFee;
+            row.batteryFee = batteryFee;
+            row.status = data.status || "覆盖生效";
+            row.updatedAt = today;
+          } else {
+            if (l1CityOverrides.some(r => r.city === city)) return "该城市已有覆盖价，请直接编辑";
+            l1CityOverrides.push({
+              id: "L1C-" + Date.now(),
+              city, cabinetFee, batteryFee,
+              status: data.status || "覆盖生效",
+              updatedAt: today
+            });
+          }
+          return {
+            successMessage: "演示：城市覆盖价已保存（仅影响新产生跨网费，不追溯）",
+            afterClose: () => render()
+          };
+        }
+      });
+    }
+
+    function openStdDayCityOverrideForm(editId) {
+      const row = editId ? stdDayCityOverrides.find(r => r.id === editId) : null;
+      openProtoForm({
+        title: row ? "编辑日值城市覆盖" : "添加日值城市覆盖",
+        fields: [
+          { name: "city", label: "城市", value: row?.city || "", required: true },
+          { name: "price", label: "标准日值（元/人天）", type: "number", value: String(row?.price ?? platformStandardDayPrice.price) },
+          { name: "status", label: "状态", type: "select", value: row?.status || "覆盖生效", options: ["覆盖生效", "沿用全网", "停用"], optionLabels: { "覆盖生效": "覆盖生效", "沿用全网": "沿用全网", "停用": "停用" } }
+        ],
+        submitLabel: "保存",
+        onSubmit: (data) => {
+          const city = (data.city || "").trim();
+          if (!city) return "请填写城市";
+          const price = parseFloat(data.price);
+          if (Number.isNaN(price) || price < 0) return "请填写有效日值";
+          const today = new Date().toISOString().slice(0, 10);
+          if (row) {
+            row.city = city;
+            row.price = price;
+            row.status = data.status || "覆盖生效";
+            row.updatedAt = today;
+          } else {
+            if (stdDayCityOverrides.some(r => r.city === city)) return "该城市已有覆盖价，请直接编辑";
+            stdDayCityOverrides.push({
+              id: "STD-" + Date.now(),
+              city, price,
+              status: data.status || "覆盖生效",
+              updatedAt: today
+            });
+          }
+          return {
+            successMessage: "演示：人天日值城市覆盖已保存（仅影响新消耗计提，不追溯）",
+            afterClose: () => render()
+          };
+        }
+      });
     }
 
     function openPlatformFeeRateForm(opId) {
@@ -7699,8 +7826,17 @@
       let body = "";
       if (tab === "pending") {
         const sub = state.depositRechargeSubTab || "waiting";
-        const pendingRows = depositRechargeOrders.filter(o => o.status === "待确认");
-        const processedRows = depositRechargeOrders.filter(o => o.status !== "待确认");
+        const pf = getPf();
+        const matchRechargeFilter = (o) => {
+          if (pf.operatorId && pf.operatorId !== "全部" && o.operatorId !== pf.operatorId) return false;
+          /* 时间按提交日；已处理同时兼容处理日命中 */
+          const inSubmit = matchDateStr(o.submitTime, pf.dateFrom, pf.dateTo);
+          const inConfirm = o.confirmTime ? matchDateStr(o.confirmTime, pf.dateFrom, pf.dateTo) : false;
+          if (!inSubmit && !(o.status !== "待确认" && inConfirm)) return false;
+          return true;
+        };
+        const pendingRows = depositRechargeOrders.filter(o => o.status === "待确认" && matchRechargeFilter(o));
+        const processedRows = depositRechargeOrders.filter(o => o.status !== "待确认" && matchRechargeFilter(o));
         const subTabs = panelTopTabs([
           ["waiting", "待确认 (" + pendingRows.length + ")"],
           ["processed", "已处理 (" + processedRows.length + ")"]
@@ -8084,7 +8220,7 @@
               <label>状态<select id="stdDayStatus"><option ${platformStandardDayPrice.status === "生效" ? "selected" : ""}>生效</option><option ${platformStandardDayPrice.status === "停用" ? "selected" : ""}>停用</option></select></label>
             </form>
             <p style="font-size:12px;color:var(--muted);margin:12px 0">最近更新：${platformStandardDayPrice.updatedAt} · ${platformStandardDayPrice.updatedBy}</p>
-            <button type="button" class="btn primary" id="saveStdDayPrice">发布全网默认日值（演示）</button>
+            <button type="button" class="btn primary" id="saveStdDayPrice" data-save-std-day>发布全网默认日值（演示）</button>
             <p style="font-size:12px;color:var(--muted);margin:10px 0 0">改价<strong>不追溯</strong>历史消耗计提。</p>
           </div>
         </section>
@@ -8100,7 +8236,7 @@
                 <td><button type="button" class="link-btn" data-std-city-edit="${r.id}">编辑（演示）</button></td>
               </tr>`).join("") || "<tr><td colspan='5'>暂无城市覆盖</td></tr>"}</tbody>
             </table>
-            <button type="button" class="btn" style="margin-top:10px" id="addStdDayCityOverride">+ 添加城市覆盖（演示）</button>
+            <button type="button" class="btn" style="margin-top:10px" id="addStdDayCityOverride" data-add-std-city>+ 添加城市覆盖（演示）</button>
           </div>
         </section>`;
       }
@@ -8116,7 +8252,7 @@
               <label>状态<select id="l1Status"><option ${l1UnifiedPricing.status === "生效" ? "selected" : ""}>生效</option><option ${l1UnifiedPricing.status === "停用" ? "selected" : ""}>停用</option></select></label>
             </form>
             <p style="font-size:12px;color:var(--muted);margin:12px 0">最近更新：${l1UnifiedPricing.updatedAt} · ${l1UnifiedPricing.updatedBy}。变更后 enrichSwapTriplet / 运营商往来账演示按新单价计算。</p>
-            <button type="button" class="btn primary" id="saveL1Pricing">发布全网默认价（演示）</button>
+            <button type="button" class="btn primary" id="saveL1Pricing" data-save-l1-pricing>发布全网默认价（演示）</button>
             <p style="font-size:12px;color:var(--muted);margin:10px 0 0">改价<strong>不追溯</strong>历史跨网订单。城市覆盖见下表。</p>
           </div>
         </section>
@@ -8132,7 +8268,7 @@
                 <td><button type="button" class="link-btn" data-l1-city-edit="${r.id}">编辑（演示）</button></td>
               </tr>`).join("") || "<tr><td colspan='6'>暂无城市覆盖</td></tr>"}</tbody>
             </table>
-            <button type="button" class="btn" style="margin-top:10px" id="addL1CityOverride">+ 添加城市覆盖（演示）</button>
+            <button type="button" class="btn" style="margin-top:10px" id="addL1CityOverride" data-add-l1-city>+ 添加城市覆盖（演示）</button>
           </div>
         </section>
         <section class="panel">
@@ -14565,20 +14701,30 @@
         </section>`;
       } else if (tab === "riders") {
         const f = getPf();
+        const focusZero = state.dayPoolRiderFocus === "zeroQuota";
         const riders = dayPoolRiders.filter(r => {
           if (!matchOrgScope(r)) return false;
           if (f.teamId !== "全部" && r.teamId !== f.teamId) return false;
           if (!matchKw(r.phone, f.keyword) && !matchKw(r.name, f.keyword) && !matchKw(r.id, f.keyword)) return false;
           if (f.quotaStatus !== "全部" && r.quotaStatus !== f.quotaStatus) return false;
+          if (focusZero && !(r.status === "在职" && (r.remainingDays || 0) === 0)) return false;
           return myDayPools().some(p => p.id === r.poolId);
         });
-        body = `<section class="panel">
+        const focusBanner = focusZero
+          ? `<div class="pool-warn-banner" style="margin-bottom:12px">${noteBtn("day_pool_hold_no_quota")}
+              当前筛选：<strong>在职 · 剩余人天为 0</strong>（共 ${riders.length} 人）。原因须区分 <strong>个人无额度</strong> / <strong>预占失败</strong>；持电池者为「待还电」。
+              <button type="button" class="link-btn" data-clear-rider-focus style="margin-left:8px">清除筛选</button>
+            </div>`
+          : "";
+        body = `<section class="panel" id="dayPoolRiderList">
           ${panelHead("登记骑手", "校验个人/渠道互斥；退出团队自动回池", "day_pool_channel", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="register">登记骑手</button> <button type="button" class="btn" data-pool-form="batchRegister">批量导入</button>` : "")}
           <div class="panel-body orders-table-wrap">
+            ${focusBanner}
             <table>
-              <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>在职状态</th><th>已分配</th><th>已消耗</th><th>剩余额度</th><th>额度状态</th><th>今日权益</th><th>操作</th></tr></thead>
+              <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>在职状态</th><th>已分配</th><th>已消耗</th><th>剩余额度</th><th>额度状态</th><th>今日权益</th><th>持电池</th><th>操作</th></tr></thead>
               <tbody>${riders.map(r => {
                 const p = poolById(r.poolId);
+                const gateHint = r.gateReason || r.failReason || "";
                 return `<tr>
                 <td>${r.name}<br><small>${r.id} · ${r.phone}</small></td>
                 <td>${r.team || "—"}</td>
@@ -14587,10 +14733,11 @@
                 <td>${r.allocatedDays || 0} 人天</td><td>${r.usedDays || 0} 人天</td>
                 <td><strong>${r.remainingDays || 0}</strong> 人天</td>
                 <td>${tag(r.quotaStatus || "未分配")}</td>
-                <td>${eligibilityTag(r.todayEligibility)}${r.failReason ? `<br><small style="color:var(--red)">${r.failReason}</small>` : ""}</td>
+                <td>${eligibilityTag(r.todayEligibility)}${gateHint ? `<br><small style="color:var(--red)">${gateHint}</small>` : ""}</td>
+                <td>${(r.batteryHeld || 0) > 0 ? tag("持有") : "—"}</td>
                 <td class="row-actions">${canEditDayPool() && r.status === "在职" ? `<button type="button" class="link-btn" data-pool-form="leaveTeam" data-rider-id="${r.id}">移出团队</button>` : "—"}</td>
               </tr>`;
-              }).join("") || "<tr><td colspan='10'>暂无登记骑手</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='11'>暂无登记骑手</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -14781,6 +14928,7 @@
       }
 
       const warnPool = pools.find(p => p.balancePct < 20);
+      const zeroQuotaN = isChannelRole() ? zeroQuotaActiveRidersAlert().length : 0;
       return `
         ${ownScopeBanner()}
         ${teamBanner}
@@ -14791,6 +14939,10 @@
         ${!isTeamAdminLogin() && warnPool ? `<div class="pool-warn-banner">${noteBtn("day_pool_warn")}${noteBtn("day_pool_insufficient")}
           <strong>${warnPool.name}</strong> 可用余额 <strong>${warnPool.balancePct}%</strong>（${warnPool.availableDays}/${warnPool.totalDays} 人天）。
           ${canEditDayPool() ? `<button type="button" class="link-btn" data-pool-form="renew" data-pool-id="${warnPool.id}">立即续费</button>` : ""}
+        </div>` : ""}
+        ${!isTeamAdminLogin() && zeroQuotaN > 0 ? `<div class="pool-warn-banner">${noteBtn("day_pool_hold_no_quota")}
+          <strong>在职骑手零额度</strong>：共 <strong>${zeroQuotaN}</strong> 人剩余人天为 0（含个人无额度 / 预占失败）；持电池须催还。
+          <button type="button" class="link-btn" data-goto-zero-quota style="margin-left:8px">查看名单</button>
         </div>` : ""}
         ${!isTeamAdminLogin() && isChannelRole() ? `<div class="perm-banner" style="margin-bottom:14px">${noteBtn("day_pool_b2b_refund")} 额度池<strong>不支持在线退款</strong>，需与签约运营商线下协商。</div>` : ""}
         ${pageWithTabs(sidebar, body)}`;
@@ -15016,8 +15168,9 @@
         btn.onclick = () => { state.employeeTab = btn.dataset.emptab; render(); };
       });
       root.querySelectorAll("[data-dptab]").forEach(btn => {
-        btn.onclick = () => { state.dayPoolTab = btn.dataset.dptab; render(); };
+        btn.onclick = () => { state.dayPoolTab = btn.dataset.dptab; if (btn.dataset.dptab !== "riders") state.dayPoolRiderFocus = null; render(); };
       });
+      /* data-goto-zero-quota / data-clear-rider-focus：document 级委托，见文末 init */
       root.querySelectorAll("[data-dppools-sub]").forEach(btn => {
         btn.onclick = () => { state.dayPoolPoolsSubTab = btn.dataset.dppoolsSub; render(); };
       });
@@ -16534,15 +16687,23 @@
       if (ep) ep.onclick = () => window.alert("演示：已打开违约金参数编辑（宽限期/日率/上限/类型多选）");
       const term = document.querySelector("#demoLeaseTerminate");
       if (term) term.onclick = () => window.alert("演示终止结算单 TS-260713\n· 提前通知日已满足\n· 应付租金/违约金/设备回收清单\n· 待资方+运营商确认（平台只读）");
-      const addCity = document.querySelector("#addL1CityOverride");
-      if (addCity) addCity.onclick = () => window.alert("演示：新增城市覆盖价（保存后仅影响新产生跨网费）");
-      document.querySelectorAll("[data-l1-city-edit]").forEach(btn => {
-        btn.onclick = () => window.alert("演示：编辑城市覆盖 " + btn.dataset.l1CityEdit);
+      document.querySelectorAll("[data-save-l1-pricing], #saveL1Pricing").forEach(btn => {
+        btn.onclick = (e) => { e.preventDefault(); saveL1PricingForm(); };
       });
-      const addStdCity = document.querySelector("#addStdDayCityOverride");
-      if (addStdCity) addStdCity.onclick = () => window.alert("演示：新增人天标准日值城市覆盖（保存后仅影响新消耗计提）");
+      document.querySelectorAll("[data-save-std-day], #saveStdDayPrice").forEach(btn => {
+        btn.onclick = (e) => { e.preventDefault(); savePlatformStandardDayPriceForm(); };
+      });
+      document.querySelectorAll("[data-add-l1-city], #addL1CityOverride").forEach(btn => {
+        btn.onclick = (e) => { e.preventDefault(); openL1CityOverrideForm(null); };
+      });
+      document.querySelectorAll("[data-l1-city-edit]").forEach(btn => {
+        btn.onclick = (e) => { e.preventDefault(); openL1CityOverrideForm(btn.dataset.l1CityEdit); };
+      });
+      document.querySelectorAll("[data-add-std-city], #addStdDayCityOverride").forEach(btn => {
+        btn.onclick = (e) => { e.preventDefault(); openStdDayCityOverrideForm(null); };
+      });
       document.querySelectorAll("[data-std-city-edit]").forEach(btn => {
-        btn.onclick = () => window.alert("演示：编辑日值城市覆盖 " + btn.dataset.stdCityEdit);
+        btn.onclick = (e) => { e.preventDefault(); openStdDayCityOverrideForm(btn.dataset.stdCityEdit); };
       });
       renderPageFilters();
       document.querySelectorAll("[data-swap-policy]").forEach(inp => {
@@ -16718,8 +16879,16 @@
         body = `<section class="panel"><div class="panel-body"><p style="color:var(--red);margin:0 0 8px"><strong>页面渲染失败</strong>：${String(e.message || e)}</p><p style="font-size:13px;color:var(--muted);margin:0">请打开浏览器控制台查看详情；建议通过 <code>python3 main.py</code> 访问 <code>/prototype/index.html</code>。</p></div></section>`;
       }
       document.querySelector("#views").innerHTML = `<div class="view active">${phase2BannerHtml()}${body}</div>`;
-      bindInteractiveActions(document);
-      bindPageDynamicControls();
+      try {
+        bindInteractiveActions(document);
+      } catch (e) {
+        console.error("bindInteractiveActions failed", e);
+      }
+      try {
+        bindPageDynamicControls();
+      } catch (e) {
+        console.error("bindPageDynamicControls failed", e);
+      }
       if (state.detailSubId) openPackageDetail(state.detailSubId, { fromSwapId: state.detailSubFromSwapId });
       else if (state.detailRefundId) openUserRefundDetail(state.detailRefundId);
       else if (state.detailSwapId) openSwapDetail(state.detailSwapId);
@@ -16766,6 +16935,21 @@
     });
 
     document.addEventListener("click", e => {
+      const gotoZero = e.target.closest("[data-goto-zero-quota]");
+      if (gotoZero) {
+        e.preventDefault();
+        e.stopPropagation();
+        navigateToZeroQuotaRiders();
+        return;
+      }
+      const clearFocus = e.target.closest("[data-clear-rider-focus]");
+      if (clearFocus) {
+        e.preventDefault();
+        e.stopPropagation();
+        state.dayPoolRiderFocus = null;
+        render();
+        return;
+      }
       const btn = e.target.closest("[data-view-note]");
       if (btn) {
         e.stopPropagation();
@@ -16884,6 +17068,10 @@
       if (PF_CONFIRM_KEYS.has(pfKey())) return;
       getPf()[el.dataset.pfField] = el.value;
       if (state.view === "platformUsers") state.platformUsersPage = 1;
+      if (state.view === "depositManage" && (state.depositTab || "pending") === "pending") {
+        state.depositRechargePendingPage = 1;
+        state.depositRechargeProcessedPage = 1;
+      }
       render();
     });
     document.querySelector("#pageFilters").addEventListener("click", e => {
