@@ -2794,7 +2794,7 @@
     }
 
     function rentExpiryPolicyLabel(policy) {
-      return policy === "suspend" ? "到期停服" : "到期兜底 SKU";
+      return "到期停服";
     }
 
     function contractPricingCell(c) {
@@ -5312,10 +5312,10 @@
 
     /** 个人套餐城市底价可选 SKU（暂定 · decision-041 补充） */
     const PERSONAL_PKG_SKU_PRESETS = [
-      { pkg: "包月30天", pkgType: "monthly", validityHours: null, channelFallback: false, retailPrice: 299 },
-      { pkg: "7天套餐", pkgType: "weekly", validityHours: null, channelFallback: false, retailPrice: 89 },
-      { pkg: "1天套餐", pkgType: "daily", validityHours: 24, channelFallback: true, retailPrice: 29 },
-      { pkg: "单次换电", pkgType: "single", validityHours: 24, channelFallback: true, retailPrice: 9.9 }
+      { pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 299 },
+      { pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 89 },
+      { pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29 },
+      { pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9 }
     ];
 
     function paginateList(rows, page, pageSize) {
@@ -13051,16 +13051,15 @@
       state.pricingEditId = isNew ? "new" : id;
       const cities = ["上海", "杭州"];
       const skuOptionsHtml = (selected) => PERSONAL_PKG_SKU_PRESETS.map(p =>
-        `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-fallback="${p.channelFallback ? 1 : 0}" data-price="${p.retailPrice}"${selected === p.pkg ? " selected" : ""}>${p.pkg}</option>`
+        `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-price="${p.retailPrice}"${selected === p.pkg ? " selected" : ""}>${p.pkg}</option>`
       ).join("");
       if (isNew) {
         document.querySelector("#pricingFormTitle").textContent = "新增 SKU · 个人套餐";
         document.querySelector("#pricingForm").innerHTML = `
-          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">套餐名称仅可从固定列表选择（暂定：包月30天 / 7天套餐 / 1天套餐 / 单次换电）；1天/单次为渠道兜底必选。</p>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">套餐名称仅可从固定列表选择（暂定：包月30天 / 7天套餐 / 1天套餐 / 单次换电）；名称编辑时不可改。</p>
           <label>城市<select name="city">${cities.map(c => `<option>${c}</option>`).join("")}</select></label>
           <label>套餐 SKU<select name="pkgPreset" id="pricingPkgPreset"></select></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="299" required /></label>
-          <label>渠道兜底<select name="channelFallback"><option value="0">否</option><option value="1">是（必选上架）</option></select></label>
           <label>状态<select name="status"><option selected>生效</option><option>停用</option></select></label>`;
         const syncPreset = () => {
           const city = document.querySelector("#pricingForm [name=city]")?.value || "上海";
@@ -13074,11 +13073,10 @@
             return;
           }
           sel.innerHTML = presets.map(p =>
-            `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-fallback="${p.channelFallback ? 1 : 0}" data-price="${p.retailPrice}">${p.pkg}</option>`
+            `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-price="${p.retailPrice}">${p.pkg}</option>`
           ).join("");
           const first = presets[0];
           document.querySelector("#pricingForm [name=retailPrice]").value = first.retailPrice;
-          document.querySelector("#pricingForm [name=channelFallback]").value = first.channelFallback ? "1" : "0";
         };
         syncPreset();
         document.querySelector("#pricingForm [name=city]")?.addEventListener("change", syncPreset);
@@ -13086,7 +13084,6 @@
           const opt = e.target.selectedOptions[0];
           if (!opt?.dataset.price) return;
           document.querySelector("#pricingForm [name=retailPrice]").value = opt.dataset.price;
-          document.querySelector("#pricingForm [name=channelFallback]").value = opt.dataset.fallback || "0";
         });
       } else {
         const allowed = PERSONAL_PKG_SKU_PRESETS.some(p => p.pkg === row.pkg);
@@ -13098,7 +13095,6 @@
             ? skuOptionsHtml(row.pkg)
             : `<option selected>${row.pkg}</option>`}</select></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="${row.retailPrice}" required /></label>
-          <label>渠道兜底<input value="${row.channelFallback ? "是（必选）" : "否"}" readonly /></label>
           <label>状态<select name="status"><option ${row.status === "生效" ? "selected" : ""}>生效</option><option ${row.status === "停用" ? "selected" : ""}>停用</option></select></label>`;
       }
       document.querySelector("#pricingModal").classList.add("open");
@@ -13139,7 +13135,6 @@
           pkg,
           pkgType: opt.dataset.type || "monthly",
           validityHours: opt.dataset.hours ? parseInt(opt.dataset.hours, 10) : null,
-          channelFallback: form.querySelector("[name=channelFallback]")?.value === "1",
           retailPrice,
           status,
           updatedAt: new Date().toISOString().slice(0, 10)
@@ -13509,7 +13504,7 @@
                   ? `<small style="color:var(--green)">比底价低 ¥${Math.abs(diff).toFixed(diff % 1 ? 1 : 0)}</small>`
                   : `<small style="color:var(--warn)">比底价高 ¥${Math.abs(diff).toFixed(diff % 1 ? 1 : 0)}</small>`;
             return `<tr>
-              <td>${r.pkg}${r.channelFallback ? `<br><small>${tag("兜底")}</small>` : ""}</td>
+              <td>${r.pkg}</td>
               <td>¥${r.retailPrice}</td>
               <td><strong>¥${eff}</strong><br>${diffHtml}</td>
               <td>${tag(zp ? "区价" : "继承")}</td>
@@ -13562,15 +13557,14 @@
           const rows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id);
           body = `<section class="panel panel-with-top-tabs">
             ${topTabs}
-            ${panelHead("城市底价（个人套餐）", "运营商×城市×SKU · 未挂分区的站点用此价；须保留<strong>1天+单次</strong>渠道兜底", "pricing_pkg", `<button type="button" class="btn primary" data-new-pricing-sku>+ 新增 SKU</button>`)}
+            ${panelHead("城市底价（个人套餐）", "运营商×城市×SKU · 未挂分区的站点用此价", "pricing_pkg", `<button type="button" class="btn primary" data-new-pricing-sku>+ 新增 SKU</button>`)}
             <div class="panel-body orders-table-wrap">
               <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg")}${noteBtn("pricing_deposit")} 同城差异价请到「价格分区」。个人用户信用不足须实缴电池押金 <strong>¥${depCfg.amount}</strong>。</p>
               <table>
-                <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>渠道兜底</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+                <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
                 <tbody>${rows.map(r => `<tr>
                   <td>${r.city}</td><td>${r.pkg}</td>
                   <td>${r.validityHours ? r.validityHours + "h" : "按 SKU"}</td>
-                  <td>${r.channelFallback ? tag("必选") : "—"}</td>
                   <td>¥${r.retailPrice}</td><td>${tag(r.status)}</td><td>${r.updatedAt}</td>
                   <td><button type="button" class="link-btn" data-edit-pricing="${r.id}">编辑</button></td>
                 </tr>`).join("")}</tbody>
@@ -15443,17 +15437,16 @@
           return true;
         });
         body = `<section class="panel">
-          ${panelHead("骑手零售价（只读）", "运营商城市级统一定价，不区分站点；无预占人天时默认推荐<strong>1天/单次</strong>兜底 SKU（购后24h）", "day_pool_retail")}
+          ${panelHead("骑手零售价（只读）", "运营商城市级个人套餐统一定价（渠道商只读）", "day_pool_retail")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>渠道兜底</th><th>零售价</th><th>合同批发价</th><th>状态</th></tr></thead>
+              <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>零售价</th><th>合同批发价</th><th>状态</th></tr></thead>
               <tbody>${rows.map(r => `<tr>
                 <td>${r.city}</td><td>${r.pkg}</td>
                 <td>${r.validityHours ? r.validityHours + "h" : "—"}</td>
-                <td>${r.channelFallback ? tag("兜底") : "—"}</td>
                 <td>¥${r.retailPrice}</td><td>¥${wholesale}/人天</td>
                 <td>${tag(r.status)}</td>
-              </tr>`).join("") || "<tr><td colspan='7'>暂无</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='6'>暂无</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;

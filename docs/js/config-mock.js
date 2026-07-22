@@ -323,7 +323,7 @@
       data_drill_panel: { title: "换电订单数", content: "紧凑卡片：按日换电订单数（含当日）。<br>· <strong>平台总览</strong>：先筛运营商，再筛该运营商下站点（切换运营商时站点重置为全部）<br>· 时间范围默认近 7 天，可选近 30 天或自定义（最多 31 天）" },
       data_drill_spark: { title: "换电订单折线图", content: "按所选站点与日期区间生成每日 Mock 换电订单数；右侧合计为区间之和；最高/最低取自序列。正式环境对接按日聚合 API（含当日）。" },
       platform_no_share: { title: "平台运营分成", content: "骑手套餐/换电应分台账记录运营商本站经营应得。平台收取 1% 技术服务费（C 端支付分账 + B 端确认消耗计提），见「平台服务费」。" },
-      pricing_pkg: { title: "个人套餐定价", content: "默认按<strong>运营商×城市×SKU</strong>维护城市底价。<strong>一期可选 SKU（暂定）</strong>：包月30天、7天套餐、1天套餐、单次换电（名称仅可选、编辑时不可改名）。1天/单次为渠道兜底必选。<strong>价格分区</strong>为<strong>二期</strong>。押金见「押金设置」。" },
+      pricing_pkg: { title: "个人套餐定价", content: "默认按<strong>运营商×城市×SKU</strong>维护城市底价。<strong>一期可选 SKU（暂定）</strong>：包月30天、7天套餐、1天套餐、单次换电（名称仅可选、编辑时不可改名）。渠道骑手<strong>不</strong>走个人套餐自费兜底。<strong>价格分区</strong>为<strong>二期</strong>。押金见「押金设置」。" },
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
       channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
@@ -484,10 +484,10 @@
       day_pool_rules: { title: "额度使用规则", content: "按<strong>团队</strong>配置额度上限（人天/结算周期）；扣天/激活等口径继承额度池<strong>平台统一四项</strong>，不在规则层配置站点或权益类型。团队须先绑定<strong>消耗额度池</strong>（见「骑手登记 → 骑手团队」）。" },
       day_pool_b2b_refund: { title: "额度池退款说明（渠道商）", content: "人天额度池<strong>不支持在线退款</strong>。若需退未使用额度，须与<strong>签约运营商线下协商</strong>；达成一致后由运营商在后台执行额度扣减（账本类型：<strong>退款</strong>），资金按对公约定另行结算。渠道商后台不可自行发起池退款。" },
       day_pool_operator_adjust: { title: "运营商额度调整", content: "运营商在「渠道管理 → 渠道权益 → 已售额度池」手工调账。类型：充值、赠送、退款、修正、过期恢复（30 天内）。" },
-      entitlement_api: { title: "渠道骑手可换电校验", content: "换电前调用 <code>POST /api/v1/entitlement/check</code>：入参 user_id、cabinet_sn、site_id；返回 allowed、entitlement_type（day_pool/personal_pkg）、pool_id、seller_operator_id（userOwner）、today_status（reserved/confirmed/failed/pending_first_swap）、fail_reason、fallback（推荐 1天/单次兜底 SKU）。预占失败时 allowed=false，骑手端引导在线自费，<strong>不扣渠道池</strong>。详设见文档「渠道骑手可换电校验.md」。" },
+      entitlement_api: { title: "渠道骑手可换电校验", content: "换电前调用 <code>POST /api/v1/entitlement/check</code>：返回 allowed_swap / allowed_return、fail_reason、gate_reason。无人天额度时 <strong>allowed_swap=false</strong>，持电池仅可还电；<strong>无自费兜底 SKU</strong>。见 decision-054。" },
       day_pool_team: { title: "骑手团队", content: "入口在<strong>骑手登记</strong>页内 Tab「骑手团队」。渠道商创建团队并<strong>绑定消耗额度池</strong>（必选）。一运营商一池时默认团队自动绑定；向多家运营商签约时各团队须指定对应池。登记/分配/预占/消耗均从团队绑定池扣减。在职与离职骑手均可加入/变更/移除团队。" },
       day_pool_org: { title: "团队与额度池", content: "编排单元为<strong>团队</strong>（非组织/站点）。团队 <code>pool_id</code> 决定从哪个额度池扣减；额度使用规则为团队配置周期额度上限。" },
-      day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护；渠道商只读。渠道成员<strong>无预占人天</strong>时引导在线支付，默认推荐<strong>1天/单次</strong>兜底 SKU（购后24h有效）；平台 C 端 1% 在支付成功时收取。" },
+      day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护个人套餐城市价；渠道商只读。<strong>已取消</strong>渠道零额度自费兜底：无预占/无额度时不可换电，仅可还电，须渠道续配。" },
       day_pool_allocate: { title: "分配与收回", content: "分配：从团队绑定池可用余额划出 N 人天给骑手（分配即开通，按池统一口径预占/确认）。收回/退出团队：剩余未用人天自动退回池余额。" },
       day_pool_contract: { title: "额度池规则", content: "平台统一（只读）：<strong>分配即开通</strong>；每日预占后<strong>换电或持电池</strong>确认消耗；池过期<strong>不退</strong>。B 端结算节奏由渠道商与运营商线下协商，不在此展示。" },
       day_pool_identity: { title: "个人与渠道互斥", content: "同一骑手<strong>不可同时</strong>拥有生效中个人套餐与渠道团队成员身份。加入团队前须<strong>退订或冻结</strong>个人套餐。退出团队（主动/被移除）时<strong>未用人天自动回池</strong>。" },
@@ -495,7 +495,7 @@
       day_pool_purchase: { title: "购买人天额度", content: "渠道商向签约运营商按批发价采购人天；<strong>同一运营商续费在原池增购</strong>，不因团队再建第二池。向新运营商签约才产生新池实例。" },
       day_pool_ledger: { title: "额度明细账本", content: "所有额度变动留痕。渠道商可见：购买、分配、收回、预占、确认消耗、释放、续费等。运营商调账类型：<strong>充值、赠送、退款、修正、过期恢复</strong>（协商退款走「退款」；过期恢复仅运营商、池过期后 30 天内）。" },
       day_pool_warn: { title: "低余额预警", content: "规则①余额&lt;总额 20%；规则②余额不足以支撑<strong>在职骑手×10 天</strong>。触发后<strong>短信预警渠道商+运营商</strong>，并写入短信记录表（2026-07-13 确认）。" },
-      day_pool_hold_no_quota: { title: "零额度 / 待还电", content: "渠道商顶栏在「余额不足」旁展示<strong>骑手零额度</strong>（在职且剩余人天=0）。原因须区分：①<strong>个人无额度</strong>（分配已用尽）；②<strong>预占失败</strong>（池余额不足等）。若仍持电池→「待还电」：仅可还电、禁止换电；不透支；可自费兜底。见 decision-049。" },
+      day_pool_hold_no_quota: { title: "零额度 / 待还电", content: "渠道商顶栏「骑手零额度」（在职剩余人天=0）。原因：①个人无额度 ②预占失败。持电池→「待还电」：<strong>仅可还电、禁止换电</strong>；不透支；<strong>无自费兜底</strong>。见 decision-049 / 054。" },
       day_pool_refund: { title: "续费与退款", content: "<strong>续费</strong>：渠道商在原池上增购人天（在线/线下采购）。<strong>退款</strong>：不支持在线操作，须与运营商线下协商，由运营商后台扣减额度（类型：退款）。详见「额度池退款说明」。" },
       platform_scope: { title: "平台管理范围", content: "平台管理员可查看全业务汇总，治理运营商主体、设备绑定与跨网统价；不替代运营商日常运营与定价。" },
       platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、进件账户摘要、平台保证金与信用额度。运营商在登录页选「运营商登录」凭手机号进入；登录后仅见本人经营数据。" },
@@ -1495,7 +1495,7 @@
       { id: "RC260401099", type: "套餐支付", order: "SUB260401099", site: "浦东骑手驿站", city: "上海", user: "U9001", pkg: "包月30天", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-04-01 08:00", status: "成功" },
       { id: "RC260524015", type: "套餐支付", order: "SUB260524015", site: "陆家嘴分站", city: "上海", user: "U3321", pkg: "次卡10次", payee: "陆家嘴联营", deviceOwnerId: "OP-LJZ", mch: "2088999***", amount: 89, fee: 1.6, net: 87.4, channel: "微信支付", time: "2026-05-23 09:40", status: "成功" },
       { id: "RC-POOL-001", type: "额度池采购", order: "QP-2601", site: "—", city: "上海", user: "—", pkg: "人天池 10000天", payee: PAYEE_OPERATOR, deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 85000, fee: 0, net: 85000, channel: "对公转账", time: "2026-01-05 10:00", status: "成功", note: "批发 ¥8.5/人天" },
-      { id: "RC-POOL-088", type: "额度池零售", order: "PAY-POOL-088", site: "浦东骑手驿站", city: "上海", user: "U2103", pkg: "1天套餐·渠道兜底", payee: PAYEE_OPERATOR, deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 29, fee: 0.29, net: 28.71, channel: "微信支付", time: "2026-06-09 07:50", status: "成功", note: "无预占人天·在线支付兜底；渠道兜底零售" },
+      { id: "RC-POOL-088", type: "额度池零售", order: "PAY-POOL-088", site: "浦东骑手驿站", city: "上海", user: "U1028", pkg: "1天套餐", payee: PAYEE_OPERATOR, deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 29, fee: 0.29, net: 28.71, channel: "微信支付", time: "2026-06-09 07:50", status: "成功", note: "个人用户短时套餐（历史样例；渠道兜底路径已废止）" },
       { id: "RC260601099R", type: "退款出款", order: "SUB260601099", site: "浦东骑手驿站", city: "上海", user: "U9001", pkg: "包月30天", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: -186, fee: 0, net: -186, channel: "原路退回", time: "2026-06-01 10:15", status: "成功", note: "RF-260601-003 中途完结·套餐退" },
       { id: "RC260608015R", type: "退款出款", order: "SUB260608015", site: "世博换电服务点", city: "上海", user: "U2199", pkg: "单次换电", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: -9.9, fee: 0, net: -9.9, channel: "原路退回", time: "2026-06-08 16:06", status: "成功", note: "RF-260608-002 单次未换电退订" },
       { id: "RC260610088R", type: "退款出款", order: "SUB260610088", site: "浦东骑手驿站", city: "上海", user: "U2201", pkg: "7天套餐", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: -89, fee: 0, net: -89, channel: "原路退回", time: "—", status: "待审核", note: "RF-260610-001 待确认后出款" },
@@ -1977,8 +1977,8 @@
     const dayPoolRetailPrices = [
       { id: "RP-01", poolId: "QP-2601", city: "上海", pkg: "包月30天", retailPrice: 299, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-05-01" },
       { id: "RP-03", poolId: "QP-2601", city: "上海", pkg: "次卡10次", retailPrice: 89, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-04-15" },
-      { id: "RP-04", poolId: "QP-2601", city: "上海", pkg: "1天套餐", retailPrice: 29, wholesalePrice: 8.5, channelFallback: true, validityHours: 24, status: "生效", updatedAt: "2026-06-01" },
-      { id: "RP-05", poolId: "QP-2601", city: "上海", pkg: "单次换电", retailPrice: 9.9, wholesalePrice: 8.5, channelFallback: true, validityHours: 24, status: "生效", updatedAt: "2026-06-01" }
+      { id: "RP-04", poolId: "QP-2601", city: "上海", pkg: "1天套餐", retailPrice: 29, wholesalePrice: 8.5, validityHours: 24, status: "生效", updatedAt: "2026-06-01" },
+      { id: "RP-05", poolId: "QP-2601", city: "上海", pkg: "单次换电", retailPrice: 9.9, wholesalePrice: 8.5, validityHours: 24, status: "生效", updatedAt: "2026-06-01" }
     ];
 
     const dayPoolExceptions = [
@@ -2274,12 +2274,12 @@
     ];
 
     const operatorPkgPrices = [
-      { id: "OP-P-01", operatorId: "OP-SX", city: "上海", pkg: "包月30天", pkgType: "monthly", validityHours: null, channelFallback: false, retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
-      { id: "OP-P-03", operatorId: "OP-SX", city: "上海", pkg: "7天套餐", pkgType: "weekly", validityHours: null, channelFallback: false, retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
-      { id: "OP-P-04", operatorId: "OP-SX", city: "上海", pkg: "1天套餐", pkgType: "daily", validityHours: 24, channelFallback: true, retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-05", operatorId: "OP-SX", city: "上海", pkg: "单次换电", pkgType: "single", validityHours: 24, channelFallback: true, retailPrice: 9.9, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-06", operatorId: "OP-SX", city: "上海", pkg: "次卡10次", pkgType: "times", validityHours: null, channelFallback: false, retailPrice: 89, status: "生效", updatedAt: "2026-04-15" },
-      { id: "OP-P-07", operatorId: "OP-SX", city: "上海", pkg: "30天畅换", pkgType: "monthly", validityHours: null, channelFallback: false, retailPrice: 329, status: "生效", updatedAt: "2026-05-15" }
+      { id: "OP-P-01", operatorId: "OP-SX", city: "上海", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
+      { id: "OP-P-03", operatorId: "OP-SX", city: "上海", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
+      { id: "OP-P-04", operatorId: "OP-SX", city: "上海", pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
+      { id: "OP-P-05", operatorId: "OP-SX", city: "上海", pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9, status: "生效", updatedAt: "2026-06-01" },
+      { id: "OP-P-06", operatorId: "OP-SX", city: "上海", pkg: "次卡10次", pkgType: "times", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-04-15" },
+      { id: "OP-P-07", operatorId: "OP-SX", city: "上海", pkg: "30天畅换", pkgType: "monthly", validityHours: null, retailPrice: 329, status: "生效", updatedAt: "2026-05-15" }
     ];
 
     /** 同城价格分区：站点挂区 → 区价覆盖城市底价（可高可低）；未配 SKU 继承底价 */

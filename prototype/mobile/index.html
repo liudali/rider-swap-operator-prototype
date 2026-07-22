@@ -436,7 +436,8 @@
             <option value="cooling_refund">冷静期退款 · 李骑手 U2188</option>
             <option value="channel">渠道人天 · 待办押金 · U2110</option>
             <option value="channel_deposit_done">渠道人天 · 押金已办 · 持电池</option>
-            <option value="channel_fail">渠道预占失败 · 赵骑手 U2103</option>
+            <option value="channel_fail">渠道预占失败·待还电 · 赵骑手 U2103</option>
+            <option value="channel_no_quota">个人无额度·待还电 · 吴骑手 U2112</option>
             <option value="channel_resign">渠道离职回池 · 孙骑手 U2110</option>
           </optgroup>
           <optgroup label="个人 / 人天池异常">
@@ -592,7 +593,8 @@
               <option value="cooling_refund">冷静期退款·U2188</option>
               <option value="channel">渠道人天</option>
               <option value="channel_deposit_done">渠道·押金已办</option>
-              <option value="channel_fail">渠道预占失败·U2103</option>
+              <option value="channel_fail">渠道预占失败·待还电·U2103</option>
+              <option value="channel_no_quota">个人无额度·待还电·U2112</option>
               <option value="channel_resign">渠道离职回池</option>
             </optgroup>
             <optgroup label="异常">
@@ -725,11 +727,21 @@
       },
       channel_fail: {
         loggedIn: true, phone: "137****2103", name: "赵骑手", userId: "U2103",
-        kyc: true, entitlement: "渠道人天", pkg: "人天额度", daysLeft: null, swapUsed: 0,
-        status: "权益不可用", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601",
-        preOccupyFail: true, failReason: "渠道额度池余额不足，今日预占失败", holdsBattery: false,
+        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 0, swapUsed: 1,
+        status: "待还电", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601",
+        preOccupyFail: true, failReason: "渠道额度池余额不足，今日预占失败",
+        gateReason: "预占失败", holdsBattery: true, currentBatterySn: "BAT-SF-2103",
         depositStatus: "实付在押", depositAmount: 99, depositMethod: "实缴",
         mockWechatPayScore: 600, mockZhimaScore: 620
+      },
+      channel_no_quota: {
+        loggedIn: true, phone: "134****2112", name: "吴骑手", userId: "U2112",
+        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 0, swapUsed: 0,
+        status: "待还电", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601",
+        preOccupyFail: false, gateReason: "个人无额度",
+        failReason: "个人分配人天已用尽", holdsBattery: true, currentBatterySn: "BAT-SF-2112",
+        depositStatus: "信用免押", depositAmount: 0, depositMethod: "微信支付分",
+        mockWechatPayScore: 650, mockZhimaScore: 640
       },
       channel_cross3: {
         loggedIn: true, phone: "137****2088", name: "王骑手", userId: "U2088",
@@ -841,7 +853,7 @@
           { id: "C03", title: "今日预占", role: "channel", hint: "◆ 服务卡展示「今日已预占」方可换电", autoOpen: "mine" },
           { id: "C04", title: "首次领取电池", role: "channel", hint: "● 先完成支付分免押或缴押，再扫码领取", autoOpen: "scan" },
           { id: "C05", title: "日常换电与确认消耗", role: "channel_deposit_done", hint: "●/◆ 押金已办结；换电成功后「今日已确认」", autoOpen: "scan" },
-          { id: "C06", title: "额度异常与自费兜底", role: "channel_fail", hint: "! 预占失败：1天/单次自费，不扣渠道池", autoOpen: "scan" },
+          { id: "C06", title: "额度异常 · 仅可还电", role: "channel_fail", hint: "! 无人天额度：禁止换电，持电池仅可还电；联系渠道续配", autoOpen: "scan" },
           { id: "C07", title: "离职/移除", role: "channel_resign", hint: "■→只读 服务终止；持电池仅可还电", autoOpen: "mine" },
           { id: "C08", title: "还电与回池完结", role: "channel_resign", hint: "●/◆ 还电后剩余人天回池，不向骑手退款", autoOpen: "scan" }
         ]
@@ -1532,8 +1544,12 @@
         card = `<div class="service-card warn"><div><h3>服务已冻结</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 未持有电池</p><p style="font-size:11px;margin-top:6px;opacity:.85">符合解冻条件可立即解除；解冻后首次须领取电池</p></div><button type="button" class="btn-gold" data-action="unfreeze">解除冻结</button></div>`;
       } else if (u.pendingPickup && !u.holdsBattery) {
         card = `<div class="service-card warn"><div><h3>待领取电池</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 解冻后首次服务</p><p style="font-size:11px;margin-top:6px;opacity:.85">请扫码领取电池（非换电），领取后可正常换电</p></div><button type="button" class="btn-gold" data-action="scan">扫码领取</button></div>`;
-      } else if (u.preOccupyFail || u.status === "权益不可用") {
-        card = `<div class="service-card warn"><div><h3>渠道人天 · 今日不可用</h3><p>${u.channel}<br>${u.failReason || "预占失败"}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">可在线自费购买 1天/单次 兜底套餐换电（不扣渠道池）</p></div><button type="button" class="btn-gold" data-action="fallback">自费换电</button></div>`;
+      } else if (u.preOccupyFail || u.status === "权益不可用" || u.status === "待还电" || isChannelQuotaBlocked(u)) {
+        const reason = u.gateReason || u.failReason || "今日无人天额度";
+        const batHint = u.holdsBattery
+          ? "持有电池：仅可还电入柜，不可换电/出电"
+          : "未持电池：不可换电，请联系渠道管理员续配额度";
+        card = `<div class="service-card warn"><div><h3>渠道人天 · 今日不可用</h3><p>${u.channel}<br>${reason}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">${batHint}</p></div>${u.holdsBattery ? `<button type="button" class="btn-gold" data-action="scan">扫码还电</button>` : ""}</div>`;
       } else if (u.coolingPeriod) {
         const batHint = u.holdsBattery ? " · 持有电池" : "";
         const coolLine = u.refundApplied ? "已提交冷静期退款，等待运营商审核"
@@ -1576,7 +1592,7 @@
           <div class="section-title">常用功能</div>
           <div class="grid-4">
             <button type="button" class="grid-item" data-action="scan"><span class="gi">⊞</span>扫码换电</button>
-            ${!(u.entitlement === "渠道人天" && !u.preOccupyFail) ? `<button type="button" class="grid-item" data-action="buy"><span class="gi">🛒</span>购买套餐</button>` : ""}
+            ${u.entitlement === "渠道人天" ? "" : `<button type="button" class="grid-item" data-action="buy"><span class="gi">🛒</span>购买套餐</button>`}
             <button type="button" class="grid-item" data-action="coupon"><span class="gi orange">🎫</span>我的优惠券</button>
             <button type="button" class="grid-item" data-action="service"><span class="gi">📞</span>客服电话</button>
             <button type="button" class="grid-item" data-action="return"><span class="gi">🔋</span>电池退还</button>
@@ -1633,7 +1649,6 @@
         return;
       }
       if (action === "scan") { startScan(); return; }
-      if (action === "fallback") { startScan(); return; }
       if (action === "buy") {
         if (u.loggedIn && !u.kyc && u.channelAttr) { openOverlay("overlayKyc"); return; }
         openPurchaseFlow();
@@ -1735,6 +1750,16 @@
       return !!(u.channelResigned || u.status === "已离职" || u.status === "已完结");
     }
 
+    /** 渠道人天无可用额度：禁止换电；持电池仅可还电（无自费兜底） */
+    function isChannelQuotaBlocked(u) {
+      if (u.entitlement !== "渠道人天") return false;
+      if (u.preOccupyFail || u.status === "权益不可用" || u.status === "待还电") return true;
+      if (u.gateReason === "个人无额度" || u.gateReason === "预占失败") return true;
+      if (u.remainingDays != null && u.remainingDays <= 0
+        && u.todayEligibility !== "已预占" && u.todayEligibility !== "已确认消耗") return true;
+      return false;
+    }
+
     function startScan() {
       const u = user();
       const site = SITES[state.scanSite];
@@ -1754,31 +1779,39 @@
         toast("服务已完结，剩余人天已回池");
         return;
       }
-      const channelFirstPickup = u.entitlement === "渠道人天" && !u.holdsBattery && !u.preOccupyFail && u.status === "服务中";
+      if (isChannelQuotaBlocked(u) && !u.holdsBattery) {
+        toast("今日无人天额度，不可换电；请联系渠道管理员续配");
+        return;
+      }
+      const channelFirstPickup = u.entitlement === "渠道人天" && !u.holdsBattery && !isChannelQuotaBlocked(u) && u.status === "服务中";
       const pickupMode = (u.pendingPickup && !u.holdsBattery) || channelFirstPickup;
       if (pickupMode && needsDepositBeforePickup(u)) {
         openOverlay("overlayScan");
         renderChannelDepositSheet(site);
         return;
       }
-      const suspended = isLeaseChannelSuspended(u) || (isChannelResigned(u) && u.holdsBattery);
+      const returnOnly = (isLeaseChannelSuspended(u) || (isChannelResigned(u) && u.holdsBattery)
+        || (isChannelQuotaBlocked(u) && u.holdsBattery));
       const body = document.getElementById("scanBody");
+      const returnHint = isChannelQuotaBlocked(u)
+        ? "无人天额度：仅可<strong>还电</strong>，不可<strong>换电/出电</strong>"
+        : (isChannelResigned(u) ? "离职回池：可" : "渠道已停用：可") + "取<strong>还电</strong>，不可<strong>出电</strong>";
       body.innerHTML = `
         <div class="scan-box">
           <div class="scan-frame"><div class="scan-line"></div></div>
           <p style="color:var(--muted);font-size:13px">${pickupMode ? "对准换电柜二维码 · 领取电池" : "对准换电柜二维码"}</p>
           <p style="font-size:12px;margin-top:8px;color:var(--blue)">当前柜机：${site.name}</p>
           ${pickupMode ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">${channelFirstPickup ? "渠道首次服务须" : "解冻后首次服务须"}<strong>领取电池</strong>（出电，非换电）</p>` : ""}
-          ${suspended && u.holdsBattery ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">${isChannelResigned(u) ? "离职回池：可" : "渠道已停用：可"}取<strong>还电</strong>，不可<strong>出电</strong></p>` : ""}
+          ${returnOnly && u.holdsBattery ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">${returnHint}</p>` : ""}
           ${pickupMode
             ? `<button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟领取电池</button>`
-            : suspended && u.holdsBattery
+            : returnOnly && u.holdsBattery
             ? `<button type="button" class="btn-block" style="margin-top:16px;background:var(--blue)" id="btnSimReturn">模拟还电入柜</button>
                <button type="button" class="btn-block" style="margin-top:8px;background:#fff;color:var(--danger);border:1px solid var(--danger)" id="btnSimScan">模拟扫码换电（不出电）</button>`
             : `<button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟扫描成功</button>`}
         </div>`;
       body.querySelector("#btnSimScan").onclick = () => pickupMode ? runPickupBattery(site) : runSwap(site);
-      if (suspended && u.holdsBattery) {
+      if (returnOnly && u.holdsBattery) {
         body.querySelector("#btnSimReturn").onclick = () => runReturnBattery(site);
       }
       openOverlay("overlayScan");
@@ -1897,8 +1930,9 @@
         showScanResult(false, "白名单付费用户须购买白名单套餐后方可换电（E_LEASE_PKG_REQUIRED）", site);
         return;
       }
-      if (u.preOccupyFail) {
-        showPreOccupyFailResult(site, u.failReason || "渠道人天今日不可用");
+      if (u.preOccupyFail || isChannelQuotaBlocked(u)) {
+        const reason = u.gateReason || u.failReason || "渠道人天今日不可用";
+        showScanResult(false, `${reason}，不可换电（仅可还电）`, site);
         return;
       }
       const gate = checkSwapGate(u, site);
@@ -1928,34 +1962,43 @@
     function runReturnBattery(site) {
       const u = user();
       const resign = isChannelResigned(u);
-      if ((!isLeaseChannelSuspended(u) && !resign) || !u.holdsBattery) {
+      const quotaBlock = isChannelQuotaBlocked(u);
+      if ((!isLeaseChannelSuspended(u) && !resign && !quotaBlock) || !u.holdsBattery) {
         showScanResult(false, "当前无法还电", site);
         return;
       }
       const id = "RT" + Date.now().toString().slice(-8);
-      const batSn = u.currentBatterySn || (resign ? "BAT-SF-2110" : "BAT-JD-050");
+      const batSn = u.currentBatterySn || (resign ? "BAT-SF-2110" : "BAT-SF-RET");
       u.holdsBattery = false;
       u.currentBatterySn = null;
       if (resign) {
         u.status = "已完结";
         u.remainingDays = 0;
+      } else if (quotaBlock) {
+        u.status = "权益不可用";
       }
       state.returnOrders.unshift({
         id, site: site.name, battery: batSn, time: new Date().toLocaleString("zh-CN"),
         status: "已归还", userId: u.userId,
-        note: resign ? "离职还电 · 剩余人天已回池" : "渠道停服期间还电入柜"
+        note: resign ? "离职还电 · 剩余人天已回池"
+          : (quotaBlock ? "零额度还电 · 不可换电" : "渠道停服期间还电入柜")
       });
-      showReturnResult(site, id, batSn, resign);
+      showReturnResult(site, id, batSn, resign, quotaBlock);
     }
 
-    function showReturnResult(site, returnId, batSn, resign) {
+    function showReturnResult(site, returnId, batSn, resign, quotaBlock) {
+      const tip = resign
+        ? "✓ 剩余人天已回池 · 不向骑手退款 · 服务完结"
+        : (quotaBlock
+          ? "✓ 电池已归还 · 仍无人天额度，不可换电；请联系渠道续配"
+          : "渠道停服期间仅支持还电，暂不可取新电池");
       document.getElementById("scanBody").innerHTML = `
         <div class="result-ok">
           <div class="big">✓</div>
           <h3 style="margin-bottom:8px">还电成功</h3>
           <p style="font-size:13px;color:var(--muted);line-height:1.7">
             单号 ${returnId}<br>${site.name}<br>已归还 ${batSn} · 格口已关闭<br>
-            <small>${resign ? "✓ 剩余人天已回池 · 不向骑手退款 · 服务完结" : "渠道停服期间仅支持还电，暂不可取新电池"}</small>
+            <small>${tip}</small>
           </p>
           <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
         </div>`;
@@ -1966,64 +2009,12 @@
       };
     }
 
-    function payFallbackAndSwap(site, sku) {
-      const u = user();
-      const pkgMap = { day1: { pkg: "1天畅换", amount: 29 }, single: { pkg: "单次换电", amount: 9.9 } };
-      const sel = pkgMap[sku] || pkgMap.day1;
-      const payId = "PAY-POOL-" + Date.now().toString().slice(-6);
-      state.purchaseOrders.unshift({
-        id: payId, pkg: sel.pkg + "·渠道兜底", amount: sel.amount,
-        time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId
-      });
-      u.fallbackPaid = true;
-      u.fallbackSku = sel.pkg;
-      const gate = checkSwapGate(u, site);
-      if (!gate.ok) {
-        showScanResult(false, gate.msg, site);
-        return;
-      }
-      const userOp = u.operator || "OP-SX";
-      const cabOp = site.operator;
-      const batOp = site.batteryOperator || site.operator;
-      const cabFee = userOp !== cabOp ? 0.5 : 0;
-      const batFee = userOp !== batOp ? 0.1 : 0;
-      const id = "SW" + Date.now().toString().slice(-8);
-      state.swapOrders.unshift({
-        id, site: site.name, time: new Date().toLocaleString("zh-CN"), status: "成功",
-        type: "渠道兜底自费", userId: u.userId,
-        userOwner: userOp, cabinetOwner: cabOp, batteryOwner: batOp, l1Fee: cabFee + batFee
-      });
-      u.swapUsed = (u.swapUsed || 0) + 1;
-      showScanResult(true, "换电成功（自费兜底）", site, id, { userOp, cabOp, batOp, l1Fee: cabFee + batFee });
-    }
-
-    function showPreOccupyFailResult(site, reason) {
-      document.getElementById("scanBody").innerHTML = `
-        <div class="result-ok">
-          <div class="big" style="color:var(--danger)">!</div>
-          <h3 style="margin-bottom:8px">渠道人天不可用</h3>
-          <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px">${reason}<br><small>今日未预占成功，无法消耗渠道额度池</small></p>
-          <p style="font-size:12px;color:var(--blue);margin-bottom:12px">可选运营商兜底 SKU（购后 24h 有效）：</p>
-          <button type="button" class="btn-block" data-fallback="day1" style="margin-bottom:8px">1天畅换 · ¥29</button>
-          <button type="button" class="btn-block" data-fallback="single" style="margin-bottom:8px;background:#fff;color:var(--blue);border:1px solid var(--blue)">单次换电 · ¥9.9</button>
-          <button type="button" class="btn-block" style="margin-top:8px;background:var(--bg);color:var(--muted)" data-close-scan>取消</button>
-        </div>`;
-      document.getElementById("scanBody").querySelectorAll("[data-fallback]").forEach(btn => {
-        btn.onclick = () => payFallbackAndSwap(site, btn.dataset.fallback);
-      });
-      document.getElementById("scanBody").querySelector("[data-close-scan]").onclick = () => closeOverlay("overlayScan");
-    }
-
     function showScanResult(ok, msg, site, swapId, _triplet) {
       const u = user();
       let dayLine = "";
       if (ok && u.entitlement === "渠道人天") {
-        if (msg && String(msg).includes("自费兜底")) {
-          dayLine = `<br><small>✓ 渠道兜底自费 · 不扣渠道池</small>`;
-        } else {
-          u.todayEligibility = "已确认消耗";
-          dayLine = `<br><small>✓ 今日人天：已确认消耗（同日不重复扣）</small>`;
-        }
+        u.todayEligibility = "已确认消耗";
+        dayLine = `<br><small>✓ 今日人天：已确认消耗（同日不重复扣）</small>`;
       }
       document.getElementById("scanBody").innerHTML = ok ? `
         <div class="result-ok">
