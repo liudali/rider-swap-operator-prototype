@@ -3587,7 +3587,8 @@
       /* platformAccounts：统计月份下沉到余额/冻结下方，顶部不再展示 */
     };
 
-    const PF_CONFIRM_KEYS = new Set(["users"]);
+    const PF_CONFIRM_KEYS = new Set(["users", "devices_cabinet"]);
+    const PF_CONFIRM_LABELS = { users: "确认筛选", devices_cabinet: "查询" };
 
     function renderPageFilters() {
       const key = pfKey();
@@ -3601,8 +3602,9 @@
         return;
       }
       const f = getPf();
+      const confirmLabel = PF_CONFIRM_LABELS[key] || "确认筛选";
       const confirmBtn = PF_CONFIRM_KEYS.has(key)
-        ? `<div class="field pf-actions"><label>&nbsp;</label><button type="button" class="btn primary" data-pf-confirm>确认筛选</button></div>`
+        ? `<div class="field pf-actions"><label>&nbsp;</label><button type="button" class="btn primary" data-pf-confirm>${confirmLabel}</button></div>`
         : "";
       box.innerHTML = specs.map(s => renderFilterField(s, f)).join("") + confirmBtn;
       box.classList.add("visible");
@@ -10843,7 +10845,11 @@
         bootVersion: c.bootVersion || "1",
         module4gType: c.module4gType || "ML307",
         exchangeableSpecs: c.exchangeableSpecs != null ? c.exchangeableSpecs : "48V/20Ah",
-        swapMode: c.swapMode || "正常换电",
+        swapMode: (() => {
+          const m = c.swapMode || "正常换电";
+          if (m === "仅取电" || m === "仅还电") return "正常换电";
+          return m;
+        })(),
         bluetoothType: c.bluetoothType || "类型1-0000FFE0",
         serviceStatus: c.serviceStatus || c.deviceStatus || "启用",
         chargingService: {
@@ -10927,8 +10933,8 @@
                 <div class="cab-inline-ctrl">
                   <select data-cab-swap-mode="${c.sn}">
                     <option ${meta.swapMode === "正常换电" ? "selected" : ""}>正常换电</option>
-                    <option ${meta.swapMode === "仅取电" ? "selected" : ""}>仅取电</option>
-                    <option ${meta.swapMode === "仅还电" ? "selected" : ""}>仅还电</option>
+                    <option ${meta.swapMode === "MQTT离线换电" ? "selected" : ""}>MQTT离线换电</option>
+                    <option ${meta.swapMode === "蓝牙换电" ? "selected" : ""}>蓝牙换电</option>
                   </select>
                   ${opsDemo ? `<button type="button" class="btn" data-cab-confirm-swap="${c.sn}">确认切换</button>` : ""}
                 </div>
@@ -10973,20 +10979,20 @@
             <p style="font-size:12px;color:var(--muted);margin:8px 0 0">短信模板/接收人见平台告警配置；发送记录可查。</p>
           </div>
         </section>
-        ${opsDemo ? `<div class="cab-ops-bar">
-          <p style="width:100%;margin:0 0 8px;font-size:12px;color:var(--muted)">远程运维：原型为演示桩；生产接 IoT 真接口（2026-07-13 确认一期）</p>
-          <button type="button" class="btn primary" data-cab-demo="查看电柜快照">查看电柜快照</button>
-          <button type="button" class="btn primary" data-cab-demo="查看设备快照">查看设备快照</button>
-          <button type="button" class="btn primary" data-cab-demo="查看发送请求记录">查看发送请求记录</button>
+        ${opsDemo ? `<div class="cab-ops-bar cab-ops-bar--phase2" title="二期">
+          <div class="phase2-banner" role="status" style="width:100%;margin:0 0 8px">${phase2BadgeHtml()}<div><strong>远程运维 · 二期</strong> — 快照查看、指令下发、运维记录等一期不交付；原型可浏览演示入口。</div></div>
+          <button type="button" class="btn primary" data-cab-demo="查看电柜快照">查看电柜快照 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn primary" data-cab-demo="查看设备快照">查看设备快照 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn primary" data-cab-demo="查看发送请求记录">查看发送请求记录 ${phase2BadgeHtml()}</button>
           <button type="button" class="btn primary" data-cab-ops-log title="二期">查看运维操作记录 ${phase2BadgeHtml()}</button>
-          <button type="button" class="btn" data-cab-demo="通电">通电</button>
-          <button type="button" class="btn danger" data-cab-demo="断电">断电</button>
-          <button type="button" class="btn" data-cab-demo="开启风扇">开启风扇</button>
-          <button type="button" class="btn danger" data-cab-demo="关闭风扇">关闭风扇</button>
-          <button type="button" class="btn" data-cab-demo="主板重启">主板重启</button>
-          <button type="button" class="btn" data-cab-demo="更新设备版本号">更新设备版本号</button>
-          <button type="button" class="btn" data-cab-demo="上传二维码">上传二维码</button>
-          <button type="button" class="btn" data-cab-demo="反向供电配置">反向供电配置</button>
+          <button type="button" class="btn" data-cab-demo="通电">通电 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn danger" data-cab-demo="断电">断电 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn" data-cab-demo="开启风扇">开启风扇 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn danger" data-cab-demo="关闭风扇">关闭风扇 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn" data-cab-demo="主板重启">主板重启 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn" data-cab-demo="更新设备版本号">更新设备版本号 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn" data-cab-demo="上传二维码">上传二维码 ${phase2BadgeHtml()}</button>
+          <button type="button" class="btn" data-cab-demo="反向供电配置">反向供电配置 ${phase2BadgeHtml()}</button>
         </div>` : ""}
         <section class="panel">
           ${panelHead("端口状态", `共 ${ports.length} 个格口 · IoT 实时 · 操作属二期`, "devices_cab_port_ops", phase2BadgeHtml())}
@@ -11138,7 +11144,6 @@
         const canMoveCab = isOperatorRole();
         body = `
           <div class="cab-toolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
-            <button type="button" class="btn primary" data-pf-confirm>查询</button>
             <button type="button" class="btn" data-export-bat-flow title="二期">导出电池流转记录 ${phase2BadgeHtml()}</button>
             <button type="button" class="btn" data-cab-ops-log title="二期">运维操作记录 ${phase2BadgeHtml()}</button>
           </div>
@@ -15570,7 +15575,13 @@
         btn.onclick = () => { state.cabinetDetailSn = null; render(); };
       });
       root.querySelectorAll("[data-cab-demo]").forEach(btn => {
-        btn.onclick = () => window.alert(`[IoT 远程运维 · 演示桩] ${btn.dataset.cabDemo} 已模拟下发；生产接真实 IoT 指令接口`);
+        btn.onclick = () => {
+          if (btn.closest(".cab-ops-bar--phase2")) {
+            phase2FeatureAlert("换电柜详情 · 远程运维", `${btn.dataset.cabDemo} · 一期不交付`);
+            return;
+          }
+          window.alert(`[IoT 远程运维 · 演示桩] ${btn.dataset.cabDemo} 已模拟下发；生产接真实 IoT 指令接口`);
+        };
       });
       root.querySelectorAll("[data-cab-refresh-iccid]").forEach(btn => {
         btn.onclick = () => window.alert("演示：已刷新物联网卡状态");
