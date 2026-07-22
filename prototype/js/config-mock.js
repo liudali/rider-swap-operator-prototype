@@ -327,7 +327,8 @@
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
       channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
-      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。卡差价：按渠道×SKU 配置专享价与佣金；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。平台仅查询监管。" },
+      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。卡差价：按渠道×SKU 配置专享价与佣金；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。平台仅查询监管。" },
+      login_portal: { title: "登录分流与改密", content: "登录页区分<strong>运营商登录</strong>与<strong>渠道商登录</strong>。账号均为手机号+密码。修改密码页：手机号 → 获取验证码 → 新密码（≥6 位）→ 返回登录；演示验证码固定 888888。" },
       day_pool_one_per_operator: { title: "一运营商一池", content: "渠道商 × 运营商 = <strong>唯一</strong> `DayPool`。向第二家运营商签约才新增池；增购、赠送、退款、分配、预占/确认等均写入<strong>额度变动记录</strong>，不新建第二池。" },
       day_pool_b2b_settlement: { title: "B2B 资金与平台计提", content: "渠道<strong>采购/到账时</strong>批发款已是运营商收入（在线 T+0/T+1 或线下确认）。骑手<strong>确认消耗</strong>仅扣池余额，<strong>不向运营商二次打款</strong>；平台按标准人天价 × 1% 向额度售卖方计提（见「平台服务费」）。" },
       inter_op: { title: "运营商往来账", content: "归属「平台服务 → 运营商往来」页内 Tab：概况 / 跨网服务费明细 / 日清账单 / 周月汇总。跨站换电时 U 经平台代付柜机费+电池费；日清优先划扣平台保证金。概况支持<strong>今日/昨日/近7天/近30天</strong>；明细可筛站点/状态/方向/换电单。运营商只见平台代收/代付，不见对手方。" },
@@ -403,10 +404,10 @@
       orders_freeze: { title: "服务冻结", content: "<strong>个人套餐</strong>用户在<strong>套餐有效期内</strong>且<strong>未持有电池</strong>时可申请冻结/解除冻结，<strong>满足条件即系统自动生效</strong>，无需运营商审核。冻结期间不可换电；解冻后 <code>valid_to</code> 按冻结天数顺延，<strong>首次服务为领取电池</strong>（非换电），之后继续消耗原套餐额度。渠道人天用户不适用。" },
       orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>实付押金</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用/微信支付分达标免实付（仍须还电规则）" },
       orders_deposit_waiver: { title: "信用免押", content: "满足运营商「押金设置」中的<strong>微信支付分</strong>或<strong>芝麻信用</strong>门槛可免实付押金（仍须遵守还电规则）。详情页与实付押金分开展示。" },
-      rider_battery_deposit: { title: "骑手电池押金", content: "与「平台保证金」不同。<br>· 购套餐<strong>同笔支付</strong>实付押金 → 运营商子商户实收<br>· 类型：实付在押 / 信用免押 / 渠道担保（人天/白名单）<br>· 运营商「用户」台账；平台「用户管理 → 用户押金统计」按运营商只读汇总<br>· 实付数额由「定价管理 → 押金设置」配置；<strong>仅退押</strong>进「退款管理」" },
+      rider_battery_deposit: { title: "骑手电池押金", content: "与「平台保证金」不同。<br>· 个人：购套餐<strong>同笔</strong>免押或实缴 → 运营商子商户<br>· 渠道人天：<strong>首次领电前</strong>免押或实缴（非静默渠道担保）<br>· 类型：实付在押 / 信用免押 / 渠道担保（租赁等 B 端）<br>· 运营商「用户」台账；平台「用户管理 → 用户押金统计」只读汇总<br>· 数额见「定价管理 → 押金设置」；<strong>仅退押</strong>进「退款管理」" },
       platform_users_info: { title: "用户信息", content: "全平台用户列表：服务运营商、类型、电池押金状态、套餐/权益、持有电池等。" },
       platform_users_deposit_stats: { title: "用户押金统计", content: "按运营商汇总实付在押、免押人数、渠道担保、退押中金额；只读，不参与平台/合伙人清分。" },
-      pricing_deposit: { title: "押金设置", content: "面向<strong>个人套餐用户</strong>：当芝麻信用/微信支付分<strong>低于运营商设定门槛</strong>时，须缴纳电池押金。<br>· 可配置：押金数额、微信支付分门槛、芝麻信用门槛、启停<br>· 任一路达标即可免押（实收 ¥0）；均未达标则按配置数额同笔实缴<br>· 渠道人天/设备租赁白名单不适用（押金责任在渠道）" },
+      pricing_deposit: { title: "押金设置", content: "面向<strong>个人购套餐</strong>与<strong>渠道人天首次领电</strong>：用户可选<strong>微信支付分免押</strong>或<strong>实缴押金</strong>。<br>· 可配置：押金数额、微信支付分门槛、芝麻信用门槛、启停<br>· 任一路达标即可免押（实收 ¥0）；均未达标则须实缴<br>· 个人：购套餐同笔；渠道人天：首次领取电池前办结（decision-050）<br>· 设备租赁白名单仍可走渠道担保（B 端）" },
       orders_swap: { title: "换电订单", content: "列出换电单；权益来源：<strong>个人套餐</strong>（支付时已清分，本表不展示应分）、<strong>渠道人天</strong>、<strong>激活码（二期）</strong>（按天/次确认消耗，类人天）。每笔记录三元组 U/C/B 与跨网设备服务费。" },
       orders_swap_triplet: { title: "运营商三元组与 跨网设备服务费", content: "换电成功时 IoT 上报 userOwner/cabinetOwner/batteryOwner。应付方恒为 userOwner：C≠U 时代付柜机费 ¥0.5/次；B≠U 时代付电池费 ¥0.1/次；经平台保证金/信用额度日清。运营商往来账只见平台代收/代付。" },
       orders_swap_entitlement: { title: "权益来源与消耗", content: "<strong>个人套餐</strong>：骑手在线购套餐，款在<strong>支付成功</strong>时已清分；换电仅履约，不记应分/消耗。点套餐单号在<strong>换电订单页内</strong>抽屉查看套餐明细，不跳转「套餐购买订单」列表。<br><strong>渠道人天</strong>：换电消耗额度池人天（预占→确认）。<br><strong>激活码（二期）</strong>：渠道线下批发码，骑手输码开通；换电按<strong>天/次</strong>确认消耗并向运营商结算（类人天），不产生 C 端应分金额。" },
@@ -474,30 +475,30 @@
       channel_card_margin: { title: "佣金对账", content: "按<strong>自然月</strong>汇总经推广链接成交订单。<br><strong>佣金及时到付</strong>：支付成功已分账至渠道子商户，对账页展示「已即时分账」。<br><strong>线下结算</strong>：应结佣金=Σ commission；由运营商与渠道线下结。平台 1%=Σ pay×1%。" },
       channel_instant_commission: { title: "佣金及时到付", content: "仅<strong>渠道分销（骑士卡）</strong>签约可开。运营商在「渠道管理 → 签约渠道」开启；须渠道绑定收款账户并完成微信/支付宝进件。开启后设置<strong>渠道佣金比例</strong>（实付×比例，与平台 1% 并列即时清分）。未开启则沿用按单固定佣金 + 线下结算。" },
       channel_card_accounts: { title: "渠道收款账户（佣金及时到付）", content: "开启「佣金及时到付」后，渠道须在支付通道开通子商户，用于接收链接购卡佣金的<strong>即时分账</strong>。未进件完成前运营商不可正式开启该设置。" },
-      pricing_card: { title: "渠道分销价", content: "同一运营商可签<strong>多个分销渠道</strong>，各渠道独立维护授权 SKU、正式价、<strong>专享价</strong>与佣金。入口：「渠道管理 → 签约渠道」编辑；「定价管理 → 渠道分销价」汇总对比。专享价 ≤ 正式零售价。" },
+      pricing_card: { title: "渠道分销价", content: "同一运营商可签<strong>多个分销渠道</strong>，各渠道独立维护授权 SKU、正式价、<strong>专享价</strong>与佣金。「平台设置 → 渠道分销价」操作仅<strong>编辑</strong>价格；签约档案在「渠道管理 → 签约渠道」。专享价 ≤ 正式零售价。" },
       day_pool_panel: { title: "人天额度池", content: "渠道商向签约运营商批发换电人天额度。<br><strong>可用</strong>=Σ DayPool.availableDays；<strong>预占中</strong>=Σ frozenDays。00:00 预占 → 换电/持电池确认消耗 → 日终释放未消耗预占。" },
       day_pool_reserve: { title: "预占与确认消耗", content: "天级模式：每日 00:00 预占 1 人天。当日<strong>有换电或持有电池</strong>→确认消耗 1 人天（每骑手每日 1 条记录）；<strong>无换电且未持电池</strong>→日终释放。同一骑手同一天只扣 1 人天，但记录当日换电次数。" },
       day_pool_consume: { title: "骑手日消耗（渠道商说明）", content: "每骑手每个自然日最多 1 条确认消耗记录，含<strong>当日换电次数</strong>与<strong>持有电池数</strong>。<br><br><strong>判定规则</strong>：① 当天有换电 → 确认消耗；② 当天未换电但<strong>持有电池</strong> → 仍视为使用服务，确认消耗；③ 不持有电池且未换电 → 不产生消耗，日终释放预占。" },
       day_pool_swap_sync: { title: "换电同步", content: "渠道骑手<strong>每一次</strong>成功换电均实时同步至渠道商后台，可与人天消耗记录勾稽。跨网换电同样同步（含站点、换电单号）。" },
       day_pool_insufficient: { title: "余额不足", content: "不允许透支。余额不足以覆盖配置范围内全部骑手时，整批预占失败（不做部分分配）。管理员可续费/调范围后手动重试；续费成功后系统自动重试失败批次。骑手权益不可用时可自费/按零售价支付。" },
-      day_pool_rules: { title: "额度使用规则", content: "按<strong>团队</strong>配置额度上限（人天/结算周期）；扣天/激活等口径继承额度池<strong>平台统一四项</strong>，不在规则层配置站点或权益类型。团队须先绑定<strong>消耗额度池</strong>（见「骑手团队」Tab）。" },
+      day_pool_rules: { title: "额度使用规则", content: "按<strong>团队</strong>配置额度上限（人天/结算周期）；扣天/激活等口径继承额度池<strong>平台统一四项</strong>，不在规则层配置站点或权益类型。团队须先绑定<strong>消耗额度池</strong>（见「骑手登记 → 骑手团队」）。" },
       day_pool_b2b_refund: { title: "额度池退款说明（渠道商）", content: "人天额度池<strong>不支持在线退款</strong>。若需退未使用额度，须与<strong>签约运营商线下协商</strong>；达成一致后由运营商在后台执行额度扣减（账本类型：<strong>退款</strong>），资金按对公约定另行结算。渠道商后台不可自行发起池退款。" },
       day_pool_operator_adjust: { title: "运营商额度调整", content: "运营商在「渠道管理 → 渠道权益 → 已售额度池」手工调账。类型：充值、赠送、退款、修正、过期恢复（30 天内）。" },
       entitlement_api: { title: "渠道骑手可换电校验", content: "换电前调用 <code>POST /api/v1/entitlement/check</code>：入参 user_id、cabinet_sn、site_id；返回 allowed、entitlement_type（day_pool/personal_pkg）、pool_id、seller_operator_id（userOwner）、today_status（reserved/confirmed/failed/pending_first_swap）、fail_reason、fallback（推荐 1天/单次兜底 SKU）。预占失败时 allowed=false，骑手端引导在线自费，<strong>不扣渠道池</strong>。详设见文档「渠道骑手可换电校验.md」。" },
-      day_pool_team: { title: "骑手团队", content: "渠道商创建<strong>骑手团队</strong>并<strong>绑定消耗额度池</strong>（必选）。一运营商一池时默认团队自动绑定；向多家运营商签约时各团队须指定对应池。登记/分配/预占/消耗均从团队绑定池扣减。" },
+      day_pool_team: { title: "骑手团队", content: "入口在<strong>骑手登记</strong>页内 Tab「骑手团队」。渠道商创建团队并<strong>绑定消耗额度池</strong>（必选）。一运营商一池时默认团队自动绑定；向多家运营商签约时各团队须指定对应池。登记/分配/预占/消耗均从团队绑定池扣减。在职与离职骑手均可加入/变更/移除团队。" },
       day_pool_org: { title: "团队与额度池", content: "编排单元为<strong>团队</strong>（非组织/站点）。团队 <code>pool_id</code> 决定从哪个额度池扣减；额度使用规则为团队配置周期额度上限。" },
       day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护；渠道商只读。渠道成员<strong>无预占人天</strong>时引导在线支付，默认推荐<strong>1天/单次</strong>兜底 SKU（购后24h有效）；平台 C 端 1% 在支付成功时收取。" },
       day_pool_allocate: { title: "分配与收回", content: "分配：从团队绑定池可用余额划出 N 人天给骑手（分配即开通，按池统一口径预占/确认）。收回/退出团队：剩余未用人天自动退回池余额。" },
       day_pool_contract: { title: "额度池规则", content: "平台统一（只读）：<strong>分配即开通</strong>；每日预占后<strong>换电或持电池</strong>确认消耗；池过期<strong>不退</strong>。B 端结算节奏由渠道商与运营商线下协商，不在此展示。" },
       day_pool_identity: { title: "个人与渠道互斥", content: "同一骑手<strong>不可同时</strong>拥有生效中个人套餐与渠道团队成员身份。加入团队前须<strong>退订或冻结</strong>个人套餐。退出团队（主动/被移除）时<strong>未用人天自动回池</strong>。" },
-      day_pool_channel: { title: "渠道商额度管理", content: "骑手须登记在渠道商名下并归属某一<strong>团队</strong>；团队绑定消耗额度池。登记时校验无生效中个人套餐。退出团队或被移除时未用人天自动回池。" },
+      day_pool_channel: { title: "渠道商额度管理", content: "骑手须登记在渠道商名下并归属某一<strong>团队</strong>；团队绑定消耗额度池。登记时校验无生效中个人套餐。在职/离职均可<strong>加入、变更、移除团队</strong>；移除时未用人天自动回池并记离职。" },
       day_pool_purchase: { title: "购买人天额度", content: "渠道商向签约运营商按批发价采购人天；<strong>同一运营商续费在原池增购</strong>，不因团队再建第二池。向新运营商签约才产生新池实例。" },
       day_pool_ledger: { title: "额度明细账本", content: "所有额度变动留痕。渠道商可见：购买、分配、收回、预占、确认消耗、释放、续费等。运营商调账类型：<strong>充值、赠送、退款、修正、过期恢复</strong>（协商退款走「退款」；过期恢复仅运营商、池过期后 30 天内）。" },
       day_pool_warn: { title: "低余额预警", content: "规则①余额&lt;总额 20%；规则②余额不足以支撑<strong>在职骑手×10 天</strong>。触发后<strong>短信预警渠道商+运营商</strong>，并写入短信记录表（2026-07-13 确认）。" },
       day_pool_hold_no_quota: { title: "零额度 / 待还电", content: "渠道商顶栏在「余额不足」旁展示<strong>骑手零额度</strong>（在职且剩余人天=0）。原因须区分：①<strong>个人无额度</strong>（分配已用尽）；②<strong>预占失败</strong>（池余额不足等）。若仍持电池→「待还电」：仅可还电、禁止换电；不透支；可自费兜底。见 decision-049。" },
       day_pool_refund: { title: "续费与退款", content: "<strong>续费</strong>：渠道商在原池上增购人天（在线/线下采购）。<strong>退款</strong>：不支持在线操作，须与运营商线下协商，由运营商后台扣减额度（类型：退款）。详见「额度池退款说明」。" },
       platform_scope: { title: "平台管理范围", content: "平台管理员可查看全业务汇总，治理运营商主体、设备绑定与跨网统价；不替代运营商日常运营与定价。" },
-      platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、进件账户摘要、平台保证金与信用额度。运营商登录后仅见本人经营数据。" },
+      platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、进件账户摘要、平台保证金与信用额度。运营商在登录页选「运营商登录」凭手机号进入；登录后仅见本人经营数据。" },
       platform_leasing_companies: { title: "设备租赁公司", content: "平台管理员维护出租方主体档案（可<strong>多家并存</strong>）。前期演示环境以「华东设备租赁公司」为主；架构支持后续接入更多租赁公司。" },
       platform_lease_binding: { title: "租赁关系绑定", content: "平台管理员建立「租赁公司 ↔ 运营商」绑定后，该租赁公司方可向该运营商发起租赁协议签约。<strong>运营商</strong>承租信息来源于平台运营商档案；一运营商可同时与多家租赁公司建立绑定并分别签约。" },
       platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。" },
@@ -2450,10 +2451,10 @@
     ];
 
     const platformOperators = [
-      { id: "OP-SX", name: "绿色出行", logo: "⚡", brandColor: "#1677ff", city: "上海", status: "在营", contactName: "张经理", contactPhone: "138****8001", email: "zhang@example.com", address: "上海市浦东新区银城中路", onboardDate: "2025-03-01", mchWx: "1900000123***", mchAli: "2088123456***", remark: "首版示范运营商" },
-      { id: "OP-LJZ", name: "陆家嘴联营", city: "上海", status: "在营", contactName: "李站长", contactPhone: "139****6601", email: "li@example.com", address: "上海市浦东新区陆家嘴环路", onboardDate: "2025-06-15", mchWx: "1900000456***", mchAli: "2088765432***", remark: "" },
-      { id: "OP-BJ", name: "滨江联营", city: "上海", status: "在营", contactName: "王运维", contactPhone: "137****7702", email: "wang@example.com", address: "上海市浦东新区滨江大道", onboardDate: "2025-11-01", mchWx: "1900000789***", mchAli: "2088987654***", remark: "信用额度已用尽，跨网已停" },
-      { id: "OP-HZ", name: "西湖换电", city: "杭州", status: "在营", contactName: "陈经理", contactPhone: "135****8800", email: "chen@example.com", address: "杭州市西湖区文三路", onboardDate: "2026-06-01", mchWx: "1900000999***", mchAli: "2088999888***", remark: "新入网 · 待定档" }
+      { id: "OP-SX", name: "绿色出行", logo: "⚡", brandColor: "#1677ff", city: "上海", status: "在营", contactName: "张经理", contactPhone: "138****8001", loginAccount: "13800001000", email: "zhang@example.com", address: "上海市浦东新区银城中路", onboardDate: "2025-03-01", mchWx: "1900000123***", mchAli: "2088123456***", remark: "首版示范运营商" },
+      { id: "OP-LJZ", name: "陆家嘴联营", city: "上海", status: "在营", contactName: "李站长", contactPhone: "139****6601", loginAccount: "13800006601", email: "li@example.com", address: "上海市浦东新区陆家嘴环路", onboardDate: "2025-06-15", mchWx: "1900000456***", mchAli: "2088765432***", remark: "" },
+      { id: "OP-BJ", name: "滨江联营", city: "上海", status: "在营", contactName: "王运维", contactPhone: "137****7702", loginAccount: "13800007702", email: "wang@example.com", address: "上海市浦东新区滨江大道", onboardDate: "2025-11-01", mchWx: "1900000789***", mchAli: "2088987654***", remark: "信用额度已用尽，跨网已停" },
+      { id: "OP-HZ", name: "西湖换电", city: "杭州", status: "在营", contactName: "陈经理", contactPhone: "135****8800", loginAccount: "13800008800", email: "chen@example.com", address: "杭州市西湖区文三路", onboardDate: "2026-06-01", mchWx: "1900000999***", mchAli: "2088999888***", remark: "新入网 · 待定档" }
     ];
 
     /** 平台管理员维护：各运营商平台技术服务费抽成比例（C 端支付分账 / B 端确认消耗可分别配置） */
@@ -2492,7 +2493,7 @@
     const platformChannels = [
       {
         id: "CH-SF", name: "顺丰同城渠道", city: "上海", status: "在营", settlementMode: "人天池",
-        contactName: "陈渠道", contactPhone: "139****3100", loginAccount: "sf-channel-admin",
+        contactName: "陈渠道", contactPhone: "139****3100", loginAccount: "13900003100",
         onboardDate: "2026-01-01", createdByOperatorId: "OP-SX", createdByOperatorName: PAYEE_OPERATOR,
         signedOperators: ["绿色出行"],
         paySummary: "人天额度批发",
@@ -2501,7 +2502,7 @@
       },
       {
         id: "CH-CARD", name: "骑士卡渠道", city: "上海", status: "在营", settlementMode: "卡差价",
-        contactName: "王卡务", contactPhone: "139****3201", loginAccount: "knight-card-admin",
+        contactName: "王卡务", contactPhone: "139****3201", loginAccount: "13900003201",
         onboardDate: "2026-03-01", createdByOperatorId: "OP-SX", createdByOperatorName: PAYEE_OPERATOR,
         signedOperators: ["绿色出行"],
         paySummary: "推广链接分销",
@@ -2510,7 +2511,7 @@
       },
       {
         id: "CH-DELIV", name: "闪送骑士卡", city: "上海", status: "在营", settlementMode: "卡差价",
-        contactName: "李卡务", contactPhone: "139****3210", loginAccount: "deliv-card-admin",
+        contactName: "李卡务", contactPhone: "139****3210", loginAccount: "13900003210",
         onboardDate: "2026-04-01", createdByOperatorId: "OP-SX", createdByOperatorName: PAYEE_OPERATOR,
         signedOperators: ["绿色出行"],
         paySummary: "推广链接分销",
@@ -2519,7 +2520,7 @@
       },
       {
         id: "CH-RENT", name: "京东物流租赁渠道", city: "上海", status: "在营", settlementMode: "设备租赁",
-        contactName: "赵租金", contactPhone: "139****3301", loginAccount: "jd-rent-admin",
+        contactName: "赵租金", contactPhone: "139****3301", loginAccount: "13900003301",
         onboardDate: "2026-04-01", createdByOperatorId: "OP-SX", createdByOperatorName: PAYEE_OPERATOR,
         signedOperators: ["绿色出行"],
         paySummary: "设备月租 B2B",
@@ -2529,7 +2530,7 @@
       },
       {
         id: "CH-ACT", name: "蜂鸟激活码渠道", city: "上海", status: "在营", settlementMode: "激活码",
-        contactName: "周码务", contactPhone: "139****3401", loginAccount: "fn-act-admin",
+        contactName: "周码务", contactPhone: "139****3401", loginAccount: "13900003401",
         onboardDate: "2026-05-01", createdByOperatorId: "OP-SX", createdByOperatorName: PAYEE_OPERATOR,
         signedOperators: ["绿色出行"],
         paySummary: "激活码批发",

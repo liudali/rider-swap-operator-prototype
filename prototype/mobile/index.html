@@ -364,6 +364,32 @@
     .pkg-card .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
     .pkg-card .price-official { font-size: 13px; color: var(--muted); text-decoration: line-through; }
     .pkg-card .price-tag { font-size: 10px; background: #fff1f0; color: #cf1322; padding: 2px 6px; border-radius: 4px; }
+    .deposit-block {
+      margin-top: 14px; padding: 12px; border-radius: 10px; background: #f8fafc;
+      border: 1px solid var(--border);
+    }
+    .deposit-block h5 { font-size: 13px; margin-bottom: 8px; }
+    .deposit-block .hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+    .deposit-opt {
+      display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+      border: 1.5px solid var(--border); border-radius: 8px; margin-bottom: 8px;
+      background: #fff; cursor: pointer;
+    }
+    .deposit-opt.selected { border-color: var(--blue); background: #f8faff; }
+    .deposit-opt input { margin-top: 2px; }
+    .deposit-opt .opt-title { font-size: 14px; font-weight: 600; }
+    .deposit-opt .opt-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+    .pay-summary {
+      margin-top: 12px; padding: 10px 12px; background: #fff; border-radius: 8px;
+      border: 1px dashed var(--border); font-size: 13px; line-height: 1.7;
+    }
+    .pay-summary .total { font-size: 16px; font-weight: 700; color: var(--danger); }
+    .deposit-status-card {
+      margin: 0 16px 12px; padding: 12px 14px; background: #fff; border-radius: 12px;
+      font-size: 13px; line-height: 1.6; border: 1px solid var(--border);
+    }
+    .deposit-status-card .ds-title { font-weight: 600; margin-bottom: 4px; }
+    .deposit-status-card .ds-muted { font-size: 11px; color: var(--muted); }
     .service-scope-banner {
       margin: 0 12px 10px; padding: 10px 12px; border-radius: 10px; background: #ecfdf5;
       border: 1px solid #99f6e4; font-size: 12px; color: #0f766e; line-height: 1.5;
@@ -408,7 +434,8 @@
             <option value="pending_pickup">个人套餐 · 解冻待领电池</option>
             <option value="frozen">个人套餐 · 已冻结</option>
             <option value="cooling_refund">冷静期退款 · 李骑手 U2188</option>
-            <option value="channel">渠道人天 · 孙骑手 U2110</option>
+            <option value="channel">渠道人天 · 待办押金 · U2110</option>
+            <option value="channel_deposit_done">渠道人天 · 押金已办 · 持电池</option>
             <option value="channel_fail">渠道预占失败 · 赵骑手 U2103</option>
             <option value="channel_resign">渠道离职回池 · 孙骑手 U2110</option>
           </optgroup>
@@ -564,6 +591,7 @@
               <option value="frozen">已冻结 · U1041</option>
               <option value="cooling_refund">冷静期退款·U2188</option>
               <option value="channel">渠道人天</option>
+              <option value="channel_deposit_done">渠道·押金已办</option>
               <option value="channel_fail">渠道预占失败·U2103</option>
               <option value="channel_resign">渠道离职回池</option>
             </optgroup>
@@ -595,6 +623,13 @@
       "OP-SX": { id: "OP-SX", name: "绿色出行", subMch: "19000001***" },
       "OP-LJZ": { id: "OP-LJZ", name: "陆家嘴联营", subMch: "19000002***" },
       "OP-BJ": { id: "OP-BJ", name: "滨江换电", subMch: "19000003***" }
+    };
+
+    /** 运营商押金设置（与后台「押金设置」对齐） */
+    const DEPOSIT_POLICY = {
+      "OP-SX": { amount: 99, wechatPayScoreMin: 650, zhimaScoreMin: 650, enabled: true },
+      "OP-LJZ": { amount: 199, wechatPayScoreMin: 680, zhimaScoreMin: 650, enabled: true },
+      "OP-BJ": { amount: 99, wechatPayScoreMin: 650, zhimaScoreMin: 650, enabled: true }
     };
 
     const CHANNELS = {
@@ -652,43 +687,64 @@
       personal: {
         loggedIn: true, phone: "138****1028", name: "张骑手", userId: "U1028",
         kyc: false, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 18, swapUsed: 42,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: null, holdsBattery: true
+        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: null, holdsBattery: true,
+        depositStatus: "实付在押", depositAmount: 99, depositMethod: "实缴",
+        mockWechatPayScore: 720, mockZhimaScore: 680
       },
       personal_cross3: {
         loggedIn: true, phone: "138****1028", name: "张骑手", userId: "U1028",
         kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 18, swapUsed: 42,
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: null,
-        demoCase3: true, holdsBattery: true
+        demoCase3: true, holdsBattery: true,
+        depositStatus: "信用免押", depositAmount: 0, depositMethod: "微信支付分",
+        mockWechatPayScore: 720, mockZhimaScore: 680
       },
       cooling_refund: {
         loggedIn: true, phone: "136****2188", name: "李骑手", userId: "U2188",
         kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 28, swapUsed: 5,
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", holdsBattery: false,
-        coolingPeriod: true, coolingDaysLeft: 1, payTime: "2026-06-10", payAmount: 299
+        coolingPeriod: true, coolingDaysLeft: 1, payTime: "2026-06-10", payAmount: 299,
+        depositStatus: "实付在押", depositAmount: 99, depositMethod: "实缴",
+        mockWechatPayScore: 580, mockZhimaScore: 600
       },
       channel: {
         loggedIn: true, phone: "136****2110", name: "孙骑手", userId: "U2110",
         kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 13, swapUsed: 0,
         status: "服务中", todayEligibility: "已预占", operator: "OP-SX", homeSite: "ST-SH-02",
-        channel: "顺丰同城渠道", team: "世博车队", poolId: "QP-2601", holdsBattery: false
+        channel: "顺丰同城渠道", team: "世博车队", poolId: "QP-2601", holdsBattery: false,
+        depositStatus: null, depositAmount: 0, depositMethod: null,
+        mockWechatPayScore: 700, mockZhimaScore: 660
+      },
+      channel_deposit_done: {
+        loggedIn: true, phone: "136****2110", name: "孙骑手", userId: "U2110",
+        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 13, swapUsed: 1,
+        status: "服务中", todayEligibility: "已确认消耗", operator: "OP-SX", homeSite: "ST-SH-02",
+        channel: "顺丰同城渠道", team: "世博车队", poolId: "QP-2601", holdsBattery: true,
+        depositStatus: "信用免押", depositAmount: 0, depositMethod: "微信支付分",
+        mockWechatPayScore: 700, mockZhimaScore: 660, currentBatterySn: "BAT-SF-2110"
       },
       channel_fail: {
         loggedIn: true, phone: "137****2103", name: "赵骑手", userId: "U2103",
         kyc: true, entitlement: "渠道人天", pkg: "人天额度", daysLeft: null, swapUsed: 0,
         status: "权益不可用", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601",
-        preOccupyFail: true, failReason: "渠道额度池余额不足，今日预占失败", holdsBattery: false
+        preOccupyFail: true, failReason: "渠道额度池余额不足，今日预占失败", holdsBattery: false,
+        depositStatus: "实付在押", depositAmount: 99, depositMethod: "实缴",
+        mockWechatPayScore: 600, mockZhimaScore: 620
       },
       channel_cross3: {
         loggedIn: true, phone: "137****2088", name: "王骑手", userId: "U2088",
         kyc: true, entitlement: "渠道人天", pkg: "人天额度", daysLeft: null, swapUsed: 2,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601", demoCase3: true, holdsBattery: true
+        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601", demoCase3: true, holdsBattery: true,
+        depositStatus: "信用免押", depositAmount: 0, depositMethod: "微信支付分",
+        mockWechatPayScore: 710, mockZhimaScore: 670
       },
       channel_resign: {
         loggedIn: true, phone: "136****2110", name: "孙骑手", userId: "U2110",
         kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 0, swapUsed: 0,
         status: "已离职", operator: "OP-SX", homeSite: "ST-SH-02",
         channel: "顺丰同城渠道", team: "世博车队", poolId: "QP-2601",
-        holdsBattery: true, channelResigned: true, currentBatterySn: "BAT-SF-2110"
+        holdsBattery: true, channelResigned: true, currentBatterySn: "BAT-SF-2110",
+        depositStatus: "实付在押", depositAmount: 99, depositMethod: "实缴"
       },
       none: {
         loggedIn: true, phone: "188****1850", name: "新用户", userId: "U0001",
@@ -702,19 +758,22 @@
         loggedIn: true, phone: "139****1041", name: "赵骑手", userId: "U1041",
         kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 21, swapUsed: 28,
         status: "已冻结", operator: "OP-SX", homeSite: "ST-SH-01", holdsBattery: false,
-        frozenDays: 7
+        frozenDays: 7,
+        depositStatus: "实付在押", depositAmount: 99, depositMethod: "实缴"
       },
       pending_pickup: {
         loggedIn: true, phone: "136****1055", name: "钱骑手", userId: "U1055",
         kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 26, swapUsed: 12,
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-02", holdsBattery: false,
-        pendingPickup: true
+        pendingPickup: true,
+        depositStatus: "实付在押", depositAmount: 99, depositMethod: "实缴"
       },
       lease_whitelist: {
         loggedIn: true, phone: "139****4001", name: "张配送", userId: "U4001",
         kyc: true, entitlement: "设备租赁白名单", pkg: "30天畅换 · 白名单专享", daysLeft: 22, swapUsed: 42,
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
-        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "paid", holdsBattery: true
+        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "paid", holdsBattery: true,
+        depositStatus: "渠道担保", depositAmount: 0, depositMethod: "渠道担保"
       },
       lease_whitelist_new: {
         loggedIn: true, phone: "137****4003", name: "王夜配", userId: "U4003",
@@ -766,22 +825,22 @@
           { id: "P01", title: "登录授权", role: "guest", hint: "● 勾选协议后微信一键登录", autoOpen: "mine" },
           { id: "P02", title: "实名认证", role: "none", hint: "● 填写姓名与身份证；未实名不可购套餐", autoOpen: "kyc" },
           { id: "P03", title: "确定服务运营商", role: "none", geo: "auto_unique", hint: "●/◆ 扫柜优先，其次定位匹配运营商", autoOpen: "mine" },
-          { id: "P04", title: "购买套餐", role: "none", geo: "auto_unique", hint: "● 方案 B SKU + Mock 支付；支付进运营商子商户", autoOpen: "pkg" },
-          { id: "P05", title: "首次领取电池", role: "pending_pickup", hint: "● 解冻/开通后首次为领取电池（非换电）", autoOpen: "scan" },
+          { id: "P04", title: "购买套餐", role: "none", geo: "auto_unique", hint: "● SKU + 押金二选一（支付分免押/实缴）同笔支付", autoOpen: "pkg" },
+          { id: "P05", title: "首次领取电池", role: "pending_pickup", hint: "● 解冻/开通后首次为领取电池（非换电）；押金已在购套餐办结", autoOpen: "scan" },
           { id: "P06", title: "日常换电", role: "personal", hint: "● 扫码换电主路径；写入换电订单", autoOpen: "scan" },
-          { id: "P07", title: "续费", role: "personal", hint: "● 续费原运营商，不重新定位", autoOpen: "pkg" },
+          { id: "P07", title: "续费", role: "personal", hint: "● 续费原运营商；已办结押金不重复收（演示）", autoOpen: "pkg" },
           { id: "P08", title: "冻结与解冻", role: "frozen", hint: "●/◆ 须先还电；解冻后待领电池并顺延有效期", autoOpen: "mine" },
-          { id: "P09", title: "退款/退租/完结", role: "cooling_refund", hint: "● 冷静期申请退款（须还电）；等待运营商审核", autoOpen: "mine" }
+          { id: "P09", title: "退款/退租/完结", role: "cooling_refund", hint: "● 冷静期申请退款（须还电）；建议退套餐+押金", autoOpen: "mine" }
         ]
       },
       channel: {
         story: "channel",
         steps: [
           { id: "C01", title: "登录授权", role: "guest", hint: "● 登录后进入渠道成员态，不引导购主套餐", autoOpen: "mine" },
-          { id: "C02", title: "权益到账", role: "channel", hint: "◆ 渠道/团队/池/剩余人天只读展示（前置■已完成）", autoOpen: "mine" },
+          { id: "C02", title: "权益到账", role: "channel", hint: "◆ 渠道/团队/池/剩余人天；押金待首次领电前办理", autoOpen: "mine" },
           { id: "C03", title: "今日预占", role: "channel", hint: "◆ 服务卡展示「今日已预占」方可换电", autoOpen: "mine" },
-          { id: "C04", title: "首次领取电池", role: "channel", hint: "● 未持电池时可扫码领取；校验走人天权益", autoOpen: "scan" },
-          { id: "C05", title: "日常换电与确认消耗", role: "channel", hint: "●/◆ 换电成功后展示「今日已确认 · 不重复扣」", autoOpen: "scan" },
+          { id: "C04", title: "首次领取电池", role: "channel", hint: "● 先完成支付分免押或缴押，再扫码领取", autoOpen: "scan" },
+          { id: "C05", title: "日常换电与确认消耗", role: "channel_deposit_done", hint: "●/◆ 押金已办结；换电成功后「今日已确认」", autoOpen: "scan" },
           { id: "C06", title: "额度异常与自费兜底", role: "channel_fail", hint: "! 预占失败：1天/单次自费，不扣渠道池", autoOpen: "scan" },
           { id: "C07", title: "离职/移除", role: "channel_resign", hint: "■→只读 服务终止；持电池仅可还电", autoOpen: "mine" },
           { id: "C08", title: "还电与回池完结", role: "channel_resign", hint: "●/◆ 还电后剩余人天回池，不向骑手退款", autoOpen: "scan" }
@@ -794,13 +853,15 @@
       scanSite: "ST-SH-01",
       orderTab: "swap",
       selectedPkg: "month",
+      depositChoice: "waiver_wechat",
+      depositFlow: null,
       mainline: { story: "personal", stepId: "P06" },
       swapOrders: [
         { id: "SW2605241201", site: "浦东骑手驿站", time: "2026-05-24 12:05", status: "成功", type: "个人套餐", userId: "U1028" },
         { id: "SW2605241188", site: "浦东骑手驿站", time: "2026-05-24 08:30", status: "成功", type: "个人套餐", userId: "U1028" }
       ],
       purchaseOrders: [
-        { id: "SUB260524001", pkg: "30天畅换", amount: 299, time: "2026-05-01 09:12", status: "已支付", userId: "U1028" }
+        { id: "SUB260524001", pkg: "30天畅换", amount: 398, pkgAmount: 299, depositAmount: 99, time: "2026-05-01 09:12", status: "已支付", userId: "U1028", depositStatus: "实付在押" }
       ],
       returnOrders: [],
       geoScenario: "auto_unique",
@@ -1147,6 +1208,109 @@
       return u?.channelAttr || null;
     }
 
+    function depositPolicyFor(opId) {
+      return DEPOSIT_POLICY[opId] || DEPOSIT_POLICY["OP-SX"];
+    }
+
+    function isDepositSettled(u) {
+      return !!(u && (u.depositStatus === "实付在押" || u.depositStatus === "信用免押" || u.depositStatus === "渠道担保" || u.depositStatus === "已退"));
+    }
+
+    function needsDepositBeforePickup(u) {
+      if (!u || u.holdsBattery) return false;
+      if (u.entitlement === "渠道人天") return !isDepositSettled(u);
+      return false;
+    }
+
+    function depositChoiceLabel(choice) {
+      if (choice === "waiver_wechat") return "微信支付分免押";
+      if (choice === "waiver_zhima") return "芝麻信用免押";
+      return "支付押金";
+    }
+
+    function resolveDepositOutcome(u, opId, choice) {
+      const pol = depositPolicyFor(opId);
+      const wx = u.mockWechatPayScore ?? 700;
+      const zhima = u.mockZhimaScore ?? 660;
+      if (choice === "waiver_wechat") {
+        if (wx >= pol.wechatPayScoreMin) {
+          return { ok: true, status: "信用免押", amount: 0, method: "微信支付分", msg: `微信支付分 ${wx} ≥ ${pol.wechatPayScoreMin}，免押成功` };
+        }
+        return { ok: false, msg: `微信支付分 ${wx} 未达门槛 ${pol.wechatPayScoreMin}，请改用芝麻或实缴押金` };
+      }
+      if (choice === "waiver_zhima") {
+        if (zhima >= pol.zhimaScoreMin) {
+          return { ok: true, status: "信用免押", amount: 0, method: "芝麻信用", msg: `芝麻信用 ${zhima} ≥ ${pol.zhimaScoreMin}，免押成功` };
+        }
+        return { ok: false, msg: `芝麻信用 ${zhima} 未达门槛 ${pol.zhimaScoreMin}，请改用支付分或实缴押金` };
+      }
+      return { ok: true, status: "实付在押", amount: pol.amount, method: "实缴", msg: `已缴纳电池押金 ¥${pol.amount}` };
+    }
+
+    function renderDepositOptionsHtml(opId, opts = {}) {
+      const pol = depositPolicyFor(opId);
+      const choice = state.depositChoice || "waiver_wechat";
+      const showPkg = opts.pkgAmount != null;
+      const depositLine = choice === "pay" ? pol.amount : 0;
+      const total = showPkg ? (opts.pkgAmount + depositLine) : depositLine;
+      return `
+        <div class="deposit-block">
+          <h5>电池押金</h5>
+          <p class="hint">可微信支付分/芝麻免押，或实缴押金 ¥${pol.amount}（运营商门槛：支付分≥${pol.wechatPayScoreMin} / 芝麻≥${pol.zhimaScoreMin}）</p>
+          <label class="deposit-opt${choice === "waiver_wechat" ? " selected" : ""}">
+            <input type="radio" name="depChoice" value="waiver_wechat"${choice === "waiver_wechat" ? " checked" : ""} />
+            <div><div class="opt-title">微信支付分免押</div><div class="opt-desc">达标则押金 ¥0，记「信用免押」</div></div>
+          </label>
+          <label class="deposit-opt${choice === "waiver_zhima" ? " selected" : ""}">
+            <input type="radio" name="depChoice" value="waiver_zhima"${choice === "waiver_zhima" ? " checked" : ""} />
+            <div><div class="opt-title">芝麻信用免押</div><div class="opt-desc">达标则押金 ¥0，记「信用免押」</div></div>
+          </label>
+          <label class="deposit-opt${choice === "pay" ? " selected" : ""}">
+            <input type="radio" name="depChoice" value="pay"${choice === "pay" ? " checked" : ""} />
+            <div><div class="opt-title">支付押金 ¥${pol.amount}</div><div class="opt-desc">实缴进运营商子商户，还电后退押</div></div>
+          </label>
+          <div class="pay-summary">
+            ${showPkg ? `套餐费 ¥${opts.pkgAmount}<br>` : ""}电池押金 ¥${depositLine}${choice !== "pay" ? "（免押）" : ""}<br>
+            <span class="total">应付合计 ¥${total}</span>
+          </div>
+        </div>`;
+    }
+
+    function bindDepositChoice(root, onChange) {
+      if (!root) return;
+      root.querySelectorAll('input[name="depChoice"]').forEach(inp => {
+        inp.onchange = () => {
+          state.depositChoice = inp.value;
+          if (onChange) onChange();
+        };
+      });
+    }
+
+    function applyDepositToUser(u, outcome) {
+      u.depositStatus = outcome.status;
+      u.depositAmount = outcome.amount;
+      u.depositMethod = outcome.method;
+    }
+
+    function depositStatusHtml(u) {
+      if (!u.loggedIn || u.status === "未开通") return "";
+      if (u.entitlement === "设备租赁白名单" && u.depositStatus === "渠道担保") {
+        return `<div class="deposit-status-card"><div class="ds-title">电池押金 · 渠道担保</div><div class="ds-muted">设备租赁白名单 · 押金责任在渠道（B 端）</div></div>`;
+      }
+      if (u.entitlement === "渠道人天" && !isDepositSettled(u)) {
+        return `<div class="deposit-status-card"><div class="ds-title">电池押金 · 待办理</div><div class="ds-muted">首次领取电池前须完成支付分免押或实缴押金</div>
+          <button type="button" class="btn-block" style="margin-top:10px" data-action="deposit">去办理押金</button></div>`;
+      }
+      if (!u.depositStatus) return "";
+      const amt = u.depositStatus === "实付在押" ? ` ¥${u.depositAmount || 0}` : "";
+      const method = u.depositMethod ? ` · ${u.depositMethod}` : "";
+      const refundBtn = u.depositStatus === "实付在押" && !u.holdsBattery
+        ? `<button type="button" class="btn-block" style="margin-top:10px;background:#fff;color:var(--blue);border:1px solid var(--blue)" data-action="refund_deposit">申请退押</button>`
+        : (u.depositStatus === "实付在押" && u.holdsBattery
+          ? `<p class="ds-muted" style="margin-top:6px">请先归还电池后再申请退押</p>` : "");
+      return `<div class="deposit-status-card"><div class="ds-title">电池押金 · ${u.depositStatus}${amt}</div><div class="ds-muted">办结方式${method}</div>${refundBtn}</div>`;
+    }
+
     function renderPkgOverlay() {
       const u = user();
       const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist;
@@ -1172,17 +1336,31 @@
           <div class="desc">${s.desc}</div>
         </div>`;
       }).join("");
+      const sku = skuSource[state.selectedPkg] || skuSource.month;
+      const useChannel = !isLeaseWl && attr && sku.channelSku;
+      const pkgAmount = isLeaseWl ? sku.price : (useChannel ? sku.channel : sku.official);
+      const alreadyDeposit = isDepositSettled(u) && u.entitlement === "个人套餐";
+      const depositHtml = isLeaseWl
+        ? `<div class="deposit-block"><h5>电池押金</h5><p class="hint">设备租赁白名单 · 押金责任在渠道（渠道担保），购套餐不另收个人押金</p></div>`
+        : (alreadyDeposit
+          ? `<div class="deposit-block"><h5>电池押金</h5><p class="hint">已办结（${u.depositStatus}${u.depositAmount ? " ¥" + u.depositAmount : ""}），续费不重复收押</p>
+             <div class="pay-summary">套餐费 ¥${pkgAmount}<br><span class="total">应付合计 ¥${pkgAmount}</span></div></div>`
+          : renderDepositOptionsHtml(seller?.operatorId || u.operator || "OP-SX", { pkgAmount }));
+      const payLabel = isLeaseWl || alreadyDeposit
+        ? `确认支付 ¥${pkgAmount}（Mock）`
+        : `确认支付 ¥${pkgAmount + (state.depositChoice === "pay" ? depositPolicyFor(seller?.operatorId || u.operator || "OP-SX").amount : 0)}（Mock）`;
       const kycBlock = u.loggedIn && !u.kyc
         ? `<p style="font-size:12px;color:#cf1322;margin:8px 0 0">请先完成实名认证后再购套餐</p>
            <button type="button" class="btn-block" id="btnGoKycFromPkg" style="margin-top:8px;background:#fff;color:var(--brand);border:1px solid var(--brand)">去实名认证</button>`
-        : `<button type="button" class="btn-block" id="btnPayPkg" style="margin-top:8px">确认支付（Mock）</button>`;
-      body.innerHTML = sellerBanner + banner + cards + kycBlock;
+        : `<button type="button" class="btn-block" id="btnPayPkg" style="margin-top:8px">${payLabel}</button>`;
+      body.innerHTML = sellerBanner + banner + cards + depositHtml + kycBlock;
       body.querySelectorAll(".pkg-card").forEach(c => {
         c.onclick = () => {
           state.selectedPkg = c.dataset.pkg;
           renderPkgOverlay();
         };
       });
+      bindDepositChoice(body, () => renderPkgOverlay());
       const payBtn = document.getElementById("btnPayPkg");
       if (payBtn) payBtn.onclick = paySelectedPkg;
       const kycBtn = document.getElementById("btnGoKycFromPkg");
@@ -1200,11 +1378,25 @@
       const skuSource = isLeaseWl ? LEASE_PKG_SKUS : CHANNEL_CARD_ATTR.skus;
       const sku = skuSource[state.selectedPkg] || skuSource.month;
       const useChannel = !isLeaseWl && attr && sku.channelSku;
-      const amount = isLeaseWl ? sku.price : (useChannel ? sku.channel : sku.official);
+      const pkgAmount = isLeaseWl ? sku.price : (useChannel ? sku.channel : sku.official);
+      let depositAmount = 0;
+      let depositStatus = u.depositStatus;
+      if (isLeaseWl) {
+        depositStatus = "渠道担保";
+        applyDepositToUser(u, { status: "渠道担保", amount: 0, method: "渠道担保" });
+      } else if (!(isDepositSettled(u) && u.entitlement === "个人套餐")) {
+        const outcome = resolveDepositOutcome(u, seller.operatorId, state.depositChoice || "waiver_wechat");
+        if (!outcome.ok) { toast(outcome.msg); return; }
+        applyDepositToUser(u, outcome);
+        depositAmount = outcome.amount;
+        depositStatus = outcome.status;
+        toast(outcome.msg);
+      }
+      const amount = pkgAmount + depositAmount;
       const id = "SUB" + Date.now().toString().slice(-8);
       const order = {
-        id, pkg: sku.name + (useChannel ? "·渠道专享" : ""), amount,
-        time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId,
+        id, pkg: sku.name + (useChannel ? "·渠道专享" : ""), amount, pkgAmount, depositAmount,
+        depositStatus, time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId,
         contextSource: seller.source
       };
       if (isLeaseWl && CHANNELS[seller.channelId]) {
@@ -1235,6 +1427,7 @@
         u.daysLeft = sku.days;
         u.swapUsed = 0;
         u.operator = seller.operatorId;
+        if (!u.holdsBattery) u.pendingPickup = true;
       }
       if (useChannel) {
         u.channelPurchase = attr.channelName;
@@ -1244,6 +1437,42 @@
       const payee = isLeaseWl ? CHANNELS[seller.channelId]?.name : OPERATORS[seller.operatorId]?.name;
       toast("支付成功 · ¥" + amount + " → " + (payee || "—"));
       renderMine();
+    }
+
+    function renderChannelDepositSheet(site) {
+      const u = user();
+      const opId = u.operator || "OP-SX";
+      const body = document.getElementById("scanBody");
+      body.innerHTML = `
+        <div style="padding:4px 0 8px">
+          <p style="font-size:13px;line-height:1.6;margin-bottom:8px">渠道人天 · <strong>首次领取电池前</strong>须办理电池押金（支付分/芝麻免押或实缴）。</p>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:4px">当前柜机：${site.name}</p>
+          ${renderDepositOptionsHtml(opId)}
+          <button type="button" class="btn-block" style="margin-top:12px" id="btnSettleDeposit">确认办理并领取</button>
+          <button type="button" class="btn-block" style="margin-top:8px;background:#fff;color:var(--muted);border:1px solid var(--border)" data-close-scan>取消</button>
+        </div>`;
+      bindDepositChoice(body, () => renderChannelDepositSheet(site));
+      body.querySelector("#btnSettleDeposit").onclick = () => {
+        const outcome = resolveDepositOutcome(u, opId, state.depositChoice || "waiver_wechat");
+        if (!outcome.ok) { toast(outcome.msg); return; }
+        applyDepositToUser(u, outcome);
+        toast(outcome.msg);
+        if (outcome.amount > 0) {
+          state.purchaseOrders.unshift({
+            id: "DEP" + Date.now().toString().slice(-8),
+            pkg: "渠道首次领电 · 电池押金",
+            amount: outcome.amount,
+            pkgAmount: 0,
+            depositAmount: outcome.amount,
+            depositStatus: outcome.status,
+            time: new Date().toLocaleString("zh-CN"),
+            status: "已支付",
+            userId: u.userId
+          });
+        }
+        runPickupBattery(site);
+      };
+      body.querySelector("[data-close-scan]").onclick = () => closeOverlay("overlayScan");
     }
 
     function renderMine() {
@@ -1326,7 +1555,8 @@
         const todayLine = u.todayEligibility === "已预占" ? "今日已预占（分配即开通）"
           : u.todayEligibility === "已确认消耗" || u.swapUsed > 0 ? `今日已确认消耗 · 换电 ${u.swapUsed} 次`
           : "今日资格待确认";
-        card = `<div class="service-card channel"><div><h3>渠道人天额度</h3><p>${u.channel}${u.team ? " · " + u.team : ""}<br>${quotaLine}${todayLine}</p><p style="font-size:11px;margin-top:4px;opacity:.85">可在全网换电 · 额度售卖方 OP-SX</p></div></div>`;
+        const depHint = !isDepositSettled(u) ? " · 押金待办理" : (u.holdsBattery ? "" : " · 可领取电池");
+        card = `<div class="service-card channel"><div><h3>渠道人天额度</h3><p>${u.channel}${u.team ? " · " + u.team : ""}<br>${quotaLine}${todayLine}${depHint}</p><p style="font-size:11px;margin-top:4px;opacity:.85">可在全网换电 · 额度售卖方 OP-SX</p></div>${!u.holdsBattery && isDepositSettled(u) ? `<button type="button" class="btn-gold" data-action="scan">扫码领取</button>` : (!isDepositSettled(u) ? `<button type="button" class="btn-gold" data-action="deposit">办理押金</button>` : "")}</div>`;
       } else {
         const batHint = u.holdsBattery ? " · 持有电池" : "";
         const chHint = u.channelPurchase ? ` · ${u.channelPurchase}专享价购入` : "";
@@ -1341,6 +1571,7 @@
         </div>
         ${renderServiceScopeBanner()}
         ${card}
+        ${depositStatusHtml(u)}
         <div class="section-card">
           <div class="section-title">常用功能</div>
           <div class="grid-4">
@@ -1376,6 +1607,31 @@
 
     function handleAction(action) {
       const u = user();
+      if (action === "deposit") {
+        if (u.entitlement !== "渠道人天") { toast("请在购套餐时办理押金"); return; }
+        if (isDepositSettled(u)) { toast("押金已办结"); return; }
+        state.scanSite = u.homeSite || state.scanSite;
+        document.getElementById("demoSite").value = state.scanSite;
+        openOverlay("overlayScan");
+        renderChannelDepositSheet(SITES[state.scanSite] || SITES["ST-SH-01"]);
+        return;
+      }
+      if (action === "refund_deposit") {
+        if (u.depositStatus !== "实付在押") { toast("当前无实付在押"); return; }
+        if (u.holdsBattery) { toast("请先归还电池后再申请退押"); return; }
+        u.depositStatus = "退押中";
+        state.returnOrders.unshift({
+          id: "RF" + Date.now().toString().slice(-8),
+          type: "押金退还",
+          amount: u.depositAmount || 99,
+          time: new Date().toLocaleString("zh-CN"),
+          status: "待审核",
+          userId: u.userId
+        });
+        toast("已提交退押申请 ¥" + (u.depositAmount || 99) + "，进入运营商退款管理");
+        renderMine();
+        return;
+      }
       if (action === "scan") { startScan(); return; }
       if (action === "fallback") { startScan(); return; }
       if (action === "buy") {
@@ -1454,13 +1710,18 @@
         }
         list.innerHTML = rows.map(o => `<div class="order-card">
             <div class="top"><span class="id">${o.id}</span><span class="status">${o.status}</span></div>
-            <div class="meta">${o.pkg} · ¥${o.amount}${o.sellerOperatorName ? "<br>服务：" + o.sellerOperatorName : ""}${o.channel ? "<br>渠道：" + o.channel + " · " + (o.linkCode || "") : ""}<br>${o.time}</div>
+            <div class="meta">${o.pkg} · ¥${o.amount}${o.pkgAmount != null ? `<br>套餐 ¥${o.pkgAmount} + 押金 ¥${o.depositAmount ?? 0}${o.depositStatus ? "（" + o.depositStatus + "）" : ""}` : ""}${o.sellerOperatorName ? "<br>服务：" + o.sellerOperatorName : ""}${o.channel ? "<br>渠道：" + o.channel + " · " + (o.linkCode || "") : ""}<br>${o.time}</div>
           </div>`).join("");
       } else {
-        if (!state.returnOrders.length) {
+        rows = state.returnOrders.filter(o => !u.userId || o.userId === u.userId);
+        if (!rows.length) {
           list.innerHTML = `<div class="empty"><div class="icon">📋</div>暂无退租记录</div>`;
           return;
         }
+        list.innerHTML = rows.map(o => `<div class="order-card">
+            <div class="top"><span class="id">${o.id}</span><span class="status">${o.status}</span></div>
+            <div class="meta">${o.type || "退租"} · ¥${o.amount || 0}<br>${o.time}</div>
+          </div>`).join("");
       }
     }
 
@@ -1493,7 +1754,13 @@
         toast("服务已完结，剩余人天已回池");
         return;
       }
-      const pickupMode = u.pendingPickup && !u.holdsBattery;
+      const channelFirstPickup = u.entitlement === "渠道人天" && !u.holdsBattery && !u.preOccupyFail && u.status === "服务中";
+      const pickupMode = (u.pendingPickup && !u.holdsBattery) || channelFirstPickup;
+      if (pickupMode && needsDepositBeforePickup(u)) {
+        openOverlay("overlayScan");
+        renderChannelDepositSheet(site);
+        return;
+      }
       const suspended = isLeaseChannelSuspended(u) || (isChannelResigned(u) && u.holdsBattery);
       const body = document.getElementById("scanBody");
       body.innerHTML = `
@@ -1501,7 +1768,7 @@
           <div class="scan-frame"><div class="scan-line"></div></div>
           <p style="color:var(--muted);font-size:13px">${pickupMode ? "对准换电柜二维码 · 领取电池" : "对准换电柜二维码"}</p>
           <p style="font-size:12px;margin-top:8px;color:var(--blue)">当前柜机：${site.name}</p>
-          ${pickupMode ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">解冻后首次服务须<strong>领取电池</strong>（出电，非换电）</p>` : ""}
+          ${pickupMode ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">${channelFirstPickup ? "渠道首次服务须" : "解冻后首次服务须"}<strong>领取电池</strong>（出电，非换电）</p>` : ""}
           ${suspended && u.holdsBattery ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">${isChannelResigned(u) ? "离职回池：可" : "渠道已停用：可"}取<strong>还电</strong>，不可<strong>出电</strong></p>` : ""}
           ${pickupMode
             ? `<button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟领取电池</button>`
@@ -1572,6 +1839,10 @@
 
     function runPickupBattery(site) {
       const u = user();
+      if (needsDepositBeforePickup(u)) {
+        renderChannelDepositSheet(site);
+        return;
+      }
       const gate = checkSwapGate(u, site);
       if (!gate.ok) {
         showScanResult(false, gate.msg, site);
@@ -1582,9 +1853,10 @@
       u.pendingPickup = false;
       u.currentBatterySn = batSn;
       const id = "SW" + Date.now().toString().slice(-8);
+      const typeLabel = u.entitlement === "渠道人天" ? "渠道人天 · 领取电池" : "个人套餐 · 领取电池";
       state.swapOrders.unshift({
         id, site: site.name, time: new Date().toLocaleString("zh-CN"), status: "成功",
-        type: "个人套餐 · 领取电池", userId: u.userId
+        type: typeLabel, userId: u.userId
       });
       document.getElementById("scanBody").innerHTML = `
         <div class="result-ok">
@@ -1592,7 +1864,7 @@
           <h3 style="margin-bottom:8px">领取电池成功</h3>
           <p style="font-size:13px;color:var(--muted);line-height:1.7">
             单号 ${id}<br>${site.name}<br>已领取 ${batSn} · 格口已关闭<br>
-            <small>解冻后首次服务已完成，后续可正常换电</small>
+            <small>押金：${u.depositStatus || "—"}${u.depositAmount ? " ¥" + u.depositAmount : ""} · 后续可正常换电</small>
           </p>
           <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
         </div>`;

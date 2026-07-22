@@ -8,7 +8,61 @@
 
 </head>
 <body>
-  <div class="app">
+  <div id="loginGate" class="login-gate" hidden>
+    <div class="login-card" id="loginPanel">
+      <div class="login-brand">
+        <strong>骑手换电</strong>
+        <span>运营商 · 渠道商管理后台</span>
+      </div>
+      <div class="login-tabs" role="tablist">
+        <button type="button" class="login-tab active" data-login-portal="operator" role="tab" aria-selected="true">运营商登录</button>
+        <button type="button" class="login-tab" data-login-portal="channel" role="tab" aria-selected="false">渠道商登录</button>
+      </div>
+      <form id="loginForm" class="login-form" autocomplete="on">
+        <p class="login-form-error" id="loginFormError" role="alert"></p>
+        <label>手机号
+          <input name="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" required />
+        </label>
+        <label>密码
+          <input name="password" type="password" placeholder="默认 123456" required />
+        </label>
+        <button type="submit" class="btn primary login-submit">登录</button>
+      </form>
+      <div class="login-links">
+        <button type="button" class="link-btn" id="btnOpenChangePwd">修改密码</button>
+      </div>
+      <div class="login-demo-hint" id="loginDemoHint"></div>
+    </div>
+
+    <div class="login-card" id="changePwdPanel" hidden>
+      <div class="login-brand">
+        <strong>修改密码</strong>
+        <span>通过短信验证码设置新密码</span>
+      </div>
+      <form id="changePwdForm" class="login-form" autocomplete="off">
+        <p class="login-form-error" id="changePwdFormError" role="alert"></p>
+        <label>手机号
+          <input name="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" required />
+        </label>
+        <label>验证码
+          <div class="login-sms-row">
+            <input name="smsCode" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" required />
+            <button type="button" class="btn" id="btnSendSmsCode">获取验证码</button>
+          </div>
+        </label>
+        <label>新密码
+          <input name="newPassword" type="password" minlength="6" placeholder="至少 6 位" required />
+        </label>
+        <button type="submit" class="btn primary login-submit">确认修改</button>
+      </form>
+      <div class="login-links">
+        <button type="button" class="link-btn" id="btnBackToLogin">返回登录</button>
+      </div>
+      <div class="login-demo-hint">演示验证码：<code>888888</code> · 新密码至少 6 位</div>
+    </div>
+  </div>
+
+  <div class="app" id="appShell">
     <header class="global-header" id="globalHeader"></header>
     <aside class="sidebar">
       <div class="brand">
@@ -313,7 +367,6 @@
     </div>
     <div class="note-body" id="noteBody"></div>
   </div>
-  <div id="protoToast" class="proto-toast" role="status" aria-live="polite"></div>
   <div class="note-mask" id="protoFormMask"></div>
   <div class="note-modal" id="protoFormModal" role="dialog" aria-modal="true" style="width:min(480px,calc(100vw - 32px))">
     <div class="note-head">
@@ -356,6 +409,7 @@
       <iframe id="dataPanelFrame" title="数据面板" loading="lazy"></iframe>
     </div>
   </div>
+  <div id="protoToast" class="proto-toast" role="status" aria-live="polite"></div>
   <script src="js/config-mock.js"></script>
   <script src="js/app.js"></script>
 </body>

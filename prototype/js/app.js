@@ -1,5 +1,11 @@
     const state = {
-      role: "operator", loginKey: "entity:operator", channelEntityId: "CH-SF", leasingEntityId: "LEASE-HD", loginEmployeeId: null,
+      role: "operator", loginKey: "entity:operator", channelEntityId: "CH-SF", leasingEntityId: "LEASE-HD", operatorEntityId: "OP-SX", loginEmployeeId: null,
+      auth: {
+        loggedIn: false,
+        portal: "operator",
+        phone: "",
+        changePwdFrom: "gate"
+      },
       view: "overview",
       deviceTab: "cabinet", orderTab: "package", flowTab: "receipt",
       platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "ledger", platformDeviceOpenImportModal: false, platformChannelTab: "list", platformMarketingTab: "campaigns",
@@ -9,7 +15,7 @@
       platformUsersPage: 1,
       platformUsersPageSize: 10,
       platformLeasingTab: "companies", depositTab: "pending", depositRechargeSubTab: "waiting", depositRechargePendingPage: 1, depositRechargeProcessedPage: 1, operatorCreditTab: "assignments",
-      dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider", dayPoolRiderFocus: null,
+      dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolRidersSubTab: "list", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider", dayPoolRiderFocus: null,
       pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
       channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
       channelAssetsSubTab: "dayPool", channelAssetsPage: 1, channelAssetsPageSize: 5,
@@ -44,12 +50,71 @@
     let protoConfirmState = null;
 
     function showProtoToast(msg, ms) {
+      const text = String(msg).replace(/\n+/g, " · ");
+      const looksError = /请先|请填写|请选择|请输入|不能|失败|无效|须|不可|不足|拦截|错误|拒绝|驳回|无「|暂无可用|格式/.test(text);
+      const openModal = document.querySelector(".note-modal.open");
+      if (openModal) {
+        if (openModal.id === "protoFormModal") {
+          const err = document.querySelector("#protoFormError");
+          const suc = document.querySelector("#protoFormSuccess");
+          if (looksError && err) {
+            if (suc) { suc.hidden = true; suc.textContent = ""; }
+            err.textContent = text;
+            err.hidden = false;
+            err.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            return;
+          }
+          if (!looksError && suc) {
+            if (err) { err.hidden = true; err.textContent = ""; }
+            suc.textContent = text;
+            suc.hidden = false;
+            return;
+          }
+        }
+        let banner = openModal.querySelector(".modal-inline-error");
+        if (!banner) {
+          banner = document.createElement("div");
+          banner.className = "modal-inline-error proto-form-msg";
+          banner.setAttribute("role", "alert");
+          const body = openModal.querySelector(".note-body");
+          const form = body?.querySelector("form");
+          if (body && form) body.insertBefore(banner, form);
+          else if (body) body.insertBefore(banner, body.firstChild);
+          else openModal.appendChild(banner);
+        }
+        banner.className = "modal-inline-error proto-form-msg " + (looksError ? "error" : "success");
+        banner.textContent = text;
+        banner.hidden = false;
+        banner.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        clearTimeout(showProtoToast._modalHide);
+        if (!looksError) {
+          showProtoToast._modalHide = setTimeout(() => {
+            banner.hidden = true;
+            banner.textContent = "";
+          }, ms ?? 2800);
+        }
+        return;
+      }
       const el = document.querySelector("#protoToast");
       if (!el) return;
-      el.textContent = String(msg).replace(/\n+/g, " · ");
+      el.textContent = text;
+      el.classList.toggle("is-error", looksError);
       el.classList.add("show");
       clearTimeout(showProtoToast._hide);
-      showProtoToast._hide = setTimeout(() => el.classList.remove("show"), ms ?? 2800);
+      showProtoToast._hide = setTimeout(() => el.classList.remove("show", "is-error"), ms ?? 2800);
+    }
+
+    function clearOpenModalInlineError(modal) {
+      const host = modal || document.querySelector(".note-modal.open");
+      if (!host) return;
+      host.querySelectorAll(".modal-inline-error").forEach(el => {
+        el.hidden = true;
+        el.textContent = "";
+      });
+      if (host.id === "protoFormModal") {
+        const err = document.querySelector("#protoFormError");
+        if (err) { err.hidden = true; err.textContent = ""; }
+      }
     }
 
     function escProtoAttr(s) {
@@ -608,21 +673,31 @@
           state.role = "channel";
           state.channelEntityId = id;
           state.leasingEntityId = null;
+          state.operatorEntityId = null;
         } else if (platformLeasingCompanies.some(l => l.id === id)) {
           state.role = "leasing";
           state.leasingEntityId = id;
           state.channelEntityId = null;
           state.sitePartnerId = null;
+          state.operatorEntityId = null;
         } else if (sitePartners.find(p => p.id === id)) {
           state.role = "sitePartner";
           state.sitePartnerId = id;
           state.channelEntityId = null;
           state.leasingEntityId = null;
+          state.operatorEntityId = null;
+        } else if (id !== "operator" && id !== "platform" && platformOperators.some(o => o.id === id)) {
+          state.role = "operator";
+          state.operatorEntityId = id;
+          state.channelEntityId = null;
+          state.leasingEntityId = null;
+          state.sitePartnerId = null;
         } else {
           state.role = id;
           state.channelEntityId = id === "channel" ? "CH-SF" : null;
           state.leasingEntityId = id === "leasing" ? "LEASE-HD" : null;
           state.sitePartnerId = null;
+          state.operatorEntityId = id === "operator" ? (ENT.operator?.id || "OP-SX") : null;
         }
         state.loginEmployeeId = null;
         return;
@@ -633,10 +708,347 @@
       state.role = ENTITY_ROLE[emp.entityId] || "operator";
       if (state.role === "channel") state.channelEntityId = emp.entityId;
       if (state.role === "leasing") state.leasingEntityId = emp.entityId;
+      if (state.role === "operator") state.operatorEntityId = emp.entityId;
       if (emp.roleType === "team_admin") {
         state.view = "dayPool";
         state.dayPoolTab = "consume";
       }
+    }
+
+    const AUTH_SESSION_KEY = "riderSwapAuthV1";
+    const DEMO_SMS_CODE = "888888";
+    const authAccounts = {
+      "13800001000": { portal: "operator", password: "123456", loginKey: "entity:operator", label: "绿色出行（运营商）" },
+      "13900003100": { portal: "channel", password: "123456", loginKey: "entity:CH-SF", label: "顺丰同城渠道" },
+      "13900003201": { portal: "channel", password: "123456", loginKey: "entity:CH-CARD", label: "骑士卡渠道" },
+      "13900003210": { portal: "channel", password: "123456", loginKey: "entity:CH-DELIV", label: "闪送骑士卡" },
+      "13900003301": { portal: "channel", password: "123456", loginKey: "entity:CH-RENT", label: "京东物流租赁渠道" },
+      "13900003401": { portal: "channel", password: "123456", loginKey: "entity:CH-ACT", label: "蜂鸟激活码渠道" }
+    };
+    const authSmsState = { lastPhone: "", lastPortal: "", sentAt: 0, cooldownTimer: null };
+
+    function authAccountKey(phone) {
+      return String(phone || "").replace(/\D/g, "");
+    }
+
+    function isValidLoginPhone(phone) {
+      return /^1\d{10}$/.test(authAccountKey(phone));
+    }
+
+    function upsertAuthAccount(phone, portal, loginKey, label, password) {
+      const key = authAccountKey(phone);
+      if (!isValidLoginPhone(key)) return;
+      const prev = authAccounts[key];
+      authAccounts[key] = {
+        portal,
+        loginKey,
+        label: label || prev?.label || key,
+        password: password != null ? String(password) : (prev?.password || "123456")
+      };
+    }
+
+    function syncChannelAuthAccounts() {
+      (platformChannels || []).forEach(ch => {
+        if (ch?.loginAccount) {
+          upsertAuthAccount(ch.loginAccount, "channel", `entity:${ch.id}`, ch.name);
+        }
+      });
+      (platformOperators || []).forEach(op => {
+        if (!op?.loginAccount) return;
+        const loginKey = (op.id === (ENT.operator?.id || "OP-SX")) ? "entity:operator" : `entity:${op.id}`;
+        upsertAuthAccount(op.loginAccount, "operator", loginKey, op.name);
+      });
+    }
+
+    function updateLoginDemoHint() {
+      const el = document.querySelector("#loginDemoHint");
+      if (!el) return;
+      const portal = state.auth.portal || "operator";
+      if (portal === "channel") {
+        el.innerHTML = "演示账号：<code>13900003100</code> / <code>123456</code>（顺丰同城）· 或签约渠道列表中的手机号";
+      } else {
+        el.innerHTML = "演示账号：<code>13800001000</code> / <code>123456</code>（绿色出行）· 登录后可在侧栏切换平台/资金方等演示身份";
+      }
+    }
+
+    function setLoginPortalTab(portal) {
+      state.auth.portal = portal === "channel" ? "channel" : "operator";
+      document.querySelectorAll(".login-tab").forEach(btn => {
+        const on = btn.dataset.loginPortal === state.auth.portal;
+        btn.classList.toggle("active", on);
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      updateLoginDemoHint();
+    }
+
+    function showLoginGate() {
+      state.auth.loggedIn = false;
+      const gate = document.querySelector("#loginGate");
+      const shell = document.querySelector("#appShell");
+      gate?.removeAttribute("hidden");
+      shell?.classList.add("is-auth-locked");
+      showLoginPanel();
+      setLoginPortalTab(state.auth.portal || "operator");
+      const form = document.querySelector("#loginForm");
+      if (form) {
+        form.phone.value = state.auth.phone || "";
+        form.password.value = "";
+      }
+    }
+
+    function hideLoginGate() {
+      document.querySelector("#loginGate")?.setAttribute("hidden", "");
+      document.querySelector("#appShell")?.classList.remove("is-auth-locked");
+      showLoginPanel();
+    }
+
+    function showLoginPanel() {
+      document.querySelector("#loginPanel")?.removeAttribute("hidden");
+      document.querySelector("#changePwdPanel")?.setAttribute("hidden", "");
+      clearLoginFormError("login");
+      clearLoginFormError("changePwd");
+    }
+
+    function showChangePwdPanel(opts = {}) {
+      closeUserMenu();
+      state.auth.changePwdFrom = state.auth.loggedIn ? "session" : "gate";
+      const gate = document.querySelector("#loginGate");
+      const shell = document.querySelector("#appShell");
+      gate?.removeAttribute("hidden");
+      shell?.classList.add("is-auth-locked");
+      document.querySelector("#loginPanel")?.setAttribute("hidden", "");
+      document.querySelector("#changePwdPanel")?.removeAttribute("hidden");
+      const form = document.querySelector("#changePwdForm");
+      if (!form) return;
+      form.reset();
+      form.phone.value = opts.phone || state.auth.phone || "";
+      form.smsCode.value = "";
+      form.newPassword.value = "";
+      const smsBtn = document.querySelector("#btnSendSmsCode");
+      if (smsBtn && !authSmsState.cooldownTimer) {
+        smsBtn.disabled = false;
+        smsBtn.textContent = "获取验证码";
+      }
+    }
+
+    function backFromChangePwd() {
+      if (state.auth.changePwdFrom === "session" && state.auth.loggedIn) {
+        hideLoginGate();
+        return;
+      }
+      showLoginPanel();
+      updateLoginDemoHint();
+    }
+
+    function persistAuthSession() {
+      try {
+        sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
+          loggedIn: !!state.auth.loggedIn,
+          portal: state.auth.portal,
+          phone: state.auth.phone,
+          loginKey: state.loginKey
+        }));
+      } catch (_) { /* ignore */ }
+    }
+
+    function clearAuthSession() {
+      try { sessionStorage.removeItem(AUTH_SESSION_KEY); } catch (_) { /* ignore */ }
+    }
+
+    function completeLogin(acct, phone, portal) {
+      state.auth.loggedIn = true;
+      state.auth.portal = portal;
+      state.auth.phone = authAccountKey(phone);
+      applyLoginKey(acct.loginKey);
+      state.employeeTab = "staff";
+      const nav = getAllowedNavItems();
+      if (state.role === "sitePartner") state.view = "partnerOverview";
+      else state.view = nav.includes("overview") ? "overview" : (nav[0] || "overview");
+      closeDrawer();
+      closeEmployeeForm();
+      hideLoginGate();
+      persistAuthSession();
+      render();
+    }
+
+    function tryRestoreAuthSession() {
+      syncChannelAuthAccounts();
+      let raw = null;
+      try { raw = sessionStorage.getItem(AUTH_SESSION_KEY); } catch (_) { raw = null; }
+      if (!raw) {
+        showLoginGate();
+        return false;
+      }
+      try {
+        const saved = JSON.parse(raw);
+        const phone = authAccountKey(saved.phone);
+        const portal = saved.portal === "channel" ? "channel" : "operator";
+        const acct = authAccounts[phone];
+        if (!saved.loggedIn || !acct || acct.portal !== portal) {
+          clearAuthSession();
+          showLoginGate();
+          return false;
+        }
+        completeLogin(acct, phone, portal);
+        if (saved.loginKey && saved.loginKey !== state.loginKey) {
+          applyLoginKey(saved.loginKey);
+          render();
+        }
+        return true;
+      } catch (_) {
+        clearAuthSession();
+        showLoginGate();
+        return false;
+      }
+    }
+
+    function startSmsCooldown(btn) {
+      if (!btn) return;
+      let left = 60;
+      btn.disabled = true;
+      const paint = () => { btn.textContent = `${left}s 后重发`; };
+      paint();
+      if (authSmsState.cooldownTimer) clearInterval(authSmsState.cooldownTimer);
+      authSmsState.cooldownTimer = setInterval(() => {
+        left -= 1;
+        if (left <= 0) {
+          clearInterval(authSmsState.cooldownTimer);
+          authSmsState.cooldownTimer = null;
+          btn.disabled = false;
+          btn.textContent = "获取验证码";
+          return;
+        }
+        paint();
+      }, 1000);
+    }
+
+    function resolveChangePwdAccount(phone) {
+      const acct = authAccounts[phone];
+      if (!acct) return null;
+      const prefer = state.auth.portal === "channel" ? "channel" : "operator";
+      if (acct.portal === prefer) return acct;
+      return acct;
+    }
+
+    function setLoginFormError(msg, formId) {
+      const id = formId === "changePwd" ? "changePwdFormError" : "loginFormError";
+      const el = document.querySelector("#" + id);
+      if (!el) {
+        window.alert(msg);
+        return;
+      }
+      el.textContent = String(msg || "");
+      el.classList.toggle("show", !!msg);
+    }
+
+    function clearLoginFormError(formId) {
+      setLoginFormError("", formId);
+    }
+
+    function handleSendSmsCode() {
+      const form = document.querySelector("#changePwdForm");
+      if (!form) return;
+      clearLoginFormError("changePwd");
+      const phone = authAccountKey(form.phone.value);
+      if (!isValidLoginPhone(phone)) {
+        setLoginFormError("请填写正确的 11 位手机号", "changePwd");
+        return;
+      }
+      const acct = resolveChangePwdAccount(phone);
+      if (!acct) {
+        setLoginFormError("账号不存在，请确认手机号", "changePwd");
+        return;
+      }
+      authSmsState.lastPhone = phone;
+      authSmsState.lastPortal = acct.portal;
+      authSmsState.sentAt = Date.now();
+      startSmsCooldown(document.querySelector("#btnSendSmsCode"));
+      setLoginFormError("", "changePwd");
+      window.alert(`验证码已发送（演示码 ${DEMO_SMS_CODE}）`);
+    }
+
+    function handleChangePwdSubmit(e) {
+      e.preventDefault();
+      const form = e.target;
+      clearLoginFormError("changePwd");
+      const phone = authAccountKey(form.phone.value);
+      const smsCode = String(form.smsCode.value || "").trim();
+      const newPassword = String(form.newPassword.value || "");
+      if (!isValidLoginPhone(phone)) {
+        setLoginFormError("请填写正确的 11 位手机号", "changePwd");
+        return;
+      }
+      const acct = resolveChangePwdAccount(phone);
+      if (!acct) {
+        setLoginFormError("账号不存在，请确认手机号", "changePwd");
+        return;
+      }
+      if (!authSmsState.sentAt || authSmsState.lastPhone !== phone) {
+        setLoginFormError("请先获取短信验证码", "changePwd");
+        return;
+      }
+      if (smsCode !== DEMO_SMS_CODE) {
+        setLoginFormError("验证码错误（演示请输入 888888）", "changePwd");
+        return;
+      }
+      if (newPassword.length < 6) {
+        setLoginFormError("新密码至少 6 位", "changePwd");
+        return;
+      }
+      acct.password = newPassword;
+      if (state.auth.changePwdFrom === "session" && state.auth.loggedIn) {
+        hideLoginGate();
+        window.alert("密码已修改");
+        return;
+      }
+      showLoginPanel();
+      const loginForm = document.querySelector("#loginForm");
+      if (loginForm) {
+        loginForm.phone.value = phone;
+        loginForm.password.value = "";
+      }
+      setLoginPortalTab(acct.portal);
+      clearLoginFormError("login");
+      window.alert("密码已修改，请使用新密码登录");
+    }
+
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      clearLoginFormError("login");
+      const form = e.target;
+      const phone = authAccountKey(form.phone.value);
+      const password = String(form.password.value || "");
+      const portal = state.auth.portal === "channel" ? "channel" : "operator";
+      if (!isValidLoginPhone(phone)) {
+        setLoginFormError("请填写正确的 11 位手机号", "login");
+        return;
+      }
+      const acct = authAccounts[phone];
+      if (!acct || acct.portal !== portal) {
+        setLoginFormError(portal === "channel"
+          ? "渠道商账号不存在，请使用演示号 13900003100 或签约渠道手机号"
+          : "运营商账号不存在，请使用演示号 13800001000", "login");
+        return;
+      }
+      if (acct.password !== password) {
+        setLoginFormError("密码错误", "login");
+        return;
+      }
+      completeLogin(acct, phone, portal);
+    }
+
+    function initAuthUi() {
+      document.querySelectorAll(".login-tab").forEach(btn => {
+        btn.addEventListener("click", () => setLoginPortalTab(btn.dataset.loginPortal));
+      });
+      document.querySelector("#loginForm")?.addEventListener("submit", handleLoginSubmit);
+      document.querySelector("#btnOpenChangePwd")?.addEventListener("click", () => {
+        showChangePwdPanel({ phone: document.querySelector("#loginForm")?.phone?.value || "" });
+      });
+      document.querySelector("#changePwdForm")?.addEventListener("submit", handleChangePwdSubmit);
+      document.querySelector("#btnSendSmsCode")?.addEventListener("click", handleSendSmsCode);
+      document.querySelector("#btnBackToLogin")?.addEventListener("click", backFromChangePwd);
+      updateLoginDemoHint();
     }
 
     function buildLoginSelectHtml() {
@@ -694,6 +1106,12 @@
         const id = state.leasingEntityId || "LEASE-HD";
         return platformLeasingCompanies.find(l => l.id === id) || ENT.leasing;
       }
+      if (state.role === "operator") {
+        const oid = state.operatorEntityId || ENT.operator?.id || "OP-SX";
+        const op = platformOperators.find(o => o.id === oid);
+        if (op) return { id: op.id, name: op.name, type: "运营商", city: op.city, status: op.status };
+        return ENT.operator;
+      }
       return ENT[state.role] || ENT.operator;
     }
 
@@ -749,6 +1167,8 @@
       }
       if (state.view === "dayPool") {
         if (state.dayPoolTab === "pools" && state.dayPoolPoolsSubTab === "ledger") return "dayPool_ledger";
+        if (state.dayPoolTab === "riders" && state.dayPoolRidersSubTab === "teams") return "dayPool_teams";
+        if (state.dayPoolTab === "teams") return "dayPool_teams";
         return "dayPool_" + state.dayPoolTab;
       }
       if (state.view === "platformUsers") return "platformUsers_" + state.platformUsersTab;
@@ -1975,7 +2395,7 @@
         displayName: ch ? ch.name : (ent.name || r.name),
         roleLabel: ch ? `${r.type} · ${ch.settlementMode}` : r.type,
         entity: ch ? ch.name : (ent.name || r.name),
-        account: state.loginKey.replace("entity:", "").replace("emp:", ""),
+        account: state.auth.phone || state.loginKey.replace("entity:", "").replace("emp:", ""),
         loginAt: "演示会话"
       };
     }
@@ -2063,13 +2483,15 @@
 
     function logoutLogin() {
       closeUserMenu();
-      applyLoginKey("entity:operator");
+      state.auth.loggedIn = false;
+      state.auth.phone = "";
+      clearAuthSession();
       state.view = "overview";
       state.deviceTab = "cabinet";
       closeDrawer();
       closeEmployeeForm();
-      render();
-      window.alert("已退出登录（演示：已切回默认运营商「绿色出行」）");
+      showLoginGate();
+      window.alert("已退出登录");
     }
 
     function renderGlobalHeader() {
@@ -2108,6 +2530,7 @@
             <dt>会话</dt><dd>${login.loginAt}</dd>
           </dl>
           <div class="user-menu-foot">
+            <button type="button" class="btn" id="btnMenuChangePwd">修改密码</button>
             <button type="button" class="btn" id="btnLogout">退出登录</button>
           </div>
         </div>
@@ -2118,6 +2541,11 @@
       document.querySelector("#btnUserAvatar")?.addEventListener("click", e => {
         e.stopPropagation();
         toggleUserMenu();
+      });
+      document.querySelector("#btnMenuChangePwd")?.addEventListener("click", () => {
+        showChangePwdPanel({
+          phone: state.auth.phone || ""
+        });
       });
       document.querySelector("#btnLogout")?.addEventListener("click", logoutLogin);
     }
@@ -4388,7 +4816,7 @@
         const opHint = contracts.length
           ? ` 签约运营商 ${contracts.length} 家：${contracts.map(c => c.operatorName).join("、")}；额度池 ${myDayPools().length} 个。`
           : "";
-        return `<div class="own-scope-banner">${noteBtn("day_pool_channel")} 当前登录 <strong>${e.name}</strong>：额度池 · 骑手团队 · 登记分配。${opHint}</div>`;
+        return `<div class="own-scope-banner">${noteBtn("day_pool_channel")} 当前登录 <strong>${e.name}</strong>：额度池 · 骑手登记（含团队）· 分配。${opHint}</div>`;
       }
       if (isSitePartnerRole()) {
         const p = currentSitePartner();
@@ -4618,7 +5046,7 @@
         dayPool: {
           stateKey: "dayPoolTab",
           tabs: () => (isOrgAdminLogin() ? [["consume", "消耗明细"]] : [
-            ["pools", "额度池"], ["teams", "骑手团队"], ["riders", "骑手登记"], ["allocations", "额度分配"],
+            ["pools", "额度池"], ["riders", "骑手登记"], ["allocations", "额度分配"],
             ["rules", "额度使用规则"], ["consume", "消耗明细"], ["retail", "零售价"],
             ["exceptions", "异常记录"]
           ])
@@ -6510,6 +6938,11 @@
       document.querySelector("#operatorFormTitle").textContent = op ? "编辑运营商 · " + op.name : "新增运营商";
       document.querySelector("#operatorForm").innerHTML = `
         <label>运营商名称<input name="name" value="${op?.name || ""}" required placeholder="如：绿色出行" /></label>
+        <label class="form-span-2">账号（手机号）
+          <input name="loginAccount" type="tel" inputmode="numeric" pattern="1\\d{10}" maxlength="11"
+            value="${op?.loginAccount || ""}" required placeholder="11 位手机号，用于运营商后台登录" />
+          <small style="display:block;margin-top:6px;font-size:12px;color:var(--muted);font-weight:400">默认密码：123456</small>
+        </label>
         <label>城市<select name="city"><option ${(!op || op.city === "上海") ? "selected" : ""}>上海</option><option ${op?.city === "杭州" ? "selected" : ""}>杭州</option></select></label>
         <label>状态<select name="status"><option ${(!op || op.status === "在营") ? "selected" : ""}>在营</option><option ${op?.status === "已停用" ? "selected" : ""}>已停用</option></select></label>
         <label>联系人<input name="contactName" value="${op?.contactName || ""}" /></label>
@@ -6696,11 +7129,37 @@
     function saveOperatorForm() {
       const form = document.querySelector("#operatorForm");
       const data = Object.fromEntries(new FormData(form).entries());
+      if (!data.name?.trim()) {
+        window.alert("请填写运营商名称");
+        return;
+      }
+      if (!data.loginAccount?.trim()) {
+        window.alert("请填写登录账号（手机号）");
+        return;
+      }
+      const loginPhone = String(data.loginAccount).trim();
+      if (!/^1\d{10}$/.test(loginPhone)) {
+        window.alert("登录账号须为 11 位手机号");
+        return;
+      }
+      const prevPhone = state.operatorFormId === "new"
+        ? ""
+        : (platformOperators.find(o => o.id === state.operatorFormId)?.loginAccount || "");
+      const phoneTaken = platformOperators.some(o =>
+        o.loginAccount === loginPhone && o.id !== state.operatorFormId
+      ) || platformChannels.some(c => c.loginAccount === loginPhone);
+      if (loginPhone !== prevPhone && phoneTaken) {
+        window.alert("该手机号已被其他主体用作登录账号");
+        return;
+      }
+      data.loginAccount = loginPhone;
       if (state.operatorFormId === "new") {
         const id = "OP-" + Date.now().toString().slice(-4);
         platformOperators.push({
           id, name: data.name, city: data.city, status: data.status,
-          contactName: data.contactName, contactPhone: data.contactPhone, email: data.email,
+          contactName: data.contactName, contactPhone: data.contactPhone,
+          loginAccount: loginPhone,
+          email: data.email,
           address: data.address, onboardDate: new Date().toISOString().slice(0, 10),
           mchWx: "", mchAli: "", remark: data.remark
         });
@@ -6712,14 +7171,19 @@
           effectiveFrom: new Date().toISOString().slice(0, 10), status: "生效",
           updatedAt: new Date().toISOString().slice(0, 10), updatedBy: "平台管理员", remark: "新入网默认 1%"
         };
+        upsertAuthAccount(loginPhone, "operator", `entity:${id}`, data.name.trim());
       } else {
         const op = platformOperators.find(o => o.id === state.operatorFormId);
         if (op) {
           Object.assign(op, {
             name: data.name, city: data.city, status: data.status,
-            contactName: data.contactName, contactPhone: data.contactPhone, email: data.email,
+            contactName: data.contactName, contactPhone: data.contactPhone,
+            loginAccount: loginPhone,
+            email: data.email,
             address: data.address, remark: data.remark
           });
+          const loginKey = (op.id === (ENT.operator?.id || "OP-SX")) ? "entity:operator" : `entity:${op.id}`;
+          upsertAuthAccount(loginPhone, "operator", loginKey, op.name);
         }
       }
       closeOperatorForm();
@@ -6800,7 +7264,11 @@
       document.querySelector("#channelPartnerForm").innerHTML = `
         <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0 0 4px">${noteBtn("channel_partner_manage")} 保存后同步至平台「渠道商管理」（平台只读监管）。</p>
         <label>渠道商名称<input name="name" value="${ch?.name || ""}" required placeholder="如：同城配送渠道" /></label>
-        <label>登录账号<input name="loginAccount" value="${ch?.loginAccount || ""}" required placeholder="channel-admin" /></label>
+        <label class="form-span-2">登录账号（手机号）
+          <input name="loginAccount" type="tel" inputmode="numeric" pattern="1\\d{10}" maxlength="11"
+            value="${ch?.loginAccount || ""}" required placeholder="11 位手机号，用于登录渠道商后台" />
+          <small style="display:block;margin-top:6px;font-size:12px;color:var(--muted);font-weight:400">默认密码：123456</small>
+        </label>
         ${modeSelect}
         <label>城市<select name="city"><option ${(!ch || ch.city === "上海") ? "selected" : ""}>上海</option><option ${ch?.city === "杭州" ? "selected" : ""}>杭州</option></select></label>
         <label>状态<select name="status"><option ${(!ch || ch.status === "在营") ? "selected" : ""}>在营</option><option ${ch?.status === "已停用" ? "selected" : ""}>已停用</option></select></label>
@@ -6884,9 +7352,21 @@
       const form = document.querySelector("#channelPartnerForm");
       const data = Object.fromEntries(new FormData(form).entries());
       if (!data.name?.trim() || !data.loginAccount?.trim()) {
-        window.alert("请填写渠道商名称与登录账号");
+        window.alert("请填写渠道商名称与登录手机号");
         return;
       }
+      const loginPhone = String(data.loginAccount).trim();
+      const isNewPartner = state.channelPartnerContractId === "new";
+      const prevLogin = !isNewPartner
+        ? (platformChannels.find(c => c.id === (channelContracts.find(x => x.id === state.channelPartnerContractId)?.channelId))?.loginAccount || "")
+        : "";
+      if (isNewPartner || loginPhone !== prevLogin) {
+        if (!/^1\d{10}$/.test(loginPhone)) {
+          window.alert("登录账号须为 11 位手机号，渠道商将用该号码登录管理后台");
+          return;
+        }
+      }
+      data.loginAccount = loginPhone;
       const settlementMode = data.settlementMode || channelContracts.find(c => c.id === state.channelPartnerContractId)?.settlementMode || "人天池";
       let wholesalePrice = parseFloat(data.wholesalePrice);
       if (settlementMode === "卡差价") {
@@ -7007,6 +7487,7 @@
           CHANNEL_REGISTRY[channelId] = { id: channelId, name: data.name.trim(), settlementMode: "激活码", logo: "🎫", tree: "批发激活码 · 骑手核销获套餐" };
           CHANNEL_NAV[channelId] = ["overview", "channelSettlement", "activationCodes", "activationRecords", "orderAudit", "channelCredit", "employees"];
         }
+        upsertAuthAccount(loginPhone, "channel", `entity:${channelId}`, data.name.trim());
       } else {
         const contract = channelContracts.find(c => c.id === state.channelPartnerContractId && c.operatorId === op.id);
         if (!contract) return;
@@ -7018,6 +7499,7 @@
           ch.contactName = data.contactName;
           ch.contactPhone = data.contactPhone;
           ch.loginAccount = data.loginAccount.trim();
+          upsertAuthAccount(loginPhone, "channel", `entity:${ch.id}`, ch.name);
         }
         contract.channelName = data.name.trim();
         contract.wholesalePrice = wholesalePrice;
@@ -11913,7 +12395,8 @@
       const titles = {
         purchase: "购买人天额度", renew: "续费额度池", rule: "新增额度使用规则",
         register: "登记骑手", batchRegister: "批量登记骑手", allocate: "分配人天额度", recover: "收回人天额度", adjust: "额度调整",
-        team: "新增骑手团队", teamPool: "设置团队消耗池", leaveTeam: "移出团队"
+        team: "新增骑手团队", teamPool: "设置团队消耗池", leaveTeam: "移除团队",
+        changeTeam: "变更团队", joinTeam: "加入团队"
       };
       document.querySelector("#poolFormTitle").textContent = titles[mode] || "额度池";
       const teamForEdit = (mode === "teamPool" && poolId) ? dayPoolTeams.find(t => t.id === poolId) : null;
@@ -11973,9 +12456,25 @@
           <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">支持逗号/制表符分隔；已登记在职或仍有个人套餐的行将记入失败清单。</p>`;
       } else if (mode === "leaveTeam") {
         html = `
-          <label>骑手<input value="${rider ? rider.name + " · 剩余 " + (rider.remainingDays || 0) + " 人天" : ""}" readonly></label>
+          <label>骑手<input value="${rider ? rider.name + " · " + (rider.status || "") + " · 剩余 " + (rider.remainingDays || 0) + " 人天" : ""}" readonly></label>
+          <label>当前团队<input value="${rider ? (rider.team || "—") : ""}" readonly></label>
           <label>退出原因<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">渠道商移除出团队</textarea></label>
-          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">未使用人天将<strong>自动回池</strong>；终止渠道权益，不向骑手退款。</p>`;
+          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">未使用人天将<strong>自动回池</strong>；在职状态变为<strong>离职</strong>；不向骑手退款。</p>`;
+      } else if (mode === "changeTeam" || mode === "joinTeam") {
+        const teams = myChannelTeams().filter(t => t.status === "启用");
+        const opts = teams.filter(t => mode === "joinTeam" || t.id !== rider?.teamId)
+          .map(t => {
+            const p = poolById(resolveTeamPoolId(t));
+            return `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}${p ? " · " + p.name : ""}</option>`;
+          }).join("");
+        const rehireHint = mode === "joinTeam" && rider && (rider.status === "离职" || rider.status === "已退出")
+          ? `<p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">离职骑手加入团队后将<strong>复职为在职</strong>；后续预占/消耗从新团队绑定池扣减。</p>`
+          : `<p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${mode === "changeTeam" ? "仅变更团队归属，不改变在职/离职状态；" : ""}消耗池随目标团队绑定池切换。</p>`;
+        html = `
+          <label>骑手<input value="${rider ? rider.name + " · " + rider.id + " · " + (rider.status || "") : ""}" readonly></label>
+          <label>当前团队<input value="${rider ? (rider.team || "无") : ""}" readonly></label>
+          <label>${mode === "joinTeam" ? "加入团队" : "变更至"}<select name="teamId">${opts || "<option value=\"\">暂无可用团队</option>"}</select></label>
+          ${rehireHint}`;
       } else if (mode === "allocate") {
         html = `
           <label>额度池<input value="${pool ? pool.id + " · 可用 " + pool.availableDays + " 人天" : ""}" readonly></label>
@@ -12016,6 +12515,7 @@
           <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">修改后该团队骑手后续预占/消耗从新池扣减；已分配未用人天仍在原池余额。</p>`;
       }
       document.querySelector("#poolForm").innerHTML = html;
+      clearOpenModalInlineError(document.querySelector("#poolModal"));
       const paySel = document.querySelector("#poolPayChannel");
       const syncPoolPayFields = () => {
         const online = paySel && paySel.value === "online";
@@ -12043,6 +12543,7 @@
 
     function closePoolForm() {
       state.poolForm = null;
+      clearOpenModalInlineError(document.querySelector("#poolModal"));
       document.querySelector("#poolModal").classList.remove("open");
       document.querySelector("#poolMask").classList.remove("open");
     }
@@ -12172,8 +12673,35 @@
         const team = dayPoolTeams.find(t => t.id === rider.teamId);
         const remark = document.querySelector("#poolForm [name=remark]")?.value || "移出团队";
         recycleChannelRiderToPool(rider, remark, "渠道商管理员");
-        rider.status = "已退出";
+        rider.status = "离职";
+        rider.quotaStatus = "已收回";
+        rider.todayEligibility = "已回池";
         if (team && team.riderCount > 0) team.riderCount -= 1;
+        syncTeamRiderCounts();
+      } else if ((mode === "changeTeam" || mode === "joinTeam") && rider) {
+        const teamId = document.querySelector("#poolForm [name=teamId]")?.value;
+        const team = dayPoolTeams.find(t => t.id === teamId);
+        if (!team) {
+          window.alert("请选择目标团队");
+          return;
+        }
+        if (mode === "changeTeam" && team.id === rider.teamId) {
+          window.alert("请选择与当前不同的团队");
+          return;
+        }
+        const prevTeam = dayPoolTeams.find(t => t.id === rider.teamId);
+        rider.teamId = team.id;
+        rider.team = team.name;
+        rider.poolId = resolveTeamPoolId(team) || rider.poolId;
+        if (mode === "joinTeam" && (rider.status === "离职" || rider.status === "已退出" || !rider.status)) {
+          rider.status = "在职";
+          if ((rider.remainingDays || 0) > 0) rider.quotaStatus = "使用中";
+          else if (rider.quotaStatus === "已收回" || rider.quotaStatus === "已用尽") { /* keep */ }
+          else rider.quotaStatus = rider.quotaStatus || "未分配";
+          if (rider.todayEligibility === "已回池") rider.todayEligibility = "待预占";
+        }
+        syncTeamRiderCounts();
+        if (prevTeam && prevTeam.id !== team.id) syncTeamRiderCounts();
       } else if (mode === "allocate" && pool && rider) {
         const days = parseInt(document.querySelector("#poolForm [name=days]")?.value || "0", 10);
         if (days > 0 && days <= pool.availableDays) {
@@ -12245,6 +12773,7 @@
         }
       }
       state.view = "dayPool";
+      closePoolForm();
       render();
       window.alert("演示：已保存（Mock 数据已更新）");
     }
@@ -13137,7 +13666,7 @@
         body = `<section class="panel">
           ${panelHead("渠道分销价", "按签约渠道分别设定正式价、专享价与佣金", "pricing_card", `<button type="button" class="btn primary" data-new-card-pricing>+ 新增分销价</button>`)}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_card")} 多分销渠道（如骑士卡、闪送骑士卡）<strong>各签各价</strong>；亦可在此直接维护，或至「渠道管理 → 签约渠道」批量配置。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_card")} 多分销渠道（如骑士卡、闪送骑士卡）<strong>各签各价</strong>；本页仅维护价格与佣金。签约渠道档案请至「渠道管理 → 签约渠道」。</p>
             <table>
               <thead><tr><th>渠道商</th><th>SKU</th><th>正式零售价</th><th>渠道专享价</th><th>佣金/单</th><th>有效期至</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${rows.map(r => `<tr>
@@ -13150,7 +13679,6 @@
                 <td>${tag(r.status)}</td>
                 <td>
                   <button type="button" class="link-btn" data-edit-card-pricing="${r.id}">编辑</button>
-                  <button type="button" class="link-btn" data-edit-channel-partner="${r.contractId}">签约</button>
                 </td>
               </tr>`).join("") || "<tr><td colspan='8'>暂无渠道分销签约</td></tr>"}</tbody>
             </table>
@@ -13241,11 +13769,10 @@
           ${panelHead("签约渠道商", "签约信息 · 权益概要 · 信用额度（人天池/设备租赁适用）", "channel_sales", addBtn)}
           <div class="panel-body orders-table-wrap">
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_partner_manage")}${noteBtn("channel_partner_rights")} 同一运营商可签多个分销渠道，<strong>各渠道独立配置套餐与专享价</strong>；汇总对比见「定价管理 → 渠道分销价」。</p>
-            <p style="font-size:12px;margin:0 0 12px"><label><input type="checkbox" id="depositStopOnShort" checked /> 押金不足时停服（一期可配 · 2026-07-13）</label></p>
             <table>
               <thead><tr>
                 <th>渠道商</th><th>结算模式</th><th>批发/定价</th><th>权益概要</th>
-                <th>信用分</th><th>信用额度</th><th>应押/缺口</th><th>待审凭证</th>
+                <th>信用分</th><th>信用额度</th><th>应押/缺口</th><th>待审订单</th>
                 <th>有效期</th><th>状态</th><th>操作</th>
               </tr></thead>
               <tbody>${rows.map(c => {
@@ -14551,6 +15078,10 @@
       }
       syncTeamRiderCounts();
       if (isOrgAdminLogin()) state.dayPoolTab = "consume";
+      if (state.dayPoolTab === "teams") {
+        state.dayPoolTab = "riders";
+        state.dayPoolRidersSubTab = "teams";
+      }
       const teamBanner = isTeamAdminLogin() ? (() => {
         const team = dayPoolTeams.find(t => t.id === teamAdminScopeTeamId());
         return `<div class="perm-banner" style="margin-bottom:14px">团队管理员 · <strong>${team ? team.name : "—"}</strong>：仅可查看本团队消耗明细并导出（只读，不可登记/调额）。</div>`;
@@ -14567,7 +15098,7 @@
       const isSeller = false;
       const tab = state.dayPoolTab;
       const tabs = isOrgAdminLogin() ? [["consume", "消耗明细"]] : [
-        ["pools", "额度池"], ["teams", "骑手团队"], ["riders", "骑手登记"], ["allocations", "额度分配"],
+        ["pools", "额度池"], ["riders", "骑手登记"], ["allocations", "额度分配"],
         ["rules", "额度使用规则"], ["consume", "消耗明细"], ["retail", "零售价"],
         ["exceptions", "异常记录"]
       ];
@@ -14630,19 +15161,23 @@
           </section>`;
         }
         }
-      } else if (tab === "teams") {
-        const f = getPf();
-        const multiPool = myDayPools().length > 1;
-        const teams = myChannelTeams().filter(t => {
-          if (!matchKw(t.name, f.keyword)) return false;
-          if (f.poolId !== "全部" && resolveTeamPoolId(t) !== f.poolId) return false;
-          return true;
-        });
-        const poolHint = multiPool
-          ? `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} 当前仅 1 个额度池，所有团队<strong>自动绑定</strong>该池扣减。</div>`
-          : `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} 当前仅 1 个额度池，所有团队<strong>自动绑定</strong>该池扣减。</div>`;
-        body = `${poolHint}<section class="panel">
-          ${panelHead("骑手团队", "创建团队、分配骑手；团队绑定消耗额度池", "day_pool_team", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="team">新增团队</button>` : "")}
+      } else if (tab === "riders") {
+        const ridersSub = state.dayPoolRidersSubTab || "list";
+        const ridersTopTabs = panelTopTabs([["list", "登记骑手"], ["teams", "骑手团队"]], ridersSub, "dpriders-sub");
+        if (ridersSub === "teams") {
+          const f = getPf();
+          const multiPool = myDayPools().length > 1;
+          const teams = myChannelTeams().filter(t => {
+            if (!matchKw(t.name, f.keyword)) return false;
+            if (f.poolId !== "全部" && resolveTeamPoolId(t) !== f.poolId) return false;
+            return true;
+          });
+          const poolHint = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} ${multiPool
+            ? `当前有 <strong>${myDayPools().length}</strong> 个额度池，各团队须指定消耗池。`
+            : "当前仅 1 个额度池，所有团队<strong>自动绑定</strong>该池扣减。"}</div>`;
+          body = `${poolHint}<section class="panel panel-with-top-tabs">
+          ${ridersTopTabs}
+          ${panelHead("骑手团队", "创建团队；团队绑定消耗额度池", "day_pool_team", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="team">新增团队</button>` : "")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>团队</th><th>消耗额度池</th><th>在职骑手</th><th>默认</th><th>创建时间</th><th>备注</th><th>状态</th><th>操作</th></tr></thead>
@@ -14661,6 +15196,66 @@
             </table>
           </div>
         </section>`;
+        } else {
+        const f = getPf();
+        const focusZero = state.dayPoolRiderFocus === "zeroQuota";
+        const riders = dayPoolRiders.filter(r => {
+          if (!matchOrgScope(r)) return false;
+          if (f.teamId !== "全部" && r.teamId !== f.teamId) return false;
+          if (!matchKw(r.phone, f.keyword) && !matchKw(r.name, f.keyword) && !matchKw(r.id, f.keyword)) return false;
+          if (f.quotaStatus !== "全部" && r.quotaStatus !== f.quotaStatus) return false;
+          if (focusZero && !(r.status === "在职" && (r.remainingDays || 0) === 0)) return false;
+          return myDayPools().some(p => p.id === r.poolId);
+        });
+        const focusBanner = focusZero
+          ? `<div class="pool-warn-banner" style="margin-bottom:12px">${noteBtn("day_pool_hold_no_quota")}
+              当前筛选：<strong>在职 · 剩余人天为 0</strong>（共 ${riders.length} 人）。原因须区分 <strong>个人无额度</strong> / <strong>预占失败</strong>；持电池者为「待还电」。
+              <button type="button" class="link-btn" data-clear-rider-focus style="margin-left:8px">清除筛选</button>
+            </div>`
+          : "";
+        const riderOps = (r) => {
+          if (!canEditDayPool()) return "—";
+          const hasTeam = !!(r.teamId && r.team);
+          const isActive = r.status === "在职";
+          const isLeft = r.status === "离职" || r.status === "已退出";
+          if (!isActive && !isLeft) return "—";
+          const btns = [];
+          if (!hasTeam || isLeft) {
+            btns.push(`<button type="button" class="link-btn" data-pool-form="joinTeam" data-rider-id="${r.id}">加入团队</button>`);
+          }
+          if (hasTeam) {
+            btns.push(`<button type="button" class="link-btn" data-pool-form="changeTeam" data-rider-id="${r.id}">变更团队</button>`);
+            btns.push(`<button type="button" class="link-btn" data-pool-form="leaveTeam" data-rider-id="${r.id}">移除团队</button>`);
+          }
+          return btns.join(" ") || "—";
+        };
+        body = `<section class="panel panel-with-top-tabs" id="dayPoolRiderList">
+          ${ridersTopTabs}
+          ${panelHead("登记骑手", "在职/离职均可加入、变更、移除团队；退出自动回池", "day_pool_channel", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="register">登记骑手</button> <button type="button" class="btn" data-pool-form="batchRegister">批量导入</button>` : "")}
+          <div class="panel-body orders-table-wrap">
+            ${focusBanner}
+            <table>
+              <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>在职状态</th><th>已分配</th><th>已消耗</th><th>剩余额度</th><th>额度状态</th><th>今日权益</th><th>持电池</th><th>操作</th></tr></thead>
+              <tbody>${riders.map(r => {
+                const p = poolById(r.poolId);
+                const gateHint = r.gateReason || r.failReason || "";
+                return `<tr>
+                <td>${r.name}<br><small>${r.id} · ${r.phone}</small></td>
+                <td>${r.team || "—"}</td>
+                <td><small>${p ? p.name : r.poolId}</small></td>
+                <td>${tag(r.status)}</td>
+                <td>${r.allocatedDays || 0} 人天</td><td>${r.usedDays || 0} 人天</td>
+                <td><strong>${r.remainingDays || 0}</strong> 人天</td>
+                <td>${tag(r.quotaStatus || "未分配")}</td>
+                <td>${eligibilityTag(r.todayEligibility)}${gateHint ? `<br><small style="color:var(--red)">${gateHint}</small>` : ""}</td>
+                <td>${(r.batteryHeld || 0) > 0 ? tag("持有") : "—"}</td>
+                <td class="row-actions">${riderOps(r)}</td>
+              </tr>`;
+              }).join("") || "<tr><td colspan='11'>暂无登记骑手</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+        }
       } else if (tab === "rules") {
         const f = getPf();
         const rules = dayPoolRules.filter(r => myDayPools().some(p => p.id === r.poolId)).filter(r => {
@@ -14696,48 +15291,6 @@
                 <td>${r.hitRiders}</td>
                 <td>${r.validFrom} ~ ${r.validTo}</td><td>${tag(r.status)}</td>
               </tr>`).join("") || "<tr><td colspan='8'>暂无规则</td></tr>"}</tbody>
-            </table>
-          </div>
-        </section>`;
-      } else if (tab === "riders") {
-        const f = getPf();
-        const focusZero = state.dayPoolRiderFocus === "zeroQuota";
-        const riders = dayPoolRiders.filter(r => {
-          if (!matchOrgScope(r)) return false;
-          if (f.teamId !== "全部" && r.teamId !== f.teamId) return false;
-          if (!matchKw(r.phone, f.keyword) && !matchKw(r.name, f.keyword) && !matchKw(r.id, f.keyword)) return false;
-          if (f.quotaStatus !== "全部" && r.quotaStatus !== f.quotaStatus) return false;
-          if (focusZero && !(r.status === "在职" && (r.remainingDays || 0) === 0)) return false;
-          return myDayPools().some(p => p.id === r.poolId);
-        });
-        const focusBanner = focusZero
-          ? `<div class="pool-warn-banner" style="margin-bottom:12px">${noteBtn("day_pool_hold_no_quota")}
-              当前筛选：<strong>在职 · 剩余人天为 0</strong>（共 ${riders.length} 人）。原因须区分 <strong>个人无额度</strong> / <strong>预占失败</strong>；持电池者为「待还电」。
-              <button type="button" class="link-btn" data-clear-rider-focus style="margin-left:8px">清除筛选</button>
-            </div>`
-          : "";
-        body = `<section class="panel" id="dayPoolRiderList">
-          ${panelHead("登记骑手", "校验个人/渠道互斥；退出团队自动回池", "day_pool_channel", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="register">登记骑手</button> <button type="button" class="btn" data-pool-form="batchRegister">批量导入</button>` : "")}
-          <div class="panel-body orders-table-wrap">
-            ${focusBanner}
-            <table>
-              <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>在职状态</th><th>已分配</th><th>已消耗</th><th>剩余额度</th><th>额度状态</th><th>今日权益</th><th>持电池</th><th>操作</th></tr></thead>
-              <tbody>${riders.map(r => {
-                const p = poolById(r.poolId);
-                const gateHint = r.gateReason || r.failReason || "";
-                return `<tr>
-                <td>${r.name}<br><small>${r.id} · ${r.phone}</small></td>
-                <td>${r.team || "—"}</td>
-                <td><small>${p ? p.name : r.poolId}</small></td>
-                <td>${tag(r.status)}</td>
-                <td>${r.allocatedDays || 0} 人天</td><td>${r.usedDays || 0} 人天</td>
-                <td><strong>${r.remainingDays || 0}</strong> 人天</td>
-                <td>${tag(r.quotaStatus || "未分配")}</td>
-                <td>${eligibilityTag(r.todayEligibility)}${gateHint ? `<br><small style="color:var(--red)">${gateHint}</small>` : ""}</td>
-                <td>${(r.batteryHeld || 0) > 0 ? tag("持有") : "—"}</td>
-                <td class="row-actions">${canEditDayPool() && r.status === "在职" ? `<button type="button" class="link-btn" data-pool-form="leaveTeam" data-rider-id="${r.id}">移出团队</button>` : "—"}</td>
-              </tr>`;
-              }).join("") || "<tr><td colspan='11'>暂无登记骑手</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -15173,6 +15726,13 @@
       /* data-goto-zero-quota / data-clear-rider-focus：document 级委托，见文末 init */
       root.querySelectorAll("[data-dppools-sub]").forEach(btn => {
         btn.onclick = () => { state.dayPoolPoolsSubTab = btn.dataset.dppoolsSub; render(); };
+      });
+      root.querySelectorAll("[data-dpriders-sub]").forEach(btn => {
+        btn.onclick = () => {
+          state.dayPoolRidersSubTab = btn.dataset.dpridersSub;
+          if (btn.dataset.dpridersSub !== "list") state.dayPoolRiderFocus = null;
+          render();
+        };
       });
       root.querySelectorAll("[data-dpconsume-sub]").forEach(btn => {
         btn.onclick = () => { state.dayPoolConsumeSubTab = btn.dataset.dpconsumeSub; render(); };
@@ -16921,10 +17481,15 @@
       else state.view = nav.includes("overview") ? "overview" : nav[0];
       closeDrawer();
       closeEmployeeForm();
+      persistAuthSession();
       render();
     });
 
-    applyLoginKey(state.loginKey);
+    initAuthUi();
+    const restored = tryRestoreAuthSession();
+    if (!restored) {
+      applyLoginKey(state.loginKey);
+    }
 
     function closeNote() {
       document.querySelector("#noteModal").classList.remove("open");
@@ -17191,7 +17756,10 @@
     initProtoDialogs();
     if (typeof NAV === "undefined" || typeof financeApplications === "undefined" || typeof platformMarketingCampaigns === "undefined") {
       document.querySelector("#views").innerHTML = `<section class="panel"><div class="panel-body"><p style="color:var(--red);margin:0 0 8px"><strong>Mock 数据未加载</strong></p><p style="font-size:13px;color:var(--muted);margin:0">请确认已打开 <code>prototype/index.html</code>，并通过 <code>cd 原型/外卖 && python3 main.py</code> 启动本地服务后访问 <a href="/prototype/index.html">/prototype/index.html</a>。</p></div></section>`;
-    } else {
+    } else if (state.auth.loggedIn) {
       render();
+    } else {
+      /* 登录门禁中：不渲染后台，避免闪屏 */
+      updateLoginDemoHint();
     }
   
