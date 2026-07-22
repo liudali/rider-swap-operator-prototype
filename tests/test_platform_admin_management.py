@@ -34,17 +34,19 @@ class PlatformAdminManagementTests(unittest.TestCase):
         ):
             self.assertIn(permission, CONFIG)
 
-    def test_platform_admin_login_is_not_phase2_but_other_staff_are(self):
-        self.assertIn('entityId === ENT.platform.id ? "" : "【二期】"', APP)
-        self.assertIn('label="管理员登录"', APP)
+    def test_platform_admin_login_is_phase2(self):
+        self.assertIn('label="管理员登录（二期）"', APP)
         self.assertIn('label="员工登录（二期）"', APP)
+        self.assertIn('const prefix = "【二期】"', APP)
 
-    def test_employee_phase2_has_platform_exception(self):
-        self.assertIn('v === "employees" && isPlatformRole()', APP)
-        exception_block = APP.split(
-            'v === "employees" && isPlatformRole()', 1
-        )[1][:100]
-        self.assertIn("return false", exception_block)
+    def test_platform_admin_view_is_phase2(self):
+        phase2_views = APP.split("const PHASE2_VIEWS", 1)[1].split("]);", 1)[0]
+        self.assertIn('"employees"', phase2_views)
+        self.assertIn('"overview"', phase2_views)
+        self.assertNotIn(
+            'v === "employees" && isPlatformRole()',
+            APP.split("function isPhase2View", 1)[1].split("function phase2Meta", 1)[0],
+        )
 
     def test_platform_uses_admin_label_for_reused_view(self):
         self.assertIn('return isPlatformRole() ? "管理员" : "员工"', APP)
@@ -65,17 +67,18 @@ class PlatformAdminManagementTests(unittest.TestCase):
         for marker in ("管理员列表", "新增管理员", "角色模板", "最后登录"):
             self.assertIn(marker, APP)
 
-    def test_docs_define_platform_admin_as_phase1_exception(self):
+    def test_docs_define_platform_admin_as_phase2(self):
         prd = (ROOT / "docs/PRD.md").read_text(encoding="utf-8")
         acceptance = (ROOT / "docs/acceptance-criteria.md").read_text(
             encoding="utf-8"
         )
         roles = (ROOT / "docs/角色与功能清单.md").read_text(encoding="utf-8")
 
-        self.assertIn("管理员（一期）", prd)
-        self.assertIn("平台管理员管理", acceptance)
+        self.assertIn("管理员（二期）", prd)
+        self.assertIn("平台管理员管理（二期）", acceptance)
         self.assertIn("超级管理员不可", acceptance)
         self.assertIn("管理员管理", roles)
+        self.assertIn("decision-041", roles)
 
     def test_platform_permissions_do_not_bundle_unrelated_pages(self):
         self.assertIn('"platform.channels": ["platformChannels"]', CONFIG)
