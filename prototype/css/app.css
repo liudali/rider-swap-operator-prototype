@@ -175,6 +175,24 @@
       margin-bottom: 14px; box-shadow: var(--shadow);
     }
     .filters.visible { display: grid; }
+    .panel-inline-filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-soft, #f8fafc);
+    }
+    .panel-tab-desc {
+      margin: 0;
+      padding: 12px 16px 4px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    .panel-with-top-tabs > .panel-tab-desc + .panel-inline-filters {
+      margin-top: 8px;
+    }
     .field { display: grid; gap: 6px; min-width: 0; }
     .field.pf-actions { align-self: end; }
     .field.pf-actions .btn { width: 100%; min-width: 96px; }
@@ -1333,11 +1351,17 @@
     .refund-preset.active { background: var(--brand); border-color: var(--brand); color: #fff; }
     .refund-process-amounts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .refund-process-hint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
-    .device-import { display: grid; gap: 14px; }
+    .device-import,
+    .rider-batch-import { display: grid; gap: 14px; }
     .device-import [data-import-manual],
-    .device-import [data-import-file] { display: grid; gap: 10px; }
+    .device-import [data-import-file],
+    .rider-batch-import [data-import-manual],
+    .rider-batch-import [data-import-file] { display: grid; gap: 10px; }
     .device-import [data-import-manual][hidden],
-    .device-import [data-import-file][hidden] { display: none; }
+    .device-import [data-import-file][hidden],
+    .rider-batch-import [data-import-manual][hidden],
+    .rider-batch-import [data-import-file][hidden] { display: none; }
+    .rider-batch-import .rider-batch-tpl-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
     #channelPartnerForm.form-grid { grid-template-columns: 1fr 1fr; align-items: start; }
     #channelPartnerForm .form-span-2 { grid-column: 1 / -1; }
     #channelPartnerForm .card-sku-pricing table input { height: 32px; width: 100%; max-width: 120px; }

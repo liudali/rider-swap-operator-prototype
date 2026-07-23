@@ -15,7 +15,8 @@
       platformUsersPage: 1,
       platformUsersPageSize: 10,
       platformLeasingTab: "companies", depositTab: "pending", depositRechargeSubTab: "waiting", depositRechargePendingPage: 1, depositRechargeProcessedPage: 1, operatorCreditTab: "assignments",
-      dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolRidersSubTab: "list", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider", dayPoolRiderFocus: null,
+      dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolRidersSubTab: "list", dayPoolAllocSubTab: "riders", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider", dayPoolRiderFocus: null,
+      dayPoolRidersPage: 1, dayPoolRidersPageSize: 8, dayPoolTeamsPage: 1, dayPoolTeamsPageSize: 8,
       pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
       channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
       channelAssetsSubTab: "dayPool", channelAssetsPage: 1, channelAssetsPageSize: 5,
@@ -1172,6 +1173,9 @@
         if (state.dayPoolTab === "pools" && state.dayPoolPoolsSubTab === "ledger") return "dayPool_ledger";
         if (state.dayPoolTab === "riders" && state.dayPoolRidersSubTab === "teams") return "dayPool_teams";
         if (state.dayPoolTab === "teams") return "dayPool_teams";
+        if (state.dayPoolTab === "allocations") {
+          return (state.dayPoolAllocSubTab || "riders") === "logs" ? "dayPool_allocations_logs" : "dayPool_allocations_riders";
+        }
         return "dayPool_" + state.dayPoolTab;
       }
       if (state.view === "platformUsers") return "platformUsers_" + state.platformUsersTab;
@@ -1556,6 +1560,183 @@
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    /** 动态加载 SheetJS（xlsx）；原型解析 Excel 用 */
+    function loadSheetJsLib() {
+      if (window.XLSX) return Promise.resolve(window.XLSX);
+      if (window.__sheetJsLoading) return window.__sheetJsLoading;
+      window.__sheetJsLoading = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+        s.async = true;
+        s.onload = () => {
+          window.__sheetJsLoading = null;
+          if (window.XLSX) resolve(window.XLSX);
+          else reject(new Error("SheetJS 加载失败"));
+        };
+        s.onerror = () => {
+          window.__sheetJsLoading = null;
+          reject(new Error("无法加载 Excel 解析库，请改用 CSV/TXT 或检查网络"));
+        };
+        document.head.appendChild(s);
+      });
+      return window.__sheetJsLoading;
+    }
+
+    /** 文本行 → [{phone,name}]；跳过手机号/姓名表头 */
+    function parseRiderBatchText(text) {
+      const lines = String(text || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (!lines.length) return [];
+      const rows = [];
+      lines.forEach((line, idx) => {
+        const parts = line.split(/[,\t，]+/).map(s => s.trim()).filter(Boolean);
+        if (!parts.length) return;
+        const phone = parts[0] || "";
+        const name = parts[1] || "";
+        if (idx === 0 && /^(手机|手机号|电话|phone)$/i.test(phone) && (!name || /^(姓名|名字|name)$/i.test(name))) return;
+        if (!phone && !name) return;
+        rows.push({ phone, name: name || ("新骑手" + (rows.length + 1)), raw: line });
+      });
+      return rows;
+    }
+
+    function parseRiderBatchSheetAoA(aoa) {
+      const rows = [];
+      (aoa || []).forEach((arr, idx) => {
+        if (!arr || !arr.length) return;
+        const phone = String(arr[0] ?? "").trim();
+        const name = String(arr[1] ?? "").trim();
+        if (!phone && !name) return;
+        if (idx === 0 && /^(手机|手机号|电话|phone)$/i.test(phone) && (!name || /^(姓名|名字|name)$/i.test(name))) return;
+        rows.push({ phone, name: name || ("新骑手" + (rows.length + 1)), raw: phone + "," + name });
+      });
+      return rows;
+    }
+
+    let riderBatchImportParsedRows = [];
+    let riderBatchImportParsing = false;
+
+    async function parseRiderBatchFile(file) {
+      if (!file) return [];
+      const name = (file.name || "").toLowerCase();
+      if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+        if (name.endsWith(".xls") && !name.endsWith(".xlsx")) {
+          throw new Error("暂不支持 .xls，请另存为 .xlsx 或导出 CSV");
+        }
+        const XLSX = await loadSheetJsLib();
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
+        const sheetName = wb.SheetNames[0];
+        if (!sheetName) return [];
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "" });
+        return parseRiderBatchSheetAoA(aoa);
+      }
+      const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("文件读取失败"));
+        reader.readAsText(file);
+      });
+      return parseRiderBatchText(text);
+    }
+
+    async function downloadRiderBatchXlsxTemplate() {
+      const XLSX = await loadSheetJsLib();
+      const ws = XLSX.utils.aoa_to_sheet([
+        ["手机号", "姓名"],
+        ["13800001111", "张三"],
+        ["13900002222", "李四"]
+      ]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "骑手登记");
+      XLSX.writeFile(wb, "rider-batch-template.xlsx");
+    }
+
+    function bindRiderBatchImportForm(formEl) {
+      riderBatchImportParsedRows = [];
+      riderBatchImportParsing = false;
+      const root = formEl.querySelector(".rider-batch-import");
+      if (!root) return;
+      const manualBox = formEl.querySelector("[data-import-manual]");
+      const fileBox = formEl.querySelector("[data-import-file]");
+      const batchLines = formEl.querySelector('[name="batchLines"]');
+      const riderFile = formEl.querySelector('[name="riderFile"]');
+      const fileHint = formEl.querySelector("[data-import-file-hint]");
+      const setMode = (mode) => {
+        root.dataset.importMode = mode;
+        formEl.querySelectorAll("[data-import-mode-btn]").forEach(b => {
+          b.classList.toggle("active", b.dataset.importModeBtn === mode);
+        });
+        const isFile = mode === "file";
+        if (manualBox) manualBox.hidden = isFile;
+        if (fileBox) fileBox.hidden = !isFile;
+        if (batchLines) batchLines.required = !isFile;
+      };
+      formEl.querySelectorAll("[data-import-mode-btn]").forEach(btn => {
+        btn.onclick = () => setMode(btn.dataset.importModeBtn);
+      });
+      formEl.querySelector("[data-rider-batch-csv-tpl]")?.addEventListener("click", () => {
+        downloadCsv("rider-batch-template.csv", "手机号,姓名\n13800001111,张三\n13900002222,李四");
+      });
+      formEl.querySelector("[data-rider-batch-xlsx-tpl]")?.addEventListener("click", () => {
+        downloadRiderBatchXlsxTemplate().catch(err => window.alert(err.message || String(err)));
+      });
+      riderFile?.addEventListener("change", () => {
+        riderBatchImportParsedRows = [];
+        const file = riderFile.files && riderFile.files[0];
+        if (!file) {
+          if (fileHint) fileHint.textContent = "尚未选择文件。支持 CSV / TXT / XLSX，列为手机号、姓名。";
+          return;
+        }
+        riderBatchImportParsing = true;
+        if (fileHint) fileHint.textContent = `正在解析「${file.name}」…`;
+        parseRiderBatchFile(file).then(rows => {
+          riderBatchImportParsedRows = rows;
+          riderBatchImportParsing = false;
+          if (fileHint) {
+            fileHint.textContent = rows.length
+              ? `已解析 ${rows.length} 条（${file.name}）`
+              : `未能从「${file.name}」解析到有效行，请确认列为手机号、姓名`;
+          }
+        }).catch(err => {
+          riderBatchImportParsedRows = [];
+          riderBatchImportParsing = false;
+          if (fileHint) fileHint.textContent = err.message || "解析失败，请改用 CSV/TXT";
+        });
+      });
+      setMode("manual");
+    }
+
+    function runRiderBatchRegister(teamId, site, rows) {
+      const team = dayPoolTeams.find(t => t.id === teamId);
+      const results = [];
+      (rows || []).forEach((row, i) => {
+        const phone = (row.phone || "").trim();
+        const name = (row.name || ("新骑手" + (i + 1))).trim();
+        if (!phone) {
+          results.push({ phone: row.raw || "—", name: "—", ok: false, reason: "格式错误" });
+          return;
+        }
+        if (userHasActivePersonalPackage(phone)) {
+          results.push({ phone, name, ok: false, reason: "仍有生效中个人套餐" });
+          return;
+        }
+        if (dayPoolRiders.some(r => r.phone === phone && r.status === "在职")) {
+          results.push({ phone, name, ok: false, reason: "已登记在职" });
+          return;
+        }
+        const id = "U" + Date.now().toString().slice(-4) + i;
+        const poolId = team ? resolveTeamPoolId(team) : (defaultChannelPoolId() || "QP-2601");
+        dayPoolRiders.push({
+          id, name, phone, teamId, team: team ? team.name : "默认团队", poolId, site, city: "上海",
+          status: "在职", allocatedDays: 0, usedDays: 0, remainingDays: 0, quotaStatus: "未分配",
+          todayEligibility: "未分配", todaySwaps: 0, ruleId: "—"
+        });
+        if (team) team.riderCount = (team.riderCount || 0) + 1;
+        results.push({ phone, name, ok: true, reason: "登记成功" });
+      });
+      return results;
     }
 
     function openRentTopupForm() {
@@ -2475,7 +2656,9 @@
       const already = state.view === "dayPool" && state.dayPoolTab === "riders" && state.dayPoolRiderFocus === "zeroQuota";
       state.view = "dayPool";
       state.dayPoolTab = "riders";
+      state.dayPoolRidersSubTab = "list";
       state.dayPoolRiderFocus = "zeroQuota";
+      state.dayPoolRidersPage = 1;
       closeDrawer();
       render();
       requestAnimationFrame(() => {
@@ -3469,12 +3652,21 @@
       dayPool_riders: [
         { key: "teamId", label: "团队", type: "select", options: () => [{ v: "全部", t: "全部团队" }].concat(myChannelTeams().map(t => ({ v: t.id, t: t.name }))) },
         { key: "keyword", label: "骑手手机/姓名", placeholder: "" },
+        { key: "status", label: "在职状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "在职", t: "在职" }, { v: "离职", t: "离职" }] },
         { key: "quotaStatus", label: "额度状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "使用中", t: "使用中" }, { v: "未分配", t: "未分配" }, { v: "已用尽", t: "已用尽" }, { v: "已收回", t: "已收回" }] }
       ],
-      dayPool_allocations: [
-        { key: "poolId", label: "额度池", type: "select", options: () => [{ v: "全部", t: "全部" }].concat(myDayPools().map(p => ({ v: p.id, t: p.id }))) },
-        { key: "riderId", label: "骑手 ID", placeholder: "U2101" },
-        { key: "type", label: "操作类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "购买", t: "购买" }, { v: "分配", t: "分配" }, { v: "收回", t: "收回" }, { v: "消耗", t: "消耗" }] }
+      dayPool_allocations_riders: [
+        { key: "keyword", label: "骑手", placeholder: "姓名/ID/手机" },
+        { key: "teamId", label: "团队", type: "select", options: () => [{ v: "全部", t: "全部团队" }].concat(myChannelTeams().map(t => ({ v: t.id, t: t.name }))) },
+        { key: "poolId", label: "消耗池", type: "select", options: () => [{ v: "全部", t: "全部" }].concat(myDayPools().map(p => ({ v: p.id, t: p.name }))) },
+        { key: "quotaStatus", label: "额度状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "使用中", t: "使用中" }, { v: "未分配", t: "未分配" }, { v: "已用尽", t: "已用尽" }, { v: "已收回", t: "已收回" }] }
+      ],
+      dayPool_allocations_logs: [
+        { key: "poolId", label: "额度池", type: "select", options: () => [{ v: "全部", t: "全部" }].concat(myDayPools().map(p => ({ v: p.id, t: p.name || p.id }))) },
+        { key: "type", label: "操作", type: "select", options: [{ v: "全部", t: "全部" }, { v: "分配", t: "分配" }, { v: "收回", t: "收回" }, { v: "消耗", t: "消耗" }] },
+        { key: "keyword", label: "骑手", placeholder: "姓名/ID" },
+        { key: "dateFrom", label: "日起", type: "date" },
+        { key: "dateTo", label: "日止", type: "date" }
       ],
       dayPool_consume: [
         { key: "dateFrom", label: "日期起", type: "date" },
@@ -3643,6 +3835,10 @@
       let specs = PAGE_FILTER_SPECS[key];
       /* 总览：统计范围下沉到经营指标卡内，顶部不再展示 */
       if (key === "overview" && (isOperatorRole() || isPlatformRole())) specs = [];
+      /* 人天额度池·额度池 / 骑手登记 / 额度分配 / 消耗明细：筛选下沉到页内 Tab 下方 */
+      if (state.view === "dayPool" && (state.dayPoolTab === "pools" || state.dayPoolTab === "consume" || state.dayPoolTab === "allocations" || state.dayPoolTab === "riders")) specs = [];
+      /* 服务保证金账户·变动明细：筛选下沉到页内 Tab 下方 */
+      if (key === "depositAccount_ledger") specs = [];
       const box = document.querySelector("#pageFilters");
       if (!specs || !specs.length) {
         box.classList.remove("visible");
@@ -3658,10 +3854,20 @@
       box.classList.add("visible");
     }
 
+    /** 页内下沉筛选条（与 PAGE_FILTER_SPECS / getPf 同源） */
+    function inlinePfBarHtml(filterKey) {
+      const specs = PAGE_FILTER_SPECS[filterKey];
+      if (!specs || !specs.length) return "";
+      const fKey = filterKey;
+      if (!state.pf[fKey]) state.pf[fKey] = PF_DEFAULTS[fKey] ? { ...PF_DEFAULTS[fKey] } : {};
+      const f = state.pf[fKey];
+      return `<div class="panel-inline-filters" data-inline-pf="${fKey}" aria-label="页面筛选">${specs.map(s => renderFilterField(s, f)).join("")}</div>`;
+    }
+
     function applyPageFiltersFromDom() {
       const key = pfKey();
       const f = getPf();
-      document.querySelectorAll("#pageFilters [data-pf-field]").forEach(el => {
+      document.querySelectorAll("#pageFilters [data-pf-field], .panel-inline-filters [data-pf-field]").forEach(el => {
         f[el.dataset.pfField] = el.value;
       });
       return f;
@@ -5116,7 +5322,7 @@
           stateKey: "dayPoolTab",
           tabs: () => (isOrgAdminLogin() ? [["consume", "消耗明细"]] : [
             ["pools", "额度池"], ["riders", "骑手登记"], ["allocations", "额度分配"],
-            ["rules", "额度使用规则"], ["consume", "消耗明细"], ["retail", "零售价"],
+            ["consume", "消耗明细"], ["retail", "零售价"],
             ["exceptions", "异常记录"]
           ])
         },
@@ -8265,6 +8471,12 @@
       return renderDepositAccount();
     }
 
+    function depositAccountTabDesc(tab) {
+      if (tab === "recharge") return "对公收款专户、提交充值申请与申请进度。";
+      if (tab === "ledger") return "充值入账、日清划扣、平台费代扣变动明细。";
+      return "准入档位、保证金/信用额度 KPI 与清分收款专户。";
+    }
+
     function renderDepositAccount() {
       const tab = state.depositAccountTab === "recharge" || state.depositAccountTab === "ledger"
         ? state.depositAccountTab : "overview";
@@ -8282,6 +8494,7 @@
         ["recharge", "充值申请" + (pending ? " (" + pending + ")" : "")],
         ["ledger", "变动明细"]
       ], tab, "deposit-acc-tab");
+      const tabDesc = `<p class="panel-tab-desc">${depositAccountTabDesc(tab)}</p>`;
       const banner = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("deposit_recharge")}${noteBtn("operator_deposit")}
           跨网清分与 B 端平台费优先从<strong>平台保证金</strong>划扣；余额为 0 才启用信用额度。充值须对公转账，平台确认后入账。</div>`;
       let content = "";
@@ -8326,7 +8539,8 @@
       } else if (tab === "ledger") {
         const pf = getPf();
         const ledgerRows = filterDepositLedgerRows(ledger, pf);
-        content = `${panelHead("保证金变动明细", `充值入账、日清划扣、平台费代扣 · ${ledgerRows.length} 条`, "operator_deposit", `<button type="button" class="link-btn" data-view-jump="interOp">查看往来账</button>`)}
+        content = `${inlinePfBarHtml("depositAccount_ledger")}
+          ${panelHead("保证金变动明细", `充值入账、日清划扣、平台费代扣 · ${ledgerRows.length} 条`, "operator_deposit", `<button type="button" class="link-btn" data-view-jump="interOp">查看往来账</button>`)}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>时间</th><th>类型</th><th>变动</th><th>余额</th><th>关联单</th><th>操作方</th></tr></thead>
@@ -8370,6 +8584,7 @@
       return `${ownScopeBanner()}${banner}
         <section class="panel panel-with-top-tabs">
           ${topTabs}
+          ${tabDesc}
           ${content}
         </section>`;
     }
@@ -9583,7 +9798,7 @@
             ${kpi(lowPool ? "额度池预警" : "额度池数", lowPool ? lowPool.id + " · " + lowPool.balancePct + "%" : pools.length + " 个", lowPool ? "低于 20% 或不足在职×10天" : "向运营商采购", lowPool ? "!" : "池", lowPool ? "day_pool_warn" : "day_pool_purchase")}
           </div>
           ${contract ? `<section class="panel">
-            ${panelHead("签约运营商", "批发价与合同（只读）；可用站点见额度使用规则", "day_pool_contract")}
+            ${panelHead("签约运营商", "批发价与合同（只读）；池级扣天/激活见额度池详情", "day_pool_contract")}
             <div class="panel-body">
               <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
                 <div style="width:56px;height:56px;border-radius:12px;background:var(--primary,#1677ff);display:flex;align-items:center;justify-content:center;font-size:28px">${contract.operatorLogo || "🚚"}</div>
@@ -12595,7 +12810,7 @@
       const rider = riderId ? dayPoolRiders.find(r => r.id === riderId) : null;
       state.poolForm = { mode, poolId: pool ? pool.id : null, riderId: rider ? rider.id : null };
       const titles = {
-        purchase: "购买人天额度", renew: "续费额度池", rule: "新增额度使用规则",
+        purchase: "购买人天额度", renew: "续费额度池",
         register: "登记骑手", batchRegister: "批量登记骑手", allocate: "分配人天额度", recover: "收回人天额度", adjust: "额度调整",
         team: "新增骑手团队", teamPool: "设置团队消耗池", leaveTeam: "移除团队",
         changeTeam: "变更团队", joinTeam: "加入团队"
@@ -12632,15 +12847,6 @@
           <label>续费人天数<input type="number" name="addDays" value="500" min="1"></label>
           <label>延长失效至<input type="date" name="validTo" value="${pool ? pool.validTo : ""}"></label>
           <label>续费原因<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">余额不足后续费</textarea></label>`;
-      } else if (mode === "rule") {
-        const teams = myChannelTeams().filter(t => resolveTeamPoolId(t));
-        html = `
-          <label>团队<select name="teamId" id="ruleTeamSelect">${teams.map(t => `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}</option>`).join("")}</select></label>
-          <label>消耗额度池<input name="poolDisplay" id="rulePoolDisplay" readonly value="—"></label>
-          <input type="hidden" name="poolId" id="rulePoolId" value="">
-          <label>规则名称<input name="ruleName" value="新团队规则"></label>
-          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">扣天/激活口径继承额度池<strong>平台统一四项</strong>（分配即开通），不在规则层配置站点或权益类型。</p>
-          <label>团队额度上限（人天/结算周期）<input type="number" name="capDays" value="300"></label>`;
       } else if (mode === "register") {
         const teams = myChannelTeams();
         html = `
@@ -12653,9 +12859,30 @@
       } else if (mode === "batchRegister") {
         const teams = myChannelTeams();
         html = `
-          <label>所属团队<select name="teamId">${teams.map(t => `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}</option>`).join("")}</select></label>
-          <label style="grid-column:1/-1">批量数据<textarea name="batchLines" rows="8" placeholder="每行：手机号,姓名&#10;13800001111,张三&#10;13900002222,李四" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius);font-family:monospace;font-size:12px"></textarea></label>
-          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">支持逗号/制表符分隔；已登记在职或仍有个人套餐的行将记入失败清单。</p>`;
+          <div class="rider-batch-import" data-import-mode="manual" style="grid-column:1/-1">
+            <label>所属团队<select name="teamId">${teams.map(t => `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}</option>`).join("")}</select></label>
+            <div>
+              <span style="font-size:12px;color:var(--muted)">导入方式</span>
+              <div class="refund-preset-row" style="margin-top:6px">
+                <button type="button" class="refund-preset active" data-import-mode-btn="manual">手工录入（少量）</button>
+                <button type="button" class="refund-preset" data-import-mode-btn="file">文件导入（大量）</button>
+              </div>
+            </div>
+            <div data-import-manual>
+              <label style="display:grid;gap:6px">批量数据<textarea name="batchLines" rows="8" placeholder="每行：手机号,姓名&#10;13800001111,张三&#10;13900002222,李四" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius);font-family:monospace;font-size:12px"></textarea></label>
+              <p style="font-size:12px;color:var(--muted);margin:0">支持逗号/制表符分隔；已登记在职或仍有个人套餐的行将记入失败清单。</p>
+            </div>
+            <div data-import-file hidden>
+              <label style="display:grid;gap:6px">骑手表格（CSV / TXT / XLSX）
+                <input type="file" name="riderFile" accept=".csv,.txt,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+              </label>
+              <p class="refund-process-hint" data-import-file-hint style="margin:0">尚未选择文件。列为<strong>手机号、姓名</strong>；xlsx 取第一个工作表。</p>
+              <div class="rider-batch-tpl-actions">
+                <button type="button" class="link-btn" data-rider-batch-csv-tpl>下载 CSV 模板</button>
+                <button type="button" class="link-btn" data-rider-batch-xlsx-tpl>下载 Excel 模板</button>
+              </div>
+            </div>
+          </div>`;
       } else if (mode === "leaveTeam") {
         html = `
           <label>骑手<input value="${rider ? rider.name + " · " + (rider.status || "") + " · 剩余 " + (rider.remainingDays || 0) + " 人天" : ""}" readonly></label>
@@ -12718,6 +12945,7 @@
       }
       document.querySelector("#poolForm").innerHTML = html;
       clearOpenModalInlineError(document.querySelector("#poolModal"));
+      if (mode === "batchRegister") bindRiderBatchImportForm(document.querySelector("#poolForm"));
       const paySel = document.querySelector("#poolPayChannel");
       const syncPoolPayFields = () => {
         const online = paySel && paySel.value === "online";
@@ -12727,18 +12955,6 @@
         if (offWrap) offWrap.style.display = online ? "none" : "";
       };
       if (paySel) { paySel.onchange = syncPoolPayFields; syncPoolPayFields(); }
-      const ruleTeamSel = document.querySelector("#ruleTeamSelect");
-      const syncRulePoolFromTeam = () => {
-        if (!ruleTeamSel) return;
-        const team = dayPoolTeams.find(t => t.id === ruleTeamSel.value);
-        const pid = team ? resolveTeamPoolId(team) : "";
-        const p = poolById(pid);
-        const disp = document.querySelector("#rulePoolDisplay");
-        const hid = document.querySelector("#rulePoolId");
-        if (disp) disp.value = p ? `${p.name}（${p.id}）` : (pid || "—");
-        if (hid) hid.value = pid || "";
-      };
-      if (ruleTeamSel) { ruleTeamSel.onchange = syncRulePoolFromTeam; syncRulePoolFromTeam(); }
       document.querySelector("#poolModal").classList.add("open");
       document.querySelector("#poolMask").classList.add("open");
     }
@@ -12782,23 +12998,6 @@
         window.alert(pay.payChannel === "online"
           ? "采购单 " + orderNo + " 已创建，支付成功后入账" + (existingPool ? "池 " + existingPool.id : "（首单将创建唯一额度池）")
           : "采购单 " + orderNo + " 已创建，运营商确认到账后入账" + (existingPool ? "池 " + existingPool.id : "（首单将创建唯一额度池）"));
-      } else if (mode === "rule") {
-        const teamId = document.querySelector("#poolForm [name=teamId]")?.value;
-        const team = dayPoolTeams.find(t => t.id === teamId);
-        const poolId = document.querySelector("#poolForm [name=poolId]")?.value || (team ? resolveTeamPoolId(team) : state.dayPoolSelectedId);
-        if (!team || !poolId) {
-          window.alert("请选择已绑定额度池的团队");
-          return;
-        }
-        dayPoolRules.push({
-          id: "RULE-" + Date.now().toString().slice(-4), poolId,
-          teamId, teamName: team.name,
-          name: document.querySelector("#poolForm [name=ruleName]")?.value || team.name,
-          capDays: parseInt(document.querySelector("#poolForm [name=capDays]")?.value || "0", 10),
-          status: "启用", validFrom: "2026-06-10", validTo: "2026-12-31", hitRiders: 0
-        });
-        const p = dayPools.find(x => x.id === poolId);
-        if (p && p.status === "待配置") p.status = "使用中";
       } else if (mode === "register") {
         const teamId = document.querySelector("#poolForm [name=teamId]")?.value || "TEAM-DEFAULT";
         const team = dayPoolTeams.find(t => t.id === teamId);
@@ -12819,39 +13018,32 @@
         if (team) team.riderCount = (team.riderCount || 0) + 1;
       } else if (mode === "batchRegister") {
         const teamId = document.querySelector("#poolForm [name=teamId]")?.value || "TEAM-DEFAULT";
-        const team = dayPoolTeams.find(t => t.id === teamId);
         const site = document.querySelector("#poolForm [name=site]")?.value || "浦东骑手驿站";
-        const lines = (document.querySelector("#poolForm [name=batchLines]")?.value || "").split(/\n/).map(l => l.trim()).filter(Boolean);
-        const results = [];
-        lines.forEach((line, i) => {
-          const parts = line.split(/[,\t，\s]+/).filter(Boolean);
-          const phone = parts[0] || "";
-          const name = parts[1] || ("新骑手" + (i + 1));
-          if (!phone) {
-            results.push({ phone: line, name: "—", ok: false, reason: "格式错误" });
+        const importRoot = document.querySelector("#poolForm .rider-batch-import");
+        const importMode = importRoot?.dataset.importMode || "manual";
+        let rows = [];
+        if (importMode === "file") {
+          if (riderBatchImportParsing) {
+            window.alert("文件仍在解析，请稍候再保存");
             return;
           }
-          if (userHasActivePersonalPackage(phone)) {
-            results.push({ phone, name, ok: false, reason: "仍有生效中个人套餐" });
+          rows = riderBatchImportParsedRows.slice();
+          if (!rows.length) {
+            window.alert("请先选择并成功解析骑手表格文件（CSV / TXT / XLSX）");
             return;
           }
-          if (dayPoolRiders.some(r => r.phone === phone && r.status === "在职")) {
-            results.push({ phone, name, ok: false, reason: "已登记在职" });
+        } else {
+          rows = parseRiderBatchText(document.querySelector("#poolForm [name=batchLines]")?.value || "");
+          if (!rows.length) {
+            window.alert("请填写至少一行：手机号,姓名");
             return;
           }
-          const id = "U" + Date.now().toString().slice(-4) + i;
-          const poolId = team ? resolveTeamPoolId(team) : (defaultChannelPoolId() || "QP-2601");
-          dayPoolRiders.push({
-            id, name, phone, teamId, team: team ? team.name : "默认团队", poolId, site, city: "上海",
-            status: "在职", allocatedDays: 0, usedDays: 0, remainingDays: 0, quotaStatus: "未分配",
-            todayEligibility: "未分配", todaySwaps: 0, ruleId: "—"
-          });
-          if (team) team.riderCount = (team.riderCount || 0) + 1;
-          results.push({ phone, name, ok: true, reason: "登记成功" });
-        });
+        }
+        const results = runRiderBatchRegister(teamId, site, rows);
         const okN = results.filter(r => r.ok).length;
         window.alert("批量登记完成：成功 " + okN + " 条，失败 " + (results.length - okN) + " 条\n\n" +
           results.map(r => (r.ok ? "✓ " : "✗ ") + r.phone + " " + r.name + (r.ok ? "" : " — " + r.reason)).join("\n"));
+        riderBatchImportParsedRows = [];
       } else if (mode === "team") {
         const poolId = document.querySelector("#poolForm [name=poolId]")?.value || defaultChannelPoolId();
         const name = document.querySelector("#poolForm [name=teamName]")?.value || "新团队";
@@ -15244,7 +15436,7 @@
         </section>`;
     }
 
-    function renderDayPoolLedgerPanel() {
+    function renderDayPoolLedgerPanel(topTabsHtml, inlineFiltersHtml) {
       const f = getPf();
       const rows = dayPoolLedger.filter(r => {
         if (!myDayPools().some(p => p.id === r.poolId)) return false;
@@ -15252,7 +15444,9 @@
         if (f.type !== "全部" && !r.type.includes(f.type.replace("预占", "资格预占").replace("确认消耗", "确认消耗").replace("释放", "释放"))) return false;
         return true;
       });
-      return `<section class="panel">
+      return `<section class="panel${topTabsHtml ? " panel-with-top-tabs" : ""}">
+        ${topTabsHtml || ""}
+        ${inlineFiltersHtml || ""}
         ${panelHead("额度明细账本", "购买/分配/收回/预占/消耗全链路留痕；余额不得为负", "day_pool_ledger")}
         <div class="panel-body orders-table-wrap">
           <table>
@@ -15278,6 +15472,9 @@
         state.dayPoolTab = "riders";
         state.dayPoolRidersSubTab = "teams";
       }
+      if (state.dayPoolTab === "rules") {
+        state.dayPoolTab = "pools";
+      }
       const teamBanner = isTeamAdminLogin() ? (() => {
         const team = dayPoolTeams.find(t => t.id === teamAdminScopeTeamId());
         return `<div class="perm-banner" style="margin-bottom:14px">团队管理员 · <strong>${team ? team.name : "—"}</strong>：仅可查看本团队消耗明细并导出（只读，不可登记/调额）。</div>`;
@@ -15295,7 +15492,7 @@
       const tab = state.dayPoolTab;
       const tabs = isOrgAdminLogin() ? [["consume", "消耗明细"]] : [
         ["pools", "额度池"], ["riders", "骑手登记"], ["allocations", "额度分配"],
-        ["rules", "额度使用规则"], ["consume", "消耗明细"], ["retail", "零售价"],
+        ["consume", "消耗明细"], ["retail", "零售价"],
         ["exceptions", "异常记录"]
       ];
       const sidebar = tabSidebar(tabs, tab, "dptab");
@@ -15303,11 +15500,13 @@
       let body = "";
       if (tab === "pools") {
         const poolSubTab = state.dayPoolPoolsSubTab || "list";
-        const poolSubSidebar = innerTabSidebar([["list", "额度池列表"], ["ledger", "额度明细"]], poolSubTab, "dppools-sub");
+        const poolSubTabs = panelTopTabs([["list", "额度池列表"], ["ledger", "额度明细"]], poolSubTab, "dppools-sub");
         if (poolSubTab === "ledger") {
-          body = `${poolSubSidebar}${renderDayPoolLedgerPanel()}`;
+          body = renderDayPoolLedgerPanel(poolSubTabs, inlinePfBarHtml("dayPool_ledger"));
         } else {
-          body = `${poolSubSidebar}<section class="panel">
+          body = `<section class="panel panel-with-top-tabs">
+          ${poolSubTabs}
+          ${inlinePfBarHtml("dayPool_pools")}
           ${panelHead("额度池列表", "一运营商一池；增购入账同一池，见额度明细", "day_pool_panel", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="purchase">增购人天额度</button>` : "")}
           <div class="panel-body orders-table-wrap">
             <table>
@@ -15368,16 +15567,19 @@
             if (f.poolId !== "全部" && resolveTeamPoolId(t) !== f.poolId) return false;
             return true;
           });
+          const teamsPg = paginateList(teams, state.dayPoolTeamsPage, state.dayPoolTeamsPageSize || 8);
+          state.dayPoolTeamsPage = teamsPg.page;
           const poolHint = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} ${multiPool
             ? `当前有 <strong>${myDayPools().length}</strong> 个额度池，各团队须指定消耗池。`
             : "当前仅 1 个额度池，所有团队<strong>自动绑定</strong>该池扣减。"}</div>`;
           body = `${poolHint}<section class="panel panel-with-top-tabs">
           ${ridersTopTabs}
+          ${inlinePfBarHtml("dayPool_teams")}
           ${panelHead("骑手团队", "创建团队；团队绑定消耗额度池", "day_pool_team", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="team">新增团队</button>` : "")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>团队</th><th>消耗额度池</th><th>在职骑手</th><th>默认</th><th>创建时间</th><th>备注</th><th>状态</th><th>操作</th></tr></thead>
-              <tbody>${teams.map(t => `<tr>
+              <tbody>${teamsPg.slice.map(t => `<tr>
                 <td><strong>${t.name}</strong><br><small>${t.id}</small></td>
                 <td>${teamPoolCell(t)}</td>
                 <td>${t.riderCount || 0}</td>
@@ -15390,6 +15592,7 @@
                 </td>
               </tr>`).join("") || "<tr><td colspan='8'>暂无团队</td></tr>"}</tbody>
             </table>
+            ${renderTablePager(teamsPg, "dpriders-team-page")}
           </div>
         </section>`;
         } else {
@@ -15399,10 +15602,13 @@
           if (!matchOrgScope(r)) return false;
           if (f.teamId !== "全部" && r.teamId !== f.teamId) return false;
           if (!matchKw(r.phone, f.keyword) && !matchKw(r.name, f.keyword) && !matchKw(r.id, f.keyword)) return false;
+          if (f.status && f.status !== "全部" && r.status !== f.status) return false;
           if (f.quotaStatus !== "全部" && r.quotaStatus !== f.quotaStatus) return false;
           if (focusZero && !(r.status === "在职" && (r.remainingDays || 0) === 0)) return false;
           return myDayPools().some(p => p.id === r.poolId);
         });
+        const ridersPg = paginateList(riders, state.dayPoolRidersPage, state.dayPoolRidersPageSize || 8);
+        state.dayPoolRidersPage = ridersPg.page;
         const focusBanner = focusZero
           ? `<div class="pool-warn-banner" style="margin-bottom:12px">${noteBtn("day_pool_hold_no_quota")}
               当前筛选：<strong>在职 · 剩余人天为 0</strong>（共 ${riders.length} 人）。原因须区分 <strong>个人无额度</strong> / <strong>预占失败</strong>；持电池者为「待还电」。
@@ -15427,12 +15633,13 @@
         };
         body = `<section class="panel panel-with-top-tabs" id="dayPoolRiderList">
           ${ridersTopTabs}
+          ${inlinePfBarHtml("dayPool_riders")}
           ${panelHead("登记骑手", "在职/离职均可加入、变更、移除团队；退出自动回池", "day_pool_channel", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="register">登记骑手</button> <button type="button" class="btn" data-pool-form="batchRegister">批量导入</button>` : "")}
           <div class="panel-body orders-table-wrap">
             ${focusBanner}
             <table>
               <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>在职状态</th><th>已分配</th><th>已消耗</th><th>剩余额度</th><th>额度状态</th><th>今日权益</th><th>持电池</th><th>操作</th></tr></thead>
-              <tbody>${riders.map(r => {
+              <tbody>${ridersPg.slice.map(r => {
                 const p = poolById(r.poolId);
                 const gateHint = r.gateReason || r.failReason || "";
                 return `<tr>
@@ -15449,101 +15656,82 @@
               </tr>`;
               }).join("") || "<tr><td colspan='11'>暂无登记骑手</td></tr>"}</tbody>
             </table>
+            ${renderTablePager(ridersPg, "dpriders-list-page")}
           </div>
         </section>`;
         }
-      } else if (tab === "rules") {
-        const f = getPf();
-        const rules = dayPoolRules.filter(r => myDayPools().some(p => p.id === r.poolId)).filter(r => {
-          if (f.poolId !== "全部" && r.poolId !== f.poolId) return false;
-          if (f.teamId !== "全部" && r.teamId !== f.teamId) return false;
-          if (f.status !== "全部" && r.status !== f.status) return false;
-          return true;
-        });
-        const cfgPool = selectedDayPool() || pools[0];
-        const cfgCard = cfgPool ? `<section class="panel">
-          ${panelHead("额度池规则", "平台统一；B 端结算节奏由双方线下协商", "day_pool_contract")}
-          <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("day_pool_identity")} 登记渠道团队前须无生效中个人套餐（可退订或冻结后加入）。</p>
-            <div class="detail-grid">
-              <div class="detail-item"><span>额度池</span><strong>${cfgPool.name}（${cfgPool.id}）</strong></div>
-              <div class="detail-item"><span>扣天口径</span><strong>${cfgPool.deductMode}</strong></div>
-              <div class="detail-item"><span>激活时机</span><strong>${cfgPool.activationMode}</strong></div>
-              <div class="detail-item"><span>池过期退款</span><strong>${cfgPool.poolExpiryRefund}</strong></div>
-            </div>
-          </div>
-        </section>` : "";
-        body = `${cfgCard}${isChannelRole() ? `<div class="perm-banner" style="margin-bottom:14px">${noteBtn("day_pool_b2b_refund")} 人天额度池<strong>不支持在线退款</strong>；须与签约运营商线下协商，由运营商后台扣减额度。</div>` : ""}<section class="panel">
-          ${panelHead("额度使用规则", "按团队配置周期额度上限；扣天/激活继承池级平台四项", "day_pool_rules", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="rule">新增规则</button>` : "")}
-          <div class="panel-body orders-table-wrap">
-            <table>
-              <thead><tr><th>规则</th><th>团队</th><th>额度池</th><th>团队上限</th><th>已用/上限</th><th>命中骑手</th><th>有效期</th><th>状态</th></tr></thead>
-              <tbody>${rules.map(r => `<tr>
-                <td><strong>${r.name}</strong><br><small>${r.id}</small></td>
-                <td>${r.teamName || "—"}</td>
-                <td>${r.poolId}</td>
-                <td>${r.capDays || "—"} 人天/周期</td>
-                <td>${r.capUsed != null ? r.capUsed + " / " + r.capDays : "—"}</td>
-                <td>${r.hitRiders}</td>
-                <td>${r.validFrom} ~ ${r.validTo}</td><td>${tag(r.status)}</td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无规则</td></tr>"}</tbody>
-            </table>
-          </div>
-        </section>`;
       } else if (tab === "allocations") {
+        const allocSub = state.dayPoolAllocSubTab || "riders";
+        const allocTopTabs = panelTopTabs(
+          [["riders", "骑手额度分配"], ["logs", "分配/收回明细"]],
+          allocSub,
+          "dpalloc-sub"
+        );
         const f = getPf();
-        const riders = dayPoolRiders.filter(r => {
-          if (!myDayPools().some(p => p.id === r.poolId)) return false;
-          if (f.poolId !== "全部" && r.poolId !== f.poolId) return false;
-          if (f.riderId && !matchKw(r.id, f.riderId) && !matchKw(r.name, f.riderId)) return false;
-          return true;
-        });
-        const logs = dayPoolAllocationLogs.filter(l => {
-          if (!myDayPools().some(p => p.id === l.poolId)) return false;
-          if (f.poolId !== "全部" && l.poolId !== f.poolId) return false;
-          if (f.riderId && !matchKw(l.riderId, f.riderId) && !matchKw(l.riderName, f.riderId)) return false;
-          if (f.type !== "全部" && l.type !== f.type) return false;
-          return true;
-        });
-        body = `<section class="panel">
-          ${panelHead("骑手额度分配", "从额度池分配给骑手；未使用额度可收回至池", "day_pool_allocate")}
-          <div class="panel-body orders-table-wrap">
-            <table>
-              <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>已分配</th><th>已消耗</th><th>剩余可收回</th><th>额度状态</th><th>操作</th></tr></thead>
-              <tbody>${riders.map(r => `<tr>
-                <td>${r.name}<br><small>${r.id}</small></td>
-                <td>${r.team || "—"}</td>
-                <td><small>${(poolById(r.poolId) || {}).name || r.poolId}</small></td>
-                <td>${r.allocatedDays || 0} 人天</td><td>${r.usedDays || 0} 人天</td>
-                <td><strong>${r.remainingDays || 0}</strong> 人天</td>
-                <td>${tag(r.quotaStatus || "未分配")}</td>
-                <td class="row-actions">
-                  ${canEditDayPool() && r.status === "在职" ? `<button type="button" class="link-btn" data-pool-form="allocate" data-pool-id="${r.poolId}" data-rider-id="${r.id}">分配</button>` : ""}
-                  ${canEditDayPool() && (r.remainingDays || 0) > 0 ? `<button type="button" class="link-btn" data-pool-form="recover" data-pool-id="${r.poolId}" data-rider-id="${r.id}">收回</button>` : ""}
-                </td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无骑手</td></tr>"}</tbody>
-            </table>
-          </div>
-        </section>
-        <section class="panel">
-          ${panelHead("分配/收回明细", "渠道商操作留痕；含购买与消耗记录", "day_pool_purchase")}
-          <div class="panel-body orders-table-wrap">
-            <table>
-              <thead><tr><th>时间</th><th>额度池</th><th>操作</th><th>骑手</th><th>人天数</th><th>池余额后</th><th>操作人</th><th>备注</th></tr></thead>
-              <tbody>${logs.map(l => `<tr>
-                <td>${l.time}</td><td>${l.poolId}</td><td>${tag(l.type)}</td>
-                <td>${l.riderName !== "—" ? l.riderName + "<br><small>" + l.riderId + "</small>" : "—"}</td>
-                <td>${l.type === "收回" || l.type === "消耗" ? "-" : "+"}${l.days}</td>
-                <td>${l.poolBalanceAfter}</td><td>${l.operator}</td><td>${l.remark || "—"}</td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无明细</td></tr>"}</tbody>
-            </table>
-          </div>
+        let allocInner = "";
+        if (allocSub === "logs") {
+          const logs = dayPoolAllocationLogs.filter(l => {
+            if (!myDayPools().some(p => p.id === l.poolId)) return false;
+            if (f.poolId !== "全部" && l.poolId !== f.poolId) return false;
+            if (f.type !== "全部" && l.type !== f.type) return false;
+            if (f.keyword && !matchKw(l.riderId, f.keyword) && !matchKw(l.riderName, f.keyword)) return false;
+            if (!matchDateStr(l.time, f.dateFrom, f.dateTo)) return false;
+            return true;
+          });
+          allocInner = `${panelHead("分配/收回明细", "渠道商操作留痕；含分配、收回与消耗记录", "day_pool_purchase")}
+            <div class="panel-body orders-table-wrap">
+              <table>
+                <thead><tr><th>时间</th><th>额度池</th><th>操作</th><th>骑手</th><th>人天数</th><th>池余额后</th><th>操作人</th><th>备注</th></tr></thead>
+                <tbody>${logs.map(l => `<tr>
+                  <td>${l.time}</td><td>${l.poolId}</td><td>${tag(l.type)}</td>
+                  <td>${l.riderName !== "—" ? l.riderName + "<br><small>" + l.riderId + "</small>" : "—"}</td>
+                  <td>${l.type === "收回" || l.type === "消耗" ? "-" : "+"}${l.days}</td>
+                  <td>${l.poolBalanceAfter}</td><td>${l.operator}</td><td>${l.remark || "—"}</td>
+                </tr>`).join("") || "<tr><td colspan='8'>暂无明细</td></tr>"}</tbody>
+              </table>
+            </div>`;
+        } else {
+          const riders = dayPoolRiders.filter(r => {
+            if (!myDayPools().some(p => p.id === r.poolId)) return false;
+            if (f.poolId !== "全部" && r.poolId !== f.poolId) return false;
+            if (f.teamId !== "全部" && r.teamId !== f.teamId) return false;
+            if (f.quotaStatus !== "全部" && (r.quotaStatus || "未分配") !== f.quotaStatus) return false;
+            if (f.keyword && !matchKw(r.id, f.keyword) && !matchKw(r.name, f.keyword) && !matchKw(r.phone, f.keyword)) return false;
+            return true;
+          });
+          allocInner = `${panelHead("骑手额度分配", "从额度池分配给骑手；未使用额度可收回至池", "day_pool_allocate")}
+            <div class="panel-body orders-table-wrap">
+              <table>
+                <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>已分配</th><th>已消耗</th><th>剩余可收回</th><th>额度状态</th><th>操作</th></tr></thead>
+                <tbody>${riders.map(r => `<tr>
+                  <td>${r.name}<br><small>${r.id}</small></td>
+                  <td>${r.team || "—"}</td>
+                  <td><small>${(poolById(r.poolId) || {}).name || r.poolId}</small></td>
+                  <td>${r.allocatedDays || 0} 人天</td><td>${r.usedDays || 0} 人天</td>
+                  <td><strong>${r.remainingDays || 0}</strong> 人天</td>
+                  <td>${tag(r.quotaStatus || "未分配")}</td>
+                  <td class="row-actions">
+                    ${canEditDayPool() && r.status === "在职" ? `<button type="button" class="link-btn" data-pool-form="allocate" data-pool-id="${r.poolId}" data-rider-id="${r.id}">分配</button>` : ""}
+                    ${canEditDayPool() && (r.remainingDays || 0) > 0 ? `<button type="button" class="link-btn" data-pool-form="recover" data-pool-id="${r.poolId}" data-rider-id="${r.id}">收回</button>` : ""}
+                  </td>
+                </tr>`).join("") || "<tr><td colspan='8'>暂无骑手</td></tr>"}</tbody>
+              </table>
+            </div>`;
+        }
+        body = `<section class="panel panel-with-top-tabs">
+          ${allocTopTabs}
+          ${inlinePfBarHtml(allocSub === "logs" ? "dayPool_allocations_logs" : "dayPool_allocations_riders")}
+          ${allocInner}
         </section>`;
       } else if (tab === "consume") {
         const f = getPf();
         const sub = state.dayPoolConsumeSubTab || "rider";
-        const subTabs = [["rider", "骑手日消耗"], ["swaps", "换电同步"], ["summary", "团队汇总"]];
-        const subSidebar = innerTabSidebar(subTabs, sub, "dpconsume-sub");
+        const consumeTopTabs = panelTopTabs(
+          [["rider", "骑手日消耗"], ["swaps", "换电同步"], ["summary", "团队汇总"]],
+          sub,
+          "dpconsume-sub"
+        );
+        const consumeFilters = inlinePfBarHtml("dayPool_consume");
         const exportBtn = isTeamAdminLogin() && employeeHasPerm("day_pool.export")
           ? `<button type="button" class="btn primary" id="btnExportOrgConsume">导出本团队 CSV</button>` : "";
         const teamFilterName = f.teamId !== "全部" ? (dayPoolTeams.find(t => t.id === f.teamId) || {}).name : null;
@@ -15572,9 +15760,9 @@
           return true;
         });
         const consumeBanner = `<div class="perm-banner" style="margin-bottom:14px">${noteBtn("day_pool_consume")} <strong>渠道商说明</strong>：骑手当天<strong>未换电但持有电池</strong>也视为使用服务并确认 1 人天；<strong>不持电池且未换电</strong>则不产生消耗。</div>`;
+        let consumeInner = "";
         if (sub === "rider") {
-          body = `${consumeBanner}${pageWithInnerTabs(subSidebar, `<section class="panel">
-            ${panelHead("骑手日消耗明细", "每骑手每日 1 条；含换电次数与持有电池数", "day_pool_consume", exportBtn)}
+          consumeInner = `${panelHead("骑手日消耗明细", "每骑手每日 1 条；含换电次数与持有电池数", "day_pool_consume", exportBtn)}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr>
@@ -15591,11 +15779,9 @@
                   <td>${tag(r.status)}</td>
                 </tr>`).join("") || "<tr><td colspan='9'>暂无</td></tr>"}</tbody>
               </table>
-            </div>
-          </section>`)}`;
+            </div>`;
         } else if (sub === "swaps") {
-          body = `${consumeBanner}${pageWithInnerTabs(subSidebar, `<section class="panel">
-            ${panelHead("换电同步记录", "每次换电实时同步至渠道商", "day_pool_swap_sync")}
+          consumeInner = `${panelHead("换电同步记录", "每次换电实时同步至渠道商", "day_pool_swap_sync")}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr>
@@ -15608,11 +15794,9 @@
                   <td>${r.crossNet ? tag("跨网") : "—"}</td><td>${tag(r.status)}</td>
                 </tr>`).join("") || "<tr><td colspan='7'>暂无</td></tr>"}</tbody>
               </table>
-            </div>
-          </section>`)}`;
+            </div>`;
         } else {
-          body = `${consumeBanner}${pageWithInnerTabs(subSidebar, `<section class="panel">
-            ${panelHead("团队每日汇总", "预占/确认/释放与换电、持电池勾稽", "day_pool_reserve")}
+          consumeInner = `${panelHead("团队每日汇总", "预占/确认/释放与换电、持电池勾稽", "day_pool_reserve")}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr>
@@ -15627,9 +15811,13 @@
                   <td>${r.batteryOnlyUsers || 0}</td><td>${r.unreleased}</td>
                 </tr>`).join("") || "<tr><td colspan='10'>暂无</td></tr>"}</tbody>
               </table>
-            </div>
-          </section>`)}`;
+            </div>`;
         }
+        body = `${consumeBanner}<section class="panel panel-with-top-tabs">
+          ${consumeTopTabs}
+          ${consumeFilters}
+          ${consumeInner}
+        </section>`;
       } else if (tab === "retail") {
         const f = getPf();
         const contract = myChannelContracts()[0];
@@ -15956,11 +16144,34 @@
         btn.onclick = () => {
           state.dayPoolRidersSubTab = btn.dataset.dpridersSub;
           if (btn.dataset.dpridersSub !== "list") state.dayPoolRiderFocus = null;
+          state.dayPoolRidersPage = 1;
+          state.dayPoolTeamsPage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-dpriders-list-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.dpridersListPage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.dayPoolRidersPage = p;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-dpriders-team-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.dpridersTeamPage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.dayPoolTeamsPage = p;
           render();
         };
       });
       root.querySelectorAll("[data-dpconsume-sub]").forEach(btn => {
         btn.onclick = () => { state.dayPoolConsumeSubTab = btn.dataset.dpconsumeSub; render(); };
+      });
+      root.querySelectorAll("[data-dpalloc-sub]").forEach(btn => {
+        btn.onclick = () => { state.dayPoolAllocSubTab = btn.dataset.dpallocSub; render(); };
       });
       root.querySelectorAll("[data-prtab]").forEach(btn => {
         btn.onclick = () => { state.pricingTab = btn.dataset.prtab; render(); };
@@ -17617,12 +17828,8 @@
           } else if (state.view === "operators" && cur === "channels") {
             desc = "全平台渠道商只读监管；主体由签约运营商创建维护，平台不可新增。";
           } else if (state.view === "platformService" && cur === "deposit") {
-            const d = state.depositAccountTab || "overview";
-            desc = d === "recharge"
-              ? "对公收款专户、提交充值申请与申请进度。"
-              : d === "ledger"
-                ? "充值入账、日清划扣、平台费代扣变动明细。"
-                : "准入档位、保证金/信用额度 KPI 与清分收款专户。";
+            /* 三级 Tab 说明下沉到页内 Tab 下方，顶栏不再随 Tab 切换 */
+            desc = "";
           } else if (state.view === "platformService" && cur === "fee") {
             const ft = state.platformFeeTab || "overview";
             desc = ft === "cEnd"
@@ -17748,6 +17955,7 @@
         e.preventDefault();
         e.stopPropagation();
         state.dayPoolRiderFocus = null;
+        state.dayPoolRidersPage = 1;
         render();
         return;
       }
@@ -17863,37 +18071,51 @@
     document.querySelector("#saveDeviceReplaceForm").addEventListener("click", saveDeviceReplaceForm);
     document.querySelector("#deviceReplaceForm").addEventListener("submit", e => { e.preventDefault(); saveDeviceReplaceForm(); });
 
-    document.querySelector("#pageFilters").addEventListener("change", e => {
+    document.querySelector(".main").addEventListener("change", e => {
       const el = e.target.closest("[data-pf-field]");
-      if (!el) return;
+      if (!el || !el.closest("#pageFilters, .panel-inline-filters")) return;
       if (PF_CONFIRM_KEYS.has(pfKey())) return;
-      getPf()[el.dataset.pfField] = el.value;
+      const inlineBox = el.closest(".panel-inline-filters[data-inline-pf]");
+      if (inlineBox) {
+        const ik = inlineBox.getAttribute("data-inline-pf");
+        if (!state.pf[ik]) state.pf[ik] = PF_DEFAULTS[ik] ? { ...PF_DEFAULTS[ik] } : {};
+        state.pf[ik][el.dataset.pfField] = el.value;
+      } else {
+        getPf()[el.dataset.pfField] = el.value;
+      }
       if (state.view === "platformUsers") state.platformUsersPage = 1;
       if (pfKey() === "devices_battery") state.deviceBatteryPage = 1;
       if (pfKey() === "orders_user_deposit") state.userDepositPage = 1;
+      if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
+      if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
       if (state.view === "depositManage" && (state.depositTab || "pending") === "pending") {
         state.depositRechargePendingPage = 1;
         state.depositRechargeProcessedPage = 1;
       }
       render();
     });
-    document.querySelector("#pageFilters").addEventListener("click", e => {
+    document.querySelector(".main").addEventListener("click", e => {
       if (!e.target.closest("[data-pf-confirm]")) return;
+      if (!e.target.closest("#pageFilters, .panel-inline-filters")) return;
       applyPageFiltersFromDom();
       if (state.view === "platformUsers") state.platformUsersPage = 1;
       if (pfKey() === "devices_battery") state.deviceBatteryPage = 1;
       if (pfKey() === "orders_user_deposit") state.userDepositPage = 1;
+      if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
+      if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
       render();
     });
-    document.querySelector("#pageFilters").addEventListener("keydown", e => {
+    document.querySelector(".main").addEventListener("keydown", e => {
       if (e.key !== "Enter") return;
       const el = e.target.closest("[data-pf-field]");
-      if (!el || !PF_CONFIRM_KEYS.has(pfKey())) return;
+      if (!el || !el.closest("#pageFilters, .panel-inline-filters") || !PF_CONFIRM_KEYS.has(pfKey())) return;
       e.preventDefault();
       applyPageFiltersFromDom();
       if (state.view === "platformUsers") state.platformUsersPage = 1;
       if (pfKey() === "devices_battery") state.deviceBatteryPage = 1;
       if (pfKey() === "orders_user_deposit") state.userDepositPage = 1;
+      if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
+      if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
       render();
     });
 

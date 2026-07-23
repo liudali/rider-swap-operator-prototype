@@ -485,7 +485,7 @@
       day_pool_consume: { title: "骑手日消耗（渠道商说明）", content: "每骑手每个自然日最多 1 条确认消耗记录，含<strong>当日换电次数</strong>与<strong>持有电池数</strong>。<br><br><strong>判定规则</strong>：① 当天有换电 → 确认消耗；② 当天未换电但<strong>持有电池</strong> → 仍视为使用服务，确认消耗；③ 不持有电池且未换电 → 不产生消耗，日终释放预占。" },
       day_pool_swap_sync: { title: "换电同步", content: "渠道骑手<strong>每一次</strong>成功换电均实时同步至渠道商后台，可与人天消耗记录勾稽。跨网换电同样同步（含站点、换电单号）。" },
       day_pool_insufficient: { title: "余额不足", content: "不允许透支。余额不足以覆盖配置范围内全部骑手时，整批预占失败（不做部分分配）。管理员可续费/调范围后手动重试；续费成功后系统自动重试失败批次。骑手权益不可用时可自费/按零售价支付。" },
-      day_pool_rules: { title: "额度使用规则", content: "按<strong>团队</strong>配置额度上限（人天/结算周期）；扣天/激活等口径继承额度池<strong>平台统一四项</strong>，不在规则层配置站点或权益类型。团队须先绑定<strong>消耗额度池</strong>（见「骑手登记 → 骑手团队」）。" },
+      day_pool_rules: { title: "额度使用规则（已下线）", content: "<strong>decision-062</strong>：已移除「额度使用规则」与<strong>团队周期额度上限</strong>。额度仅受<strong>额度池可用余额</strong>与<strong>骑手个人已分配剩余</strong>约束；团队仅作编排（绑定消耗池）。池级扣天/激活口径见「额度池」详情。" },
       day_pool_b2b_refund: { title: "额度池退款说明（渠道商）", content: "人天额度池<strong>不支持在线退款</strong>。若需退未使用额度，须与<strong>签约运营商线下协商</strong>；达成一致后由运营商在后台执行额度扣减（账本类型：<strong>退款</strong>），资金按对公约定另行结算。渠道商后台不可自行发起池退款。" },
       day_pool_operator_adjust: { title: "运营商额度调整", content: "运营商在「渠道管理 → 渠道权益 → 已售额度池」手工调账。类型：充值、赠送、退款、修正、过期恢复（30 天内）。" },
       entitlement_api: { title: "渠道骑手可换电校验", content: "换电前调用 <code>POST /api/v1/entitlement/check</code>：返回 allowed_swap / allowed_return、fail_reason、gate_reason。无人天额度时 <strong>allowed_swap=false</strong>，持电池仅可还电；<strong>无自费兜底 SKU</strong>。见 decision-054。" },
@@ -495,7 +495,7 @@
       day_pool_allocate: { title: "分配与收回", content: "分配：从团队绑定池可用余额划出 N 人天给骑手（分配即开通，按池统一口径预占/确认）。收回/退出团队：剩余未用人天自动退回池余额。" },
       day_pool_contract: { title: "额度池规则", content: "平台统一（只读）：<strong>分配即开通</strong>；每日预占后<strong>换电或持电池</strong>确认消耗；池过期<strong>不退</strong>。B 端结算节奏由渠道商与运营商线下协商，不在此展示。" },
       day_pool_identity: { title: "个人与渠道互斥", content: "同一骑手<strong>不可同时</strong>拥有生效中个人套餐与渠道团队成员身份。加入团队前须<strong>退订或冻结</strong>个人套餐。退出团队（主动/被移除）时<strong>未用人天自动回池</strong>。" },
-      day_pool_channel: { title: "渠道商额度管理", content: "骑手须登记在渠道商名下并归属某一<strong>团队</strong>；团队绑定消耗额度池。登记时校验无生效中个人套餐。在职/离职均可<strong>加入、变更、移除团队</strong>；移除时未用人天自动回池并记离职。" },
+      day_pool_channel: { title: "渠道商额度管理", content: "骑手须登记在渠道商名下并归属某一<strong>团队</strong>；团队绑定消耗额度池。登记时校验无生效中个人套餐。在职/离职均可<strong>加入、变更、移除团队</strong>；移除时未用人天自动回池并记离职。<strong>批量导入</strong>支持手工粘贴或上传 CSV/TXT/XLSX（手机号、姓名）。" },
       day_pool_purchase: { title: "购买人天额度", content: "渠道商向签约运营商按批发价采购人天；<strong>同一运营商续费在原池增购</strong>，不因团队再建第二池。向新运营商签约才产生新池实例。" },
       day_pool_ledger: { title: "额度明细账本", content: "所有额度变动留痕。渠道商可见：购买、分配、收回、预占、确认消耗、释放、续费等。运营商调账类型：<strong>充值、赠送、退款、修正、过期恢复</strong>（协商退款走「退款」；过期恢复仅运营商、池过期后 30 天内）。" },
       day_pool_warn: { title: "低余额预警", content: "规则①余额&lt;总额 20%；规则②余额不足以支撑<strong>在职骑手×10 天</strong>。触发后<strong>短信预警渠道商+运营商</strong>，并写入短信记录表（2026-07-13 确认）。" },
@@ -1942,10 +1942,8 @@
       { id: "TEAM-WB", channelId: "CH-SF", name: "世博车队", poolId: "QP-2601", isDefault: false, riderCount: 1, status: "启用", createdAt: "2026-06-01", remark: "共享闪送主池 QP-2601" },
     ];
 
-    const dayPoolRules = [
-      { id: "RULE-01", poolId: "QP-2601", teamId: "TEAM-DEFAULT", teamName: "默认团队", name: "默认团队", capDays: 300, capUsed: 186, status: "启用", validFrom: "2026-01-01", validTo: "2026-12-31", hitRiders: 5 },
-      { id: "RULE-02", poolId: "QP-2601", teamId: "TEAM-WB", teamName: "世博车队", name: "世博车队", capDays: 120, capUsed: 45, status: "启用", validFrom: "2026-03-01", validTo: "2026-12-31", hitRiders: 1 }
-    ];
+    /* decision-062：不再维护团队周期额度上限；保留空数组以免历史引用报错 */
+    const dayPoolRules = [];
 
     const dayPoolRiders = [
       { id: "U2101", name: "王骑手", phone: "138****2101", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 30, usedDays: 12, remainingDays: 18, quotaStatus: "使用中", todayEligibility: "已确认消耗", todaySwaps: 1, batteryHeld: 1, ruleId: "RULE-01" },
@@ -2726,8 +2724,9 @@
       dayPool_pools: { poolId: "", status: "全部" },
       dayPool_teams: { keyword: "", poolId: "全部" },
       dayPool_rules: { poolId: "全部", teamId: "全部", status: "全部" },
-      dayPool_riders: { teamId: "全部", keyword: "", quotaStatus: "全部" },
-      dayPool_allocations: { riderId: "", type: "全部", poolId: "全部" },
+      dayPool_riders: { teamId: "全部", keyword: "", status: "全部", quotaStatus: "全部" },
+      dayPool_allocations_riders: { keyword: "", teamId: "全部", poolId: "全部", quotaStatus: "全部" },
+      dayPool_allocations_logs: { poolId: "全部", type: "全部", keyword: "", dateFrom: "", dateTo: "" },
       dayPool_consume: { dateFrom: "2026-06-08", dateTo: "2026-06-09", teamId: "全部" },
       dayPool_retail: { city: "全部" },
       dayPool_exceptions: { type: "全部", status: "全部" },
