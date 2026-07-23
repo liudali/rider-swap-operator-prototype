@@ -49,7 +49,8 @@
     }
 
     function calcPlatformFeeAmount(basePrice, operatorId, trigger) {
-      const isBEnd = trigger === "确认消耗" || trigger === "consume" || trigger === "激活码核销";
+      const t = String(trigger || "");
+      const isBEnd = t === "确认消耗" || t.startsWith("确认消耗") || t === "consume" || t === "激活码核销";
       const rate = isBEnd ? operatorBEndFeeRate(operatorId) : operatorCEndFeeRate(operatorId);
       return Math.round(basePrice * rate * 1000) / 1000;
     }
@@ -313,7 +314,7 @@
       overview_lease_cab: { title: "租赁柜机", content: "（已合并至「柜机」KPI）" },
       overview_lease_bat: { title: "租赁电池", content: "（已合并至「电池」KPI）" },
       overview_cleared: { title: "已清分金额", content: "概览已改为「套餐购买金额」；清分明细见财务/资金相关页。原公式：Σ packageOrders.accrued 且 payout=已清分。" },
-      overview_withdrawable: { title: "可提现余额", content: "概览已下线该 KPI；公式：已清分 − 已提现 − 待审提现 − 本月融资待还。详见提现申请页。" },
+      overview_withdrawable: { title: "可提现余额", content: "概览已下线该 KPI；<strong>一期</strong>公式：已清分 − 已提现 − 待审提现。<strong>二期</strong>再扣本月融资待还预留。详见提现申请页。" },
       overview_inter_pending: { title: "跨网待日清", content: "概览已下线；见运营商往来账。" },
       overview_platform_fee_kpi: { title: "平台服务费（概览 KPI）", content: "概览已下线；见平台服务费账单。" },
       overview_channel_summary: { title: "签约渠道汇总", content: "概览已改为「站点」营业状态 KPI；渠道签约仍见渠道管理。" },
@@ -346,7 +347,7 @@
       swap_policy_cross_net: { title: "跨网换电", content: "关闭后：① 本运营商用户不可在其他运营商柜机换电；② 其他运营商用户不可在本运营商站点换电。与信用额度停跨网叠加。" },
       platform_fee: { title: "平台服务费", content: "平台按<strong>运营商维度</strong>配置抽成比例（默认 1%）。<strong>C 端</strong>：支付成功分账至平台商户（已确认）。<strong>B 端渠道人天</strong>：确认消耗时按平台标准人天价 × 该运营商 B 端费率向额度售卖方 U 计提（与批发价无关）。运营商后台只读查看本主体适用比例；优先划扣保证金，保证金为 0 才占用信用额度。" },
       platform_operator_fee_rate: { title: "运营商平台服务费", content: "在<strong>运营商管理 → 运营商平台服务费</strong>维护各运营商 C 端 / B 端抽成比例（可不同）。新订单、新消耗按生效配置计算；历史已清分不回溯。运营商在「平台服务费」页只读查看。" },
-      platform_fee_trigger: { title: "计费触发", content: "C 端：支付成功分账（费率=该运营商 C 端比例）。B 端人天池：<strong>确认消耗</strong>（费率=该运营商 B 端比例），计提基数=平台标准人天价。B 端激活码：<strong>码核销成功</strong>（同 B 端费率），计提基数=标准人天价 × 码对应服务人天。计提主体均为额度售卖方 U。" },
+      platform_fee_trigger: { title: "计费触发", content: "C 端：支付成功分账（费率=该运营商 C 端比例）。B 端人天池：<strong>确认消耗</strong>分两场景——<strong>确认消耗-换电</strong>（关联换电单）与<strong>确认消耗-持有电池</strong>（当日无换电但持电池，无关联单）；费率=该运营商 B 端比例，计提基数=平台标准人天价。B 端激活码：<strong>码核销成功</strong>（同 B 端费率）。计提主体均为额度售卖方 U。" },
       platform_standard_day_price: { title: "人天标准日值", content: "平台统一设置（默认 ¥8.5/人天），可按<strong>城市覆盖</strong>；向运营商展示；B 端 1% 平台费按此计提。亦为运营商面向渠道商的<strong>默认批发价</strong>，运营商可在定价管理中修改实际批发价。" },
       pricing_quota: { title: "人天批发定价", content: "运营商向签约渠道商设定人天批发单价与最低起购量；<strong>默认批发价</strong>（无渠道）供新建签约继承，可单独设置；各渠道可覆盖。新建默认价=平台标准人天价，运营商可改。平台 B 端 1% 仍按平台标准价计提。" },
       flows_accrual: { title: "清分明细", content: "C 端支付成功后的分账明细：平台 1%、运营商净额；含退款冲正记录。" },
@@ -421,7 +422,7 @@
       arch_b: { title: "架构 B · 运营商收款", content: "骑手 C 端支付进入<strong>运营商</strong>微信/支付宝子商户；支付成功时 1% 分账至平台商户。人天池/激活码渠道无 C 端收款账户；<strong>渠道分销</strong>在运营商开启「佣金及时到付」且渠道进件后，佣金随支付<strong>即时分账</strong>至渠道子商户。" },
       flows_receipt: { title: "资金实收", content: "骑手套餐/自费支付进入<strong>运营商</strong>进件商户的实收流水；<strong>退款亦由运营商子商户原路出款</strong>。" },
       flows_accrual: { title: "清分明细", content: "C 端支付成功后的分账明细：平台 1%、运营商净额；开启<strong>佣金及时到付</strong>的骑士卡链接订单另含渠道佣金分账；含退款冲正记录。" },
-      flows_payout: { title: "提现申请", content: "运营商从可提现余额发起申请 → 平台审核 → 通过后打款至<strong>收款账户</strong>默认子商户绑定的<strong>对公结算账户</strong>。<br>可提现余额已扣除本月融资待还预留。<strong>未绑定对公不可提现</strong>。<strong>渠道商-设备租赁</strong>不适用本流程（白名单套餐款进渠道子商户）。" },
+      flows_payout: { title: "提现申请", content: "运营商从可提现余额发起申请 → 平台审核 → 通过后打款至<strong>收款账户</strong>默认子商户绑定的<strong>对公结算账户</strong>。<br><strong>一期</strong>可提现 = 已清分 − 已提现 − 待审（不扣融资待还）。「本月融资待还」预留属<strong>二期</strong>（与融资管理同期）。<strong>未绑定对公不可提现</strong>。<strong>渠道商-设备租赁</strong>不适用本流程（白名单套餐款进渠道子商户）。" },
       flows_withdraw_apply: { title: "发起提现", content: "申请金额不得超过当前可提现余额；提交后状态为「待审核」，平台在流水管理审核。" },
       platform_withdraw_review: { title: "运营商提现审核", content: "平台审核运营商提现申请：通过后代付/提现至运营商绑定账户；驳回须填写原因。<br>仅适用于<strong>运营商</strong>经营收入子商户，不含渠道商-设备租赁。" },
       orders_pkg_pay: { title: "收款主体", content: "架构 B 下 C 端套餐支付进入<strong>运营商</strong>进件商户（演示：绿色出行）。渠道商无收款账户；B 端采购款付至运营商。" },
@@ -520,7 +521,7 @@
       platform_marketing: { title: "平台营销（二期）", content: "【二期】立减优惠券：原价 − 券 = 实付；链接须带 <code>op=</code>；支付成功即锁定 userOwner；款进运营商。<strong>不代收、不拨付用户款</strong>。券面价差<strong>默认运营商承担</strong>；营销服务费按协议月结。一期不交付，原型仅演示。" },
       platform_marketing_collect: { title: "运营商收款", content: "用户经 ch=PLATFORM 链接购套餐，须已锁定运营商；实付款进<strong>该运营商</strong>子商户；支付分账 1%。立减额由运营商让利（无平台补贴）。" },
       platform_marketing_payout: { title: "券核销与营销费", content: "立减合计 = 运营商让利记账；另计应付营销服务费。<strong>无</strong>用户款拨付、无平台补贴出账。月度对账供运营商确认营销费。" },
-      platform_flows: { title: "平台流水视角", content: "用户支付：C 端套餐/自费流水及 1% 平台分账。运营商之间：跨网柜机/电池费经平台代收代付的日清流水。平台提成：B 端确认消耗计提 + C 端支付分账汇总。" },
+      platform_flows: { title: "平台流水视角", content: "用户支付：C 端套餐/自费流水及 1% 平台分账。运营商之间：跨网柜机/电池费经平台代收代付的日清流水。平台提成：B 端确认消耗（换电 / 持有电池）计提 + C 端支付分账汇总；持电池确认无关联换电单。" },
       platform_account: { title: "平台收款账户", content: "智格平台 1% 技术服务费统一进入平台商户（微信/支付宝分账 + B 端代扣）。<strong>账户余额、冻结</strong>为商户当前实时状态，不受统计月份影响；月提成与营收构成随月份切换。非运营商经营账户。" },
       module_order_audit: { title: "变更记录", content: "统一<strong>变更记录</strong>（C-02/D-A1）：跨模块时间线，记录订单/服务生命周期事件（冻结、消耗、换电、退款等）。用于客诉、对账与监管；<strong>非新订单列表</strong>。渠道仅见本渠道成员事件；运营商见本主体订单；平台全平台只读。" },
       module_channel_credit: { title: "渠道信用额度", content: "平台按在册骑手与设备标准评估<strong>信用额度</strong>，用于抵扣渠道应押总额；运营商可调整额度上限。渠道线下打款后提交凭证，由<strong>运营商审核</strong>。分级抵扣规则按信用评分映射抵扣比例。与运营商准入档位（A/B/C/D）独立。" },
@@ -1022,7 +1023,7 @@
       {
         id: "SUB260524001", user: "U1028", phone: "138****1028", site: "浦东骑手驿站", city: "上海", pkg: "包月30天", pkgType: "monthly",
         pay: 299, status: "服务中", serviceState: "服务中", payTime: "2026-05-01 09:12", validFrom: "2026-05-01", validTo: "2026-05-31",
-        swapLimit: null, swapUsed: 42, accrued: 208, payout: "已清分", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", cabinet: "CAB-22018",
+        swapLimit: null, swapUsed: 42, accrued: 2208, payout: "已清分", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", cabinet: "CAB-22018",
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null
       },
       {
@@ -1533,8 +1534,8 @@
 
     const operatorWithdrawalRequests = [
       { id: "WD-260501", operatorId: "OP-SX", amount: 186, applyTime: "2026-05-02 09:00", reviewTime: "2026-05-02 09:10", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-05-02 10:00", accountId: "PA-OP-WX", accountLabel: "微信 · 2088123456***", monthDueReserved: 0, rejectReason: null },
-      { id: "WD-260601", operatorId: "OP-SX", amount: 245, applyTime: "2026-06-02 09:00", reviewTime: "2026-06-02 09:15", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-06-02 09:30", accountId: "PA-OP-WX", accountLabel: "微信 · 2088123456***", monthDueReserved: 10500, rejectReason: null },
-      { id: "WD-260605", operatorId: "OP-SX", amount: 81, applyTime: "2026-06-05 14:20", reviewTime: null, reviewedBy: null, status: "待审核", withdrawTime: null, accountId: "PA-OP-WX", accountLabel: "微信 · 2088123456***", monthDueReserved: 10500, rejectReason: null }
+      { id: "WD-260601", operatorId: "OP-SX", amount: 245, applyTime: "2026-06-02 09:00", reviewTime: "2026-06-02 09:15", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-06-02 09:30", accountId: "PA-OP-WX", accountLabel: "微信 · 2088123456***", monthDueReserved: 0, rejectReason: null },
+      { id: "WD-260605", operatorId: "OP-SX", amount: 81, applyTime: "2026-06-05 14:20", reviewTime: "2026-06-05 16:00", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-06-05 16:30", accountId: "PA-OP-WX", accountLabel: "微信 · 2088123456***", monthDueReserved: 0, rejectReason: null }
     ];
 
     const payoutBatches = operatorWithdrawalRequests;
@@ -1805,7 +1806,7 @@
     const financeRepaymentSchedules = [
       { id: "FRS-001", loanNoteId: "LN-2603-01", applicationId: "FDA-2603-01", term: 1, dueDate: "2026-04-10", principal: 10000, rent: 600, serviceFee: 0, dueAmount: 10600, paidAmount: 10600, status: "已还清" },
       { id: "FRS-002", loanNoteId: "LN-2603-01", applicationId: "FDA-2603-01", term: 2, dueDate: "2026-05-10", principal: 10000, rent: 550, serviceFee: 0, dueAmount: 10550, paidAmount: 10550, status: "已还清" },
-      { id: "FRS-003", loanNoteId: "LN-2603-01", applicationId: "FDA-2603-01", term: 3, dueDate: "2026-06-10", principal: 10000, rent: 500, serviceFee: 0, dueAmount: 10500, paidAmount: 0, status: "逾期" }
+      { id: "FRS-003", loanNoteId: "LN-2603-01", applicationId: "FDA-2603-01", term: 3, dueDate: "2026-06-10", principal: 10000, rent: 500, serviceFee: 0, dueAmount: 10500, paidAmount: 10500, status: "已还清" }
     ];
 
     const leaseRentBills = [
@@ -2655,16 +2656,19 @@
     const platformFeeAccruals = [
       { id: "PF-001", date: "2026-06-09", operatorId: "OP-SX", channelId: "CH-SF", channelName: ENT.channel.name,
         poolId: "QP-2601", swapId: "SW2606090830", riderId: "U2101", days: 1, basePrice: platformAccrualDayPrice(), contractWholesalePrice: 8.5, feeRate: PLATFORM_FEE_RATE,
-        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗", feeTarget: "额度售卖方U", status: "待代扣", deductPath: "保证金代扣" },
+        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗-换电", feeTarget: "额度售卖方U", status: "待代扣", deductPath: "保证金代扣" },
       { id: "PF-002", date: "2026-06-09", operatorId: "OP-SX", channelId: "CH-SF", channelName: ENT.channel.name,
         poolId: "QP-2601", swapId: "SW2606091430", riderId: "U2110", days: 1, basePrice: platformAccrualDayPrice(), contractWholesalePrice: 8.5, feeRate: PLATFORM_FEE_RATE,
-        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗", feeTarget: "额度售卖方U", status: "已代扣", deductPath: "保证金代扣" },
+        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗-换电", feeTarget: "额度售卖方U", status: "已代扣", deductPath: "保证金代扣" },
       { id: "PF-003", date: "2026-06-08", operatorId: "OP-SX", channelId: "CH-SF", channelName: ENT.channel.name,
         poolId: "QP-2601", swapId: "SW2605241140", riderId: "U2102", days: 1, basePrice: platformAccrualDayPrice(), contractWholesalePrice: 8.5, feeRate: PLATFORM_FEE_RATE,
-        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗", feeTarget: "额度售卖方U", status: "已代扣", deductPath: "保证金代扣" },
-      { id: "PF-004", date: "2026-06-02", operatorId: "OP-SX", channelId: "CH-SF", channelName: ENT.channel.name,
-        poolId: "QP-2601", swapId: "SW2606021015", riderId: "U2110", days: 1, basePrice: platformAccrualDayPrice(), contractWholesalePrice: 8.5, feeRate: PLATFORM_FEE_RATE,
-        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗", feeTarget: "额度售卖方U", status: "已代扣", deductPath: "保证金代扣" },
+        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗-换电", feeTarget: "额度售卖方U", status: "已代扣", deductPath: "保证金代扣" },
+      { id: "PF-004", date: "2026-06-09", operatorId: "OP-SX", channelId: "CH-SF", channelName: ENT.channel.name,
+        poolId: "QP-2601", swapId: null, riderId: "U2106", days: 1, basePrice: platformAccrualDayPrice(), contractWholesalePrice: 8.5, feeRate: PLATFORM_FEE_RATE,
+        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗-持有电池", feeTarget: "额度售卖方U", status: "已代扣", deductPath: "保证金代扣", note: "当日无换电·持电池确认" },
+      { id: "PF-004b", date: "2026-06-02", operatorId: "OP-SX", channelId: "CH-SF", channelName: ENT.channel.name,
+        poolId: "QP-2601", swapId: null, riderId: "U2112", days: 1, basePrice: platformAccrualDayPrice(), contractWholesalePrice: 8.5, feeRate: PLATFORM_FEE_RATE,
+        feeAmount: Math.round(platformAccrualDayPrice() * PLATFORM_FEE_RATE * 1000) / 1000, trigger: "确认消耗-持有电池", feeTarget: "额度售卖方U", status: "已代扣", deductPath: "保证金代扣", note: "当日无换电·持电池确认" },
       { id: "PF-005", date: "2026-06-03", operatorId: "OP-SX", channelId: null, channelName: "—",
         poolId: null, swapId: null, riderId: "U2201", ref: "SUB260610088", days: 0, basePrice: 89, contractWholesalePrice: null, feeRate: PLATFORM_FEE_RATE,
         feeAmount: 0.89, trigger: "支付成功", feeTarget: "运营商", status: "已代扣", deductPath: "支付通道分账" },
@@ -2678,7 +2682,8 @@
 
     function refreshPlatformFeeAccruals() {
       platformFeeAccruals.forEach(a => {
-        const isBEnd = a.trigger === "确认消耗" || a.trigger === "激活码核销" || !!a.poolId;
+        const t = String(a.trigger || "");
+        const isBEnd = t === "确认消耗" || t.startsWith("确认消耗") || t === "激活码核销" || !!a.poolId;
         a.feeRate = isBEnd ? operatorBEndFeeRate(a.operatorId) : operatorCEndFeeRate(a.operatorId);
         a.feeAmount = Math.round(a.basePrice * a.feeRate * 1000) / 1000;
       });

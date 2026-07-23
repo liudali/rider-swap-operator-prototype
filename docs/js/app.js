@@ -3071,7 +3071,11 @@
 
     function filterPlatformFeeBEndRows(rows, pf) {
       return rows.filter(a => {
-        if (pf.type && pf.type !== "全部" && a.trigger !== pf.type) return false;
+        if (pf.type && pf.type !== "全部") {
+          if (pf.type === "确认消耗") {
+            if (!isConfirmConsumeTrigger(a.trigger)) return false;
+          } else if (a.trigger !== pf.type) return false;
+        }
         if (!matchDateStr(a.date, pf.dateFrom, pf.dateTo)) return false;
         if (pf.status && pf.status !== "全部" && a.status !== pf.status) return false;
         return true;
@@ -3088,8 +3092,19 @@
       return platformFeeAccruals.filter(r => r.operatorId === currentEntity().id);
     }
 
+    function isConfirmConsumeTrigger(trigger) {
+      const t = String(trigger || "");
+      return t === "确认消耗" || t.startsWith("确认消耗-") || t === "确认消耗持有电池";
+    }
+
     function isPlatformFeeBEndRow(a) {
-      return a.trigger === "确认消耗" || a.trigger === "激活码核销" || !!a.poolId;
+      return isConfirmConsumeTrigger(a.trigger) || a.trigger === "激活码核销" || !!a.poolId;
+    }
+
+    function platformFeeAssocRef(r) {
+      if (r.trigger === "确认消耗-持有电池" || r.trigger === "确认消耗持有电池") return "—";
+      if (r.trigger === "确认消耗-换电") return r.swapId || "—";
+      return r.swapId || r.ref || r.poolId || "—";
     }
 
     function myPlatformFeeBEndAccruals() {
@@ -3267,7 +3282,11 @@
       ],
       platformFee_bEnd: [
         { key: "type", label: "触发类型", type: "select", options: [
-          { v: "全部", t: "全部" }, { v: "确认消耗", t: "确认消耗" }, { v: "激活码核销", t: "激活码核销" }
+          { v: "全部", t: "全部" },
+          { v: "确认消耗", t: "确认消耗（全部）" },
+          { v: "确认消耗-换电", t: "确认消耗-换电" },
+          { v: "确认消耗-持有电池", t: "确认消耗-持有电池" },
+          { v: "激活码核销", t: "激活码核销" }
         ] },
         { key: "dateFrom", label: "日起", type: "date" },
         { key: "dateTo", label: "日止", type: "date" },
@@ -3585,7 +3604,13 @@
         { key: "dateTo", label: "日期止", type: "date" }
       ],
       platformFlows_platformFee: [
-        { key: "trigger", label: "类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "确认消耗", t: "B 端确认消耗" }, { v: "支付成功", t: "C 端支付成功" }] },
+        { key: "trigger", label: "类型", type: "select", options: [
+          { v: "全部", t: "全部" },
+          { v: "确认消耗", t: "B 端确认消耗（全部）" },
+          { v: "确认消耗-换电", t: "确认消耗-换电" },
+          { v: "确认消耗-持有电池", t: "确认消耗-持有电池" },
+          { v: "支付成功", t: "C 端支付成功" }
+        ] },
         { key: "dateFrom", label: "日起", type: "date" },
         { key: "dateTo", label: "日止", type: "date" },
         { key: "operatorId", label: "计提主体", type: "select", options: () => platformOperatorOptions() }
@@ -4066,12 +4091,20 @@
         .reduce((x, s) => x + s.dueAmount - (s.paidAmount || 0), 0);
     }
 
+    /**
+     * 可提现余额（一期）= 已清分 − 已提现 − 待审/处理中
+     * 「本月融资待还」预留扣减为二期（融资管理同期交付，见 decision-061）
+     */
     function operatorWithdrawableBalance(operatorId) {
       const cleared = operatorClearedBalance(operatorId);
       const withdrawn = operatorWithdrawnTotal(operatorId);
       const pending = operatorPendingWithdrawTotal(operatorId);
-      const monthDue = operatorFinanceMonthDue(operatorId);
-      return Math.max(0, +(cleared - withdrawn - pending - monthDue).toFixed(2));
+      return Math.max(0, +(cleared - withdrawn - pending).toFixed(2));
+    }
+
+    /** 二期公式：一期可提现再扣本月融资待还；一期不调用 */
+    function operatorWithdrawableBalancePhase2(operatorId) {
+      return Math.max(0, +(operatorWithdrawableBalance(operatorId) - operatorFinanceMonthDue(operatorId)).toFixed(2));
     }
 
     function operatorDefaultWithdrawAccount(operatorId) {
@@ -4141,10 +4174,9 @@
       const opId = currentEntity().id;
       const avail = operatorWithdrawableBalance(opId);
       const acct = operatorDefaultWithdrawAccount(opId);
-      const monthDue = operatorFinanceMonthDue(opId);
       if (!acct) { showProtoToast("请先在收款账户开通默认子商户"); return; }
       if (!paymentAccountCorpBound(acct)) { showProtoToast("请先在收款账户绑定对公结算账户"); return; }
-      if (avail <= 0) { showProtoToast("可提现余额不足（已扣除本月融资待还 ¥" + monthDue.toLocaleString("zh-CN") + "）"); return; }
+      if (avail <= 0) { showProtoToast("可提现余额不足"); return; }
       if (myOperatorWithdrawals().some(w => w.status === "待审核")) { showProtoToast("已有待审核申请"); return; }
       const acctLabel = acct.channel + " · " + paymentAccountCorpLabel(acct);
       openProtoForm({
@@ -4157,13 +4189,15 @@
         onSubmit: (data) => {
           const amount = parseFloat(data.amount);
           if (!Number.isFinite(amount) || amount <= 0) return "请输入有效金额";
-          if (amount > avail + 0.009) return "不得超过可提现余额 ¥" + avail.toFixed(2);
+          const latest = operatorWithdrawableBalance(opId);
+          if (amount > latest + 0.009) return "不得超过可提现余额 ¥" + latest.toFixed(2);
           operatorWithdrawalRequests.unshift({
             id: "WD-" + Date.now().toString().slice(-6), operatorId: opId, amount,
             applyTime: new Date().toISOString().slice(0, 16).replace("T", " "),
             reviewTime: null, reviewedBy: null, status: "待审核", withdrawTime: null,
             accountId: acct.id, accountLabel: acctLabel,
-            monthDueReserved: monthDue, rejectReason: null
+            monthDueReserved: 0,
+            rejectReason: null
           });
           return { successMessage: "已提交 · 等待平台审核后打款至对公账户", afterClose: () => render() };
         }
@@ -7881,7 +7915,7 @@
       platformStandardDayPrice.updatedAt = new Date().toISOString().slice(0, 10);
       platformStandardDayPrice.updatedBy = "平台管理员";
       platformFeeAccruals.forEach(a => {
-        if (a.trigger === "确认消耗" || a.poolId) a.basePrice = platformAccrualDayPrice();
+        if (isConfirmConsumeTrigger(a.trigger) || a.poolId) a.basePrice = platformAccrualDayPrice();
       });
       refreshPlatformFeeAccruals();
       showProtoToast("演示：人天标准日值已更新。B 端计提基数与新签约默认批发价将按 ¥" + platformStandardDayPrice.price + "/人天 展示");
@@ -8635,21 +8669,20 @@
         <section class="panel">
           ${panelHead("运营商提现审核", `待审 ${pending} 条 · 共 ${rows.length} 条`, "platform_withdraw_review")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_withdraw_review")} 用户付款已实时清分；运营商提现须审核通过后打款至绑定账户。<strong>渠道商-设备租赁</strong>不适用。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_withdraw_review")} 用户付款已实时清分；运营商提现须审核通过后打款至绑定账户。<strong>渠道商-设备租赁</strong>不适用。一期不预留融资待还${phase2BadgeHtml()}。</p>
             <table>
-              <thead><tr><th>申请单</th><th>运营商</th><th>金额</th><th>到账账户</th><th>本月待还预留</th><th>申请时间</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>申请单</th><th>运营商</th><th>金额</th><th>到账账户</th><th>申请时间</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${rows.map(w => `<tr>
                 <td>${w.id}</td>
                 <td>${operatorLabel(w.operatorId)}</td>
                 <td><strong>¥${w.amount}</strong></td>
                 <td><small>${w.accountLabel}</small></td>
-                <td>${w.monthDueReserved ? "¥" + w.monthDueReserved.toLocaleString("zh-CN") : "—"}</td>
                 <td>${w.applyTime}</td>
                 <td>${tag(w.status)}${w.rejectReason ? `<br><small style="color:var(--red)">${w.rejectReason}</small>` : ""}</td>
                 <td>${w.status === "待审核"
                   ? `<button type="button" class="link-btn" data-approve-withdraw="${w.id}">通过</button> · <button type="button" class="link-btn" data-reject-withdraw="${w.id}">驳回</button>`
                   : (w.withdrawTime || "—")}</td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -9293,7 +9326,11 @@
         const f = getPf();
         const bRows = platformFeeAccruals.filter(r => {
           if (f.operatorId !== "全部" && r.operatorId !== f.operatorId) return false;
-          if (f.trigger !== "全部" && r.trigger !== f.trigger) return false;
+          if (f.trigger && f.trigger !== "全部") {
+            if (f.trigger === "确认消耗") {
+              if (!isConfirmConsumeTrigger(r.trigger)) return false;
+            } else if (r.trigger !== f.trigger) return false;
+          }
           if (!matchDateStr(r.date, f.dateFrom, f.dateTo)) return false;
           return true;
         });
@@ -9309,17 +9346,19 @@
           feeRate: operatorCEndFeeRate(p.deviceOwnerId),
           status: "已分账", deductPath: "支付通道分账"
         }));
-        const rows = f.trigger === "确认消耗" ? bRows : f.trigger === "支付成功" ? cRows : bRows.concat(cRows);
-        const total = rows.reduce((s, r) => s + (r.feeAmount || r.amount || 0), 0);
+        const merged = f.trigger === "全部" ? bRows.concat(cRows)
+          : f.trigger === "支付成功" ? cRows
+          : bRows;
+        const total = merged.reduce((s, r) => s + (r.feeAmount || r.amount || 0), 0);
         return `${ownScopeBanner()}${pageWithTabs(sidebar, `<section class="panel">
             ${panelHead("平台提成流水", `合计 ¥${total.toFixed(2)}`, "platform_flows")}
             <div class="panel-body orders-table-wrap">
-              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_fee")}${noteBtn("platform_operator_fee_rate")} 提成按各运营商 C/B 端配置比例计算。</p>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_fee")}${noteBtn("platform_fee_trigger")}${noteBtn("platform_operator_fee_rate")} 人天池确认消耗分<strong>换电</strong>（有关联换电单）与<strong>持有电池</strong>（无关联单）。</p>
               <table>
                 <thead><tr><th>流水号</th><th>日期</th><th>计提主体</th><th>场景</th><th>关联单</th><th>费率</th><th>提成</th><th>状态</th><th>扣款路径</th></tr></thead>
-                <tbody>${rows.map(r => `<tr>
+                <tbody>${merged.map(r => `<tr>
                   <td>${r.id}</td><td>${r.date}</td><td>${operatorLabel(r.operatorId)}</td>
-                  <td>${r.trigger}</td><td>${r.swapId || r.ref || r.poolId || "—"}</td>
+                  <td>${r.trigger}</td><td>${platformFeeAssocRef(r)}</td>
                   <td>${formatFeeRatePct(r.feeRate || (r.trigger === "支付成功" ? operatorCEndFeeRate(r.operatorId) : operatorBEndFeeRate(r.operatorId)))}</td>
                   <td class="fee-platform">¥${(r.feeAmount || r.amount || 0).toFixed(3)}</td>
                   <td>${tag(r.status)}</td><td>${r.deductPath}</td>
@@ -12234,22 +12273,21 @@
               ${arch}
               <div class="kpi-grid in-panel" style="margin-bottom:14px">
                 ${kpi("已清分", "¥" + cleared.toLocaleString("zh-CN"), "实时入账", "清", "overview_cleared")}
-                ${kpi("本月融资待还", "¥" + monthDue.toLocaleString("zh-CN"), "可提现须预留", "还", "finance_repayments")}
-                ${kpi("可提现余额", "¥" + withdrawable.toLocaleString("zh-CN"), "已扣待还与待审", "提", "overview_withdrawable")}
+                ${kpi("本月融资待还 " + phase2BadgeHtml(), "¥" + monthDue.toLocaleString("zh-CN"), "二期预留 · 一期不扣可提现", "还", "finance_repayments")}
+                ${kpi("可提现余额", "¥" + withdrawable.toLocaleString("zh-CN"), "一期：已清分 − 已提现 − 待审", "提", "overview_withdrawable")}
                 ${kpi("已提现", "¥" + withdrawn.toLocaleString("zh-CN"), pendingWd ? "待审 ¥" + pendingWd : "累计", "出", "flows_payout")}
               </div>
-              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("flows_payout")}${noteBtn("flows_withdraw_apply")}${noteBtn("accounts_corp_bind")} 支付成功即清分；提现须<strong>平台审核</strong>后打款至默认子商户绑定的<strong>对公结算账户</strong>。</p>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("flows_payout")}${noteBtn("flows_withdraw_apply")}${noteBtn("accounts_corp_bind")} 支付成功即清分；提现须<strong>平台审核</strong>后打款至默认子商户绑定的<strong>对公结算账户</strong>。融资待还预留属二期${phase2BadgeHtml()}。</p>
               <div class="orders-table-wrap">
               <table>
-                <thead><tr><th>申请单</th><th>金额</th><th>到账账户</th><th>待还预留</th><th>申请时间</th><th>审核</th><th>状态</th><th>到账时间</th></tr></thead>
+                <thead><tr><th>申请单</th><th>金额</th><th>到账账户</th><th>申请时间</th><th>审核</th><th>状态</th><th>到账时间</th></tr></thead>
                 <tbody>${rows.map(w => `<tr>
                   <td>${w.id}</td><td><strong>¥${w.amount}</strong></td><td><small>${w.accountLabel}</small></td>
-                  <td>${w.monthDueReserved ? "¥" + w.monthDueReserved.toLocaleString("zh-CN") : "—"}</td>
                   <td>${w.applyTime}</td>
                   <td>${w.reviewedBy ? w.reviewedBy + "<br><small>" + (w.reviewTime || "") + "</small>" : "—"}</td>
                   <td>${tag(w.status)}${w.rejectReason ? `<br><small style="color:var(--red)">${w.rejectReason}</small>` : ""}</td>
                   <td>${w.withdrawTime || "—"}</td>
-                </tr>`).join("") || "<tr><td colspan='8'>暂无提现申请</td></tr>"}</tbody>
+                </tr>`).join("") || "<tr><td colspan='7'>暂无提现申请</td></tr>"}</tbody>
               </table>
               </div>
             </div>
@@ -14495,12 +14533,12 @@
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_standard_day_price")} 计提基数 = 平台标准人天价 ¥${platformAccrualDayPrice()}/人天（与合同批发价无关）；优先划扣保证金。</p>
             <table>
               <thead><tr>
-                <th>日期</th><th>渠道商</th><th>额度池</th><th>换电单</th><th>骑手</th>
+                <th>日期</th><th>渠道商</th><th>额度池</th><th>关联单</th><th>骑手</th>
                 <th>平台计提基数</th><th>合同批发价</th><th>B 端费率</th><th>服务费</th><th>计提主体</th><th>触发</th><th>代扣路径</th><th>状态</th>
               </tr></thead>
               <tbody>${filteredB.map(a => `<tr>
                 <td>${a.date}</td><td>${a.channelName}</td><td>${a.poolId || "—"}</td>
-                <td>${a.swapId || a.ref || "—"}</td><td>${a.riderId}</td>
+                <td>${platformFeeAssocRef(a)}</td><td>${a.riderId}</td>
                 <td><strong class="fee-platform">¥${a.basePrice}${a.days ? "/人天" : ""}</strong></td>
                 <td>${a.contractWholesalePrice != null ? "¥" + a.contractWholesalePrice + (a.days ? "/人天" : "") : "—"}${(a.contractWholesalePrice != null && a.contractWholesalePrice !== a.basePrice) ? ` <small style="color:var(--muted)">≠计提基数</small>` : ""}</td>
                 <td>${formatFeeRatePct(a.feeRate)}</td>
@@ -14513,7 +14551,7 @@
       } else {
         content = `<div class="pool-hero" style="margin-bottom:14px">${noteBtn("platform_fee")}${noteBtn("platform_fee_trigger")}
           <h2>平台技术服务费 · 两类收入</h2>
-          <p><strong>C 端</strong>：个人套餐支付成功，按实付 × ${formatFeeRatePct(feeCfg.cEndRate)} <strong>支付通道分账</strong>至平台。<strong>B 端</strong>：渠道骑手确认消耗（或激活码核销），按标准人天价 × ${formatFeeRatePct(feeCfg.bEndRate)} 向额度售卖方计提，<strong>优先划扣保证金</strong>。</p>
+          <p><strong>C 端</strong>：个人套餐支付成功，按实付 × ${formatFeeRatePct(feeCfg.cEndRate)} <strong>支付通道分账</strong>至平台。<strong>B 端</strong>：人天池骑手<strong>确认消耗-换电</strong>（有换电单）或<strong>确认消耗-持有电池</strong>（无关联单），或激活码核销，按标准人天价 × ${formatFeeRatePct(feeCfg.bEndRate)} 向额度售卖方计提，<strong>优先划扣保证金</strong>。</p>
         </div>
         <div class="kpi-grid">
           ${kpi("C 端分账合计", "¥" + cTotal.toFixed(2), cRows.length + " 笔套餐支付", "C", "platform_fee")}
