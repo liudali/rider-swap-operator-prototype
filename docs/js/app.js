@@ -17,6 +17,9 @@
       platformLeasingTab: "companies", depositTab: "pending", depositRechargeSubTab: "waiting", depositRechargePendingPage: 1, depositRechargeProcessedPage: 1, operatorCreditTab: "assignments",
       dayPoolTab: "pools", dayPoolPoolsSubTab: "list", dayPoolRidersSubTab: "list", dayPoolAllocSubTab: "riders", dayPoolSelectedId: "QP-2601", dayPoolConsumeSubTab: "rider", dayPoolRiderFocus: null,
       dayPoolRidersPage: 1, dayPoolRidersPageSize: 8, dayPoolTeamsPage: 1, dayPoolTeamsPageSize: 8,
+      channelLinksSubTab: "packages", channelPackagesPage: 1, channelPackagesPageSize: 8,
+      channelPromoLinksPage: 1, channelPromoLinksPageSize: 8,
+      commissionStatementSubTab: "summary", commissionDetailPage: 1, commissionDetailPageSize: 8,
       pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
       channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
       channelAssetsSubTab: "dayPool", channelAssetsPage: 1, channelAssetsPageSize: 5,
@@ -237,20 +240,31 @@
       if (afterClose) afterClose();
     }
 
-    function openProtoConfirm({ title, message, confirmLabel, onConfirm, onCancel }) {
+    function openProtoConfirm({ title, message, html, confirmLabel, cancelLabel, onConfirm, onCancel, modalWidth }) {
       protoConfirmState = { onConfirm, onCancel };
       document.querySelector("#protoConfirmTitle").textContent = title || "确认";
-      document.querySelector("#protoConfirmMessage").textContent = message || "";
+      const msgEl = document.querySelector("#protoConfirmMessage");
+      if (html) {
+        msgEl.innerHTML = html;
+      } else {
+        msgEl.textContent = message || "";
+      }
       document.querySelector("#okProtoConfirm").textContent = confirmLabel || "确定";
+      const cancelBtn = document.querySelector("#cancelProtoConfirm");
+      if (cancelBtn) cancelBtn.textContent = cancelLabel || "取消";
+      const modal = document.querySelector("#protoConfirmModal");
+      if (modal) modal.style.width = modalWidth || "min(420px,calc(100vw - 32px))";
       document.querySelector("#protoConfirmMask").classList.add("open");
-      document.querySelector("#protoConfirmModal").classList.add("open");
+      modal?.classList.add("open");
     }
 
     function closeProtoConfirm(ok) {
       const cb = protoConfirmState;
       protoConfirmState = null;
       document.querySelector("#protoConfirmMask")?.classList.remove("open");
-      document.querySelector("#protoConfirmModal")?.classList.remove("open");
+      const modal = document.querySelector("#protoConfirmModal");
+      modal?.classList.remove("open");
+      if (modal) modal.style.width = "min(420px,calc(100vw - 32px))";
       if (ok && cb?.onConfirm) cb.onConfirm();
       else if (!ok && cb?.onCancel) cb.onCancel();
     }
@@ -319,9 +333,39 @@
       return channelContracts.find(c => c.channelId === channelId && contractSettlementMode(c) === "卡差价");
     }
 
+    function protoBusinessDate() {
+      return "2026-07-23";
+    }
+
+    function nextProtoBusinessDay() {
+      const d = new Date(protoBusinessDate() + "T12:00:00");
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    }
+
+    function applyDueCardSettlementChange(contract) {
+      if (!contract?.settlementChangePending) return;
+      const p = contract.settlementChangePending;
+      if (!p.effectiveFrom || protoBusinessDate() < p.effectiveFrom) return;
+      contract.instantCommissionPayout = !!p.targetInstant;
+      contract.commissionRate = p.targetInstant ? p.targetRate : null;
+      if (p.targetInstant && !contract.instantCommissionEnabledAt) {
+        contract.instantCommissionEnabledAt = p.effectiveFrom;
+      }
+      const csm = channelSettlementModes.find(m => m.channelId === contract.channelId);
+      if (csm) {
+        csm.instantCommissionPayout = !!p.targetInstant;
+        csm.commissionRate = contract.commissionRate;
+        csm.desc = p.targetInstant ? "推广链接分销 · 佣金即时分账" : "推广链接分销 · 佣金线下结算";
+      }
+      contract.settlementChangePending = null;
+    }
+
     function channelInstantCommissionEnabled(channelId) {
       const c = cardContractForChannel(channelId);
-      return !!(c?.instantCommissionPayout && c.commissionRate > 0);
+      if (!c) return false;
+      applyDueCardSettlementChange(c);
+      return !!(c.instantCommissionPayout && c.commissionRate > 0);
     }
 
     function channelHasPayoutAccount(channelId) {
@@ -337,6 +381,40 @@
       return channelInstantCommissionEnabled(channelId) ? "即时分账" : "线下待结";
     }
 
+    function orderCommissionSettleType(o) {
+      const s = String(o.commissionSettlement || "");
+      if (/即时/.test(s)) return "即时分账";
+      return "线下结算";
+    }
+
+    function commissionMonthSettleRows(cid, month) {
+      const orders = channelLinkOrders.filter(o => o.channelId === cid && payMonthKey(o.payTime) === month);
+      if (!orders.length) {
+        return [{ month, settleType: "—", orderCount: 0, totalPaid: 0, totalCommission: 0, totalFee: 0, status: "无成交" }];
+      }
+      const map = new Map();
+      orders.forEach(o => {
+        const t = orderCommissionSettleType(o);
+        if (!map.has(t)) map.set(t, []);
+        map.get(t).push(o);
+      });
+      const prefer = ["即时分账", "线下结算"];
+      return [...map.keys()]
+        .sort((a, b) => prefer.indexOf(a) - prefer.indexOf(b))
+        .map(t => {
+          const list = map.get(t);
+          return {
+            month,
+            settleType: t,
+            orderCount: list.length,
+            totalPaid: list.reduce((s, o) => s + o.paidPrice, 0),
+            totalCommission: list.reduce((s, o) => s + o.commission, 0),
+            totalFee: list.reduce((s, o) => s + o.platformFee, 0),
+            status: t === "即时分账" ? "已即时分账" : "待线下结算"
+          };
+        });
+    }
+
     function channelUsesCreditEval(channelId) {
       const contract = channelContracts.find(c => c.channelId === channelId);
       return contract ? contractSettlementMode(contract) !== "卡差价" : true;
@@ -344,6 +422,33 @@
 
     function payMonthKey(payTime) {
       return (payTime || "").slice(0, 7);
+    }
+
+    /** 最近 n 个自然月（含当月），新→旧，格式 YYYY-MM */
+    function recentCalendarMonthKeys(n, anchorDate) {
+      const d = anchorDate ? new Date(anchorDate) : new Date(2026, 6, 23); /* 原型锚定 2026-07-23 */
+      const keys = [];
+      const count = Math.max(1, n || 6);
+      for (let i = 0; i < count; i++) {
+        const x = new Date(d.getFullYear(), d.getMonth() - i, 1);
+        keys.push(x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0"));
+      }
+      return keys;
+    }
+
+    function commissionRangeMonthKeys(rangeVal) {
+      const v = rangeVal || "last6";
+      if (v === "last6" || v === "全部") return recentCalendarMonthKeys(6);
+      if (v === "last12") return recentCalendarMonthKeys(12);
+      if (/^\d{4}-\d{2}$/.test(v)) return [v];
+      return recentCalendarMonthKeys(6);
+    }
+
+    function commissionRangeLabel(rangeVal) {
+      const v = rangeVal || "last6";
+      if (v === "last6" || v === "全部") return "近6个月";
+      if (v === "last12") return "近12个月";
+      return v;
     }
 
     function channelPackagesFor(cid) {
@@ -3818,10 +3923,12 @@
         { key: "phone", label: "用户手机", placeholder: "完整或后四位" }
       ],
       commissionStatement: [
-        { key: "month", label: "统计月份", type: "select", options: () => {
-          const cid = isChannelRole() ? channelEntityId() : "CH-CARD";
-          const months = commissionMonthsForChannel(cid);
-          return [{ v: "全部", t: "全部月份" }].concat(months.map(m => ({ v: m, t: m })));
+        { key: "month", label: "统计范围", type: "select", options: () => {
+          const months = recentCalendarMonthKeys(12);
+          return [
+            { v: "last6", t: "近6个月" },
+            { v: "last12", t: "近12个月" }
+          ].concat(months.map(m => ({ v: m, t: m })));
         }}
       ],
       /* platformAccounts：统计月份下沉到余额/冻结下方，顶部不再展示 */
@@ -3837,8 +3944,12 @@
       if (key === "overview" && (isOperatorRole() || isPlatformRole())) specs = [];
       /* 人天额度池·额度池 / 骑手登记 / 额度分配 / 消耗明细：筛选下沉到页内 Tab 下方 */
       if (state.view === "dayPool" && (state.dayPoolTab === "pools" || state.dayPoolTab === "consume" || state.dayPoolTab === "allocations" || state.dayPoolTab === "riders")) specs = [];
+      /* 骑士卡·佣金对账：筛选下沉到页内 Tab 下方 */
+      if (key === "commissionStatement") specs = [];
       /* 服务保证金账户·变动明细：筛选下沉到页内 Tab 下方 */
       if (key === "depositAccount_ledger") specs = [];
+      /* 运营商往来：筛选下沉到页内 Tab 下方 */
+      if (key === "interOp" || key === "interOp_ledger" || key === "interOp_daily" || key === "interOp_period") specs = [];
       const box = document.querySelector("#pageFilters");
       if (!specs || !specs.length) {
         box.classList.remove("visible");
@@ -5159,11 +5270,7 @@
       const v = view || state.view;
       if (PHASE2_VIEWS.has(v)) return true;
       if (v === "channelSales" && state.channelSalesTab === "platformMarketing") return true;
-      /* 骑士卡一期仅：套餐与链接 / 购卡记录 / 佣金对账；收款账户等未写 → 二期 */
-      if (isChannelRole()) {
-        const mode = contractSettlementMode(channelProfile());
-        if ((mode === "卡差价" || mode === "渠道分销") && v === "accounts") return true;
-      }
+      /* 骑士卡「收款账户」为一期（decision-064）：即时到付 + 线下结算均需账户 */
       return false;
     }
 
@@ -7084,17 +7191,17 @@
             ${tableHead}
             <tbody>${rows.map(a => accountRowHtml(a)).join("") || "<tr><td colspan='10'>暂无账户</td></tr>"}</tbody>
           </table>`;
-      } else if (isCardInstant) {
+      } else if (isCardChannel()) {
         const rows = paymentAccounts.filter(a => a.entityId === opId);
         const unbound = rows.filter(a => paymentAccountNeedsCorp(a) && !paymentAccountCorpBound(a)).length;
-        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_card_accounts")}${noteBtn("accounts_corp_bind")} 佣金及时到付：分账至子商户后，结算至绑定的<strong>对公账户</strong>。${unbound ? ` 当前 <strong>${unbound}</strong> 个账户待绑定。` : ""}</p>
+        const settleHint = isCardInstant
+          ? `当前为<strong>佣金及时到付</strong>：支付成功分账至渠道子商户，再结算至绑定的<strong>对公账户</strong>。`
+          : `当前为<strong>线下结算</strong>：购卡款进运营商子商户；运营商按对账结果线下打佣至本渠道<strong>对公结算账户</strong>。开启即时到付后须完成微信/支付宝进件。`;
+        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_card_accounts")}${noteBtn("accounts_corp_bind")} ${settleHint}${unbound ? ` 当前 <strong>${unbound}</strong> 个账户待绑定对公。` : ""}</p>
           <table>
             ${tableHead}
-            <tbody>${rows.map(a => accountRowHtml(a)).join("") || "<tr><td colspan='10'>暂无账户，请联系运营商协助进件</td></tr>"}</tbody>
+            <tbody>${rows.map(a => accountRowHtml(a)).join("") || "<tr><td colspan='10'>暂无账户，请完成进件或维护对公收款信息</td></tr>"}</tbody>
           </table>`;
-      } else if (isCardChannel()) {
-        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_instant_commission")} 当前签约未开启佣金及时到付，无需配置收款账户。用户经推广链接购卡款进运营商子商户。</p>
-          <div class="empty" style="padding:24px;text-align:center;color:var(--muted)">未开启即时到付 · 无收款账户</div>`;
       } else {
         const rows = paymentAccounts.filter(a => a.entityId === opId);
         const unbound = rows.filter(a => paymentAccountNeedsCorp(a) && !paymentAccountCorpBound(a)).length;
@@ -7111,7 +7218,7 @@
       return `
         ${ownScopeBanner()}
         <section class="panel">
-          ${panelHead("收款账户管理", isLeaseCh ? "白名单套餐收款 · 须绑定对公" : isCardInstant ? "佣金分账进件 · 须绑定对公" : isCardChannel() ? "佣金及时到付（未开启）" : "进件子商户 + 对公结算账户绑定", isCardInstant ? "channel_card_accounts" : "accounts_panel")}
+          ${panelHead("收款账户管理", isLeaseCh ? "白名单套餐收款 · 须绑定对公" : isCardChannel() ? (isCardInstant ? "即时到付 · 子商户进件 + 对公" : "线下结算 · 对公收款账户") : "进件子商户 + 对公结算账户绑定", isCardChannel() ? "channel_card_accounts" : "accounts_panel")}
           <div class="panel-body orders-table-wrap">
             ${body}
           </div>
@@ -7573,11 +7680,12 @@
         <div class="field-card field-card-instant form-span-2" style="padding:12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc">
           <p style="font-size:12px;font-weight:600;margin:0 0 10px">${noteBtn("channel_instant_commission")} 佣金及时到付（仅渠道分销）</p>
           <label>开启即时到付<select name="instantCommissionPayout" id="instantCommissionPayout">
-            <option value="0" ${!contract?.instantCommissionPayout ? "selected" : ""}>关闭 · 佣金线下结算</option>
-            <option value="1" ${contract?.instantCommissionPayout ? "selected" : ""}>开启 · 支付成功即时分账至渠道</option>
+            <option value="0" ${!((contract?.settlementChangePending?.targetInstant) ?? contract?.instantCommissionPayout) ? "selected" : ""}>关闭 · 佣金线下结算</option>
+            <option value="1" ${((contract?.settlementChangePending?.targetInstant) ?? contract?.instantCommissionPayout) ? "selected" : ""}>开启 · 支付成功即时分账至渠道</option>
           </select></label>
-          <label class="field-card-instant-on">渠道佣金比例（%）<input name="commissionRatePct" type="number" min="0.1" max="50" step="0.1" value="${contract?.commissionRate != null ? (contract.commissionRate * 100) : 9}" /></label>
-          <p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--muted);margin:8px 0 0">平台服务费仍按默认 <strong>1%</strong> 即时清分。开启须渠道在「收款账户」完成进件（微信/支付宝子商户）。</p>
+          <label class="field-card-instant-on">渠道佣金比例（%）<input name="commissionRatePct" type="number" min="0.1" max="50" step="0.1" value="${(contract?.settlementChangePending?.targetRate ?? contract?.commissionRate) != null ? ((contract?.settlementChangePending?.targetRate ?? contract.commissionRate) * 100) : 9}" /></label>
+          <p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--muted);margin:8px 0 0">平台服务费仍按默认 <strong>1%</strong> 即时清分。开启须渠道在「收款账户」完成进件。结算类型变更<strong>次日 00:00</strong>生效（decision-065）。</p>
+          ${contract?.settlementChangePending ? `<p class="form-span-2" style="font-size:12px;color:var(--warn);margin:8px 0 0">⏳ 已预约于 <strong>${contract.settlementChangePending.effectiveFrom} 00:00</strong> 切换为「${contract.settlementChangePending.targetInstant ? "即时到付" : "线下结算"}」；此前新单仍按当前生效方式。</p>` : ""}
           ${contract?.channelId && !channelHasPayoutAccount(contract.channelId) ? `<p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--warn);margin:8px 0 0">⚠ 当前渠道尚未开通收款账户，无法正式开启即时到付。</p>` : ""}
         </div>
         <label class="field-rent">月租（元/月 · 签约统一价）<input name="monthlyRent" type="number" min="1000" step="100" value="${contract?.monthlyRent ?? 12000}" /></label>
@@ -7798,18 +7906,76 @@
         contract.validFrom = data.validFrom;
         contract.validTo = data.validTo;
         if (contractSettlementMode(contract) === "卡差价") {
-          contract.instantCommissionPayout = instantCommissionPayout;
-          contract.commissionRate = instantCommissionPayout ? commissionRate : null;
-          if (instantCommissionPayout && !contract.instantCommissionEnabledAt) {
-            contract.instantCommissionEnabledAt = new Date().toISOString().slice(0, 10);
+          const prevInstant = !!contract.instantCommissionPayout;
+          const settleChanged = prevInstant !== instantCommissionPayout;
+          const finishCardSettleAndRest = () => {
+            if (settleChanged) {
+              contract.settlementChangePending = {
+                targetInstant: instantCommissionPayout,
+                targetRate: instantCommissionPayout ? commissionRate : null,
+                effectiveFrom: nextProtoBusinessDay(),
+                fromInstant: prevInstant,
+                savedAt: protoBusinessDate()
+              };
+            } else {
+              contract.settlementChangePending = null;
+              contract.instantCommissionPayout = instantCommissionPayout;
+              contract.commissionRate = instantCommissionPayout ? commissionRate : null;
+              if (instantCommissionPayout && !contract.instantCommissionEnabledAt) {
+                contract.instantCommissionEnabledAt = protoBusinessDate();
+              }
+              const csm = channelSettlementModes.find(m => m.channelId === contract.channelId);
+              if (csm) {
+                csm.instantCommissionPayout = instantCommissionPayout;
+                csm.commissionRate = commissionRate;
+                csm.desc = instantCommissionPayout ? "推广链接分销 · 佣金即时分账" : "推广链接分销 · 佣金线下结算";
+              }
+            }
+            finishChannelPartnerEditRest({
+              contract, data, settlementMode, wholesalePrice, minDays, monthlyRent,
+              dedicatedSiteId, dedicatedSiteName, op
+            });
+          };
+          if (settleChanged) {
+            const eff = nextProtoBusinessDay();
+            const fromL = prevInstant ? "即时到付" : "线下结算";
+            const toL = instantCommissionPayout ? "即时到付" : "线下结算";
+            openProtoConfirm({
+              title: "确认结算方式变更",
+              confirmLabel: "确认预约",
+              modalWidth: "min(480px,calc(100vw - 32px))",
+              html: `<p>结算方式变更将于 <strong>${eff} 00:00</strong> 生效。</p>
+                <p><strong>${fromL}</strong> → <strong>${toL}</strong></p>
+                <ul>
+                  <li>今日（含）新成交仍按「${fromL}」</li>
+                  <li>历史订单不回溯；已即时分账佣金不追回</li>
+                </ul>
+                <p>是否确认预约变更？</p>`,
+              onConfirm: finishCardSettleAndRest
+            });
+            return;
           }
-          const csm = channelSettlementModes.find(m => m.channelId === contract.channelId);
-          if (csm) {
-            csm.instantCommissionPayout = instantCommissionPayout;
-            csm.commissionRate = commissionRate;
-            csm.desc = instantCommissionPayout ? "推广链接分销 · 佣金即时分账" : "推广链接分销 · 佣金线下结算";
-          }
+          finishCardSettleAndRest();
+          return;
         }
+        finishChannelPartnerEditRest({
+          contract, data, settlementMode, wholesalePrice, minDays, monthlyRent,
+          dedicatedSiteId, dedicatedSiteName, op
+        });
+        return;
+      }
+      closeChannelPartnerForm();
+      state.view = "channelSales";
+      state.channelSalesTab = "contracts";
+      render();
+      const chStatus = data.status;
+      const leaseStop = settlementMode === "设备租赁" && chStatus === "已停用";
+      window.alert(leaseStop
+        ? "演示：渠道商已设为「已停用」。设备租赁白名单用户不可取电，仍可还电入柜（骑手端选 lease_suspended 体验）。"
+        : "演示：渠道商信息已保存（Mock）");
+    }
+
+    function finishChannelPartnerEditRest({ contract, data, settlementMode, wholesalePrice, minDays, monthlyRent, dedicatedSiteId, dedicatedSiteName, op }) {
         if (contractSettlementMode(contract) === "人天池") {
           const quota = operatorDayQuotaPrices.find(q => q.operatorId === op.id && q.channelId === contract.channelId);
           if (quota) {
@@ -7847,7 +8013,6 @@
         if (contractSettlementMode(contract) === "卡差价") {
           applyCardSkuPricingFromForm(contract.channelId, data, false);
         }
-      }
       closeChannelPartnerForm();
       state.view = "channelSales";
       state.channelSalesTab = "contracts";
@@ -12863,7 +13028,7 @@
             <label>所属团队<select name="teamId">${teams.map(t => `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}</option>`).join("")}</select></label>
             <div>
               <span style="font-size:12px;color:var(--muted)">导入方式</span>
-              <div class="refund-preset-row" style="margin-top:6px">
+              <div class="refund-process-presets" role="group" aria-label="导入方式" style="margin-top:6px">
                 <button type="button" class="refund-preset active" data-import-mode-btn="manual">手工录入（少量）</button>
                 <button type="button" class="refund-preset" data-import-mode-btn="file">文件导入（大量）</button>
               </div>
@@ -14484,6 +14649,13 @@
       ], active, "interop-inner");
     }
 
+    function interOpTabDesc(tab) {
+      if (tab === "ledger") return "跨网服务费明细；可按站点、状态、平台方向、换电单筛选。";
+      if (tab === "daily") return "日清账单；每日 23:59:59 汇总，可按状态筛选。";
+      if (tab === "period") return "周/月汇总由日账单聚合；不改变日清事实账。";
+      return "保证金/信用额度 KPI、往来趋势；页内含明细/日清/周月。";
+    }
+
     function renderInterOp() {
       const allowed = ["overview", "ledger", "daily", "period"];
       let tab = state.interOpTab || "overview";
@@ -14496,6 +14668,8 @@
       return `${ownScopeBanner()}
         <section class="panel panel-with-top-tabs">
           ${interOpHubTabs(tab)}
+          <p class="panel-tab-desc">${interOpTabDesc(tab)}</p>
+          ${inlinePfBarHtml(pfKey())}
           ${content}
         </section>`;
     }
@@ -15004,6 +15178,8 @@
       const cid = channelEntityId();
       const packages = channelPackagesFor(cid);
       const links = channelPromoLinksFor(cid);
+      const sub = state.channelLinksSubTab || "packages";
+      const topTabs = panelTopTabs([["packages", "可销售套餐"], ["links", "推广链接"]], sub, "chlinks-sub");
       const form = state.channelLinkForm;
       const newLinkForm = form ? `
         <div class="field-card" style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:8px">
@@ -15023,37 +15199,21 @@
             </div>
           </div>
         </div>` : "";
-      return `
+
+      if (sub === "links") {
+        const pg = paginateList(links, state.channelPromoLinksPage, state.channelPromoLinksPageSize || 8);
+        state.channelPromoLinksPage = pg.page;
+        return `
         ${ownScopeBanner()}
-        <section class="panel">
-          ${panelHead("可销售套餐", "价格由运营商签约配置 · 渠道可为本套餐生成多条推广链接", "channel_settlement_card", `<button type="button" class="btn primary" data-new-promo-link>+ 新建链接</button>`)}
-          <div class="panel-body orders-table-wrap">
-            <table>
-              <thead><tr><th>套餐</th><th>正式价</th><th>渠道专享价</th><th>佣金/单</th><th>推广链接数</th><th>累计点击</th><th>累计成交</th><th>状态</th></tr></thead>
-              <tbody>${packages.map(p => {
-                const st = packageLinkStats(p.id);
-                return `<tr>
-                  <td><strong>${p.name}</strong><br><small style="color:var(--muted)">${p.skuId}</small></td>
-                  <td>¥${p.officialPrice}</td>
-                  <td><strong>¥${p.channelPrice}</strong></td>
-                  <td>¥${p.commissionPerOrder}</td>
-                  <td>${st.linkCount} 条</td>
-                  <td>${st.clicks}</td>
-                  <td>${st.conversions}</td>
-                  <td>${tag(p.status)}</td>
-                </tr>`;
-              }).join("") || "<tr><td colspan='8'>暂无可售套餐</td></tr>"}</tbody>
-            </table>
-          </div>
-        </section>
-        <section class="panel">
-          ${panelHead("推广链接", "同一套餐可多条 · 二维码 · 直达运营商小程序 · 24h 归因", "module_channel_links")}
+        <section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${panelHead("推广链接", "同一套餐可多条 · 二维码 · 直达运营商小程序 · 24h 归因", "module_channel_links", `<button type="button" class="btn primary" data-new-promo-link>+ 新建链接</button>`)}
           <div class="panel-body">
             ${newLinkForm}
             <div class="orders-table-wrap">
               <table>
                 <thead><tr><th>套餐</th><th>链接用途</th><th>链接码</th><th>点击</th><th>成交</th><th>创建日</th><th>状态</th><th>小程序链接</th><th>操作</th></tr></thead>
-                <tbody>${links.map(l => {
+                <tbody>${pg.slice.map(l => {
                   const pkg = packages.find(p => p.id === l.packageId);
                   return `<tr>
                     <td>${pkg ? pkg.name : l.skuId}<br><small>¥${pkg?.channelPrice || "—"}</small></td>
@@ -15072,7 +15232,37 @@
                   </tr>`;
                 }).join("") || "<tr><td colspan='9'>暂无推广链接，点击「+ 新建链接」</td></tr>"}</tbody>
               </table>
+              ${renderTablePager(pg, "chlinks-link-page")}
             </div>
+          </div>
+        </section>`;
+      }
+
+      const pkgPg = paginateList(packages, state.channelPackagesPage, state.channelPackagesPageSize || 8);
+      state.channelPackagesPage = pkgPg.page;
+      return `
+        ${ownScopeBanner()}
+        <section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${panelHead("可销售套餐", "价格由运营商签约配置 · 渠道可为本套餐生成多条推广链接", "channel_settlement_card", `<button type="button" class="btn" data-goto-promo-links>+ 新建链接</button>`)}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>套餐</th><th>正式价</th><th>渠道专享价</th><th>佣金/单</th><th>推广链接数</th><th>累计点击</th><th>累计成交</th><th>状态</th></tr></thead>
+              <tbody>${pkgPg.slice.map(p => {
+                const st = packageLinkStats(p.id);
+                return `<tr>
+                  <td><strong>${p.name}</strong><br><small style="color:var(--muted)">${p.skuId}</small></td>
+                  <td>¥${p.officialPrice}</td>
+                  <td><strong>¥${p.channelPrice}</strong></td>
+                  <td>¥${p.commissionPerOrder}</td>
+                  <td>${st.linkCount} 条</td>
+                  <td>${st.clicks}</td>
+                  <td>${st.conversions}</td>
+                  <td>${tag(p.status)}</td>
+                </tr>`;
+              }).join("") || "<tr><td colspan='8'>暂无可售套餐</td></tr>"}</tbody>
+            </table>
+            ${renderTablePager(pkgPg, "chlinks-pkg-page")}
           </div>
         </section>`;
     }
@@ -15108,59 +15298,89 @@
     function renderCommissionStatement() {
       const cid = channelEntityId();
       const f = getPf();
+      if (!f.month || f.month === "全部") f.month = "last6";
       const instant = channelInstantCommissionEnabled(cid);
       const contract = cardContractForChannel(cid);
-      const months = commissionMonthsForChannel(cid);
-      const monthRows = (f.month && f.month !== "全部" ? [f.month] : months).map(m => commissionMonthSummary(cid, m));
+      const rangeMonths = commissionRangeMonthKeys(f.month);
+      const monthSet = new Set(rangeMonths);
+      const monthRows = rangeMonths.flatMap(m => commissionMonthSettleRows(cid, m));
       const grand = monthRows.reduce((acc, r) => ({
         orderCount: acc.orderCount + r.orderCount,
         totalPaid: acc.totalPaid + r.totalPaid,
         totalCommission: acc.totalCommission + r.totalCommission,
         totalFee: acc.totalFee + r.totalFee
       }), { orderCount: 0, totalPaid: 0, totalCommission: 0, totalFee: 0 });
-      const focusMonth = f.month && f.month !== "全部" ? f.month : (months[0] || "");
-      const focus = focusMonth ? commissionMonthSummary(cid, focusMonth) : null;
-      return `
-        ${ownScopeBanner()}
-        <div class="platform-price-banner" style="margin-bottom:14px">${instant
-          ? `已开启<strong>佣金及时到付</strong> · 佣金比例 <strong>${formatCommissionRate(contract?.commissionRate)}</strong> · 支付成功<strong>即时分账</strong>至渠道子商户 · 平台 1% 同步清分`
-          : `佣金按<strong>自然月</strong>汇总 · 用户经链接购卡由平台<strong>代收</strong> · 支付成功<strong>实时清分</strong> 1% · 渠道佣金由运营商<strong>线下结算</strong>`}</div>
+      const detailOrders = channelLinkOrders
+        .filter(o => o.channelId === cid && monthSet.has(payMonthKey(o.payTime)))
+        .sort((a, b) => String(b.payTime).localeCompare(String(a.payTime)));
+      const sub = state.commissionStatementSubTab || "summary";
+      const topTabs = panelTopTabs([["summary", "月度汇总"], ["detail", "明细"]], sub, "comm-sub");
+      const rangeLabel = commissionRangeLabel(f.month);
+      const isSingleMonth = /^\d{4}-\d{2}$/.test(f.month);
+      const kpiMonthLabel = isSingleMonth ? f.month : rangeLabel;
+      const rangeFilter = `<div style="margin-bottom:14px">${inlinePfBarHtml("commissionStatement")}</div>`;
+      const pending = contract?.settlementChangePending;
+      const pendingBanner = pending
+        ? `<div class="pool-warn-banner" style="margin-bottom:12px">${noteBtn("channel_instant_commission")} 结算方式将于 <strong>${pending.effectiveFrom} 00:00</strong> 切换为「${pending.targetInstant ? "即时到付" : "线下结算"}」；此前新单仍按当前生效方式。历史订单不回溯（decision-065）。</div>`
+        : "";
+
+      const banner = `${pendingBanner}<div class="platform-price-banner" style="margin-bottom:14px">${instant
+        ? `当前生效：<strong>佣金及时到付</strong> · 佣金比例 <strong>${formatCommissionRate(contract?.commissionRate)}</strong> · 支付成功<strong>即时分账</strong>至渠道子商户 · 平台 1% 同步清分`
+        : `当前生效：佣金<strong>线下结算</strong> · 用户经链接购卡由平台<strong>代收</strong> · 支付成功<strong>实时清分</strong> 1% · 渠道佣金由运营商<strong>线下结算</strong>`}</div>
         <div class="kpi-grid">
-          ${kpi("统计月份", (f.month && f.month !== "全部" ? f.month : months.length + " 个月"), focus ? focus.orderCount + " 笔成交" : "—", "月", "channel_card_margin")}
-          ${kpi("实付合计", "¥" + (focus ? focus.totalPaid : grand.totalPaid).toLocaleString(), "用户支付总额", "付", "channel_settlement_card")}
-          ${kpi(instant ? "已分账佣金" : "应结佣金", "¥" + (focus ? focus.totalCommission : grand.totalCommission).toLocaleString(), instant ? "已即时到付" : "线下与运营商结", "佣", "channel_card_margin")}
-          ${kpi("平台 1%", "¥" + (focus ? focus.totalFee : grand.totalFee).toFixed(2), "已清分", "服", "platform_fee")}
-        </div>
-        <section class="panel">
-          ${panelHead("月度佣金汇总", instant ? "按自然月统计 · 佣金已即时分账" : "按自然月统计链接购卡与应结佣金", "channel_card_margin")}
-          <div class="panel-body orders-table-wrap">
-            <table>
-              <thead><tr><th>月份</th><th>成交笔数</th><th>实付合计</th><th>${instant ? "已分账佣金" : "应结佣金"}</th><th>平台 1%</th><th>结算状态</th></tr></thead>
-              <tbody>${monthRows.map(r => `<tr>
-                <td><strong>${r.month}</strong></td>
-                <td>${r.orderCount}</td>
-                <td>¥${r.totalPaid.toLocaleString()}</td>
-                <td><strong style="color:var(--green)">¥${r.totalCommission.toLocaleString()}</strong></td>
-                <td>¥${r.totalFee.toFixed(2)}</td>
-                <td>${tag(r.orderCount ? (instant ? "已即时分账" : "待线下结算") : "无成交")}</td>
-              </tr>`).join("") || "<tr><td colspan='6'>暂无对账数据</td></tr>"}</tbody>
-            </table>
-          </div>
-        </section>
-        ${focus && focus.orders.length ? `<section class="panel">
-          ${panelHead(focusMonth + " 明细", "该月经链接购卡订单", "module_channel_orders")}
+          ${kpi("统计范围", kpiMonthLabel, grand.orderCount + " 笔成交", "月", "channel_card_margin")}
+          ${kpi("实付合计", "¥" + grand.totalPaid.toLocaleString(), "用户支付总额", "付", "channel_settlement_card")}
+          ${kpi("佣金合计", "¥" + grand.totalCommission.toLocaleString(), "含即时分账与待线下", "佣", "channel_card_margin")}
+          ${kpi("平台 1%", "¥" + grand.totalFee.toFixed(2), "已清分", "服", "platform_fee")}
+        </div>`;
+
+      if (sub === "detail") {
+        const pg = paginateList(detailOrders, state.commissionDetailPage, state.commissionDetailPageSize || 8);
+        state.commissionDetailPage = pg.page;
+        return `
+        ${ownScopeBanner()}
+        ${rangeFilter}
+        ${banner}
+        <section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${panelHead(isSingleMonth ? (f.month + " 明细") : (rangeLabel + " 明细"), "范围内经链接购卡订单 · 订单级结算方式", "module_channel_orders")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算方式</th><th>链接用途</th><th>支付时间</th></tr></thead>
-              <tbody>${focus.orders.map(o => `<tr>
+              <tbody>${pg.slice.map(o => `<tr>
                 <td>${o.id}</td><td>${o.riderName}<br><small>${o.phone}</small></td><td>${o.skuName}</td>
                 <td>¥${o.paidPrice}</td><td>¥${o.commission}</td>
                 <td>${tag(o.commissionSettlement || commissionSettlementLabel(cid))}</td>
                 <td>${o.linkPurpose || "—"}</td><td>${o.payTime}</td>
-              </tr>`).join("")}</tbody>
+              </tr>`).join("") || "<tr><td colspan='8'>该范围内暂无明细</td></tr>"}</tbody>
+            </table>
+            ${renderTablePager(pg, "comm-detail-page")}
+          </div>
+        </section>`;
+      }
+
+      return `
+        ${ownScopeBanner()}
+        ${rangeFilter}
+        ${banner}
+        <section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${panelHead("月度佣金汇总", "按自然月 × 结算方式拆行（同月可多行）· decision-065", "channel_card_margin")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>月份</th><th>结算方式</th><th>成交笔数</th><th>实付合计</th><th>佣金</th><th>平台 1%</th><th>结算状态</th></tr></thead>
+              <tbody>${monthRows.map(r => `<tr>
+                <td><strong>${r.month}</strong></td>
+                <td>${r.settleType === "—" ? "—" : tag(r.settleType)}</td>
+                <td>${r.orderCount}</td>
+                <td>¥${r.totalPaid.toLocaleString()}</td>
+                <td><strong style="color:var(--green)">¥${r.totalCommission.toLocaleString()}</strong></td>
+                <td>¥${r.totalFee.toFixed(2)}</td>
+                <td>${tag(r.status)}</td>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无对账数据</td></tr>"}</tbody>
             </table>
           </div>
-        </section>` : ""}`;
+        </section>`;
     }
 
     function renderRentPool() {
@@ -16063,7 +16283,60 @@
       root.querySelectorAll("[data-new-promo-link]").forEach(btn => {
         btn.onclick = () => {
           const pkgs = channelPackagesFor(channelEntityId());
+          state.channelLinksSubTab = "links";
           state.channelLinkForm = { packageId: pkgs[0]?.id || "", purpose: "" };
+          render();
+        };
+      });
+      root.querySelectorAll("[data-goto-promo-links]").forEach(btn => {
+        btn.onclick = () => {
+          const pkgs = channelPackagesFor(channelEntityId());
+          state.channelLinksSubTab = "links";
+          state.channelPromoLinksPage = 1;
+          state.channelLinkForm = { packageId: pkgs[0]?.id || "", purpose: "" };
+          render();
+        };
+      });
+      root.querySelectorAll("[data-chlinks-sub]").forEach(btn => {
+        btn.onclick = () => {
+          state.channelLinksSubTab = btn.dataset.chlinksSub;
+          if (btn.dataset.chlinksSub !== "links") state.channelLinkForm = null;
+          state.channelPackagesPage = 1;
+          state.channelPromoLinksPage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-chlinks-pkg-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.chlinksPkgPage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.channelPackagesPage = p;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-chlinks-link-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.chlinksLinkPage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.channelPromoLinksPage = p;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-comm-sub]").forEach(btn => {
+        btn.onclick = () => {
+          state.commissionStatementSubTab = btn.dataset.commSub;
+          state.commissionDetailPage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-comm-detail-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.commDetailPage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.commissionDetailPage = p;
           render();
         };
       });
@@ -17838,14 +18111,8 @@
                 ? "B 端确认消耗/激活码核销计提；优先划扣保证金。"
                 : "平台服务费两类：C 端支付分账 + B 端消耗计提；含比例与月结账单。";
           } else if (state.view === "platformService" && cur === "interOverview") {
-            const it = state.interOpTab || "overview";
-            desc = it === "ledger"
-              ? "跨网服务费明细；可按站点、状态、平台方向、换电单筛选。"
-              : it === "daily"
-                ? "日清账单；每日 23:59:59 汇总，可按状态筛选。"
-                : it === "period"
-                  ? "周/月汇总由日账单聚合；不改变日清事实账。"
-                  : "保证金/信用额度 KPI、往来趋势；页内含明细/日清/周月。";
+            /* 三级 Tab 说明下沉到页内 Tab 下方，顶栏不再随 Tab 切换 */
+            desc = "";
           } else if (state.view === "orderService" && cur === "package") {
             desc = "个人用户购买包月/次卡；含待退款状态。";
           } else if (state.view === "orderService" && cur === "swap") {
@@ -18088,6 +18355,7 @@
       if (pfKey() === "orders_user_deposit") state.userDepositPage = 1;
       if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
       if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
+      if (pfKey() === "commissionStatement") state.commissionDetailPage = 1;
       if (state.view === "depositManage" && (state.depositTab || "pending") === "pending") {
         state.depositRechargePendingPage = 1;
         state.depositRechargeProcessedPage = 1;
@@ -18103,6 +18371,7 @@
       if (pfKey() === "orders_user_deposit") state.userDepositPage = 1;
       if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
       if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
+      if (pfKey() === "commissionStatement") state.commissionDetailPage = 1;
       render();
     });
     document.querySelector(".main").addEventListener("keydown", e => {
@@ -18116,6 +18385,7 @@
       if (pfKey() === "orders_user_deposit") state.userDepositPage = 1;
       if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
       if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
+      if (pfKey() === "commissionStatement") state.commissionDetailPage = 1;
       render();
     });
 
