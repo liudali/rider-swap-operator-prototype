@@ -378,13 +378,30 @@
     }
 
     function commissionSettlementLabel(channelId) {
-      return channelInstantCommissionEnabled(channelId) ? "即时分账" : "线下待结";
+      return channelInstantCommissionEnabled(channelId) ? "即时分账" : "线下结算";
     }
 
     function orderCommissionSettleType(o) {
       const s = String(o.commissionSettlement || "");
       if (/即时/.test(s)) return "即时分账";
       return "线下结算";
+    }
+
+    /** 购卡记录「状态」：线下结算不展示清分态，统一 ——（decision-071） */
+    function linkOrderStatusCell(o, channelId) {
+      const settle = o.commissionSettlement
+        ? orderCommissionSettleType(o)
+        : commissionSettlementLabel(channelId);
+      if (settle === "线下结算") return "——";
+      const st = o.status || "—";
+      return st === "—" || st === "——" ? "——" : tag(st);
+    }
+
+    function linkOrderSettleCell(o, channelId) {
+      const settle = o.commissionSettlement
+        ? orderCommissionSettleType(o)
+        : commissionSettlementLabel(channelId);
+      return tag(settle);
     }
 
     function commissionMonthSettleRows(cid, month) {
@@ -410,7 +427,8 @@
             totalPaid: list.reduce((s, o) => s + o.paidPrice, 0),
             totalCommission: list.reduce((s, o) => s + o.commission, 0),
             totalFee: list.reduce((s, o) => s + o.platformFee, 0),
-            status: t === "即时分账" ? "已即时分账" : "待线下结算"
+            /* 线下无系统清分态，状态 ——（对齐购卡记录 decision-071 / 074） */
+            status: t === "即时分账" ? "已即时分账" : "——"
           };
         });
     }
@@ -3097,8 +3115,7 @@
     function teamPoolCell(team) {
       const pid = resolveTeamPoolId(team);
       const p = poolById(pid);
-      const auto = defaultChannelPoolId() ? `<br><small style="color:var(--muted)">唯一池，自动绑定</small>` : "";
-      return p ? `<strong>${p.name}</strong><br><small>${p.id} · ${p.sellerName}</small>${auto}` : (pid || "—");
+      return p ? `<strong>${p.name}</strong><br><small>${p.id} · ${p.sellerName}</small>` : (pid || "—");
     }
 
     function syncTeamRiderCounts() {
@@ -3473,6 +3490,53 @@
 
     function selectedDayPool() {
       return myDayPools().find(p => p.id === state.dayPoolSelectedId) || myDayPools()[0] || null;
+    }
+
+    function dayPoolDetailBodyHtml(sel) {
+      if (!sel) return "<p style=\"color:var(--muted)\">未找到额度池</p>";
+      return `
+        <div class="detail-grid">
+          <div class="detail-item"><span>额度池</span><strong>${sel.name}</strong><br><small style="font-weight:400;color:var(--muted)">${sel.id}</small></div>
+          <div class="detail-item"><span>售卖方</span><strong>${sel.sellerName || "—"}</strong></div>
+          <div class="detail-item"><span>采购单</span><strong>${sel.orderNo || "—"}</strong></div>
+          <div class="detail-item"><span>状态</span><strong>${poolStatusTag(sel.status)}</strong></div>
+          <div class="detail-item"><span>扣天口径</span><strong>${sel.deductMode || "—"}</strong></div>
+          <div class="detail-item"><span>激活时机</span><strong>${sel.activationMode || "—"}</strong></div>
+          <div class="detail-item"><span>池过期退款</span><strong>${sel.poolExpiryRefund || "—"}</strong></div>
+          <div class="detail-item"><span>批发单价</span><strong>¥${sel.wholesalePrice}/人天</strong></div>
+          <div class="detail-item"><span>总购买</span><strong>${(sel.totalDays || 0) - (sel.giftedDays || 0)} 人天</strong></div>
+          <div class="detail-item"><span>赠送</span><strong>${sel.giftedDays || 0} 人天</strong></div>
+          <div class="detail-item"><span>预占/冻结</span><strong>${sel.frozenDays || 0} 人天</strong></div>
+          <div class="detail-item"><span>已消耗</span><strong>${sel.consumedDays || 0} 人天</strong></div>
+          <div class="detail-item"><span>可用余额</span><strong>${sel.availableDays || 0} 人天</strong></div>
+          <div class="detail-item"><span>可退款购买额度</span><strong>${Math.max(0, (sel.availableDays || 0) - (sel.giftedDays || 0))} 人天</strong></div>
+          <div class="detail-item"><span>有效期</span><strong>${sel.validFrom || "—"} ~ ${sel.validTo || "—"}</strong></div>
+        </div>
+        <div class="usage-bar" style="margin-top:12px"><i style="width:${Math.min(100, sel.balancePct || 0)}%"></i></div>
+        <p style="font-size:12px;color:var(--muted);margin:8px 0 0">已消耗 ${sel.consumedDays || 0} · 预占 ${sel.frozenDays || 0} · 可用 ${sel.availableDays || 0} / 总量 ${sel.totalDays || 0}</p>
+        <div class="stat-pills" style="margin-top:12px">
+          <span class="stat-pill">底层 <strong>分钟账本</strong>（1人天=1440分钟）</span>
+          <span class="stat-pill">余额比例 <strong>${sel.balancePct != null ? sel.balancePct + "%" : "—"}</strong></span>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:14px 0 0">${noteBtn("day_pool_ledger")} ${noteBtn("day_pool_panel")} 增购入账见「额度明细」；池不支持在线退款，须与运营商线下协商。</p>`;
+    }
+
+    function openDayPoolDetail(poolId) {
+      const sel = (poolId && poolById(poolId)) || selectedDayPool();
+      if (!sel || (isChannelRole() && sel.ownerId !== currentEntity().id)) {
+        showProtoToast("未找到额度池");
+        return;
+      }
+      state.dayPoolSelectedId = sel.id;
+      state.dayPoolTab = "pools";
+      state.dayPoolPoolsSubTab = "list";
+      document.querySelector("#drawerTitle").textContent = "额度池详情 · " + sel.name;
+      document.querySelector("#drawerBody").innerHTML = dayPoolDetailBodyHtml(sel);
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindNotes();
+      bindDrawerActions();
     }
 
     function poolStatusTag(status) {
@@ -3937,7 +4001,8 @@
       ],
       platformMarketing_pending: [
         { key: "keyword", label: "订单/手机", placeholder: "PMO-" },
-        { key: "activationStatus", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已退款", t: "已退款" }] }
+        { key: "orderStatus", label: "订单状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已完结", t: "已完结" }] },
+        { key: "refundStatus", label: "退款状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "——", t: "——" }, { v: "退款中", t: "退款中" }, { v: "已退款", t: "已退款" }] }
       ],
       platformMarketing_settlements: [
         { key: "operatorId", label: "运营商", type: "select", options: () => platformOperatorOptions() },
@@ -4117,12 +4182,15 @@
       return Math.round(pkg * 0.01 * 100) / 100;
     }
 
+    /** 平台统一定义的信用免押门槛（运营商押金设置页只读展示，decision-073） */
+    const CREDIT_WAIVER_SCORE_MIN = 500;
+
     function myPersonalDepositSettings() {
       const eid = currentEmployee() ? currentEmployee().entityId : currentEntity().id;
       if (!operatorPersonalDepositSettings[eid]) {
         operatorPersonalDepositSettings[eid] = {
           amount: 99, enabled: true, scope: "个人套餐",
-          wechatPayScoreMin: 650, zhimaScoreMin: 650,
+          wechatPayScoreMin: CREDIT_WAIVER_SCORE_MIN, zhimaScoreMin: CREDIT_WAIVER_SCORE_MIN,
           note: "信用不足时实缴；达标免押则实收 ¥0",
           updatedAt: new Date().toISOString().slice(0, 10),
           updatedBy: entityNameById(eid)
@@ -4132,8 +4200,9 @@
       if (s.amount == null || Number.isNaN(Number(s.amount))) s.amount = 99;
       if (s.enabled == null) s.enabled = true;
       if (!s.scope) s.scope = "个人套餐";
-      if (s.wechatPayScoreMin == null || Number.isNaN(Number(s.wechatPayScoreMin))) s.wechatPayScoreMin = 650;
-      if (s.zhimaScoreMin == null || Number.isNaN(Number(s.zhimaScoreMin))) s.zhimaScoreMin = 650;
+      /* 门槛由平台统一，不可被运营商改写 */
+      s.wechatPayScoreMin = CREDIT_WAIVER_SCORE_MIN;
+      s.zhimaScoreMin = CREDIT_WAIVER_SCORE_MIN;
       return s;
     }
 
@@ -4206,15 +4275,18 @@
         }
       }
       const maxPkg = depositOnly ? 0 : Number(rf.suggestedRefund ?? rf.pkgRefund) || 0;
+      /* 中途完结：押金与套餐费解耦，处理弹窗默认不退押（decision-070） */
+      const earlyEndNoDeposit = !depositOnly && rf.type === "中途完结";
       const maxDep = depositOnly
         ? (Number(rf.depositRefund) || Number(pkg?.depositPaid) || 0)
-        : (Number(rf.depositRefund) || Number(pkg?.depositPaid) || 0);
+        : earlyEndNoDeposit ? 0 : (Number(rf.depositRefund) || Number(pkg?.depositPaid) || 0);
       const emergencySwaps = Number(rf.emergencySwaps) || Number(pkg?.emergencySwapsPurchased) || 0;
       return {
         pkg, depositOnly, purchaseDays, refundableDays, emergencySwaps,
+        earlyEndNoDeposit,
         maxPkg, maxDep,
         defaultPkg: depositOnly ? 0 : Number(rf.suggestedRefund ?? rf.pkgRefund) || 0,
-        defaultDep: Number(rf.depositRefund) || 0
+        defaultDep: earlyEndNoDeposit ? 0 : (Number(rf.depositRefund) || 0)
       };
     }
 
@@ -4242,19 +4314,21 @@
           <div class="refund-process-presets" role="group" aria-label="退款策略">
             <button type="button" class="refund-preset active" data-refund-preset="manual">手动填写退款金额</button>
             <button type="button" class="refund-preset" data-refund-preset="full">退还全部金额</button>
-            <button type="button" class="refund-preset" data-refund-preset="deposit">仅退还押金</button>
+            ${caps.earlyEndNoDeposit ? "" : `<button type="button" class="refund-preset" data-refund-preset="deposit">仅退还押金</button>`}
             <button type="button" class="refund-preset" data-refund-preset="reject">拒绝退款</button>
           </div>
           <div class="refund-process-amounts" data-refund-amounts>
-            <label>实退押金金额<input name="depositRefund" type="number" step="0.01" min="0" max="${caps.maxDep}" value="${caps.defaultDep}" /></label>
+            <label>实退押金金额<input name="depositRefund" type="number" step="0.01" min="0" max="${caps.maxDep}" value="${caps.defaultDep}" ${caps.earlyEndNoDeposit ? "readonly" : ""} /></label>
             <label>实退订单金额<input name="pkgRefund" type="number" step="0.01" min="0" max="${caps.maxPkg}" value="${caps.defaultPkg}" ${caps.depositOnly ? "readonly" : ""} /></label>
           </div>
           <div class="refund-process-reject" data-refund-reject hidden>
             <label>拒绝原因<textarea name="rejectReason" rows="2" placeholder="请填写拒绝原因">${escProtoAttr(rf.rejectReason || "")}</textarea></label>
           </div>
           <p class="refund-process-hint">${caps.depositOnly
-            ? "押金退还不完结套餐；实退订单金额固定为 0。"
-            : "实退金额不得超过上方可退口径；确认后原路退至用户支付渠道。"}</p>
+            ? "押金退还不完结套餐；实退订单金额固定为 0。须电池已还且服务/订单已完结。"
+            : caps.earlyEndNoDeposit
+              ? "中途完结仅退套餐费；押金不在本单退还。用户可在电池已还且订单完结后另行申请退押。"
+              : "实退金额不得超过上方可退口径；确认后原路退至用户支付渠道。"}</p>
         </div>`;
       openProtoForm({
         title: "处理退款",
@@ -4280,7 +4354,7 @@
             if (mode === "full") {
               depInput.value = caps.maxDep;
               pkgInput.value = caps.maxPkg;
-              depInput.readOnly = false;
+              depInput.readOnly = !!caps.earlyEndNoDeposit;
               if (!caps.depositOnly) pkgInput.readOnly = false;
             } else if (mode === "deposit") {
               depInput.value = caps.maxDep;
@@ -4288,7 +4362,7 @@
               depInput.readOnly = false;
               if (!caps.depositOnly) pkgInput.readOnly = false;
             } else if (mode === "manual") {
-              depInput.readOnly = false;
+              depInput.readOnly = !!caps.earlyEndNoDeposit;
               if (!caps.depositOnly) pkgInput.readOnly = false;
             }
           };
@@ -9672,31 +9746,34 @@
         </section>`;
       } else if (tab === "pending") {
         const rows = platformMarketingOrders.filter(o => {
-          if (f.activationStatus === "已退款" && o.status !== "已退款") return false;
+          const refund = o.refundStatus || "——";
+          if (f.orderStatus && f.orderStatus !== "全部" && o.status !== f.orderStatus) return false;
+          if (f.refundStatus && f.refundStatus !== "全部" && refund !== f.refundStatus) return false;
+          /* 兼容旧筛选项 activationStatus */
+          if (f.activationStatus === "已退款" && refund !== "已退款") return false;
           if (f.activationStatus === "服务中" && o.status !== "服务中") return false;
-          if (f.activationStatus === "pending" || f.activationStatus === "activated") {
-            /* 兼容旧筛选项：不再有待激活 */
-            if (f.activationStatus === "pending") return false;
-            if (f.activationStatus === "activated" && o.status !== "服务中") return false;
-          } else if (f.activationStatus && f.activationStatus !== "全部" && o.status !== f.activationStatus) return false;
           if (f.keyword && !matchKw(o.id, f.keyword) && !matchKw(o.phone, f.keyword) && !matchKw(o.riderName, f.keyword)) return false;
           return true;
         });
         body = `<section class="panel">
           ${panelHead("成交订单", `共 ${rows.length} 笔 · 立减券 · 运营商收款`, "platform_marketing_collect")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_marketing_payout")} 支付成功即服务中；1% 按实付分账；立减额<strong>运营商让利</strong>；营销服务费协议记账。<strong>无平台代收/补贴/拨付。</strong></p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_marketing_payout")} 支付成功即服务中；1% 按实付分账；立减额<strong>运营商让利</strong>；营销服务费协议记账。<strong>无平台代收/补贴/拨付。</strong>订单状态与退款状态分列（decision-078）。</p>
             <table>
-              <thead><tr><th>订单</th><th>用户</th><th>锁定运营商</th><th>原价/立减/实付</th><th>1%技服</th><th>营销费</th><th>状态</th></tr></thead>
-              <tbody>${rows.map(o => `<tr>
+              <thead><tr><th>订单</th><th>用户</th><th>锁定运营商</th><th>原价/立减/实付</th><th>1%技服</th><th>营销费</th><th>订单状态</th><th>退款状态</th></tr></thead>
+              <tbody>${rows.map(o => {
+                const refund = o.refundStatus || "——";
+                return `<tr>
                 <td>${o.id}<br><small>${o.payTime}<br>${o.linkPurpose || o.linkCode}</small></td>
                 <td>${o.riderName}<br><small>${o.phone}</small></td>
                 <td><strong>${o.lockedOperatorName || o.activatedOperatorName || "—"}</strong><br><small>${o.lockedOperatorId || o.activatedOperatorId || ""}</small></td>
                 <td>¥${o.officialPrice} − ¥${o.couponAmount || 0}<br><strong>实付 ¥${o.paidPrice}</strong></td>
                 <td>¥${o.platformFee}</td>
                 <td>${o.marketingServiceFee != null ? "¥" + o.marketingServiceFee : "—"}</td>
-                <td>${tag(o.status)}${o.refundStatus ? `<br><small>${o.refundStatus}</small>` : ""}</td>
-              </tr>`).join("") || "<tr><td colspan='7'>暂无订单</td></tr>"}</tbody>
+                <td>${tag(o.status)}</td>
+                <td>${refund === "——" ? "——" : tag(refund)}</td>
+              </tr>`;
+              }).join("") || "<tr><td colspan='8'>暂无订单</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -12313,7 +12390,7 @@
     function packageServiceStateDetailCompareHtml(scopedRows) {
       const states = ["服务中", "已冻结", "中途完结", "已完结"];
       const preferIds = {
-        "服务中": ["SUB260525001", "SUB260524001"],
+        "服务中": ["SUB260524001", "SUB260525001"],
         "已冻结": ["SUB260524002"],
         "中途完结": ["SUB260615033", "SUB260523088"],
         "已完结": ["SUB260401099", "SUB260606001"]
@@ -13258,21 +13335,18 @@
           <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">「退款」「修正」为扣减：填写正数，系统将记为负向变动；扣减后可用余额不得为负。协商退款选「退款」。</p>
           <label>原因/协商单号<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">线下协商退款，扣减未使用购买额度</textarea></label>`;
       } else if (mode === "team") {
-        const multi = myDayPools().length > 1;
-        const defPool = defaultChannelPoolId();
+        const defPool = defaultChannelPoolId() || (myDayPools()[0] && myDayPools()[0].id);
         const defP = defPool ? poolById(defPool) : null;
         html = `
           <label>团队名称<input name="teamName" placeholder="如：浦东早班队"></label>
-          ${multi ? `<label>消耗额度池<select name="poolId">${myDayPools().map(p => `<option value="${p.id}">${p.name} · ${p.sellerName}</option>`).join("")}</select></label>
-          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">当前有 <strong>${myDayPools().length}</strong> 个额度池，须指定本团队从哪个池扣减人天。</p>`
-            : `<label>消耗额度池<input readonly value="${defP ? defP.name + "（唯一池，自动绑定）" : "—"}"></label><input type="hidden" name="poolId" value="${defPool || ""}">`}
+          <label>消耗额度池<input readonly value="${defP ? defP.name + "（渠道唯一池）" : "—"}"></label>
+          <input type="hidden" name="poolId" value="${defPool || ""}">
+          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">一个渠道商仅一个人天池；团队与骑手统一从该池扣减，无需按团队分配。</p>
           <label>备注<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)"></textarea></label>`;
       } else if (mode === "teamPool" && teamForEdit) {
-        html = `
-          <label>团队<input readonly value="${teamForEdit.name}${teamForEdit.isDefault ? "（默认团队）" : ""}"></label>
-          <input type="hidden" name="teamId" value="${teamForEdit.id}">
-          <label>消耗额度池<select name="poolId">${myDayPools().map(p => `<option value="${p.id}"${p.id === resolveTeamPoolId(teamForEdit) ? " selected" : ""}>${p.name} · ${p.sellerName}</option>`).join("")}</select></label>
-          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">修改后该团队骑手后续预占/消耗从新池扣减；已分配未用人天仍在原池余额。</p>`;
+        /* 一渠道一池：不再提供按团队切换消耗池 */
+        showProtoToast("渠道仅一个人天池，无需按团队设置消耗池");
+        return;
       }
       document.querySelector("#poolForm").innerHTML = html;
       clearOpenModalInlineError(document.querySelector("#poolModal"));
@@ -14299,10 +14373,10 @@
         }
       } else if (tab === "deposit") {
         const cfg = myPersonalDepositSettings();
-        const wxMin = Number(cfg.wechatPayScoreMin) || 650;
-        const zhimaMin = Number(cfg.zhimaScoreMin) || 650;
+        const wxMin = CREDIT_WAIVER_SCORE_MIN;
+        const zhimaMin = CREDIT_WAIVER_SCORE_MIN;
         body = `<section class="panel">
-          ${panelHead("押金设置", "个人套餐 · 信用门槛 + 不足时须缴电池押金数额", "pricing_deposit")}
+          ${panelHead("押金设置", "个人套餐 · 信用门槛（平台统一只读）+ 不足时须缴电池押金数额", "pricing_deposit")}
           <div class="panel-body">
             <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("pricing_deposit")}${noteBtn("rider_battery_deposit")}${noteBtn("orders_deposit_waiver")}
               适用对象：<strong>个人套餐用户</strong> · 微信支付分或芝麻信用<strong>任一路达标</strong>可免押 · 均未达标则实缴 · 购套餐<strong>同笔支付</strong>进运营商子商户 · 不参与清分</div>
@@ -14324,23 +14398,21 @@
                   <option value="0" ${cfg.enabled === false ? "selected" : ""}>关闭（本运营商暂不收个人押金）</option>
                 </select>
               </label>
-              <label style="display:flex;flex-direction:column;gap:6px;font-size:13px">
-                <span>微信支付分免押门槛</span>
-                <input name="wechatPayScoreMin" type="number" min="0" max="950" step="1" required value="${wxMin}" style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
-                <small style="color:var(--muted)">≥ 该分可免押 · 常见 550～750</small>
-              </label>
-              <label style="display:flex;flex-direction:column;gap:6px;font-size:13px">
-                <span>芝麻信用免押门槛</span>
-                <input name="zhimaScoreMin" type="number" min="0" max="950" step="1" required value="${zhimaMin}" style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
-                <small style="color:var(--muted)">≥ 该分可免押 · 与支付分任一路达标即可</small>
-              </label>
+              <div class="detail-item" style="margin:0">
+                <span>平台统一 · 不可修改</span>
+                <strong>微信支付分免押（≥${wxMin}）</strong>
+              </div>
+              <div class="detail-item" style="margin:0">
+                <span>平台统一 · 不可修改</span>
+                <strong>芝麻信用免押（≥${zhimaMin}）</strong>
+              </div>
               <label class="form-span-2" style="display:flex;flex-direction:column;gap:6px;font-size:13px;grid-column:1/-1">
                 <span>说明（对内）</span>
                 <input name="note" value="${(cfg.note || "").replace(/"/g, "&quot;")}" placeholder="可选" style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
               </label>
               <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button type="submit" class="btn primary" data-save-personal-deposit>保存押金设置</button>
-                <small style="color:var(--muted)">[假设] 保存后对新购套餐立即生效；在途订单沿用下单时数额与门槛</small>
+                <small style="color:var(--muted)">可改押金数额与启停；免押门槛由平台统一，运营商不可修改（decision-073）</small>
               </div>
             </form>
             <table style="margin-top:20px">
@@ -14565,13 +14637,15 @@
           title = "激活码批发订单";
           noteId = "channel_settlement_activation";
           subHint = "AC- · 确认到账后按单造码（订单=批次）· 一码一用";
-          thead = `<tr><th>批发单（批次）</th><th>渠道商</th><th>套餐码</th><th>数量</th><th>金额</th><th>支付</th><th>状态</th><th>操作</th></tr>`;
+          thead = `<tr><th>批发单（批次）</th><th>渠道商</th><th>套餐码</th><th>数量</th><th>金额</th><th>支付</th><th>订单状态</th><th>发码状态</th><th>操作</th></tr>`;
+          emptyCol = 9;
           tbody = pg.slice.map(o => `<tr>
-                  <td>${o.id}${o.codesMinted ? `<br><small style="color:var(--muted)">已发码 ${o.codesMinted}</small>` : ""}</td>
+                  <td>${o.id}${o.codesMinted ? `<br><small style="color:var(--muted)">造码 ${o.codesMinted} 张</small>` : ""}</td>
                   <td>${o.channelName}</td><td>${o.skuName}<br><small>${o.validityDays} 天/码 · ¥${o.unitPrice}</small></td>
                   <td>${o.qty} 码</td><td>¥${o.amount.toLocaleString("zh-CN")}</td>
                   <td>${o.payMethod}${o.offlineVoucher ? `<br><small>${o.offlineVoucher}</small>` : ""}</td>
-                  <td>${tag(o.orderStatus)}${o.mintStatus ? `<br><small style="color:var(--muted)">${o.mintStatus}</small>` : ""}</td>
+                  <td>${tag(o.orderStatus)}</td>
+                  <td>${o.mintStatus ? tag(o.mintStatus) : "——"}</td>
                   <td>${b2bOrderActionCell(o, "operator", "act")}</td>
                 </tr>`).join("") || `<tr><td colspan='${emptyCol}'>暂无激活码批发订单</td></tr>`;
         } else {
@@ -15163,7 +15237,8 @@
         <td>${o.skuName}<br><small style="color:var(--muted)">${o.validityDays} 天/码 · ¥${o.unitPrice}</small></td>
         <td>${o.qty} 码</td>
         <td>¥${o.amount.toLocaleString("zh-CN")}</td>
-        <td>${tag(o.orderStatus)}${o.mintStatus ? `<br><small style="color:var(--muted)">${o.mintStatus}${o.codesMinted ? " " + o.codesMinted + " 张" : ""}</small>` : ""}</td>
+        <td>${tag(o.orderStatus)}</td>
+        <td>${o.mintStatus ? `${tag(o.mintStatus)}${o.codesMinted ? `<br><small style="color:var(--muted)">${o.codesMinted} 张</small>` : ""}` : "——"}</td>
         <td>${o.createdAt || "—"}${o.offlineVoucher ? `<br><small style="color:var(--muted)">${o.offlineVoucher}</small>` : ""}</td>
       </tr>`).join("");
       return `${ownScopeBanner()}
@@ -15177,8 +15252,8 @@
           ${panelHead("我的批发订单", "渠道申请 · 线下付款 · 运营商确认后按单造码", "channel_settlement_activation", `<button type="button" class="btn primary" data-act-wholesale-apply>申请批发</button>`)}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>批发单（批次）</th><th>套餐码</th><th>数量</th><th>金额</th><th>状态</th><th>申请时间</th></tr></thead>
-              <tbody>${orderRows || "<tr><td colspan='6'>暂无批发订单，请先申请批发</td></tr>"}</tbody>
+              <thead><tr><th>批发单（批次）</th><th>套餐码</th><th>数量</th><th>金额</th><th>订单状态</th><th>发码状态</th><th>申请时间</th></tr></thead>
+              <tbody>${orderRows || "<tr><td colspan='7'>暂无批发订单，请先申请批发</td></tr>"}</tbody>
             </table>
           </div>
         </section>
@@ -15450,11 +15525,11 @@
                 <td>${o.skuName}<br><small style="color:var(--muted)">正式 ¥${o.officialPrice}</small></td>
                 <td><strong>¥${o.paidPrice}</strong></td>
                 <td>¥${o.commission}${o.commissionRate ? `<br><small>${formatCommissionRate(o.commissionRate)}</small>` : ""}</td>
-                <td>${tag(o.commissionSettlement || commissionSettlementLabel(cid))}</td>
+                <td>${linkOrderSettleCell(o, cid)}</td>
                 <td>${o.linkPurpose || "—"}</td>
                 <td><small>${o.linkCode}</small></td>
                 <td>${o.payTime}</td>
-                <td>${tag(o.status)}</td>
+                <td>${linkOrderStatusCell(o, cid)}</td>
               </tr>`).join("") || "<tr><td colspan='10'>暂无购卡记录</td></tr>"}</tbody>
             </table>
           </div>
@@ -15516,7 +15591,7 @@
               <tbody>${pg.slice.map(o => `<tr>
                 <td>${o.id}</td><td>${o.riderName}<br><small>${o.phone}</small></td><td>${o.skuName}</td>
                 <td>¥${o.paidPrice}</td><td>¥${o.commission}</td>
-                <td>${tag(o.commissionSettlement || commissionSettlementLabel(cid))}</td>
+                <td>${linkOrderSettleCell(o, cid)}</td>
                 <td>${o.linkPurpose || "—"}</td><td>${o.payTime}</td>
               </tr>`).join("") || "<tr><td colspan='8'>该范围内暂无明细</td></tr>"}</tbody>
             </table>
@@ -15542,7 +15617,7 @@
                 <td>¥${r.totalPaid.toLocaleString()}</td>
                 <td><strong style="color:var(--green)">¥${r.totalCommission.toLocaleString()}</strong></td>
                 <td>¥${r.totalFee.toFixed(2)}</td>
-                <td>${tag(r.status)}</td>
+                <td>${r.status === "——" || r.status === "—" || r.status === "无成交" ? (r.status === "无成交" ? tag(r.status) : "——") : tag(r.status)}</td>
               </tr>`).join("") || "<tr><td colspan='7'>暂无对账数据</td></tr>"}</tbody>
             </table>
           </div>
@@ -15901,7 +15976,7 @@
                 <th>预占/冻结</th><th>已消耗</th><th>可用余额</th><th>余额比例</th>
                 <th>有效期</th><th>状态</th><th>操作</th>
               </tr></thead>
-              <tbody>${pools.map(p => `<tr class="${p.id === (sel && sel.id) ? "site-stats-total" : ""}" data-select-pool="${p.id}" style="cursor:pointer">
+              <tbody>${pools.map(p => `<tr class="${p.id === (sel && sel.id) ? "site-stats-total" : ""}">
                 <td><strong>${p.name}</strong><br><small style="color:var(--muted)">${p.id}</small></td>
                 <td>${isSeller ? p.ownerName : p.sellerName}</td>
                 <td>${p.totalDays - p.giftedDays} 人天</td>
@@ -15913,7 +15988,7 @@
                 <td>${p.validFrom} ~ ${p.validTo}</td>
                 <td>${poolStatusTag(p.status)}${p.warnSms ? "<br><small>已短信预警</small>" : ""}</td>
                 <td class="row-actions">
-                  <button type="button" class="link-btn" data-select-pool="${p.id}">详情</button>
+                  <button type="button" class="link-btn" data-open-pool-detail="${p.id}">详情</button>
                   ${canEditDayPool() ? `<button type="button" class="link-btn" data-pool-form="renew" data-pool-id="${p.id}">续费</button>` : ""}
                 </td>
               </tr>`).join("") || "<tr><td colspan='11'>暂无额度池</td></tr>"}</tbody>
@@ -15921,23 +15996,10 @@
           </div>
         </section>`;
         if (sel) {
-          body += `<section class="panel">
-            ${panelHead(sel.name + " 详情", sel.id + " · 订单 " + sel.orderNo, "day_pool_ledger")}
+          body += `<section class="panel" id="dayPoolDetailPanel">
+            ${panelHead(sel.name + " 详情", sel.id + " · 订单 " + sel.orderNo, "day_pool_ledger", `<button type="button" class="link-btn" data-open-pool-detail="${sel.id}">抽屉查看</button>`)}
             <div class="panel-body">
-              <div class="detail-grid">
-                <div class="detail-item"><span>扣天口径</span><strong>${sel.deductMode}</strong></div>
-                <div class="detail-item"><span>激活时机</span><strong>${sel.activationMode}</strong></div>
-                <div class="detail-item"><span>池过期退款</span><strong>${sel.poolExpiryRefund}</strong></div>
-                <div class="detail-item"><span>批发单价</span><strong>¥${sel.wholesalePrice}/人天</strong></div>
-                <div class="detail-item"><span>可退款购买额度</span><strong>${Math.max(0, sel.availableDays - sel.giftedDays)} 人天</strong></div>
-              </div>
-              <div class="usage-bar"><i style="width:${Math.min(100, sel.balancePct)}%"></i></div>
-              <small style="color:var(--muted)">已消耗 ${sel.consumedDays} · 预占 ${sel.frozenDays} · 可用 ${sel.availableDays} / 总量 ${sel.totalDays}</small>
-              <div class="stat-pills">
-                <span class="stat-pill">底层 <strong>分钟账本</strong>（1人天=1440分钟）</span>
-                <span class="stat-pill">今日预占 <strong>${sel.frozenDays}</strong> 人天</span>
-                <span class="stat-pill">今日确认 <strong>7</strong> 人天（含 1 人仅持电池）</span>
-              </div>
+              ${dayPoolDetailBodyHtml(sel)}
             </div>
           </section>`;
         }
@@ -15947,7 +16009,6 @@
         const ridersTopTabs = panelTopTabs([["list", "登记骑手"], ["teams", "骑手团队"]], ridersSub, "dpriders-sub");
         if (ridersSub === "teams") {
           const f = getPf();
-          const multiPool = myDayPools().length > 1;
           const teams = myChannelTeams().filter(t => {
             if (!matchKw(t.name, f.keyword)) return false;
             if (f.poolId !== "全部" && resolveTeamPoolId(t) !== f.poolId) return false;
@@ -15955,16 +16016,14 @@
           });
           const teamsPg = paginateList(teams, state.dayPoolTeamsPage, state.dayPoolTeamsPageSize || 8);
           state.dayPoolTeamsPage = teamsPg.page;
-          const poolHint = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} ${multiPool
-            ? `当前有 <strong>${myDayPools().length}</strong> 个额度池，各团队须指定消耗池。`
-            : "当前仅 1 个额度池，所有团队<strong>自动绑定</strong>该池扣减。"}</div>`;
+          const poolHint = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} 一个渠道商<strong>仅一个人天额度池</strong>；所有团队与骑手均从该池扣减，不按团队分配/切换消耗池。</div>`;
           body = `${poolHint}<section class="panel panel-with-top-tabs">
           ${ridersTopTabs}
           ${inlinePfBarHtml("dayPool_teams")}
-          ${panelHead("骑手团队", "创建团队；团队绑定消耗额度池", "day_pool_team", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="team">新增团队</button>` : "")}
+          ${panelHead("骑手团队", "创建与管理团队；扣减统一走渠道唯一额度池", "day_pool_team", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="team">新增团队</button>` : "")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>团队</th><th>消耗额度池</th><th>在职骑手</th><th>默认</th><th>创建时间</th><th>备注</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>团队</th><th>消耗额度池</th><th>在职骑手</th><th>默认</th><th>创建时间</th><th>备注</th><th>状态</th></tr></thead>
               <tbody>${teamsPg.slice.map(t => `<tr>
                 <td><strong>${t.name}</strong><br><small>${t.id}</small></td>
                 <td>${teamPoolCell(t)}</td>
@@ -15973,10 +16032,7 @@
                 <td>${t.createdAt || "—"}</td>
                 <td>${t.remark || "—"}</td>
                 <td>${tag(t.status)}</td>
-                <td class="row-actions">
-                  ${canEditDayPool() && multiPool ? `<button type="button" class="link-btn" data-pool-form="teamPool" data-pool-id="${t.id}">设置消耗池</button>` : (multiPool ? "" : `<small style="color:var(--muted)">自动绑定</small>`)}
-                </td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无团队</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无团队</td></tr>"}</tbody>
             </table>
             ${renderTablePager(teamsPg, "dpriders-team-page")}
           </div>
@@ -16656,18 +16712,8 @@
           const cfg = myPersonalDepositSettings();
           cfg.amount = Math.round(amount * 100) / 100;
           cfg.enabled = String(fd.get("enabled")) !== "0";
-          const wxMin = parseInt(fd.get("wechatPayScoreMin"), 10);
-          const zhimaMin = parseInt(fd.get("zhimaScoreMin"), 10);
-          if (Number.isNaN(wxMin) || wxMin < 0 || wxMin > 950) {
-            window.alert("请填写有效的微信支付分门槛（0～950）");
-            return;
-          }
-          if (Number.isNaN(zhimaMin) || zhimaMin < 0 || zhimaMin > 950) {
-            window.alert("请填写有效的芝麻信用门槛（0～950）");
-            return;
-          }
-          cfg.wechatPayScoreMin = wxMin;
-          cfg.zhimaScoreMin = zhimaMin;
+          cfg.wechatPayScoreMin = CREDIT_WAIVER_SCORE_MIN;
+          cfg.zhimaScoreMin = CREDIT_WAIVER_SCORE_MIN;
           cfg.note = String(fd.get("note") || "").trim();
           cfg.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
           cfg.updatedBy = currentEmployee()?.name || currentEntity().name;
@@ -16816,12 +16862,25 @@
       root.querySelectorAll("[data-pm-confirm-agreement]").forEach(btn => {
         btn.onclick = () => { confirmPlatformMarketingAgreement(btn.dataset.pmConfirmAgreement); showProtoToast("已确认参与平台营销活动"); render(); };
       });
+      root.querySelectorAll("[data-open-pool-detail]").forEach(btn => {
+        btn.onclick = e => {
+          e.preventDefault();
+          e.stopPropagation();
+          openDayPoolDetail(btn.dataset.openPoolDetail);
+        };
+      });
       root.querySelectorAll("[data-select-pool]").forEach(el => {
         el.onclick = e => {
           if (e.target.closest("[data-pool-form]")) return;
-          state.dayPoolSelectedId = el.dataset.selectPool;
+          e.stopPropagation();
+          const id = el.dataset.selectPool;
+          state.dayPoolSelectedId = id;
           state.dayPoolTab = "pools";
+          state.dayPoolPoolsSubTab = "list";
           render();
+          requestAnimationFrame(() => {
+            document.querySelector("#dayPoolDetailPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
         };
       });
       root.querySelectorAll("[data-select-pool-only]").forEach(btn => {

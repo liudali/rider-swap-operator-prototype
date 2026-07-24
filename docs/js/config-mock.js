@@ -268,9 +268,9 @@
       platformService: ["平台服务", "二级：服务保证金账户 / 平台服务费 / 运营商往来（页内：概况/明细/日清/周月）。"],
       channelSettlement: ["渠道结算模式", "人天池 / 渠道分销（骑士卡） / 设备租赁 / 激活码四种结算模式演示。"],
       channelCredit: ["渠道信用额度", "平台评估信用抵扣押金；运营商可调整额度；渠道提交打款凭证由运营商审核。"],
-      commissionStatement: ["佣金对账", "页内「月度汇总 / 明细」；统计范围默认<strong>近6个月</strong>，可选近12个月或任意自然月。开启<strong>佣金及时到付</strong>时展示已即时分账；未开启则为线下待结。"],
+      commissionStatement: ["佣金对账", "页内「月度汇总 / 明细」；统计范围默认<strong>近6个月</strong>，可选近12个月或任意自然月。开启<strong>佣金及时到付</strong>时展示已即时分账；未开启则为线下结算。"],
       channelLinks: ["套餐与链接", "管理运营商授权的可售套餐；同一套餐可生成<strong>多条推广链接</strong>与<strong>二维码</strong>；扫码直达运营商小程序；24h 归因期内享渠道专享价。"],
-      channelOrders: ["购卡记录", "经本渠道推广链接成交的套餐购买记录；支持<strong>支付时间</strong>筛选。"],
+      channelOrders: ["购卡记录", "经本渠道推广链接成交的套餐购买记录；支持<strong>支付时间</strong>筛选。结算仅<strong>即时分账 / 线下结算</strong>；线下结算时「状态」为 ——。"],
       rentPool: ["月租账单", "向运营商支付设备月租（MO-）；欠费停服。"],
       rentDevices: ["租赁设备", "柜机/电池 SN 与部署站点；月租为签约统一价。"],
       leaseWhitelist: ["白名单用户", "扁平名单 · 无团队 · 渠道自行维护；区分<strong>白名单免费</strong>与<strong>白名单付费</strong>（须购白名单套餐）。"],
@@ -397,21 +397,21 @@
       devices_bat: { title: "电池", content: "归属本运营商的电池 SN、电量与健康度。位置四档：自有电柜 / 其他运营商电柜 / 柜外 / 柜外-用户；支持按位置筛选与分页。补电与调拨在运维流程处理（原型仅占位）。" },
       orders_pkg: { title: "套餐购买订单", content: "骑手支付购买的包月/次卡订单，定义服务有效期与额度。支持中途完结退款、冻结/解冻。一笔套餐在有效期内可产生多笔换电订单。" },
       orders_service_change: { title: "服务变更", content: "骑手发起的<strong>中途完结</strong>及<strong>冻结/解冻</strong>记录。中途完结进入退款流程；冻结/解冻在个人用户满足条件时<strong>系统自动生效</strong>，本后台只读查询。" },
-      orders_early_end: { title: "退款追溯", content: "退款详情抽屉展示<strong>进度步骤</strong>、关联<strong>服务变更单/套餐单</strong>及<strong>支付与退款流水</strong>、清分冲正；与列表审核操作在同一模块完成。" },
-      refund_manage: { title: "退款管理", content: "C 端退订/中途完结/冷静期/<strong>押金退还</strong>统一入口。待审单点「处理退款」：展示可退口径，快捷策略（手动/全部/仅押金/拒绝），录入实退押金与实退订单金额（≤可退）。套餐退款与押金退还可<strong>分别</strong>设置自动/手动。<strong>支付渠道按比例原路退</strong>：退套餐费时<strong>平台 C 端 1% 同步按比例冲正退还</strong>（见 decision-008）。押金不参与 1%，退押无平台费冲正。" },
+      orders_early_end: { title: "中途完结与退款", content: "<strong>中途完结只退未使用套餐费</strong>，与押金解耦（decision-070）。<br>· 套餐费：进入「退款管理」按规则原路退<br>· 押金：不随中途完结一并退；用户在<strong>电池已还且订单完结</strong>后可自行申请「押金退还」<br>· 退款详情抽屉展示进度、关联单与流水" },
+      refund_manage: { title: "退款管理", content: "C 端退订/中途完结/冷静期/<strong>押金退还</strong>统一入口。待审单点「处理退款」：展示可退口径，快捷策略（手动/全部/仅押金/拒绝），录入实退押金与实退订单金额（≤可退）。<strong>中途完结默认仅退套餐费</strong>（decision-070）。套餐退款与押金退还可<strong>分别</strong>设置自动/手动。<strong>支付渠道按比例原路退</strong>：退套餐费时<strong>平台 C 端 1% 同步按比例冲正退还</strong>（见 decision-008）。押金不参与 1%，退押无平台费冲正。" },
       refund_platform_fee: { title: "平台费退还", content: "微信/支付宝等通道退款按分账比例回退。<br>· 退套餐费 R 时：平台费退还 ≈ R × C 端费率（或 原平台费 × R/原实付）<br>· 清分明细记「平台费冲正」<br>· <strong>押金</strong>未参与分账 → 退押不冲平台费<br>· 废止旧口径「平台 1% 不退」（D24）在 C 端原路退场景的适用" },
       refund_cooling_period: { title: "3 天冷静期", content: "自<strong>支付成功/开通服务</strong>起 <strong>3 个自然日</strong>内，用户可申请退款。<br>建议应退套餐费 = 实付 ×（总天数 − 已使用天数）÷ 总天数；押金按还电规则另计。<br><strong>默认须运营商审核</strong>；确认退款时可修改实退金额。<br>超过 3 天：不享受冷静期强制退款权益；平台不主动退还，用户可尝试中途完结（须符合 SKU 规则）。" },
       refund_mode_auto: { title: "套餐退款 · 自动", content: "开启后，符合 §5.2.1 SKU 规则（<strong>不含冷静期</strong>）且已还电 → 系统自动原路退。<strong>冷静期申请始终须人工确认</strong>（不受自动模式影响）。" },
       refund_mode_manual: { title: "套餐退款 · 手动", content: "关闭自动退款时，所有<strong>套餐类</strong>退款申请进入待审核；运营商<strong>确认退款</strong>后系统自动执行原路退/垫付记账。" },
-      deposit_refund_mode: { title: "押金退还模式", content: "骑手申请<strong>仅退电池押金</strong>（已还电）统一进入「退款管理」。<br>· <strong>自动退款</strong>：已还电且无争议 → 系统自动原路退运营商子商户实收押金<br>· <strong>手动确认</strong>：进入待审核，确认后系统执行<br>· 与套餐退款模式<strong>独立配置</strong>；冷静期/中途完结中的押金子项随主单审核" },
-      orders_freeze: { title: "服务冻结", content: "<strong>个人套餐</strong>用户在<strong>套餐有效期内</strong>且<strong>未持有电池</strong>时可申请冻结/解除冻结，<strong>满足条件即系统自动生效</strong>，无需运营商审核。冻结期间不可换电；解冻后 <code>valid_to</code> 按冻结天数顺延，<strong>首次服务为领取电池</strong>（非换电），之后继续消耗原套餐额度。渠道人天用户不适用。" },
+      deposit_refund_mode: { title: "押金退还模式", content: "骑手申请<strong>仅退电池押金</strong>统一进入「退款管理」。<br>· 前提：<strong>电池已还回且服务/订单已完结</strong>（decision-070）<br>· <strong>自动退款</strong>：已还电且无争议 → 系统自动原路退运营商子商户实收押金<br>· <strong>手动确认</strong>：进入待审核，确认后系统执行<br>· 与套餐退款模式<strong>独立配置</strong>；中途完结<strong>不含</strong>押金子项；冷静期押金是否同单另计" },
+      orders_freeze: { title: "服务冻结", content: "<strong>个人套餐</strong>用户在<strong>套餐有效期内</strong>且<strong>未持有电池</strong>时可申请冻结/解除冻结，<strong>满足条件即系统自动生效</strong>，无需运营商审核。冻结期间不可换电；解冻后 <code>valid_to</code> 按冻结天数顺延，骑手端首次服务为领取电池。<strong>服务中</strong>套餐详情<strong>不展示</strong>解冻/首服信息块（decision-070）。渠道人天用户不适用。" },
       orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>押金方式（全站统一）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）；不单列「无需押金」<br>· <strong>套餐购买订单</strong>：押金方式与<strong>收款状态</strong>（已收 / 待付 / ——）分列；仅实付有收款状态（decision-067）<br>· <strong>实付</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用/微信支付分达标免实付（仍须还电规则）" },
       orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：按套餐单展示押金明细。<br>· <strong>押金类型</strong>：实付 / 信用免押<br>· <strong>押金状态</strong>：仅实付有「在押 / 退押中 / 已退押」；信用免押统一 ——<br>· 筛选项：套餐单号、手机、支付日、押金类型、押金状态；支持分页<br>· 渠道担保不在本页；退押执行在「退款管理」" },
-      orders_deposit_waiver: { title: "信用免押", content: "满足运营商「押金设置」中的<strong>微信支付分</strong>或<strong>芝麻信用</strong>门槛可免实付押金（仍须遵守还电规则）。详情页与实付押金分开展示。" },
+      orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>微信支付分免押（≥500）</strong>或<strong>芝麻信用免押（≥500）</strong>任一达标（运营商押金设置页只读展示，不可改；decision-073）。详情页与实付押金分开展示。" },
       rider_battery_deposit: { title: "骑手电池押金", content: "与「平台保证金」不同。<br>· 个人：购套餐<strong>同笔</strong>免押或实缴 → 运营商子商户<br>· 渠道人天：<strong>首次领电前</strong>免押或实缴（非静默渠道担保）<br>· <strong>押金方式（全站）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）<br>· 运营商「订单与服务 → 用户押金」明细；「用户」台账；平台「用户管理 → 用户押金统计」只读汇总<br>· 数额见「定价管理 → 押金设置」；<strong>仅退押</strong>进「退款管理」" },
       platform_users_info: { title: "用户信息", content: "全平台用户列表。<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（支付分或芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
       platform_users_deposit_stats: { title: "用户押金统计", content: "按运营商汇总实付在押、免押人数、渠道担保、退押中金额；只读，不参与平台/合伙人清分。" },
-      pricing_deposit: { title: "押金设置", content: "面向<strong>个人购套餐</strong>与<strong>渠道人天首次领电</strong>：用户可选<strong>微信支付分免押</strong>或<strong>实缴押金</strong>。<br>· 可配置：押金数额、微信支付分门槛、芝麻信用门槛、启停<br>· 任一路达标即可免押（实收 ¥0）；均未达标则须实缴<br>· 个人：购套餐同笔；渠道人天：首次领取电池前办结（decision-050）<br>· 设备租赁白名单仍可走渠道担保（B 端）" },
+      pricing_deposit: { title: "押金设置", content: "面向<strong>个人购套餐</strong>与<strong>渠道人天首次领电</strong>。<br>· 运营商可配置：押金数额、启停<br>· <strong>免押门槛由平台统一</strong>，只读展示：微信支付分免押（≥500）、芝麻信用免押（≥500）；任一路达标即可免押（decision-073）<br>· 均未达标则须实缴<br>· 个人：购套餐同笔；渠道人天：首次领取电池前办结（decision-050）" },
       orders_swap: { title: "换电订单", content: "列出换电单；权益来源：<strong>个人套餐</strong>（支付时已清分，本表不展示应分）、<strong>渠道人天</strong>、<strong>激活码（二期）</strong>（按天/次确认消耗，类人天）。每笔记录三元组 U/C/B 与跨网设备服务费。" },
       orders_swap_triplet: { title: "运营商三元组与 跨网设备服务费", content: "换电成功时 IoT 上报 userOwner/cabinetOwner/batteryOwner。应付方恒为 userOwner：C≠U 时代付柜机费 ¥0.5/次；B≠U 时代付电池费 ¥0.1/次；经平台保证金/信用额度日清。运营商往来账只见平台代收/代付。" },
       orders_swap_entitlement: { title: "权益来源与消耗", content: "<strong>个人套餐</strong>：骑手在线购套餐，款在<strong>支付成功</strong>时已清分；换电仅履约，不记应分/消耗。点套餐单号在<strong>换电订单页内</strong>抽屉查看套餐明细，不跳转「套餐购买订单」列表。<br><strong>渠道人天</strong>：换电消耗额度池人天（预占→确认）。<br><strong>激活码（二期）</strong>：渠道线下批发码，骑手输码开通；换电按<strong>天/次</strong>确认消耗并向运营商结算（类人天），不产生 C 端应分金额。" },
@@ -476,7 +476,7 @@
       channel_inter_op: { title: "渠道跨网往来账", content: "设备租赁渠道开通跨网后，本渠道骑手在他网换电的<strong>跨网设备服务费</strong>经平台代收代付；渠道只见平台代付/代收，不见对手方运营商。" },
       lease_battery_hold: { title: "电池持有", content: "展示本渠道白名单用户当前持有的<strong>电池 SN</strong>、SOC、取电时间与站点；数据来自换电/IoT，渠道<strong>只读</strong>。" },
       lease_dedicated_site: { title: "渠道专属站点", content: "签约设备租赁时可<strong>新建/绑定专属站点</strong>，标记 <code>public_open=false</code>（<strong>专用·不对公众开放</strong>）。租赁设备默认部署在该站。<br>骑手端小程序地图/附近站点：<strong>仅该渠道白名单用户</strong>可见专属站 POI；非白名单地图不可见，扫码拦截。" },
-      channel_card_margin: { title: "佣金对账", content: "按<strong>自然月</strong>汇总经推广链接成交订单。<br><strong>佣金及时到付</strong>：支付成功已分账至渠道子商户，对账页展示「已即时分账」。<br><strong>线下结算</strong>：应结佣金=Σ commission；由运营商与渠道线下结。平台 1%=Σ pay×1%。" },
+      channel_card_margin: { title: "佣金对账", content: "按<strong>自然月</strong>汇总经推广链接成交订单。<br><strong>佣金及时到付</strong>：支付成功已分账至渠道子商户，月度汇总「结算状态」展示「已即时分账」。<br><strong>线下结算</strong>：应结佣金=Σ commission；由运营商与渠道线下结；月度汇总「结算状态」为 ——（decision-074）。平台 1%=Σ pay×1%。" },
       channel_card_accounts: { title: "骑士卡收款账户", content: "一期能力（decision-064）。<strong>即时到付</strong>：须开通微信/支付宝子商户并绑定对公，接收佣金分账。<strong>线下结算</strong>：购卡款进运营商；渠道仍须维护对公账户，供运营商按对账线下打佣。" },
       channel_instant_commission: { title: "佣金及时到付", content: "仅<strong>渠道分销（骑士卡）</strong>签约可开。运营商在「渠道管理 → 签约渠道」开启；须渠道绑定收款账户并完成微信/支付宝进件。开启后设置<strong>渠道佣金比例</strong>。<br><strong>变更（decision-065）</strong>：即时↔线下切换于<strong>次日 00:00</strong>生效，保存时须确认提示；历史订单不回溯；对账月度汇总按结算方式<strong>拆行</strong>。" },
       pricing_card: { title: "渠道分销价", content: "同一运营商可签<strong>多个分销渠道</strong>，各渠道独立维护授权 SKU、正式价、<strong>专享价</strong>与佣金。「平台设置 → 渠道分销价」操作仅<strong>编辑</strong>价格；签约档案在「渠道管理 → 签约渠道」。专享价 ≤ 正式零售价。" },
@@ -489,7 +489,7 @@
       day_pool_b2b_refund: { title: "额度池退款说明（渠道商）", content: "人天额度池<strong>不支持在线退款</strong>。若需退未使用额度，须与<strong>签约运营商线下协商</strong>；达成一致后由运营商在后台执行额度扣减（账本类型：<strong>退款</strong>），资金按对公约定另行结算。渠道商后台不可自行发起池退款。" },
       day_pool_operator_adjust: { title: "运营商额度调整", content: "运营商在「渠道管理 → 渠道权益 → 已售额度池」手工调账。类型：充值、赠送、退款、修正、过期恢复（30 天内）。" },
       entitlement_api: { title: "渠道骑手可换电校验", content: "换电前调用 <code>POST /api/v1/entitlement/check</code>：返回 allowed_swap / allowed_return、fail_reason、gate_reason。无人天额度时 <strong>allowed_swap=false</strong>，持电池仅可还电；<strong>无自费兜底 SKU</strong>。见 decision-054。" },
-      day_pool_team: { title: "骑手团队", content: "入口在<strong>骑手登记</strong>页内 Tab「骑手团队」。渠道商创建团队并<strong>绑定消耗额度池</strong>（必选）。一运营商一池时默认团队自动绑定；向多家运营商签约时各团队须指定对应池。登记/分配/预占/消耗均从团队绑定池扣减。在职与离职骑手均可加入/变更/移除团队。" },
+      day_pool_team: { title: "骑手团队", content: "入口在<strong>骑手登记</strong>页内 Tab「骑手团队」。渠道商创建团队用于组织骑手。<br>· <strong>一个渠道商仅一个人天额度池</strong>；所有团队/骑手均从该池扣减，<strong>无</strong>「按团队分配/切换消耗池」「自动绑定」操作<br>· 列表无「操作」列（decision-072）<br>· 在职与离职骑手均可加入/变更/移除团队（在「登记骑手」列表操作）" },
       day_pool_org: { title: "团队与额度池", content: "编排单元为<strong>团队</strong>（非组织/站点）。团队 <code>pool_id</code> 决定从哪个额度池扣减；额度使用规则为团队配置周期额度上限。" },
       day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护个人套餐城市价；渠道商只读。<strong>已取消</strong>渠道零额度自费兜底：无预占/无额度时不可换电，仅可还电，须渠道续配。" },
       day_pool_allocate: { title: "分配与收回", content: "分配：从团队绑定池可用余额划出 N 人天给骑手（分配即开通，按池统一口径预占/确认）。收回/退出团队：剩余未用人天自动退回池余额。" },
@@ -526,7 +526,7 @@
       module_order_audit: { title: "变更记录", content: "统一<strong>变更记录</strong>（C-02/D-A1）：跨模块时间线，记录订单/服务生命周期事件（冻结、消耗、换电、退款等）。用于客诉、对账与监管；<strong>非新订单列表</strong>。渠道仅见本渠道成员事件；运营商见本主体订单；平台全平台只读。" },
       module_channel_credit: { title: "渠道信用额度", content: "平台按在册骑手与设备标准评估<strong>信用额度</strong>，用于抵扣渠道应押总额；运营商可调整额度上限。渠道线下打款后提交凭证，由<strong>运营商审核</strong>。分级抵扣规则按信用评分映射抵扣比例。与运营商准入档位（A/B/C/D）独立。" },
       module_channel_links: { title: "套餐与链接", content: "渠道可售套餐由运营商签约配置（正式价/专享价/佣金只读）。渠道可为同一套餐创建<strong>多条推广链接</strong>，填写<strong>链接用途</strong>；每条可<strong>生成二维码</strong>（内容与链接一致）。链接直达<strong>签约运营商小程序</strong>；用户点击后 <strong>24h</strong> 内购买授权 SKU 均享渠道专享价。" },
-      module_channel_orders: { title: "购卡记录", content: "仅展示经本渠道推广链接成交的套餐购买记录。支持按支付时间筛选；记录关联链接用途与 link_code。" },
+      module_channel_orders: { title: "购卡记录", content: "仅展示经本渠道推广链接成交的套餐购买记录。<br>· <strong>结算</strong>仅两种：即时分账 / 线下结算（废止「线下待结」粘连文案）<br>· 线下结算时「状态」统一 <strong>——</strong>（decision-071）<br>· 支持按支付时间筛选；记录关联链接用途与 link_code。" },
       module_rent_devices: { title: "租赁设备", content: "运营商维护柜机/电池 SN 与部署站点；<strong>月租为签约统一价</strong>，不在此按单台定价或展示。" }
     };
 
@@ -1047,9 +1047,10 @@
         swapLimit: null, swapUsed: 6, accrued: 32, payout: "待退款", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营", cabinet: "CAB-22044",
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null, endTime: "2026-05-22 09:00",
         refundInfo: {
-          unusedService: 179, depositRefund: 99, totalRefund: 278, refunded: 0, pending: 278,
+          unusedService: 179, pending: 179, refunded: 0,
           unusedFormula: "包月剩余 24 天 × 日单价",
-          depositStatus: "运营商已提现，待运营商垫付", refundStatus: "待退款"
+          refundStatus: "待退款",
+          depositNote: "实付押金 ¥99 仍在押；电池已还且订单完结后用户可自行申请退押"
         }
       },
       {
@@ -1112,7 +1113,12 @@
         pay: 299, status: "待退款", serviceState: "中途完结", payTime: "2026-05-20 11:00", validFrom: "2026-05-20", validTo: "2026-06-19",
         swapLimit: null, swapUsed: 18, accrued: 72, payout: "待退款", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", cabinet: "CAB-22018",
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null, endTime: "2026-06-12 09:00",
-        refundInfo: { unusedService: 145, depositRefund: 99, totalRefund: 244, refunded: 0, pending: 244, unusedFormula: "剩余 19 天", depositStatus: "待确认", refundStatus: "待退款" }
+        refundInfo: {
+          unusedService: 145, pending: 145, refunded: 0,
+          unusedFormula: "剩余 19 天",
+          refundStatus: "待退款",
+          depositNote: "实付押金 ¥99 仍在押；不随本单套餐费退款"
+        }
       },
       {
         id: "SUB2606103001", user: "U3001", phone: "138****3001", site: "浦东骑手驿站", city: "上海", pkg: "包月30天", pkgType: "monthly",
@@ -1149,16 +1155,16 @@
       "OP-SX": {
         amount: 99, enabled: true,
         scope: "个人套餐",
-        wechatPayScoreMin: 650,
-        zhimaScoreMin: 650,
+        wechatPayScoreMin: 500,
+        zhimaScoreMin: 500,
         note: "芝麻/支付分不足时实缴；达标免押则实收 ¥0",
         updatedAt: "2026-06-10", updatedBy: "绿色出行"
       },
       "OP-LJZ": {
         amount: 199, enabled: true,
         scope: "个人套餐",
-        wechatPayScoreMin: 680,
-        zhimaScoreMin: 650,
+        wechatPayScoreMin: 500,
+        zhimaScoreMin: 500,
         note: "联营区示范高押金",
         updatedAt: "2026-06-01", updatedBy: "陆家嘴联营"
       }
@@ -1190,8 +1196,8 @@
     const refundRequests = [
       {
         id: "RF-260522-001", operatorId: "OP-LJZ", scId: "SC26052201", orderId: "SUB260523088", user: "U2088", phone: "137****2088",
-        site: "陆家嘴分站", type: "中途完结", pkgName: "包月30天", pkgRefund: 120, depositRefund: 99, totalRefund: 219,
-        platformFeeRefund: 5.38, needAdvance: true, advanceReason: "运营商已提现，须垫付",
+        site: "陆家嘴分站", type: "中途完结", pkgName: "包月30天", pkgRefund: 120, depositRefund: 0, totalRefund: 120,
+        platformFeeRefund: 1.2, needAdvance: true, advanceReason: "运营商已提现，须垫付套餐费退款",
         status: "待审核", applyTime: "2026-05-22 09:00", processedTime: null, processedBy: null, rejectReason: null
       },
       {
@@ -1252,7 +1258,7 @@
       {
         id: "SC26052201", subId: "SUB260523088", user: "U2088", phone: "137****2088", site: "陆家嘴分站",
         type: "中途完结", applyTime: "2026-05-22 09:00", status: "退款处理中",
-        detail: "未使用套餐 ¥179 + 押金 ¥99", amount: 278, deviceOwnerId: "OP-LJZ"
+        detail: "未使用套餐 ¥179；押金不随中途完结退还", amount: 179, deviceOwnerId: "OP-LJZ"
       },
       {
         id: "SC26052001", subId: "SUB260524002", user: "U1041", phone: "139****1041", site: "浦东骑手驿站",
@@ -1515,7 +1521,7 @@
       { id: "RC260608015", type: "套餐支付", order: "SUB260608015", site: "世博换电服务点", city: "上海", user: "U2199", pkg: "单次换电", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 9.9, fee: 0.1, net: 9.8, channel: "微信支付", time: "2026-06-08 15:50", status: "成功" },
       { id: "RC260610088", type: "套餐支付", order: "SUB260610088", site: "浦东骑手驿站", city: "上海", user: "U2201", pkg: "7天套餐", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 89, fee: 0.89, net: 88.11, channel: "微信支付", time: "2026-06-03 08:00", status: "成功" },
       { id: "RC260606001", type: "套餐支付", order: "SUB260606001", site: "浦东骑手驿站", city: "上海", user: "U2107", pkg: "1天套餐", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 29, fee: 0.29, net: 28.71, channel: "微信支付", time: "2026-06-06 06:30", status: "成功" },
-      { id: "RC260615033D", type: "押金退还", order: "SUB260615033", site: "浦东骑手驿站", city: "上海", user: "U1066", pkg: "包月30天", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: -99, fee: 0, net: -99, channel: "原路退回", time: "—", status: "待审核", note: "中途完结·押金待退" },
+      { id: "RC260615033D", type: "押金退还", order: "SUB260615033", site: "浦东骑手驿站", city: "上海", user: "U1066", pkg: "包月30天", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: -99, fee: 0, net: -99, channel: "原路退回", time: "—", status: "待审核", note: "订单完结后用户自行申请退押" },
       { id: "RC260606BJ", type: "套餐支付", order: "SUB260606BJ", site: "滨江换电站", city: "上海", user: "U-LJZ-01", pkg: "包月30天", payee: "滨江联营", deviceOwnerId: "OP-BJ", mch: "1900000789***", amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-06-05 10:00", status: "成功" }
     ];
 
@@ -2082,8 +2088,8 @@
       { id: "LO-260605", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", riderName: "骑手B", phone: "139****2002", userId: "U-L002", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-05 14:20", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-07-05" },
       { id: "LO-260608", channelId: "CH-CARD", linkId: "LNK-C004", linkPurpose: "新客试用入口", linkCode: "qsk-7d-trial", skuId: "SKU-7D", riderName: "骑手C", phone: "137****2003", userId: "U-L003", skuName: "7天卡", officialPrice: 89, paidPrice: 79, commission: 7.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-08 08:05", status: "已清分", platformFee: 0.79, operatorNet: 71.1, pkgValidTo: "2026-06-15" },
       { id: "LO-260610", channelId: "CH-CARD", linkId: "LNK-C003", linkPurpose: "社群福利帖", linkCode: "qsk-30d-wx", skuId: "SKU-30D", riderName: "刘骑士", phone: "138****3001", userId: "U3001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-10 16:30", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-07-10" },
-      { id: "LO-260612", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", riderName: "骑手D", phone: "136****2004", userId: "U-L004", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25, commissionRate: null, commissionSettlement: "线下待结", channelTagged: true, payTime: "2026-06-12 11:08", status: "已清分", platformFee: 2.79, operatorNet: 251.21, pkgValidTo: "2026-07-12" },
-      { id: "LO-260611", channelId: "CH-DELIV", linkId: "LNK-D001", linkPurpose: "闪送 App 内嵌", linkCode: "ssk-30d-app", skuId: "SKU-DEL-30D", riderName: "闪送骑手D", phone: "136****4001", userId: "U-D001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 269, commission: 30, commissionSettlement: "线下待结", channelTagged: true, payTime: "2026-06-11 10:00", status: "已清分", platformFee: 2.69, operatorNet: 266.31, pkgValidTo: "2026-07-11" }
+      { id: "LO-260612", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", riderName: "骑手D", phone: "136****2004", userId: "U-L004", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25, commissionRate: null, commissionSettlement: "线下结算", channelTagged: true, payTime: "2026-06-12 11:08", status: "已清分", platformFee: 2.79, operatorNet: 251.21, pkgValidTo: "2026-07-12" },
+      { id: "LO-260611", channelId: "CH-DELIV", linkId: "LNK-D001", linkPurpose: "闪送 App 内嵌", linkCode: "ssk-30d-app", skuId: "SKU-DEL-30D", riderName: "闪送骑手D", phone: "136****4001", userId: "U-D001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 269, commission: 30, commissionSettlement: "线下结算", channelTagged: true, payTime: "2026-06-11 10:00", status: "已清分", platformFee: 2.69, operatorNet: 266.31, pkgValidTo: "2026-07-11" }
     ];
     const channelCardRetailOrders = channelLinkOrders;
 
@@ -2115,35 +2121,35 @@
         skuId: "SKU-30D", riderName: "周骑手", phone: "138****5101", userId: "U-P501", skuName: "包月30天卡",
         officialPrice: 299, couponAmount: 40, couponId: "CPN-SUMMER-40", paidPrice: 259, platformFee: 2.59, marketingServiceFee: 25,
         paymentArchitecture: "operator_collect", lockedOperatorId: "OP-SX", lockedOperatorName: PAYEE_OPERATOR,
-        payTime: "2026-06-12 09:30", status: "服务中", refundStatus: null, pkgValidTo: "2026-07-12"
+        payTime: "2026-06-12 09:30", status: "服务中", refundStatus: "——", pkgValidTo: "2026-07-12"
       },
       {
         id: "PMO-26061101", channelId: "PLATFORM", campaignId: "CMP-2607-01", linkCode: "plt-sx-metro", linkPurpose: "地铁灯箱·绿色出行",
         skuId: "SKU-30D", riderName: "吴骑手", phone: "139****5102", userId: "U-P502", skuName: "包月30天卡",
         officialPrice: 299, couponAmount: 40, couponId: "CPN-SUMMER-40", paidPrice: 259, platformFee: 2.59, marketingServiceFee: 25,
         paymentArchitecture: "operator_collect", lockedOperatorId: "OP-SX", lockedOperatorName: PAYEE_OPERATOR,
-        payTime: "2026-06-11 10:05", status: "服务中", refundStatus: null, pkgValidTo: "2026-07-11"
+        payTime: "2026-06-11 10:05", status: "服务中", refundStatus: "——", pkgValidTo: "2026-07-11"
       },
       {
         id: "PMO-26061001", channelId: "PLATFORM", campaignId: "CMP-2607-01", linkCode: "plt-sx-30d", linkPurpose: "抖音·绿色出行",
         skuId: "SKU-30D", riderName: "郑骑手", phone: "137****5103", userId: "U-P503", skuName: "包月30天卡",
         officialPrice: 299, couponAmount: 40, couponId: "CPN-SUMMER-40", paidPrice: 259, platformFee: 2.59, marketingServiceFee: 25,
         paymentArchitecture: "operator_collect", lockedOperatorId: "OP-SX", lockedOperatorName: PAYEE_OPERATOR,
-        payTime: "2026-06-10 11:20", status: "服务中", refundStatus: null, pkgValidTo: "2026-07-10"
+        payTime: "2026-06-10 11:20", status: "服务中", refundStatus: "退款中", pkgValidTo: "2026-07-10"
       },
       {
         id: "PMO-26060901", channelId: "PLATFORM", campaignId: "CMP-2607-01", linkCode: "plt-sx-7d", linkPurpose: "短信试用·绿色出行",
         skuId: "SKU-7D", riderName: "冯骑手", phone: "136****5104", userId: "U-P504", skuName: "7天卡",
         officialPrice: 89, couponAmount: 14, couponId: "CPN-SUMMER-14", paidPrice: 75, platformFee: 0.75, marketingServiceFee: 8,
         paymentArchitecture: "operator_collect", lockedOperatorId: "OP-SX", lockedOperatorName: PAYEE_OPERATOR,
-        payTime: "2026-06-09 07:50", status: "服务中", refundStatus: null, pkgValidTo: "2026-06-16"
+        payTime: "2026-06-09 07:50", status: "已完结", refundStatus: "——", pkgValidTo: "2026-06-16"
       },
       {
         id: "PMO-26060801", channelId: "PLATFORM", campaignId: "CMP-2607-01", linkCode: "plt-sx-30d", linkPurpose: "抖音·绿色出行",
         skuId: "SKU-30D", riderName: "陈骑手", phone: "135****5105", userId: "U-P505", skuName: "包月30天卡",
         officialPrice: 299, couponAmount: 40, couponId: "CPN-SUMMER-40", paidPrice: 259, platformFee: 2.59, marketingServiceFee: 25,
         paymentArchitecture: "operator_collect", lockedOperatorId: "OP-SX", lockedOperatorName: PAYEE_OPERATOR,
-        payTime: "2026-06-08 15:00", status: "已退款", refundStatus: "运营商原路退", refundTime: "2026-06-09 10:00", refundAmount: 259
+        payTime: "2026-06-08 15:00", status: "已完结", refundStatus: "已退款", refundTime: "2026-06-09 10:00", refundAmount: 259
       }
     ];
 
@@ -2763,7 +2769,7 @@
       platformMarketing_campaigns: { status: "全部", keyword: "" },
       platformMarketing_agreements: { operatorId: "全部", status: "全部" },
       platformMarketing_links: { campaignId: "全部", status: "全部" },
-      platformMarketing_pending: { activationStatus: "全部", keyword: "" },
+      platformMarketing_pending: { orderStatus: "全部", refundStatus: "全部", keyword: "" },
       platformMarketing_settlements: { operatorId: "全部", month: "" },
       platformMarketing_statements: { month: "2026-06", operatorId: "全部", status: "全部" },
       platformFlows_userPay: { orderId: "", flowType: "全部", operatorId: "全部" },
