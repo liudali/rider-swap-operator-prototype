@@ -222,6 +222,41 @@
     }
     .phase2-banner strong { color: #92400e; }
     .phase2-banner .badge-p2 { margin: 0 0 0 0; flex-shrink: 0; }
+    /* 非正式产品说明：详情对比区 */
+    .proto-doc-banner {
+      display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px;
+      padding: 10px 12px; border-radius: var(--radius);
+      background: #f8fafc; border: 1px dashed #94a3b8; color: #475569; font-size: 13px; line-height: 1.55;
+    }
+    .proto-doc-banner .proto-doc-badge {
+      flex-shrink: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+      padding: 2px 8px; border-radius: 4px; background: #e2e8f0; color: #334155;
+    }
+    .proto-doc-compare-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+    @media (min-width: 1280px) {
+      .proto-doc-compare-grid { grid-template-columns: repeat(4, minmax(220px, 1fr)); }
+    }
+    .proto-doc-compare-card {
+      border: 1px dashed #cbd5e1;
+      border-radius: var(--radius);
+      background: #fbfdff;
+      padding: 12px;
+      min-width: 0;
+    }
+    .proto-doc-compare-card .proto-doc-card-head {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+    }
+    .proto-doc-compare-card .proto-doc-card-head strong { font-size: 14px; }
+    .proto-doc-compare-card .detail-grid { grid-template-columns: 1fr; gap: 8px; }
+    .proto-doc-compare-card .panel { box-shadow: none; border: 1px solid var(--line); }
+    .proto-doc-compare-card .panel-head { padding: 8px 10px; }
+    .proto-doc-compare-card .panel-body { padding: 8px 10px 10px; }
     .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
     .kpi-grid.in-panel { margin-bottom: 0; }
     .kpi {

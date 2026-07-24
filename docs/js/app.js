@@ -1349,16 +1349,63 @@
 
     function userLiveHeldBattery(u, poolRider) {
       const blocked = userBatteryHoldBlocked(u, poolRider);
-      if (blocked) return { text: "未持有", hint: blocked, owner: "—" };
+      if (blocked) return { text: "未持有", hint: null, owner: "—", cell: "未持有" };
       const lastSwap = [...swapOrders].reverse().find(s => s.user === u.id && s.status === "成功");
       const bat = lastSwap?.batOut;
-      if (!bat) return { text: "未持有", hint: "无换电记录", owner: "—" };
+      if (!bat) return { text: "未持有", hint: null, owner: "—", cell: "未持有" };
       const batRec = batteries.find(b => b.sn === bat.sn);
+      const sohPct = batterySohPercent(bat, batRec);
+      const sohDisp = sohPct != null ? `SOH ${sohPct}%` : "SOH —";
+      const owner = resolveHeldBatteryOwnerName(bat, batRec, lastSwap, u);
+      /* 持有电池必须展示归属运营商 */
+      const cell = `${bat.sn}-SOC ${bat.soc}%-${sohDisp}（归属 ${owner}）`;
       return {
-        text: `${bat.sn} · SOC ${bat.soc}%${batRec ? " · " + batRec.health : ""}`,
+        text: `${bat.sn} · SOC ${bat.soc}% · ${sohDisp}`,
         hint: null,
-        owner: batRec ? operatorLabel(batRec.deviceOwnerId) : "—"
+        owner,
+        cell
       };
+    }
+
+    /** 持有电池归属：台账 → 换电单三元组 B → 柜机运营商 → 用户服务运营商 */
+    function resolveHeldBatteryOwnerName(bat, batRec, lastSwap, user) {
+      if (batRec?.deviceOwnerId) return operatorLabel(batRec.deviceOwnerId) || batRec.deviceOwnerName;
+      if (batRec?.deviceOwnerName) return batRec.deviceOwnerName;
+      if (bat?.deviceOwnerId) return operatorLabel(bat.deviceOwnerId);
+      if (bat?.deviceOwnerName) return bat.deviceOwnerName;
+      if (lastSwap) {
+        const t = enrichSwapTriplet(lastSwap);
+        if (t.batteryOwnerId && t.batteryOwnerName && t.batteryOwnerName !== "—") return t.batteryOwnerName;
+        if (t.batteryOwnerId) return operatorLabel(t.batteryOwnerId);
+        if (t.cabinetOwnerId) return t.cabinetOwnerName && t.cabinetOwnerName !== "—"
+          ? t.cabinetOwnerName
+          : operatorLabel(t.cabinetOwnerId);
+        if (lastSwap.deviceOwnerId) return operatorLabel(lastSwap.deviceOwnerId);
+      }
+      const svcOpId = user?.poolId
+        ? (dayPools.find(p => p.id === user.poolId)?.sellerId || user.deviceOwnerId)
+        : user?.deviceOwnerId;
+      if (svcOpId) return operatorLabel(svcOpId);
+      return "待补全";
+    }
+
+    /** SOH 为健康度百分比（非「正常/异常」文案）；优先 soh 字段，缺省时从 Mock 推导 */
+    function batterySohPercent(bat, batRec) {
+      const raw = bat?.soh ?? batRec?.soh;
+      if (raw != null && raw !== "") {
+        const n = Number(String(raw).replace(/%/g, ""));
+        if (Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
+      }
+      /* 兼容旧 Mock：仅有 health 文案时映射为百分比演示值 */
+      const h = String(bat?.health || batRec?.health || "");
+      if (/低电量|预警|异常|故障/.test(h)) return 72;
+      if (h.includes("正常") || h.includes("良好")) return 99;
+      if (bat?.sn) {
+        let hsh = 0;
+        for (let i = 0; i < bat.sn.length; i++) hsh = (hsh + bat.sn.charCodeAt(i) * (i + 1)) % 12;
+        return 88 + hsh; /* 88–99 */
+      }
+      return null;
     }
 
     function activePersonalPackage(u) {
@@ -1923,17 +1970,25 @@
       const poolLike = !!(u.poolId || u.poolEligibility)
         || (u.pkg && String(u.pkg).includes("人天池"))
         || (u.entitlement === "渠道人天");
+      const pack = (method, status, amountHeld, amountFace, detail, extra = {}) => ({
+        method,
+        status,
+        kind: method === "无" ? "无" : method,
+        label: method === "无" ? "—" : method,
+        amountHeld: amountHeld || 0,
+        amountFace: amountFace || 0,
+        detail: detail || "",
+        sub: detail || "",
+        methodText: method === "无" ? "——" : (detail ? `${method}（${detail}）` : method),
+        statusText: status || "——",
+        orderId: extra.orderId || null,
+        paidAt: extra.paidAt || null
+      });
+
       if (poolLike || leaseLike) {
         const chName = u.channelName || u.channel || ENT.channel?.name || "签约渠道";
-        return {
-          kind: "渠道担保",
-          label: "渠道担保",
-          amountHeld: 0,
-          amountFace: 0,
-          sub: leaseLike ? "设备租赁 · 押金算渠道" : `${chName} · 人天押金算渠道`,
-          orderId: null,
-          paidAt: null
-        };
+        /* 渠道担保无实付押金 → 押金状态为 —— */
+        return pack("渠道担保", "——", 0, 0, chName);
       }
       const pkgs = packageOrders.filter(p => p.user === uid);
       const pkg = pkgs.find(p => ["服务中", "已冻结", "中途完结"].includes(p.serviceState || p.status))
@@ -1941,83 +1996,57 @@
         || pkgs[0];
       if (pkg?.depositWaiver) {
         const w = pkg.depositWaiver;
-        return {
-          kind: "信用免押",
-          label: "信用免押",
-          amountHeld: 0,
-          amountFace: w.waivedAmount != null ? w.waivedAmount : (pkg.batteryDeposit || 0),
-          sub: `${w.type || "信用"} ${w.score != null ? w.score + "分" : ""}`.trim(),
-          orderId: pkg.id,
-          paidAt: pkg.payTime
-        };
+        const scorePart = w.score != null ? `${w.score}分` : "";
+        const detail = `${w.type || "信用"}${scorePart ? " " + scorePart : ""}`.trim();
+        /* 信用免押无实付 → 押金状态为 —— */
+        return pack("信用免押", "——", 0, w.waivedAmount != null ? w.waivedAmount : (pkg.batteryDeposit || 0), detail, {
+          orderId: pkg.id, paidAt: pkg.payTime
+        });
       }
       if (pkg && (pkg.batteryDeposit == null || pkg.batteryDeposit === 0)) {
-        return { kind: "无需", label: "无需押金", amountHeld: 0, amountFace: 0, sub: "本单无押", orderId: pkg.id, paidAt: pkg.payTime };
+        return pack("无", "——", 0, 0, "", { orderId: pkg.id, paidAt: pkg.payTime });
       }
       if (pkg && pkg.depositRefundStatus === "已退款") {
-        return {
-          kind: "已退",
-          label: "已退押",
-          amountHeld: 0,
-          amountFace: pkg.batteryDeposit || 0,
-          sub: pkg.depositRefundedAt ? `已原路退 · ${pkg.depositRefundedAt}` : "已原路退",
-          orderId: pkg.id,
-          paidAt: pkg.payTime
-        };
+        return pack("无", "——", 0, pkg.batteryDeposit || 0, "", { orderId: pkg.id, paidAt: pkg.payTime });
       }
       const pendingDepRf = typeof refundRequests !== "undefined"
         ? refundRequests.find(r => r.orderId === pkg?.id && isDepositOnlyRefund(r) && r.status === "待审核")
         : null;
       if (pkg && (pkg.depositPaid || 0) >= (pkg.batteryDeposit || 0) && pkg.batteryDeposit > 0) {
         const st = pkg.serviceState || pkg.status;
+        const paidDetail = `实收¥${pkg.depositPaid}`;
         if (pendingDepRf || st === "中途完结" || pkg.payout === "待退款" || pkg.status === "待退款") {
-          return {
-            kind: "退押中",
-            label: "退押中",
-            amountHeld: pkg.batteryDeposit,
-            amountFace: pkg.batteryDeposit,
-            sub: pendingDepRf
-              ? `实付 ¥${pkg.depositPaid} · 退款管理待审 ${pendingDepRf.id}`
-              : `实付 ¥${pkg.depositPaid} · 原路退处理中`,
-            orderId: pkg.id,
-            paidAt: pkg.payTime
-          };
+          return pack("实付", "退押中", pkg.batteryDeposit, pkg.batteryDeposit, paidDetail, {
+            orderId: pkg.id, paidAt: pkg.payTime
+          });
         }
         if (st === "已完结" || pkg.status === "已完结") {
-          return {
-            kind: "已退",
-            label: "已退押",
-            amountHeld: 0,
-            amountFace: pkg.batteryDeposit,
-            sub: `曾实付 ¥${pkg.depositPaid}`,
-            orderId: pkg.id,
-            paidAt: pkg.payTime
-          };
+          return pack("无", "——", 0, pkg.batteryDeposit, "", { orderId: pkg.id, paidAt: pkg.payTime });
         }
-        return {
-          kind: "实付",
-          label: "实付在押",
-          amountHeld: pkg.batteryDeposit,
-          amountFace: pkg.batteryDeposit,
-          sub: `实收 ¥${pkg.depositPaid} · 同笔购套餐`,
-          orderId: pkg.id,
-          paidAt: pkg.payTime
-        };
+        return pack("实付", "在押", pkg.batteryDeposit, pkg.batteryDeposit, paidDetail, {
+          orderId: pkg.id, paidAt: pkg.payTime
+        });
       }
       if (u.deposit) {
         if (String(u.deposit).includes("免押")) {
-          return { kind: "信用免押", label: "信用免押", amountHeld: 0, amountFace: 99, sub: String(u.deposit), orderId: null, paidAt: null };
+          return pack("信用免押", "——", 0, 99, String(u.deposit).replace(/^信用免押[·・\s]*/, "") || "信用免押");
         }
         const m = String(u.deposit).match(/(\d+)/);
         const amt = m ? Number(m[1]) : 99;
-        return { kind: "实付", label: "实付在押", amountHeld: amt, amountFace: amt, sub: String(u.deposit), orderId: null, paidAt: null };
+        return pack("实付", "在押", amt, amt, `实收¥${amt}`);
       }
-      return { kind: "无", label: "—", amountHeld: 0, amountFace: 0, sub: "未产生押金记录", orderId: null, paidAt: null };
+      return pack("无", "——", 0, 0, "");
     }
 
     function riderDepositCellHtml(dep) {
-      if (!dep || dep.kind === "无") return "—";
+      if (!dep || dep.method === "无" || dep.kind === "无") return "——";
+      if (dep.methodText) return dep.methodText;
       return `${tag(dep.label)}<br><small style="color:var(--muted)">${dep.sub || ""}</small>`;
+    }
+
+    function riderDepositStatusCellHtml(dep) {
+      if (!dep || !dep.status || dep.status === "——" || dep.status === "—") return "——";
+      return tag(dep.status);
     }
 
     function operatorRiderDepositStats(operatorId) {
@@ -2032,10 +2061,10 @@
       let heldAmount = 0, heldUsers = 0, creditUsers = 0, channelUsers = 0, refundingAmount = 0;
       scoped.forEach(u => {
         const d = riderBatteryDepositInfo(u);
-        if (d.kind === "实付") { heldAmount += d.amountHeld; heldUsers += 1; }
-        else if (d.kind === "退押中") { heldAmount += d.amountHeld; refundingAmount += d.amountHeld; heldUsers += 1; }
-        else if (d.kind === "信用免押") creditUsers += 1;
-        else if (d.kind === "渠道担保") channelUsers += 1;
+        if (d.method === "实付" && d.status === "在押") { heldAmount += d.amountHeld; heldUsers += 1; }
+        else if (d.method === "实付" && d.status === "退押中") { heldAmount += d.amountHeld; refundingAmount += d.amountHeld; heldUsers += 1; }
+        else if (d.method === "信用免押") creditUsers += 1;
+        else if (d.method === "渠道担保") channelUsers += 1;
       });
       return {
         users: scoped.length,
@@ -2080,13 +2109,17 @@
         channelName: u.poolId ? ENT.channel.name : "—",
         poolQuota: poolRider ? `余 ${poolRider.remainingDays} 人天` : (u.poolEligibility ? u.poolEligibility : "—"),
         poolTeam: u.poolTeam || poolRider?.team || "—",
-        heldBattery: held.text,
-        heldBatteryHint: held.hint,
+        heldBattery: held.cell || held.text,
+        heldBatteryHint: null,
         batteryOwner: held.owner,
-        depositKind: deposit.kind,
+        depositKind: deposit.method,
+        depositMethod: deposit.method,
+        depositStatus: deposit.status,
         depositLabel: deposit.label,
         depositHeld: deposit.amountHeld,
-        depositSub: deposit.sub,
+        depositSub: deposit.detail,
+        depositMethodText: deposit.methodText,
+        depositStatusText: deposit.statusText,
         depositOrderId: deposit.orderId
       };
     }
@@ -3648,19 +3681,29 @@
         { key: "payFrom", label: "支付日起", type: "date" },
         { key: "payTo", label: "支付日止", type: "date" },
         { key: "serviceState", label: "服务状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] },
-        { key: "status", label: "订单状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] }
+        { key: "status", label: "订单状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] },
+        { key: "depositMethod", label: "押金方式", type: "select", options: [
+          { v: "全部", t: "全部" }, { v: "实付", t: "实付" }, { v: "信用免押", t: "信用免押" },
+          { v: "渠道担保", t: "渠道担保" }, { v: "无", t: "——" }
+        ] },
+        { key: "depositPayStatus", label: "收款状态", type: "select", options: [
+          { v: "全部", t: "全部" }, { v: "已收", t: "已收" }, { v: "待付", t: "待付" }, { v: "无", t: "——" }
+        ] }
       ],
       orders_user_deposit: [
         { key: "orderId", label: "套餐单号", placeholder: "如 SUB260524001" },
         { key: "phone", label: "用户手机", placeholder: "完整或后四位" },
         { key: "payFrom", label: "支付日起", type: "date" },
         { key: "payTo", label: "支付日止", type: "date" },
+        { key: "depositType", label: "押金类型", type: "select", options: [
+          { v: "全部", t: "全部" }, { v: "实付", t: "实付" }, { v: "信用免押", t: "信用免押" }
+        ] },
         { key: "status", label: "押金状态", type: "select", options: [
           { v: "全部", t: "全部" },
-          { v: "实付在押", t: "实付在押" },
+          { v: "在押", t: "在押" },
           { v: "退押中", t: "退押中" },
           { v: "已退押", t: "已退押" },
-          { v: "信用免押", t: "信用免押" }
+          { v: "无", t: "——" }
         ] }
       ],
       orders_swap: [
@@ -3707,10 +3750,16 @@
         { key: "pkgService", label: "套餐/服务", type: "select", options: [
           { v: "全部", t: "全部" }, { v: "个人套餐", t: "个人套餐" }, { v: "人天池", t: "人天池" }
         ] },
-        { key: "serviceState", label: "服务状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }] },
+        { key: "serviceState", label: "服务状态", type: "select", options: [
+          { v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" },
+          { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }, { v: "不可用", t: "不可用" }
+        ] },
         { key: "depositKind", label: "电池押金", type: "select", options: [
-          { v: "全部", t: "全部" }, { v: "实付", t: "实付在押" }, { v: "信用免押", t: "信用免押" },
-          { v: "渠道担保", t: "渠道担保" }, { v: "退押中", t: "退押中" }
+          { v: "全部", t: "全部" }, { v: "实付", t: "实付" }, { v: "信用免押", t: "信用免押" },
+          { v: "渠道担保", t: "渠道担保" }, { v: "无", t: "——" }
+        ] },
+        { key: "depositStatus", label: "押金状态", type: "select", options: [
+          { v: "全部", t: "全部" }, { v: "在押", t: "在押" }, { v: "退押中", t: "退押中" }, { v: "无", t: "——" }
         ] }
       ],
       refundManage: [
@@ -3817,8 +3866,11 @@
         { key: "userType", label: "用户类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "个人用户", t: "个人用户" }, { v: "渠道成员", t: "渠道成员" }] },
         { key: "userStatus", label: "用户状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "正常", t: "正常" }, { v: "冻结", t: "冻结" }, { v: "注销中", t: "注销中" }] },
         { key: "depositKind", label: "电池押金", type: "select", options: [
-          { v: "全部", t: "全部" }, { v: "实付", t: "实付在押" }, { v: "信用免押", t: "信用免押" },
-          { v: "渠道担保", t: "渠道担保" }, { v: "退押中", t: "退押中" }
+          { v: "全部", t: "全部" }, { v: "实付", t: "实付" }, { v: "信用免押", t: "信用免押" },
+          { v: "渠道担保", t: "渠道担保" }, { v: "无", t: "——" }
+        ] },
+        { key: "depositStatus", label: "押金状态", type: "select", options: [
+          { v: "全部", t: "全部" }, { v: "在押", t: "在押" }, { v: "退押中", t: "退押中" }, { v: "无", t: "——" }
         ] }
       ],
       platformUsers_depositStats: [
@@ -3992,6 +4044,16 @@
         if (f.status !== "全部" && p.status !== f.status) return false;
         if (f.serviceState !== "全部" && (p.serviceState || p.status) !== f.serviceState) return false;
         if (!matchDateStr(p.payTime, f.payFrom, f.payTo)) return false;
+        const dep = packageDepositInfo(p);
+        if (f.depositMethod && f.depositMethod !== "全部") {
+          const want = f.depositMethod === "无" ? "无" : f.depositMethod;
+          if (dep.method !== want) return false;
+        }
+        if (f.depositPayStatus && f.depositPayStatus !== "全部") {
+          const st = (!dep.payStatus || dep.payStatus === "—" || dep.payStatus === "——") ? "无" : dep.payStatus;
+          const want = f.depositPayStatus === "无" ? "无" : f.depositPayStatus;
+          if (st !== want) return false;
+        }
         return true;
       });
     }
@@ -9303,7 +9365,15 @@
         if (f.operatorId !== "全部" && u.serviceOperatorId !== f.operatorId) return false;
         if (f.userType !== "全部" && u.userType !== f.userType) return false;
         if (f.userStatus !== "全部" && u.userStatus !== f.userStatus) return false;
-        if (f.depositKind && f.depositKind !== "全部" && u.depositKind !== f.depositKind) return false;
+        if (f.depositKind && f.depositKind !== "全部") {
+          const want = f.depositKind === "无" ? "无" : f.depositKind;
+          if (u.depositMethod !== want) return false;
+        }
+        if (f.depositStatus && f.depositStatus !== "全部") {
+          const st = (u.depositStatus === "—" || u.depositStatus === "——" || !u.depositStatus) ? "无" : u.depositStatus;
+          const want = f.depositStatus === "无" ? "无" : f.depositStatus;
+          if (st !== want) return false;
+        }
         return true;
       });
       const pg = paginateList(rows, state.platformUsersPage, state.platformUsersPageSize);
@@ -9315,19 +9385,20 @@
             <table>
               <thead><tr>
                 <th>用户</th><th>用户状态</th><th>服务运营商</th><th>用户类型</th>
-                <th>电池押金</th><th>套餐/权益</th><th>状态·生效周期</th><th>渠道商</th><th>持有电池</th>
+                <th>电池押金</th><th>押金状态</th><th>套餐/权益</th><th>状态·生效周期</th><th>渠道商</th><th>持有电池</th>
               </tr></thead>
               <tbody>${pg.slice.map(u => `<tr>
                 <td>${u.id}<br><small style="color:var(--muted)">${u.phone}</small></td>
                 <td>${tag(u.userStatus)}</td>
                 <td><strong>${u.serviceOperatorName}</strong><br><small style="color:var(--muted)">${u.serviceOperatorId}</small></td>
                 <td>${u.userType}</td>
-                <td>${riderDepositCellHtml({ kind: u.depositKind, label: u.depositLabel, sub: u.depositSub })}</td>
+                <td>${u.depositMethodText || "——"}</td>
+                <td>${riderDepositStatusCellHtml({ status: u.depositStatus })}</td>
                 <td>${u.pkgName}</td>
                 <td>${tag(String(u.pkgStatus))}<br><small style="color:var(--muted)">${u.pkgPeriod}</small></td>
                 <td>${u.channelName}</td>
-                <td>${u.heldBattery}${u.heldBatteryHint ? `<br><small style="color:var(--muted)">${u.heldBatteryHint}</small>` : (u.batteryOwner !== "—" ? `<br><small style="color:var(--muted)">归属 ${u.batteryOwner}</small>` : "")}</td>
-              </tr>`).join("") || "<tr><td colspan='9'>暂无</td></tr>"}</tbody>
+                <td>${u.heldBattery || "未持有"}</td>
+              </tr>`).join("") || "<tr><td colspan='10'>暂无</td></tr>"}</tbody>
             </table>
             ${renderTablePager(pg, "pu-page")}
           </div>
@@ -11708,32 +11779,49 @@
         </section>`)}`;
     }
 
-    function depositCell(p) {
-      if (p.depositWaiver) {
-        const w = p.depositWaiver;
-        return `${tag("信用免押")}<br><small style="color:var(--muted)">${w.type || "信用"} ${w.score != null ? w.score + "分" : ""}</small>`;
-      }
-      if (p.batteryDeposit == null) return "—";
-      if (p.batteryDeposit === 0) return `${tag("无需押金")}`;
-      const paid = (p.depositPaid || 0) >= p.batteryDeposit;
-      return `¥${p.batteryDeposit}<br><small>${paid ? tag("实付押金") : tag("待付押")}</small>`;
-    }
-
-    function packageDepositDetailHtml(p) {
+    /** 套餐单押金：方式与收款状态分列（decision-067） */
+    function packageDepositInfo(p) {
       if (p.depositWaiver) {
         const w = p.depositWaiver;
         const amt = w.waivedAmount != null ? w.waivedAmount : (p.batteryDeposit || 0);
-        return `<strong>${tag("信用免押")}</strong>
-          <br><small style="font-weight:400;color:var(--muted)">${w.type || "信用通道"} · ${w.score != null ? w.score + "分" : "—"} · 免押额 ¥${amt} · 未实收押金</small>`;
+        const score = w.score != null ? w.score + "分" : "";
+        return {
+          method: "信用免押",
+          methodHtml: `${tag("信用免押")}<br><small style="color:var(--muted)">${w.type || "信用"} ${score}</small>`,
+          methodDetail: `${tag("信用免押")}<br><small style="font-weight:400;color:var(--muted)">${w.type || "信用通道"} · ${score || "—"} · 免押额 ¥${amt}</small>`,
+          payStatus: "——",
+          amount: amt,
+          paidAmt: 0
+        };
       }
-      if (p.batteryDeposit == null) return "<strong>—</strong>";
-      if (p.batteryDeposit === 0) {
-        return `<strong>${tag("无需押金")}</strong><br><small style="font-weight:400;color:var(--muted)">本单不收电池押金</small>`;
+      if (p.batteryDeposit == null || p.batteryDeposit === 0) {
+        /* 本单不收押金 / 无记录 → 统一「——」，不单列「无需押金」（decision-068） */
+        return { method: "无", methodHtml: "——", methodDetail: "<strong>——</strong>", payStatus: "——", amount: 0, paidAmt: 0 };
       }
       const paidAmt = p.depositPaid || 0;
       const paid = paidAmt >= p.batteryDeposit;
-      return `<strong>${tag("实付押金")} ¥${p.batteryDeposit}</strong>
-        <br><small style="font-weight:400;color:var(--muted)">${paid ? "已收款" : "待付"} · 实收 ¥${paidAmt}</small>`;
+      return {
+        method: "实付",
+        methodHtml: `${tag("实付")}<br><small style="color:var(--muted)">¥${p.batteryDeposit}</small>`,
+        methodDetail: `${tag("实付")} <strong>¥${p.batteryDeposit}</strong><br><small style="font-weight:400;color:var(--muted)">应缴 ¥${p.batteryDeposit}</small>`,
+        payStatus: paid ? "已收" : "待付",
+        amount: p.batteryDeposit,
+        paidAmt
+      };
+    }
+
+    function packageDepositMethodCell(p) {
+      return packageDepositInfo(p).methodHtml;
+    }
+
+    function packageDepositPayStatusCell(p) {
+      const st = packageDepositInfo(p).payStatus;
+      if (!st || st === "——" || st === "—") return "——";
+      return tag(st);
+    }
+
+    function packageDepositDetailHtml(p) {
+      return packageDepositInfo(p).methodDetail;
     }
 
     function packageSettleSplit(p) {
@@ -11838,21 +11926,33 @@
     function pkgRefundSection(p) {
       if (!p.refundInfo) return "";
       const r = p.refundInfo;
+      const pkgAmt = r.unusedService != null ? r.unusedService : (r.pkgRefund || 0);
+      const refunded = r.refunded != null ? r.refunded : 0;
+      const pending = r.pending != null ? r.pending : pkgAmt;
+      const statusLabel = r.refundStatus || "—";
       return `<section class="panel" style="margin:16px 0 0">
-        ${panelHead("中途完结退款", r.refundStatus || "—", "orders_early_end")}
+        ${panelHead("中途完结 · 套餐费退款", statusLabel, "orders_early_end")}
         <div class="panel-body" style="padding-top:0">
           <div class="detail-grid">
-            <div class="detail-item"><span>未使用套餐</span><strong>¥${r.unusedService}</strong><br><small style="font-weight:400;color:var(--muted)">${r.unusedFormula || ""}</small></div>
-            <div class="detail-item"><span>押金退还</span><strong>¥${r.depositRefund}</strong><br><small style="font-weight:400;color:var(--muted)">${r.depositStatus || ""}</small></div>
-            <div class="detail-item"><span>应退合计</span><strong>¥${r.totalRefund}</strong></div>
-            <div class="detail-item"><span>已退/待退</span><strong>¥${r.refunded} / ¥${r.pending}</strong></div>
+            <div class="detail-item"><span>可退套餐费</span><strong>¥${pkgAmt}</strong><br><small style="font-weight:400;color:var(--muted)">${r.unusedFormula || "未使用时长折算"}</small></div>
+            <div class="detail-item"><span>已退 / 待退</span><strong>¥${refunded} / ¥${pending}</strong></div>
           </div>
+          <p style="font-size:12px;color:var(--muted);margin:12px 0 0">${noteBtn("orders_early_end")} 中途完结<strong>只退套餐费</strong>，不与押金合并。</p>
+        </div>
+      </section>
+      <section class="panel" style="margin:16px 0 0">
+        ${panelHead("押金说明", "与套餐费退款解耦", "orders_deposit")}
+        <div class="panel-body" style="padding-top:0">
+          <p style="font-size:13px;margin:0 0 8px">押金<strong>不随中途完结一并退还</strong>。用户可在<strong>服务结束</strong>（电池已还回 <strong>且</strong> 订单完结）后<strong>自行决定是否申请退押</strong>；申请进入「退款管理 · 押金退还」。</p>
+          ${r.depositNote ? `<p style="font-size:12px;color:var(--muted);margin:0">${r.depositNote}</p>` : ""}
         </div>
       </section>`;
     }
 
     function pkgResumePickupSection(p) {
-      if (!p.resumePendingPickup) return "";
+      /* 服务中详情不展示解冻/首服信息（decision-070） */
+      const st = p.serviceState || p.status;
+      if (st === "服务中" || !p.resumePendingPickup) return "";
       return `<section class="panel" style="margin:16px 0 0">
         ${panelHead("解冻后首服", "待领取电池", "orders_freeze")}
         <div class="panel-body" style="padding-top:0">
@@ -12174,6 +12274,10 @@
     }
 
     function packageDetailBodyHtml(p) {
+      const dep = packageDepositInfo(p);
+      const payStatusExtra = dep.method === "实付"
+        ? `<br><small style="font-weight:400;color:var(--muted)">实收 ¥${dep.paidAmt}</small>`
+        : "";
       return `
         <div class="detail-grid">
           <div class="detail-item"><span>设备归属</span><strong>${p.deviceOwnerName || "—"}</strong></div>
@@ -12182,7 +12286,8 @@
           <div class="detail-item"><span>进件商户</span><strong>${PAYEE_MCH.wx}</strong></div>
           <div class="detail-item"><span>支付时间</span><strong>${p.payTime}</strong></div>
           <div class="detail-item"><span>服务状态</span><strong>${serviceStateCell(p)}</strong></div>
-          <div class="detail-item"><span>电池押金</span>${packageDepositDetailHtml(p)}</div>
+          <div class="detail-item"><span>押金方式</span>${dep.methodDetail}</div>
+          <div class="detail-item"><span>收款状态</span><strong>${packageDepositPayStatusCell(p)}</strong>${payStatusExtra}</div>
           <div class="detail-item"><span>购电站点</span><strong>${p.site || "—"}</strong></div>
           <div class="detail-item"><span>有效期起</span><strong>${p.validFrom}</strong></div>
           <div class="detail-item"><span>有效期止</span><strong>${p.validTo}</strong></div>
@@ -12198,6 +12303,52 @@
         ${pkgRefundSection(p)}`;
     }
 
+    /** 套餐购买订单页 · 服务状态详情对比（非正式产品说明，decision-069） */
+    function packageServiceStateDetailCompareHtml(scopedRows) {
+      const states = ["服务中", "已冻结", "中途完结", "已完结"];
+      const preferIds = {
+        "服务中": ["SUB260525001", "SUB260524001"],
+        "已冻结": ["SUB260524002"],
+        "中途完结": ["SUB260615033", "SUB260523088"],
+        "已完结": ["SUB260401099", "SUB260606001"]
+      };
+      const pick = (st) => {
+        const pool = (scopedRows || []).filter(p => (p.serviceState || p.status) === st);
+        for (const id of (preferIds[st] || [])) {
+          const hit = pool.find(p => p.id === id) || packageOrders.find(p => p.id === id);
+          if (hit) return hit;
+        }
+        return pool[0] || packageOrders.find(p => (p.serviceState || p.status) === st) || null;
+      };
+      const cards = states.map(st => {
+        const p = pick(st);
+        if (!p) {
+          return `<div class="proto-doc-compare-card">
+            <div class="proto-doc-card-head"><strong>${tag(st)}</strong><small style="color:var(--muted)">当前范围无样例</small></div>
+            <p style="font-size:12px;color:var(--muted);margin:0">切换运营商或放宽筛选后可见。</p>
+          </div>`;
+        }
+        return `<div class="proto-doc-compare-card" data-proto-doc-state="${st}">
+          <div class="proto-doc-card-head">
+            <strong>${serviceStateCell(p)}</strong>
+            <small style="color:var(--muted)">${p.id} · ${p.pkg}</small>
+            <button type="button" class="link-btn" data-open-sub="${p.id}">打开正式详情</button>
+          </div>
+          ${packageDetailBodyHtml(p)}
+        </div>`;
+      }).join("");
+      return `<section class="panel proto-doc-compare" aria-label="服务状态详情对比（非正式）">
+        ${panelHead("详情对比 · 按服务状态", "非正式内容 · 仅产品说明")}
+        <div class="panel-body">
+          <div class="proto-doc-banner">
+            <span class="proto-doc-badge">非正式</span>
+            <div>本区<strong>不进入正式交付范围</strong>，仅供产品对照：服务状态枚举（服务中 / 已冻结 / 中途完结 / 已完结）各自详情字段与附加区块差异。正式入口仍以列表「详情」抽屉为准。</div>
+          </div>
+          <div class="proto-doc-compare-grid">${cards}</div>
+        </div>
+      </section>`;
+    }
+
     function linkedPackageSummaryHtml(p) {
       if (!p) return "";
       return `<section class="panel" style="margin:16px 0 0;box-shadow:none;border:1px solid var(--line)">
@@ -12207,7 +12358,8 @@
             <div class="detail-item"><span>套餐</span><strong>${p.pkg}</strong></div>
             <div class="detail-item"><span>服务状态</span><strong>${serviceStateCell(p)}</strong></div>
             <div class="detail-item"><span>实付金额</span><strong>¥${p.pay}</strong></div>
-            <div class="detail-item"><span>电池押金</span>${packageDepositDetailHtml(p)}</div>
+            <div class="detail-item"><span>押金方式</span>${packageDepositDetailHtml(p)}</div>
+            <div class="detail-item"><span>收款状态</span><strong>${packageDepositPayStatusCell(p)}</strong></div>
             <div class="detail-item"><span>有效期</span><strong>${p.validFrom} ~ ${p.validTo}</strong></div>
             <div class="detail-item"><span>清分状态</span><strong>${tag(p.payout || "—")}</strong></div>
           </div>
@@ -12282,14 +12434,14 @@
             type: "信用免押",
             amount: w.waivedAmount != null ? w.waivedAmount : (p.batteryDeposit || 0),
             paidAmount: 0,
-            status: "信用免押",
+            status: "——",
             payTime: p.payTime,
             note: `${w.type || "信用"}${w.score != null ? " " + w.score + "分" : ""}`.trim()
           };
         }
         if (p.batteryDeposit == null || p.batteryDeposit === 0) return null;
         if ((p.depositPaid || 0) <= 0) return null;
-        let status = "实付在押";
+        let status = "在押";
         if (p.depositRefundStatus === "已退款") {
           status = "已退押";
         } else {
@@ -12304,7 +12456,7 @@
           phone: p.phone,
           site: p.site,
           pkg: p.pkg,
-          type: "实付押金",
+          type: "实付",
           amount: p.batteryDeposit,
           paidAmount: p.depositPaid,
           status,
@@ -12319,7 +12471,12 @@
       return rows.filter(r => {
         if (!matchKw(r.orderId, f.orderId)) return false;
         if (!matchKw(r.phone, f.phone) && !matchKw(r.user, f.phone)) return false;
-        if (f.status && f.status !== "全部" && r.status !== f.status) return false;
+        if (f.depositType && f.depositType !== "全部" && r.type !== f.depositType) return false;
+        if (f.status && f.status !== "全部") {
+          const st = (r.status === "—" || r.status === "——" || !r.status) ? "无" : r.status;
+          const want = f.status === "无" ? "无" : f.status;
+          if (st !== want) return false;
+        }
         if (!matchDateStr(r.payTime, f.payFrom, f.payTo)) return false;
         return true;
       });
@@ -12329,11 +12486,11 @@
       const rows = filterUserDepositLedger(buildUserDepositLedgerRows());
       const pg = paginateList(rows, state.userDepositPage, state.userDepositPageSize || 8);
       state.userDepositPage = pg.page;
-      const held = rows.filter(r => r.status === "实付在押").reduce((s, r) => s + (r.paidAmount || r.amount || 0), 0);
+      const held = rows.filter(r => r.type === "实付" && r.status === "在押").reduce((s, r) => s + (r.paidAmount || r.amount || 0), 0);
       return `${ownScopeBanner()}<section class="panel">
           ${panelHead("用户押金", `共 ${rows.length} 条 · 实付在押合计 ¥${held.toFixed(0)} · 押金不参与清分`, "orders_user_deposit")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_user_deposit")} 个人用户购套餐<strong>同笔</strong>实付或信用免押明细；退押在「退款管理」执行。渠道担保不在本页。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_user_deposit")} 个人用户购套餐<strong>同笔</strong>实付或信用免押明细；<strong>仅实付</strong>有押金状态；退押在「退款管理」执行。渠道担保不在本页。</p>
             <table>
               <thead><tr>
                 <th>套餐单号</th><th>用户</th><th>站点</th><th>套餐</th>
@@ -12346,7 +12503,7 @@
                 <td>${r.pkg}</td>
                 <td>${tag(r.type)}</td>
                 <td>¥${r.amount}</td>
-                <td>${tag(r.status)}</td>
+                <td>${r.status === "——" || r.status === "—" ? "——" : tag(r.status)}</td>
                 <td>${r.payTime || "—"}</td>
                 <td style="white-space:normal;max-width:160px;font-size:12px;color:var(--muted)">${r.note || "—"}</td>
                 <td class="row-actions" style="white-space:nowrap">
@@ -12375,7 +12532,8 @@
       const orderSidebar = legacyTabs ? tabSidebar(orderTabDefs, tab, "otab") : "";
       const wrapOrderPage = (html) => legacyTabs ? `${pageWithTabs(orderSidebar, html)}` : html;
       if (tab === "package") {
-        const rows = filterPackageList(packageOrders.filter(filterOwnRow));
+        const ownPkgs = packageOrders.filter(filterOwnRow);
+        const rows = filterPackageList(ownPkgs);
         return `${ownScopeBanner()}${wrapOrderPage(`<section class="panel">
             ${panelHead("套餐购买订单", `共 ${rows.length} 条 · 支持单号/手机/时间筛选`, state.role === "operator" ? "orders_pkg_pay" : "orders_pkg")}
             <div class="panel-body orders-table-wrap">
@@ -12383,7 +12541,7 @@
               <table>
                 <thead><tr>
                   <th>套餐单号</th><th>用户</th><th>站点</th><th>套餐</th>
-                  <th>押金 ${noteBtn("orders_deposit")}</th><th>服务状态</th><th>有效期</th>
+                  <th>押金方式 ${noteBtn("orders_deposit")}</th><th>收款状态</th><th>服务状态</th><th>有效期</th>
                   <th>分账</th><th>操作</th>
                 </tr></thead>
                 <tbody>${rows.map(p => `<tr>
@@ -12391,15 +12549,17 @@
                   <td>${p.user}<br><small style="color:var(--muted)">${p.phone}</small></td>
                   <td>${p.site}</td>
                   <td>${p.pkg}</td>
-                  <td>${depositCell(p)}</td>
+                  <td>${packageDepositMethodCell(p)}</td>
+                  <td>${packageDepositPayStatusCell(p)}</td>
                   <td>${serviceStateCell(p)}</td>
                   <td>${p.validFrom}<br><small style="color:var(--muted)">至 ${p.validTo}</small></td>
                   <td>${tag(p.payout || "—")}</td>
                   <td><button type="button" class="link-btn" data-open-sub="${p.id}">详情</button></td>
-                </tr>`).join("") || "<tr><td colspan='9'>暂无自有设备订单</td></tr>"}</tbody>
+                </tr>`).join("") || "<tr><td colspan='10'>暂无自有设备订单</td></tr>"}</tbody>
               </table>
             </div>
-          </section>`)}`;
+          </section>
+          ${packageServiceStateDetailCompareHtml(ownPkgs)}`)}`;
       }
       if (tab === "freeze") {
         const rows = filterServiceChanges(serviceChangeRequests.filter(r => filterOwnRow(r) && (r.type === "冻结" || r.type === "解冻")));
@@ -15870,7 +16030,7 @@
                 <td>${r.allocatedDays || 0} 人天</td><td>${r.usedDays || 0} 人天</td>
                 <td><strong>${r.remainingDays || 0}</strong> 人天</td>
                 <td>${tag(r.quotaStatus || "未分配")}</td>
-                <td>${eligibilityTag(r.todayEligibility)}${gateHint ? `<br><small style="color:var(--red)">${gateHint}</small>` : ""}</td>
+                <td>${eligibilityTag(r.todayEligibility)}${gateHint ? `<br><small style="color:var(--red)">${gateHint}${(r.batteryHeld || 0) > 0 || r.todayEligibility === "待还电" ? " · 不可换电 · 仅可还电" : (r.remainingDays === 0 || r.gateReason || r.failReason ? " · 不可换电 · 须渠道续配" : "")}</small>` : ""}</td>
                 <td>${(r.batteryHeld || 0) > 0 ? tag("持有") : "—"}</td>
                 <td class="row-actions">${riderOps(r)}</td>
               </tr>`;
@@ -16108,13 +16268,28 @@
       const f = getPf();
       const opId = currentEntity().id;
       const st = operatorRiderDepositStats(opId);
+      /** 人天池无额度：不可换电；持电池仅可还电（无自费兜底，decision-054） */
+      const poolNoQuotaHint = (u) => {
+        const rider = dayPoolRiders.find(r => r.id === u.id);
+        const held = !!(rider?.batteryHeld) || (u.poolEligibility === "待还电");
+        const reason = u.poolFailReason || rider?.failReason || "无可用额度";
+        return held ? `${reason} · 不可换电 · 仅可还电` : `${reason} · 不可换电 · 须渠道续配`;
+      };
       const us = users.filter(filterOwnRow).filter(u => {
         if (!matchKw(u.id, f.userId)) return false;
         if (!matchKw(u.phone, f.phone)) return false;
         if (f.pkgService !== "全部" && userPkgServiceType(u) !== f.pkgService) return false;
         if (f.serviceState !== "全部" && (u.serviceState || "") !== f.serviceState) return false;
         const dep = riderBatteryDepositInfo(u);
-        if (f.depositKind && f.depositKind !== "全部" && dep.kind !== f.depositKind) return false;
+        if (f.depositKind && f.depositKind !== "全部") {
+          const want = f.depositKind === "无" ? "无" : f.depositKind;
+          if (dep.method !== want) return false;
+        }
+        if (f.depositStatus && f.depositStatus !== "全部") {
+          const stDep = (dep.status === "—" || dep.status === "——" || !dep.status) ? "无" : dep.status;
+          const wantSt = f.depositStatus === "无" ? "无" : f.depositStatus;
+          if (stDep !== wantSt) return false;
+        }
         return true;
       });
       return `
@@ -16134,22 +16309,26 @@
         <section class="panel">
           ${panelHead("用户列表", `共 ${us.length} 人`, "users_panel")}
           <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("users_panel")}${noteBtn("rider_battery_deposit")} 押金类型：<strong>实付在押</strong> / <strong>信用免押</strong> / <strong>渠道担保</strong>。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("users_panel")}${noteBtn("rider_battery_deposit")} 套餐与服务状态分列；电池押金为方式，押金状态<strong>仅实付</strong>有值。</p>
             <table>
               <thead><tr>
-                <th>用户</th><th>套餐/服务</th><th>人天池权益</th><th>电池押金</th><th>期内换电</th><th>最近换电</th>
+                <th>用户</th><th>套餐/服务</th><th>服务状态</th><th>人天池权益</th>
+                <th>电池押金</th><th>押金状态</th><th>期内换电</th><th>最近换电</th>
               </tr></thead>
               <tbody>${us.map(u => {
                 const dep = riderBatteryDepositInfo(u);
+                const svcState = u.serviceState || "——";
                 return `<tr>
                 <td>${u.id}<br><small style="color:var(--muted)">${u.phone}</small></td>
-                <td>${tag(u.serviceState || u.pkg)}<br><small style="color:var(--muted)">${u.pkg}</small></td>
-                <td>${u.poolEligibility ? eligibilityTag(u.poolEligibility) + (u.poolTeam ? `<br><small>${u.poolTeam}</small>` : "") + (u.poolFailReason ? `<br><small style="color:var(--red)">${u.poolFailReason} · 可自费</small>` : "") : "—"}</td>
+                <td>${u.pkg || "—"}</td>
+                <td>${svcState === "——" || !u.serviceState ? "——" : tag(svcState)}</td>
+                <td>${u.poolEligibility ? eligibilityTag(u.poolEligibility) + (u.poolTeam ? `<br><small>${u.poolTeam}</small>` : "") + (u.poolFailReason ? `<br><small style="color:var(--red)">${poolNoQuotaHint(u)}</small>` : "") : "—"}</td>
                 <td>${riderDepositCellHtml(dep)}</td>
+                <td>${riderDepositStatusCellHtml(dep)}</td>
                 <td>${scale(u.swaps)}</td>
                 <td>${u.last}</td>
               </tr>`;
-              }).join("") || "<tr><td colspan='6'>暂无</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
