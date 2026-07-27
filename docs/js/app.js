@@ -8,7 +8,7 @@
       },
       view: "overview",
       deviceTab: "cabinet", deviceBatteryPage: 1, deviceBatteryPageSize: 5, orderTab: "package", flowTab: "receipt",
-      platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "ledger", platformDeviceOpenImportModal: false, platformChannelTab: "list", platformMarketingTab: "campaigns",
+      platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "cabinet", platformDeviceOpenImportModal: false, platformChannelTab: "list", platformMarketingTab: "campaigns",
       operatorsTab: "list",
       l1PricingTab: "crossNet",
       platformUsersTab: "info",
@@ -1309,10 +1309,13 @@
       }
       if (state.view === "l1Pricing") return "l1Pricing_" + (state.l1PricingTab || "crossNet");
       if (state.view === "platformFlows") return "platformFlows_" + state.platformFlowTab;
-      if (state.view === "platformDevices") return "platformDevices_ledger";
+      if (state.view === "platformDevices") {
+        const t = state.platformDeviceTab === "battery" ? "battery" : "cabinet";
+        return "platformDevices_" + t;
+      }
       if (state.view === "platformChannels") return "platformChannels_list";
       if (state.view === "platformMarketing") return "platformMarketing_" + state.platformMarketingTab;
-      if (state.view === "deviceBinding") return "platformDevices_ledger";
+      if (state.view === "deviceBinding") return "platformDevices_cabinet";
       if (state.view === "devices") {
         if (state.deviceTab === "cabinet") return "devices_cabinet";
         if (state.deviceTab === "battery") return "devices_battery";
@@ -3973,9 +3976,18 @@
         { key: "orderStatus", label: "订单状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待支付", t: "待支付" }, { v: "支付中", t: "支付中" }, { v: "待确认到账", t: "待确认到账" }, { v: "已完成", t: "已完成" }] },
         { key: "payStatus", label: "支付状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待支付", t: "待支付" }, { v: "支付中", t: "支付中" }, { v: "待付款", t: "待付款（线下）" }, { v: "已付款", t: "已付款" }] }
       ],
+      platformDevices_cabinet: [
+        { key: "keyword", label: "电柜 SN", placeholder: "CAB-" },
+        { key: "operatorId", label: "归属运营商", type: "select", options: () => platformOperatorOptions() },
+        { key: "online", label: "在线状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "在线", t: "在线" }, { v: "离线", t: "离线" }] }
+      ],
+      platformDevices_battery: [
+        { key: "keyword", label: "电池 SN", placeholder: "BAT-" },
+        { key: "operatorId", label: "归属运营商", type: "select", options: () => platformOperatorOptions() },
+        { key: "belong", label: "当前位置", type: "select", options: [{ v: "全部", t: "全部" }, { v: "电柜", t: "电柜" }, { v: "用户", t: "用户" }, { v: "柜外", t: "柜外" }] }
+      ],
       platformDevices_ledger: [
         { key: "keyword", label: "设备 SN", placeholder: "CAB-/BAT-" },
-        { key: "type", label: "类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "cabinet", t: "换电柜" }, { v: "battery", t: "电池" }] },
         { key: "operatorId", label: "归属运营商", type: "select", options: () => platformOperatorOptions() }
       ],
       platformDevices_import: [],
@@ -5594,6 +5606,7 @@
           tabs: [["crossNet", "跨网服务费"], ["dayPrice", "人天标准日值"], ["sms", "预警短信"]]
         },
         platformUsers: { stateKey: "platformUsersTab", tabs: [["info", "用户信息"], ["depositStats", "用户押金统计"], ["serviceChange", "服务变更"]] },
+        platformDevices: { stateKey: "platformDeviceTab", tabs: [["cabinet", "电柜"], ["battery", "电池"]] },
         platformLeasing: { stateKey: "platformLeasingTab", tabs: [["companies", "租赁公司"], ["bindings", "租赁关系绑定"]] },
         platformOrders: { stateKey: "platformOrderTab", tabs: [["package", "套餐购买订单"], ["swap", "换电订单"], ["channel", "渠道商订单"]] },
         platformMarketing: { stateKey: "platformMarketingTab", tabs: [["campaigns", "活动管理"], ["agreements", "运营商签约"], ["links", "链接与二维码"], ["pending", "成交订单"], ["settlements", "券核销结算"], ["statements", "营销对账"]] },
@@ -8213,7 +8226,7 @@
 
     function openBindForm(sn) {
       state.view = "platformDevices";
-      state.platformDeviceTab = "ledger";
+      state.platformDeviceTab = "cabinet";
       state.platformDeviceOpenImportModal = true;
       closeBindForm();
       render();
@@ -8387,18 +8400,18 @@
       const op = platformOperators.find(o => o.id === operatorId);
       if (!op) return { ok: false, reason: "运营商不存在" };
       if (op.status !== "在营") return { ok: false, reason: "运营商非在营" };
-      const boundAt = new Date().toISOString().slice(0, 10);
+      const day = new Date().toISOString().slice(0, 10);
       if (iot.type === "cabinet") {
         cabinets.push({
           sn, site: "未分配站点", city: iot.city, slots: String(iot.specs).includes("8") ? 8 : 12,
           online: false, lastSwap: "—", deviceOwnerId: op.id, deviceOwnerName: op.name,
-          ownership: "自有", platformBound: true, boundAt, specs: iot.specs, iotSource: iot.source
+          ownership: "自有", platformBound: true, boundAt: day, importedAt: day, specs: iot.specs, iotSource: iot.source
         });
       } else {
         batteries.push({
-          sn, site: "未分配站点", city: iot.city, soc: 100, health: "正常",
+          sn, site: "未分配站点", city: iot.city, soc: 100, soh: 100, health: "正常",
           inCab: "待入柜", deviceOwnerId: op.id, deviceOwnerName: op.name,
-          platformBound: true, boundAt, specs: iot.specs, iotSource: iot.source
+          platformBound: true, boundAt: day, importedAt: day, specs: iot.specs, iotSource: iot.source
         });
       }
       const idx = platformDeviceInventory.findIndex(i => i.sn === sn);
@@ -9252,7 +9265,7 @@
 
     function renderDeviceBinding() {
       state.view = "platformDevices";
-      state.platformDeviceTab = "ledger";
+      state.platformDeviceTab = "cabinet";
       state.platformDeviceOpenImportModal = true;
       return renderPlatformDevices();
     }
@@ -9465,7 +9478,7 @@
             <table>
               <thead><tr>
                 <th>用户</th><th>用户状态</th><th>服务运营商</th><th>用户类型</th>
-                <th>电池押金</th><th>押金状态</th><th>套餐/权益</th><th>状态·生效周期</th><th>渠道商</th><th>持有电池</th>
+                <th>电池押金</th><th>押金状态</th><th>套餐/权益</th><th>服务状态</th><th>生效周期</th><th>渠道商</th><th>持有电池</th>
               </tr></thead>
               <tbody>${pg.slice.map(u => `<tr>
                 <td>${u.id}<br><small style="color:var(--muted)">${u.phone}</small></td>
@@ -9475,10 +9488,11 @@
                 <td>${u.depositMethodText || "——"}</td>
                 <td>${riderDepositStatusCellHtml({ status: u.depositStatus })}</td>
                 <td>${u.pkgName}</td>
-                <td>${tag(String(u.pkgStatus))}<br><small style="color:var(--muted)">${u.pkgPeriod}</small></td>
+                <td>${tag(String(u.pkgStatus))}</td>
+                <td><small style="color:var(--muted)">${u.pkgPeriod || "—"}</small></td>
                 <td>${u.channelName}</td>
                 <td>${u.heldBattery || "未持有"}</td>
-              </tr>`).join("") || "<tr><td colspan='10'>暂无</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='11'>暂无</td></tr>"}</tbody>
             </table>
             ${renderTablePager(pg, "pu-page")}
           </div>
@@ -9580,39 +9594,123 @@
         </section>`)}`;
     }
 
-    function allPlatformDeviceRows() {
-      return [
-        ...cabinets.map(c => ({ sn: c.sn, type: "cabinet", typeLabel: "换电柜", operatorId: c.deviceOwnerId, operatorName: c.deviceOwnerName, site: c.site, city: c.city, bindStatus: "已归属", boundAt: c.boundAt || "—", online: c.online, specs: c.specs || "—" })),
-        ...batteries.map(b => ({ sn: b.sn, type: "battery", typeLabel: "电池", operatorId: b.deviceOwnerId, operatorName: b.deviceOwnerName, site: b.site, city: b.city, bindStatus: "已归属", boundAt: b.boundAt || "—", soc: b.soc, specs: b.specs || "—" }))
-      ];
+    /** 平台设备台账 · 电池当前位置（三档，相对物理位置；与运营商四档位置不同） */
+    function platformBatteryBelongKind(b) {
+      const kind = batteryLocationKind(b);
+      if (kind === "柜外-用户") return "用户";
+      if (kind === "自有电柜" || kind === "其他运营商电柜") return "电柜";
+      return "柜外";
+    }
+
+    function platformBatteryBelongCell(b) {
+      const belong = platformBatteryBelongKind(b);
+      const loc = String(b.inCab || "").trim();
+      let detail = "";
+      if (belong === "电柜") detail = loc;
+      else if (belong === "用户") detail = b.holderName || b.holderPhone || "";
+      else if (loc && loc !== "柜外" && loc !== "—") detail = loc;
+      return detail
+        ? `${tag(belong)}<br><small style="color:var(--muted)">${detail}</small>`
+        : tag(belong);
+    }
+
+    function platformDeviceDateCell(v) {
+      return v && v !== "—" ? v : "—";
+    }
+
+    function allPlatformCabinetRows() {
+      return cabinets.map(c => ({
+        sn: c.sn, operatorId: c.deviceOwnerId, operatorName: c.deviceOwnerName || "—",
+        site: c.site, city: c.city,
+        boundAt: c.boundAt || "—",
+        importedAt: c.importedAt || c.boundAt || "—",
+        online: c.online !== false, specs: c.specs || "—"
+      }));
+    }
+
+    function allPlatformBatteryRows() {
+      return batteries.map(b => ({
+        sn: b.sn, operatorId: b.deviceOwnerId, operatorName: b.deviceOwnerName || "—",
+        site: b.site, city: b.city,
+        boundAt: b.boundAt || "—",
+        importedAt: b.importedAt || b.boundAt || "—",
+        soc: b.soc, soh: batterySohPercent(b), specs: b.specs || "—",
+        belong: platformBatteryBelongKind(b), raw: b
+      }));
     }
 
     function renderPlatformDevices() {
-      /* 兼容旧深链 platformDeviceTab=import → 打开批量导入弹窗 */
+      /* 兼容旧深链：import → 弹窗；ledger → 电柜 Tab */
       if (state.platformDeviceTab === "import") {
-        state.platformDeviceTab = "ledger";
+        state.platformDeviceTab = "cabinet";
         state.platformDeviceOpenImportModal = true;
       }
+      if (state.platformDeviceTab === "ledger" || !state.platformDeviceTab) {
+        state.platformDeviceTab = "cabinet";
+      }
+      const tab = state.platformDeviceTab === "battery" ? "battery" : "cabinet";
+      state.platformDeviceTab = tab;
       const f = getPf();
-      const rows = allPlatformDeviceRows().filter(r => {
-        if (f.type !== "全部" && r.type !== f.type) return false;
+      const importBtn = `<button type="button" class="btn primary" data-open-device-import>批量导入</button>`;
+      const hint = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_operator_device_gate")}${noteBtn("platform_devices_import")} 归属运营商后，方可在「我的设备」维护并分配至站点。新设备请点击「批量导入」：先选运营商，再手工填 SN 或上传 SN 表格。</p>`;
+
+      if (tab === "battery") {
+        const rows = allPlatformBatteryRows().filter(r => {
+          if (f.operatorId !== "全部" && r.operatorId !== f.operatorId) return false;
+          if (f.belong && f.belong !== "全部" && r.belong !== f.belong) return false;
+          if (f.keyword && !matchKw(r.sn, f.keyword)) return false;
+          return true;
+        });
+        return `${ownScopeBanner()}<section class="panel">
+          ${panelHead("全平台电池台账", `共 ${rows.length} 块`, "platform_device_bind", importBtn)}
+          <div class="panel-body orders-table-wrap">
+            ${hint}
+            <table>
+              <thead><tr>
+                <th>SN</th><th>规格</th><th>归属运营商</th><th>城市</th><th>站点</th>
+                <th>SOC</th><th>SOH</th><th>当前位置 ${noteBtn("platform_devices_battery_belong")}</th>
+                <th>归属日 ${noteBtn("platform_device_bound_at")}</th>
+                <th>导入日期 ${noteBtn("platform_device_imported_at")}</th>
+              </tr></thead>
+              <tbody>${rows.map(r => `<tr>
+                <td>${r.sn}</td><td>${r.specs || "—"}</td>
+                <td>${r.operatorName}</td><td>${r.city || "—"}</td><td>${r.site || "—"}</td>
+                <td>${r.soc != null ? r.soc + "%" : "—"}</td>
+                <td>${r.soh != null ? r.soh + "%" : "—"}</td>
+                <td>${platformBatteryBelongCell(r.raw)}</td>
+                <td>${platformDeviceDateCell(r.boundAt)}</td>
+                <td>${platformDeviceDateCell(r.importedAt)}</td>
+              </tr>`).join("") || "<tr><td colspan='10'>暂无电池</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      }
+
+      const rows = allPlatformCabinetRows().filter(r => {
         if (f.operatorId !== "全部" && r.operatorId !== f.operatorId) return false;
+        if (f.online === "在线" && !r.online) return false;
+        if (f.online === "离线" && r.online) return false;
         if (f.keyword && !matchKw(r.sn, f.keyword)) return false;
         return true;
       });
       return `${ownScopeBanner()}<section class="panel">
-          ${panelHead("全平台设备台账", `共 ${rows.length} 台`, "platform_device_bind",
-            `<button type="button" class="btn primary" data-open-device-import>批量导入</button>`)}
+          ${panelHead("全平台电柜台账", `共 ${rows.length} 台`, "platform_device_bind", importBtn)}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_operator_device_gate")}${noteBtn("platform_devices_import")} 归属运营商后，方可在「我的设备」维护并分配至站点。新设备请点击「批量导入」：先选运营商，再手工填 SN 或上传 SN 表格。</p>
+            ${hint}
             <table>
-              <thead><tr><th>SN</th><th>类型</th><th>规格</th><th>归属运营商</th><th>城市</th><th>站点</th><th>状态</th><th>归属日</th></tr></thead>
+              <thead><tr>
+                <th>SN</th><th>规格</th><th>归属运营商</th><th>城市</th><th>站点</th>
+                <th>在线状态</th>
+                <th>归属日 ${noteBtn("platform_device_bound_at")}</th>
+                <th>导入日期 ${noteBtn("platform_device_imported_at")}</th>
+              </tr></thead>
               <tbody>${rows.map(r => `<tr>
-                <td>${r.sn}</td><td>${r.typeLabel}</td><td>${r.specs || "—"}</td>
-                <td>${r.operatorName}</td><td>${r.city || "—"}</td><td>${r.site}</td>
-                <td>${r.online === false ? tag("离线") : r.soc != null ? `SOC ${r.soc}%` : tag("在线")}</td>
-                <td>${r.boundAt}</td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
+                <td>${r.sn}</td><td>${r.specs || "—"}</td>
+                <td>${r.operatorName}</td><td>${r.city || "—"}</td><td>${r.site || "—"}</td>
+                <td>${r.online ? tag("在线") : tag("离线")}</td>
+                <td>${platformDeviceDateCell(r.boundAt)}</td>
+                <td>${platformDeviceDateCell(r.importedAt)}</td>
+              </tr>`).join("") || "<tr><td colspan='8'>暂无电柜</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -11834,8 +11932,11 @@
         });
         const pg = paginateList(rows, state.deviceBatteryPage, state.deviceBatteryPageSize || 5);
         state.deviceBatteryPage = pg.page;
-        body = `<table><thead><tr><th>电池 SN</th><th>站点</th><th>运营主体</th><th>权属</th><th>电量</th><th>健康</th><th>位置</th></tr></thead>
-          <tbody>${pg.slice.map(b => `<tr><td>${b.sn}</td><td>${b.site}</td><td>${b.deviceOwnerName}</td><td>${ownershipCell(b)}</td><td>${b.soc}%</td><td>${tag(b.health)}</td><td>${batteryLocationCell(b)}</td></tr>`).join("") || "<tr><td colspan='7'>暂无自有设备</td></tr>"}</tbody></table>
+        body = `<table><thead><tr><th>电池 SN</th><th>站点</th><th>运营主体</th><th>权属</th><th>电量</th><th>健康度 ${noteBtn("devices_bat_soh")}</th><th>位置</th></tr></thead>
+          <tbody>${pg.slice.map(b => {
+            const soh = batterySohPercent(b);
+            return `<tr><td>${b.sn}</td><td>${b.site}</td><td>${b.deviceOwnerName}</td><td>${ownershipCell(b)}</td><td>${b.soc != null ? b.soc + "%" : "—"}</td><td>${soh != null ? soh + "%" : "—"}</td><td>${batteryLocationCell(b)}</td></tr>`;
+          }).join("") || "<tr><td colspan='7'>暂无自有设备</td></tr>"}</tbody></table>
           ${renderTablePager(pg, "bat-page")}`;
       } else if (tab === "alerts") {
         const rows = myDeviceAlerts();

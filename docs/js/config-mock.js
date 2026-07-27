@@ -285,7 +285,7 @@
       l1Pricing: ["平台统价", "二级：跨网服务费（含城市覆盖） / 人天标准日值（含城市覆盖） / 预警短信。"],
       platformUsers: ["用户管理", "二级菜单：用户信息 / 用户押金统计 / 服务变更。"],
       platformOrders: ["订单管理", "全平台套餐购买、换电与渠道批发订单查询与追溯。"],
-      platformDevices: ["设备管理", "全量设备台账；「批量导入」弹窗：先选运营商，再手工填 SN 或上传 SN 表格（类型/参数 IoT 回填）。"],
+      platformDevices: ["设备管理", "二级：电柜 / 电池。全量台账；「批量导入」弹窗：先选运营商，再手工填 SN 或上传 SN 表格（类型/参数 IoT 回填）。"],
       platformChannels: ["渠道商管理", "已并入「运营商管理 → 渠道商管理」；全平台渠道商查询与监管；主体由签约运营商创建维护，平台只读。"],
       platformMarketing: ["平台营销", "【二期】立减券获客；购时锁 OP；款进运营商（不代收）；券面价差默认运营商让利；1% + 营销服务费协议结算。一期不交付，原型仅演示。"],
       platformFlows: ["流水管理", "用户支付记录、运营商间跨网清分、平台提成。"],
@@ -394,7 +394,8 @@
       devices_cab_bat_flow: { title: "导出电池流转记录（二期）", content: "【二期】按时间范围导出电池入柜/出柜/流转 CSV。一期不交付。" },
       devices_cab_ops_log: { title: "运维操作记录（二期）", content: "【二期】远程运维指令与结果流水。一期不交付，原型可浏览演示表。" },
       devices_move_cab: { title: "移柜", content: "前提：柜机已绑定站点（<code>cabinets.site</code> 对应运营商在营站点）。将柜机从 A 站迁至 B 站，同步更新投放地址与城市；<strong>不迁移电池</strong>（电池位置仍随柜内格口/流转记录，与站点无绑定）。移柜留痕 Mock。" },
-      devices_bat: { title: "电池", content: "归属本运营商的电池 SN、电量与健康度。位置四档：自有电柜 / 其他运营商电柜 / 柜外 / 柜外-用户；支持按位置筛选与分页。补电与调拨在运维流程处理（原型仅占位）。" },
+      devices_bat: { title: "电池", content: "归属本运营商的电池 SN、电量（SOC%）与<strong>健康度（SOH%）</strong>。位置四档：自有电柜 / 其他运营商电柜 / 柜外 / 柜外-用户；支持按位置筛选与分页。补电与调拨在运维流程处理（原型仅占位）。" },
+      devices_bat_soh: { title: "健康度", content: "电池健康度 <strong>SOH</strong>，以百分比展示（0–100%），与平台设备台账「SOH」口径一致。不再使用「正常/预警」文案标签。" },
       orders_pkg: { title: "套餐购买订单", content: "骑手支付购买的包月/次卡订单，定义服务有效期与额度。支持中途完结退款、冻结/解冻。一笔套餐在有效期内可产生多笔换电订单。" },
       orders_service_change: { title: "服务变更", content: "骑手发起的<strong>中途完结</strong>及<strong>冻结/解冻</strong>记录。中途完结进入退款流程；冻结/解冻在个人用户满足条件时<strong>系统自动生效</strong>，本后台只读查询。" },
       orders_early_end: { title: "中途完结与退款", content: "<strong>中途完结只退未使用套餐费</strong>，与押金解耦（decision-070）。<br>· 套餐费：进入「退款管理」按规则原路退<br>· 押金：不随中途完结一并退；用户在<strong>电池已还且订单完结</strong>后可自行申请「押金退还」<br>· 退款详情抽屉展示进度、关联单与流水" },
@@ -409,7 +410,7 @@
       orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：按套餐单展示押金明细。<br>· <strong>押金类型</strong>：实付 / 信用免押<br>· <strong>押金状态</strong>：仅实付有「在押 / 退押中 / 已退押」；信用免押统一 ——<br>· 筛选项：套餐单号、手机、支付日、押金类型、押金状态；支持分页<br>· 渠道担保不在本页；退押执行在「退款管理」" },
       orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>微信支付分免押（≥500）</strong>或<strong>芝麻信用免押（≥500）</strong>任一达标（运营商押金设置页只读展示，不可改；decision-073）。详情页与实付押金分开展示。" },
       rider_battery_deposit: { title: "骑手电池押金", content: "与「平台保证金」不同。<br>· 个人：购套餐<strong>同笔</strong>免押或实缴 → 运营商子商户<br>· 渠道人天：<strong>首次领电前</strong>免押或实缴（非静默渠道担保）<br>· <strong>押金方式（全站）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）<br>· 运营商「订单与服务 → 用户押金」明细；「用户」台账；平台「用户管理 → 用户押金统计」只读汇总<br>· 数额见「定价管理 → 押金设置」；<strong>仅退押</strong>进「退款管理」" },
-      platform_users_info: { title: "用户信息", content: "全平台用户列表。<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（支付分或芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
+      platform_users_info: { title: "用户信息", content: "全平台用户列表。<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（支付分或芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>服务状态</strong>与<strong>生效周期</strong>分列（decision-080）<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
       platform_users_deposit_stats: { title: "用户押金统计", content: "按运营商汇总实付在押、免押人数、渠道担保、退押中金额；只读，不参与平台/合伙人清分。" },
       pricing_deposit: { title: "押金设置", content: "面向<strong>个人购套餐</strong>与<strong>渠道人天首次领电</strong>。<br>· 运营商可配置：押金数额、启停<br>· <strong>免押门槛由平台统一</strong>，只读展示：微信支付分免押（≥500）、芝麻信用免押（≥500）；任一路达标即可免押（decision-073）<br>· 均未达标则须实缴<br>· 个人：购套餐同笔；渠道人天：首次领取电池前办结（decision-050）" },
       orders_swap: { title: "换电订单", content: "列出换电单；权益来源：<strong>个人套餐</strong>（支付时已清分，本表不展示应分）、<strong>渠道人天</strong>、<strong>激活码（二期）</strong>（按天/次确认消耗，类人天）。每笔记录三元组 U/C/B 与跨网设备服务费。" },
@@ -505,7 +506,7 @@
       platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、进件账户摘要、平台保证金与信用额度。运营商在登录页选「运营商登录」凭手机号进入；登录后仅见本人经营数据。" },
       platform_leasing_companies: { title: "设备租赁公司", content: "平台管理员维护出租方主体档案（可<strong>多家并存</strong>）。前期演示环境以「华东设备租赁公司」为主；架构支持后续接入更多租赁公司。" },
       platform_lease_binding: { title: "租赁关系绑定", content: "平台管理员建立「租赁公司 ↔ 运营商」绑定后，该租赁公司方可向该运营商发起租赁协议签约。<strong>运营商</strong>承租信息来源于平台运营商档案；一运营商可同时与多家租赁公司建立绑定并分别签约。" },
-      platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。" },
+      platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。<br>设备管理分 <strong>电柜 / 电池</strong> 两个二级 Tab；电池列表含 SOC、SOH、<strong>当前位置</strong>（电柜 / 用户 / 柜外）、归属日、导入日期。" },
       platform_l1_pricing: { title: "跨网服务费", content: "柜机/电池服务费<strong>全网默认价</strong> + <strong>城市覆盖价</strong>由平台发布；跨运营商换电清分按此单价；城市价优先；改价不追溯。" },
       platform_day_standard: { title: "人天标准日值", content: "全网默认日值 + <strong>城市覆盖</strong>；B 端 1% 计提基数；亦为运营商默认批发价（可改）。" },
       platform_stats: { title: "业务汇总", content: "全平台 Mock 汇总：<br>· <strong>业务快照（不受统计范围）</strong>：运营商、渠道商、在营站点、设备<br>· <strong>经营指标（随统计范围缩放）</strong>：用户、套餐订单、换电成功、业务流水、平台营收（演示：今日×1 / 近7日×5.2 / 近30日×18）<br>· 业务流水=套餐实付+渠道 B2B 批发 · 平台营收=Σ(C 端实付×1%) + Σ(B 端确认消耗×标准人天价×1%)" },
@@ -515,7 +516,10 @@
       platform_users: { title: "用户服务运营商", content: "用户当前所属运营商取决于<strong>购买服务的提供方</strong>：个人套餐=套餐售卖运营商；渠道成员=人天额度售卖运营商（签约批发合同的 sellerOperator）。与换电三元组 userOwner 一致。" },
       platform_users_battery: { title: "持有电池", content: "仅<strong>服务中且已换电</strong>的用户展示：<code>电池编码-SOC xx%-SOH yy%（归属 xxx运营商）</code>；SOH 为健康度百分比；<strong>必须有归属运营商</strong>。<strong>已冻结 / 中途完结 / 待首换开通</strong>及无持电记录 → <strong>未持有</strong>。" },
       platform_users_freeze: { title: "申请冻结校验", content: "仅<strong>个人套餐</strong>用户可申请。须同时满足：套餐<strong>服务中且在有效期内</strong>、<strong>未持有电池</strong>（仍持有则拒绝并提示先还电）。校验通过后<strong>即时冻结</strong>，无需人工审核。" },
-      platform_devices_import: { title: "批量导入", content: "入口在<strong>设备台账</strong>页「批量导入」弹窗。<strong>先选归属运营商</strong>，再二选一：① 手工录入（少量，每行一个 SN）；② 表格导入（大量，上传 CSV/TXT，首列 SN）。类型/城市/规格由 IoT 按 SN 回填；导入即归属进台账。<strong>无「待绑定」队列</strong>。" },
+      platform_devices_import: { title: "批量导入", content: "入口在<strong>设备管理</strong>（电柜或电池 Tab）页「批量导入」弹窗。<strong>先选归属运营商</strong>，再二选一：① 手工录入（少量，每行一个 SN）；② 表格导入（大量，上传 CSV/TXT，首列 SN）。类型/城市/规格由 IoT 按 SN 回填；导入即归属进对应台账。<strong>无「待绑定」队列</strong>。" },
+      platform_devices_battery_belong: { title: "当前位置", content: "平台电池三档：<strong>电柜</strong>（在任意柜机格口，含跨运营商柜）、<strong>用户</strong>（骑手持有）、<strong>柜外</strong>（柜外充电/待入柜/资方库存等）。与运营商「我的设备·电池」四档位置（自有电柜/其他运营商电柜/柜外/柜外-用户）不同粒度。" },
+      platform_device_bound_at: { title: "归属日", content: "设备<strong>归属当前运营商</strong>的日期（平台批量导入并指定运营商时写入）。<br>· 首次导入且同时指定运营商：与「导入日期」相同<br>· 若日后发生换绑运营商：更新归属日，<strong>不改</strong>导入日期<br>· 无归属运营商（如资方库存）：显示 —" },
+      platform_device_imported_at: { title: "导入日期", content: "该 SN <strong>首次进入平台设备台账</strong>的日期（批量导入成功日）。只记一次，不因站点调拨、换电流转或运营商换绑而变更。" },
       platform_channels: { title: "渠道商监管查询", content: "渠道商主体由签约运营商在「渠道管理 → 签约渠道」维护；平台本页只读监管。" },
       channel_no_receipt: { title: "渠道收款账户", content: "人天池/激活码等模式：渠道仅 B 端向运营商付款，<strong>无</strong> C 端收款账户。<br><strong>设备租赁</strong>例外：白名单用户购套餐款进<strong>渠道子商户</strong>，须在「收款账户」进件。" },
       platform_marketing: { title: "平台营销（二期）", content: "【二期】立减优惠券：原价 − 券 = 实付；链接须带 <code>op=</code>；支付成功即锁定 userOwner；款进运营商。<strong>不代收、不拨付用户款</strong>。券面价差<strong>默认运营商承担</strong>；营销服务费按协议月结。一期不交付，原型仅演示。" },
@@ -542,7 +546,7 @@
       partnerAccount: ["partner_portal", "site_partner_open_account"],
       partnerWithdraw: ["partner_withdraw", "site_partner_open_account"],
       siteExpenses: ["site_expenses_panel", "site_expenses_venue", "site_expenses_electricity", "site_expenses_cycle", "site_expenses_landlord", "site_expenses_pay_method", "site_expenses_bill", "site_expenses_payment", "site_expenses_time"],
-      devices: ["devices_cab", "devices_cab_compose", "devices_cab_port_ops", "devices_cab_bat_flow", "devices_cab_ops_log", "devices_cab_remote_ops", "devices_bat", "devices_move_cab", "platform_operator_device_gate", "device_ownership"],
+      devices: ["devices_cab", "devices_cab_compose", "devices_cab_port_ops", "devices_cab_bat_flow", "devices_cab_ops_log", "devices_cab_remote_ops", "devices_bat", "devices_bat_soh", "devices_move_cab", "platform_operator_device_gate", "device_ownership"],
       leaseAgreements: ["lease_agreements", "lease_device_lists", "lease_device_replace", "lease_confirm"],
       leaseCollect: ["lease_collect", "lease_offline_ticket", "lease_manual_pay"],
       leaseRent: ["lease_rent_monthly", "lease_cover_gap", "lease_manual_pay", "lease_offline_ticket"],
@@ -581,7 +585,7 @@
       l1Pricing: ["platform_l1_pricing", "platform_day_standard", "platform_standard_day_price", "day_pool_warn", "inter_op_pricing"],
       platformUsers: ["platform_users", "platform_users_info", "platform_users_deposit_stats", "rider_battery_deposit", "platform_users_battery", "platform_users_freeze", "orders_service_change"],
       platformOrders: ["platform_orders", "platform_channel_po"],
-      platformDevices: ["platform_device_bind", "platform_devices_import", "platform_operator_device_gate"],
+      platformDevices: ["platform_device_bind", "platform_devices_import", "platform_operator_device_gate", "platform_devices_battery_belong", "platform_device_bound_at", "platform_device_imported_at"],
       platformChannels: ["platform_channels", "channel_partner_manage", "channel_no_receipt"],
       platformMarketing: ["platform_marketing", "platform_marketing_collect", "platform_marketing_payout"],
       platformFlows: ["platform_flows", "platform_fee"],
@@ -820,6 +824,27 @@
       { sn: "BAT-SH-0901", site: "浦东骑手驿站", city: "上海", soc: 96, soh: 99, health: "正常", inCab: "CAB-22018", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
       { sn: "BAT-BJ-1001", site: "滨江换电站", city: "上海", soc: 94, soh: 99, health: "正常", inCab: "CAB-BJ-01", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" }
     ];
+
+    /** 平台台账日期：importedAt=首次导入平台；boundAt=归属当前运营商之日（无运营商则空） */
+    (function seedPlatformDeviceDates() {
+      const seed = (list, base) => {
+        const seen = new Set();
+        list.forEach((d, i) => {
+          if (seen.has(d.sn)) return;
+          seen.add(d.sn);
+          const day = 1 + (i % 20);
+          const imported = base + String(day).padStart(2, "0");
+          if (!d.importedAt) d.importedAt = imported;
+          if (d.deviceOwnerId) {
+            if (!d.boundAt) d.boundAt = d.importedAt;
+          } else if (!d.boundAt) {
+            d.boundAt = null;
+          }
+        });
+      };
+      seed(cabinets, "2025-10-");
+      seed(batteries, "2025-11-");
+    })();
 
     function buildCabinetPowerDaily() {
       const seen = new Set();
@@ -2762,7 +2787,9 @@
       platformOrders_package: { orderId: "", phone: "", operatorId: "全部", serviceState: "全部" },
       platformOrders_swap: { swapId: "", phone: "", operatorId: "全部", status: "全部" },
       platformOrders_channel: { orderId: "", channelId: "全部", payChannel: "全部", orderStatus: "全部", payStatus: "全部" },
-      platformDevices_ledger: { keyword: "", type: "全部", operatorId: "全部", bindStatus: "全部" },
+      platformDevices_cabinet: { keyword: "", operatorId: "全部", online: "全部" },
+      platformDevices_battery: { keyword: "", operatorId: "全部", belong: "全部" },
+      platformDevices_ledger: { keyword: "", operatorId: "全部" },
       platformDevices_import: {},
       platformDevices_pending: { keyword: "", type: "全部" },
       platformChannels_list: { keyword: "", status: "全部" },
