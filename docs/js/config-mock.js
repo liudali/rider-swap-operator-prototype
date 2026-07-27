@@ -407,7 +407,7 @@
       deposit_refund_mode: { title: "押金退还模式", content: "骑手申请<strong>仅退电池押金</strong>统一进入「退款管理」。<br>· 前提：<strong>电池已还回且服务/订单已完结</strong>（decision-070）<br>· <strong>自动退款</strong>：已还电且无争议 → 系统自动原路退运营商子商户实收押金<br>· <strong>手动确认</strong>：进入待审核，确认后系统执行<br>· 与套餐退款模式<strong>独立配置</strong>；中途完结<strong>不含</strong>押金子项；冷静期押金是否同单另计" },
       orders_freeze: { title: "服务冻结", content: "<strong>个人套餐</strong>用户在<strong>套餐有效期内</strong>且<strong>未持有电池</strong>时可申请冻结/解除冻结，<strong>满足条件即系统自动生效</strong>，无需运营商审核。冻结期间不可换电；解冻后 <code>valid_to</code> 按冻结天数顺延，骑手端首次服务为领取电池。<strong>服务中</strong>套餐详情<strong>不展示</strong>解冻/首服信息块（decision-070）。渠道人天用户不适用。" },
       orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>押金方式（全站统一）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）；不单列「无需押金」<br>· <strong>套餐购买订单</strong>：押金方式与<strong>收款状态</strong>（已收 / 待付 / ——）分列；仅实付有收款状态（decision-067）<br>· <strong>实付</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用/微信支付分达标免实付（仍须还电规则）" },
-      orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：按套餐单展示押金明细。<br>· <strong>押金类型</strong>：实付 / 信用免押<br>· <strong>押金状态</strong>：仅实付有「在押 / 退押中 / 已退押」；信用免押统一 ——<br>· 筛选项：套餐单号、手机、支付日、押金类型、押金状态；支持分页<br>· 渠道担保不在本页；退押执行在「退款管理」" },
+      orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：<strong>仅实付押金</strong>流水（decision-086）。<br>· 与套餐无关联；列含支付时间/退款时间<br>· 操作列「<strong>退款日志</strong>」：抽屉展示各节点动作与时间（入账、申请、还电校验、审核、原路退等）<br>· 信用免押、渠道担保不在本页" },
       orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>微信支付分免押（≥500）</strong>或<strong>芝麻信用免押（≥500）</strong>任一达标（运营商押金设置页只读展示，不可改；decision-073）。详情页与实付押金分开展示。" },
       rider_battery_deposit: { title: "骑手电池押金", content: "与「平台保证金」不同。<br>· 个人：购套餐<strong>同笔</strong>免押或实缴 → 运营商子商户<br>· 渠道人天：<strong>首次领电前</strong>免押或实缴（非静默渠道担保）<br>· <strong>押金方式（全站）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）<br>· 运营商「订单与服务 → 用户押金」明细；「用户」台账；平台「用户管理 → 用户押金统计」只读汇总<br>· 数额见「定价管理 → 押金设置」；<strong>仅退押</strong>进「退款管理」" },
       platform_users_info: { title: "用户信息", content: "全平台用户列表。<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（支付分或芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>服务状态</strong>与<strong>生效周期</strong>分列（decision-080）<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
@@ -1159,6 +1159,56 @@
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null
       },
     ];
+
+    /** 用户押金流水（decision-086）：仅实付；与套餐无关联；一笔押金一条记录 */
+    const userDepositRecords = [
+      { id: "DEP260524001", operatorId: "OP-SX", userId: "U1028", user: "张骑手", phone: "138****1028", amount: 99, status: "在押", payTime: "2026-05-01 09:12", refundTime: null, relatedRefundId: null },
+      { id: "DEP260525001", operatorId: "OP-SX", userId: "U1055", user: "钱骑手", phone: "136****1055", amount: 99, status: "在押", payTime: "2026-05-15 10:30", refundTime: null, relatedRefundId: null },
+      { id: "DEP260610088", operatorId: "OP-SX", userId: "U2201", user: "周骑手", phone: "138****2201", amount: 99, status: "在押", payTime: "2026-06-03 08:00", refundTime: null, relatedRefundId: null },
+      { id: "DEP260605033", operatorId: "OP-SX", userId: "U2188", user: "李骑手", phone: "136****2188", amount: 99, status: "在押", payTime: "2026-06-01 12:00", refundTime: null, relatedRefundId: null },
+      { id: "DEP260607001", operatorId: "OP-SX", userId: "U2301", user: "陈骑手", phone: "138****2301", amount: 99, status: "在押", payTime: "2026-06-07 11:30", refundTime: null, relatedRefundId: null },
+      { id: "DEP260612088", operatorId: "OP-SX", userId: "U2188", user: "李骑手", phone: "136****2188", amount: 99, status: "在押", payTime: "2026-06-10 08:00", refundTime: null, relatedRefundId: null },
+      { id: "DEP260615033", operatorId: "OP-SX", userId: "U1066", user: "吴骑手", phone: "138****1066", amount: 99, status: "退押中", payTime: "2026-05-20 11:00", refundTime: null, relatedRefundId: "RF-260615-DEP" },
+      { id: "DEP2606103001", operatorId: "OP-SX", userId: "U3001", user: "刘骑士", phone: "138****3001", amount: 99, status: "在押", payTime: "2026-06-10 16:30", refundTime: null, relatedRefundId: null },
+      { id: "DEP260401099", operatorId: "OP-SX", userId: "U9001", user: "测试用户A", phone: "135****9001", amount: 99, status: "已退押", payTime: "2026-04-01 08:00", refundTime: "2026-04-28 16:20", relatedRefundId: "RF2604289001" },
+      { id: "DEP260518-SX", operatorId: "OP-SX", userId: "U3300", user: "王换网", phone: "135****3300", amount: 99, status: "已退押", payTime: "2026-05-18 10:00", refundTime: "2026-05-21 15:30", relatedRefundId: "RF260521-SX" },
+      { id: "DEP260523088", operatorId: "OP-LJZ", userId: "U2088", user: "跨网骑手", phone: "137****2088", amount: 199, status: "退押中", payTime: "2026-05-18 16:35", refundTime: null, relatedRefundId: null },
+      { id: "DEP260522-LJZ", operatorId: "OP-LJZ", userId: "U3300", user: "王换网", phone: "135****3300", amount: 199, status: "在押", payTime: "2026-05-22 09:00", refundTime: null, relatedRefundId: null }
+    ];
+
+    /** 押金退款日志：按流水号记录各节点动作与时间（decision-086） */
+    const depositRefundLogs = {
+      "DEP260524001": [
+        { action: "实付押金入账", time: "2026-05-01 09:12", actor: "系统", state: "done" }
+      ],
+      "DEP260615033": [
+        { action: "实付押金入账", time: "2026-05-20 11:00", actor: "系统", state: "done" },
+        { action: "用户申请退押", time: "2026-06-15 14:20", actor: "用户", state: "done" },
+        { action: "还电校验通过", time: "2026-06-15 14:21", actor: "系统", state: "done" },
+        { action: "运营商审核", time: null, actor: "—", state: "cur" },
+        { action: "原路退款", time: null, actor: "—", state: "pending" }
+      ],
+      "DEP260401099": [
+        { action: "实付押金入账", time: "2026-04-01 08:00", actor: "系统", state: "done" },
+        { action: "用户申请退押", time: "2026-04-26 10:00", actor: "用户", state: "done" },
+        { action: "还电校验通过", time: "2026-04-26 10:05", actor: "系统", state: "done" },
+        { action: "系统自动退押", time: "2026-04-28 16:18", actor: "系统", state: "done" },
+        { action: "原路退款成功", time: "2026-04-28 16:20", actor: "支付渠道", state: "done" }
+      ],
+      "DEP260518-SX": [
+        { action: "实付押金入账", time: "2026-05-18 10:00", actor: "系统", state: "done" },
+        { action: "用户申请退押（换运营商）", time: "2026-05-21 09:00", actor: "用户", state: "done" },
+        { action: "还电校验通过", time: "2026-05-21 09:05", actor: "系统", state: "done" },
+        { action: "原路退款成功", time: "2026-05-21 15:30", actor: "支付渠道", state: "done" }
+      ],
+      "DEP260523088": [
+        { action: "实付押金入账", time: "2026-05-18 16:35", actor: "系统", state: "done" },
+        { action: "用户申请退押", time: "2026-06-10 11:20", actor: "用户", state: "done" },
+        { action: "还电校验通过", time: "2026-06-10 11:22", actor: "系统", state: "done" },
+        { action: "运营商审核", time: null, actor: "—", state: "cur" },
+        { action: "原路退款", time: null, actor: "—", state: "pending" }
+      ]
+    };
 
     const operatorRefundSettings = {
       "OP-SX": {

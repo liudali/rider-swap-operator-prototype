@@ -3778,19 +3778,15 @@
         ] }
       ],
       orders_user_deposit: [
-        { key: "orderId", label: "套餐单号", placeholder: "如 SUB260524001" },
+        { key: "orderId", label: "流水号", placeholder: "如 DEP260524001" },
         { key: "phone", label: "用户手机", placeholder: "完整或后四位" },
         { key: "payFrom", label: "支付日起", type: "date" },
         { key: "payTo", label: "支付日止", type: "date" },
-        { key: "depositType", label: "押金类型", type: "select", options: [
-          { v: "全部", t: "全部" }, { v: "实付", t: "实付" }, { v: "信用免押", t: "信用免押" }
-        ] },
-        { key: "status", label: "押金状态", type: "select", options: [
+        { key: "status", label: "状态", type: "select", options: [
           { v: "全部", t: "全部" },
           { v: "在押", t: "在押" },
           { v: "退押中", t: "退押中" },
-          { v: "已退押", t: "已退押" },
-          { v: "无", t: "——" }
+          { v: "已退押", t: "已退押" }
         ] }
       ],
       orders_swap: [
@@ -12580,95 +12576,103 @@
     }
 
     function buildUserDepositLedgerRows() {
-      return packageOrders.filter(filterOwnRow).map(p => {
-        if (p.depositWaiver) {
-          const w = p.depositWaiver;
-          return {
-            orderId: p.id,
-            user: p.user,
-            phone: p.phone,
-            site: p.site,
-            pkg: p.pkg,
-            type: "信用免押",
-            amount: w.waivedAmount != null ? w.waivedAmount : (p.batteryDeposit || 0),
-            paidAmount: 0,
-            status: "——",
-            payTime: p.payTime,
-            note: `${w.type || "信用"}${w.score != null ? " " + w.score + "分" : ""}`.trim()
-          };
-        }
-        if (p.batteryDeposit == null || p.batteryDeposit === 0) return null;
-        if ((p.depositPaid || 0) <= 0) return null;
-        let status = "在押";
-        if (p.depositRefundStatus === "已退款") {
-          status = "已退押";
-        } else {
-          const pendingDepRf = refundRequests.find(r => r.orderId === p.id && isDepositOnlyRefund(r) && r.status === "待审核");
-          const st = p.serviceState || p.status;
-          if (pendingDepRf || st === "中途完结" || p.payout === "待退款" || p.status === "待退款") status = "退押中";
-          else if (st === "已完结" || p.status === "已完结") status = "已退押";
-        }
-        return {
-          orderId: p.id,
-          user: p.user,
-          phone: p.phone,
-          site: p.site,
-          pkg: p.pkg,
-          type: "实付",
-          amount: p.batteryDeposit,
-          paidAmount: p.depositPaid,
-          status,
-          payTime: p.payTime,
-          note: status === "已退押" && p.depositRefundedAt ? `原路退 · ${p.depositRefundedAt}` : (status === "退押中" ? "见退款管理" : "购套餐同笔支付")
-        };
-      }).filter(Boolean);
+      const opId = currentEntity().id;
+      return userDepositRecords.filter(r => r.operatorId === opId);
     }
 
     function filterUserDepositLedger(rows) {
       const f = getPf();
       return rows.filter(r => {
-        if (!matchKw(r.orderId, f.orderId)) return false;
+        if (!matchKw(r.id, f.orderId)) return false;
         if (!matchKw(r.phone, f.phone) && !matchKw(r.user, f.phone)) return false;
-        if (f.depositType && f.depositType !== "全部" && r.type !== f.depositType) return false;
-        if (f.status && f.status !== "全部") {
-          const st = (r.status === "—" || r.status === "——" || !r.status) ? "无" : r.status;
-          const want = f.status === "无" ? "无" : f.status;
-          if (st !== want) return false;
-        }
+        if (f.status && f.status !== "全部" && r.status !== f.status) return false;
         if (!matchDateStr(r.payTime, f.payFrom, f.payTo)) return false;
         return true;
       });
+    }
+
+    function depositRefundLogNodes(depositId) {
+      const custom = depositRefundLogs[depositId];
+      if (custom?.length) return custom;
+      const dep = userDepositRecords.find(r => r.id === depositId);
+      if (!dep) return [];
+      return [{ action: "实付押金入账", time: dep.payTime, actor: "系统", state: "done" }];
+    }
+
+    function depositRefundLogHtml(nodes) {
+      return `<table style="width:100%;font-size:13px;border-collapse:collapse">
+        <thead><tr>
+          <th style="text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)">节点</th>
+          <th style="text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)">动作</th>
+          <th style="text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)">时间</th>
+          <th style="text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)">操作方</th>
+        </tr></thead>
+        <tbody>${nodes.map((n, i) => {
+          const st = n.state === "cur" ? tag("进行中") : n.state === "pending" ? tag("待处理") : n.state === "fail" ? tag("失败") : tag("已完成");
+          return `<tr>
+            <td style="padding:8px 6px;border-bottom:1px solid var(--line)">${i + 1}</td>
+            <td style="padding:8px 6px;border-bottom:1px solid var(--line)"><strong>${n.action}</strong> ${st}</td>
+            <td style="padding:8px 6px;border-bottom:1px solid var(--line);color:var(--muted)">${n.time || "—"}</td>
+            <td style="padding:8px 6px;border-bottom:1px solid var(--line)">${n.actor || "—"}</td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table>`;
+    }
+
+    function openDepositRefundLog(depositId) {
+      const dep = userDepositRecords.find(r => r.id === depositId);
+      if (!dep) return;
+      const nodes = depositRefundLogNodes(depositId);
+      document.querySelector("#drawerTitle").textContent = "退款日志 · " + dep.id;
+      document.querySelector("#drawerSub").textContent = `${dep.user} · ¥${dep.amount} · ${dep.status}`;
+      document.querySelector("#drawerBody").innerHTML = `
+        <div class="detail-grid" style="margin-bottom:12px">
+          <div class="detail-item"><span>流水号</span><strong>${dep.id}</strong></div>
+          <div class="detail-item"><span>用户</span><strong>${dep.user}<br><small>${dep.phone}</small></strong></div>
+          <div class="detail-item"><span>押金状态</span><strong>${tag(dep.status)}</strong></div>
+          <div class="detail-item"><span>支付时间</span><strong>${dep.payTime || "—"}</strong></div>
+          <div class="detail-item"><span>退款时间</span><strong>${dep.refundTime || "—"}</strong></div>
+          ${dep.relatedRefundId ? `<div class="detail-item"><span>关联退款单</span><strong>${dep.relatedRefundId}</strong></div>` : ""}
+        </div>
+        <section class="panel" style="margin:0">
+          ${panelHead("节点日志", "各动作及发生时间", "deposit_refund_mode")}
+          <div class="panel-body orders-table-wrap" style="padding-top:0">
+            ${depositRefundLogHtml(nodes)}
+            ${dep.status === "退押中" && dep.relatedRefundId ? `<p style="font-size:12px;color:var(--muted);margin:12px 0 0">当前待审核，可在「退款管理」处理关联单 ${dep.relatedRefundId}。</p>
+              <button type="button" class="btn primary" style="margin-top:8px" data-view-jump="refundManage">前往退款管理</button>` : ""}
+          </div>
+        </section>`;
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindDrawerActions();
+      bindInteractiveActions(document.querySelector("#drawerBody"));
     }
 
     function renderUserDeposit() {
       const rows = filterUserDepositLedger(buildUserDepositLedgerRows());
       const pg = paginateList(rows, state.userDepositPage, state.userDepositPageSize || 8);
       state.userDepositPage = pg.page;
-      const held = rows.filter(r => r.type === "实付" && r.status === "在押").reduce((s, r) => s + (r.paidAmount || r.amount || 0), 0);
+      const held = rows.filter(r => r.status === "在押").reduce((s, r) => s + (r.amount || 0), 0);
       return `${ownScopeBanner()}<section class="panel">
           ${panelHead("用户押金", `共 ${rows.length} 条 · 实付在押合计 ¥${held.toFixed(0)} · 押金不参与清分`, "orders_user_deposit")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_user_deposit")} 个人用户购套餐<strong>同笔</strong>实付或信用免押明细；<strong>仅实付</strong>有押金状态；退押在「退款管理」执行。渠道担保不在本页。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_user_deposit")} 仅展示<strong>实付押金</strong>；与套餐无关联。点击「退款日志」查看各节点动作与时间。</p>
             <table>
               <thead><tr>
-                <th>套餐单号</th><th>用户</th><th>站点</th><th>套餐</th>
-                <th>押金类型</th><th>金额</th><th>押金状态</th><th>支付时间</th><th>说明</th><th>操作</th>
+                <th>流水号</th><th>用户</th><th>金额</th><th>状态</th><th>支付时间</th><th>退款时间</th><th>操作</th>
               </tr></thead>
               <tbody>${pg.slice.map(r => `<tr>
-                <td><button type="button" class="link-btn" data-open-sub="${r.orderId}">${r.orderId}</button></td>
+                <td><strong>${r.id}</strong></td>
                 <td>${r.user}<br><small style="color:var(--muted)">${r.phone}</small></td>
-                <td>${r.site}</td>
-                <td>${r.pkg}</td>
-                <td>${tag(r.type)}</td>
                 <td>¥${r.amount}</td>
-                <td>${r.status === "——" || r.status === "—" ? "——" : tag(r.status)}</td>
+                <td>${tag(r.status)}</td>
                 <td>${r.payTime || "—"}</td>
-                <td style="white-space:normal;max-width:160px;font-size:12px;color:var(--muted)">${r.note || "—"}</td>
+                <td>${r.refundTime || "—"}</td>
                 <td class="row-actions" style="white-space:nowrap">
-                  <button type="button" class="link-btn" data-open-sub="${r.orderId}">套餐详情</button>
-                  ${r.status === "退押中" ? `<button type="button" class="link-btn" data-view-jump="refundManage">退款管理</button>` : ""}
+                  <button type="button" class="link-btn" data-deposit-refund-log="${r.id}">退款日志</button>
                 </td>
-              </tr>`).join("") || "<tr><td colspan='10'>暂无押金明细</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无押金记录</td></tr>"}</tbody>
             </table>
             ${renderTablePager(pg, "udep-page")}
           </div>
@@ -17903,6 +17907,9 @@
       });
       root.querySelectorAll("[data-open-refund]").forEach(btn => {
         btn.onclick = () => openUserRefundDetail(btn.dataset.openRefund);
+      });
+      root.querySelectorAll("[data-deposit-refund-log]").forEach(btn => {
+        btn.onclick = () => openDepositRefundLog(btn.dataset.depositRefundLog);
       });
       root.querySelectorAll("[data-open-sub]").forEach(btn => {
         btn.onclick = () => openPackageDetail(btn.dataset.openSub);
