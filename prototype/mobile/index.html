@@ -364,6 +364,14 @@
     .pkg-card .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
     .pkg-card .price-official { font-size: 13px; color: var(--muted); text-decoration: line-through; }
     .pkg-card .price-tag { font-size: 10px; background: #fff1f0; color: #cf1322; padding: 2px 6px; border-radius: 4px; }
+    .model-picker { margin-bottom: 12px; }
+    .model-picker .model-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .model-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .model-chip {
+      border: 1px solid var(--border); background: #fff; border-radius: 8px;
+      padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--text);
+    }
+    .model-chip.active { border-color: var(--blue); background: #f0f5ff; color: var(--blue); font-weight: 600; }
     .deposit-block {
       margin-top: 14px; padding: 12px; border-radius: 10px; background: #f8fafc;
       border: 1px solid var(--border);
@@ -674,9 +682,32 @@
       channelId: "CH-CARD", channelName: "骑士卡渠道", operatorId: "OP-SX",
       linkCode: "qsk-30d-home", linkPurpose: "App 首页 Banner", expiresLabel: "剩余 18h32m",
       skus: {
-        month: { key: "month", name: "30天畅换 · 不限次", official: 299, channel: 279, days: 30, desc: "绿色出行 · 浦东骑手驿站 · 含电池服务", channelSku: true },
-        weekly: { key: "weekly", name: "7天套餐 · 不限次", official: 89, channel: 79, days: 7, desc: "短期试用", channelSku: true },
-        times: { key: "times", name: "10次卡 · 30天有效", official: 79, channel: 79, days: 30, desc: "按次计费，换电成功扣次", channelSku: false }
+        month: { key: "month", name: "30天畅换 · 不限次", official: 299, channel: 279, days: 30, desc: "绿色出行 · 浦东骑手驿站 · 含电池服务", channelSku: true, batteryModel: "48V30Ah", pkg: "30天畅换" },
+        weekly: { key: "weekly", name: "7天套餐 · 不限次", official: 89, channel: 79, days: 7, desc: "短期试用", channelSku: true, batteryModel: "48V30Ah", pkg: "7天套餐" },
+        times: { key: "times", name: "10次卡 · 30天有效", official: 79, channel: 79, days: 30, desc: "按次计费，换电成功扣次", channelSku: false, batteryModel: "48V30Ah", pkg: "次卡10次" }
+      }
+    };
+
+    /** 与后台「个人套餐价」Mock 对齐；套餐必须与电池型号绑定，无一单通兑 */
+    const BATTERY_MODEL_OPTIONS = ["48V20Ah", "48V30Ah", "60V30Ah"];
+    const OPERATOR_PKG_PRICES = [
+      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 299, status: "生效" },
+      { operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 349, status: "生效" },
+      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 89, status: "生效" },
+      { operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 109, status: "生效" },
+      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29, status: "生效" },
+      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9, status: "生效" },
+      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "次卡10次", pkgType: "times", validityHours: null, retailPrice: 89, status: "生效" },
+      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "30天畅换", pkgType: "monthly", validityHours: null, retailPrice: 329, status: "生效" },
+      { operatorId: "OP-SX", city: "上海", batteryModel: "48V20Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 269, status: "停用" }
+    ];
+    const CHANNEL_PKG_OVERRIDES = {
+      "CH-CARD": {
+        "48V30Ah": {
+          "30天畅换": { channel: 279, channelSku: true },
+          "7天套餐": { channel: 79, channelSku: true },
+          "次卡10次": { channel: 79, channelSku: false }
+        }
       }
     };
 
@@ -688,7 +719,7 @@
       },
       personal: {
         loggedIn: true, phone: "138****1028", name: "张骑手", userId: "U1028",
-        kyc: false, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 18, swapUsed: 42,
+        kyc: false, entitlement: "个人套餐", pkg: "30天畅换", batteryModel: "48V30Ah", daysLeft: 18, swapUsed: 42,
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: null, holdsBattery: true,
         depositMethod: "实付", depositStatus: "在押", depositAmount: 99, depositChannel: "实缴",
         mockWechatPayScore: 720, mockZhimaScore: 680
@@ -864,7 +895,8 @@
       role: "personal",
       scanSite: "ST-SH-01",
       orderTab: "swap",
-      selectedPkg: "month",
+      selectedPkg: "48V30Ah::30天畅换",
+      selectedBatteryModel: "48V30Ah",
       depositChoice: "waiver_wechat",
       depositFlow: null,
       mainline: { story: "personal", stepId: "P06" },
@@ -1338,6 +1370,78 @@
       return `<div class="deposit-status-card"><div class="ds-title">电池押金 · ${method}${amt}</div><div class="ds-muted">状态 ${status}${channel}</div>${refundBtn}</div>`;
     }
 
+    function resolvePurchaseCity() {
+      return "上海";
+    }
+
+    function activeBatteryModelsForPurchase(opId, city) {
+      const set = new Set();
+      OPERATOR_PKG_PRICES.forEach(r => {
+        if (r.operatorId === opId && r.city === city && r.status === "生效") set.add(r.batteryModel);
+      });
+      return BATTERY_MODEL_OPTIONS.filter(m => set.has(m));
+    }
+
+    function pkgsForBatteryModel(opId, city, model) {
+      return OPERATOR_PKG_PRICES.filter(r =>
+        r.operatorId === opId && r.city === city && r.batteryModel === model && r.status === "生效"
+      );
+    }
+
+    function pkgSelectionKey(row) {
+      return `${row.batteryModel}::${row.pkg}`;
+    }
+
+    function pkgDays(row) {
+      const map = { monthly: 30, weekly: 7, daily: 1, single: 1, times: 30 };
+      return map[row.pkgType] || 30;
+    }
+
+    function pkgDesc(row) {
+      if (row.validityHours) return `购买后 ${row.validityHours}h 有效`;
+      const d = pkgDays(row);
+      if (row.pkgType === "times") return "30天内按次扣减";
+      if (row.pkgType === "single") return "单次换电";
+      return d >= 30 ? `${d}天不限次换电` : `${d}天有效`;
+    }
+
+    function channelPriceForPkg(channelId, model, pkgName, official) {
+      const ch = CHANNEL_PKG_OVERRIDES[channelId]?.[model]?.[pkgName];
+      if (!ch) return null;
+      return { ...ch, official };
+    }
+
+    function initPkgSelectionForPurchase(opId, city) {
+      const models = activeBatteryModelsForPurchase(opId, city);
+      if (!state.selectedBatteryModel || !models.includes(state.selectedBatteryModel)) {
+        state.selectedBatteryModel = models[0] || null;
+      }
+      const pkgs = state.selectedBatteryModel ? pkgsForBatteryModel(opId, city, state.selectedBatteryModel) : [];
+      if (!state.selectedPkg || !pkgs.some(p => pkgSelectionKey(p) === state.selectedPkg)) {
+        state.selectedPkg = pkgs[0] ? pkgSelectionKey(pkgs[0]) : null;
+      }
+    }
+
+    function resolveSelectedPersonalSku(u, seller, attr) {
+      const opId = seller?.operatorId || u.operator || state.session.contextOperatorId || "OP-SX";
+      const city = resolvePurchaseCity(u);
+      initPkgSelectionForPurchase(opId, city);
+      const pkgs = pkgsForBatteryModel(opId, city, state.selectedBatteryModel);
+      const selected = pkgs.find(p => pkgSelectionKey(p) === state.selectedPkg) || pkgs[0];
+      if (!selected) return null;
+      const ch = attr ? channelPriceForPkg(attr.channelId, selected.batteryModel, selected.pkg, selected.retailPrice) : null;
+      const useChannel = !!(ch && ch.channelSku);
+      return {
+        name: selected.pkg,
+        days: pkgDays(selected),
+        batteryModel: selected.batteryModel,
+        pkg: selected.pkg,
+        retailPrice: selected.retailPrice,
+        pkgAmount: useChannel ? ch.channel : selected.retailPrice,
+        useChannel
+      };
+    }
+
     function renderPkgOverlay() {
       const u = user();
       const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist;
@@ -1350,22 +1454,70 @@
           ? `<div class="service-scope-banner" style="margin-bottom:12px">收款方：<strong>${OPERATORS[seller.operatorId].name}</strong> · 子商户 ${OPERATORS[seller.operatorId].subMch}</div>`
           : "");
       const banner = attr ? `<div class="channel-attr-banner">🟡 <strong>${attr.channelName}</strong> 推广 · ${attr.expiresLabel} 内购套餐享渠道专享价<br><small>首触链接：${attr.linkPurpose}（${attr.linkCode}）</small></div>` : "";
-      const skuSource = isLeaseWl ? LEASE_PKG_SKUS : CHANNEL_CARD_ATTR.skus;
-      const cards = Object.values(skuSource).map(s => {
-        const useChannel = !isLeaseWl && attr && s.channelSku;
-        const price = isLeaseWl ? s.price : (useChannel ? s.channel : s.official);
-        const priceHtml = useChannel
-          ? `<div class="price-row"><span class="price-official">¥${s.official}</span><span class="price">¥${price}</span><span class="price-tag">渠道专享</span></div>`
-          : `<div class="price-row"><span class="price">¥${price}</span>${attr ? `<span class="price-tag" style="background:#f5f5f5;color:var(--muted)">非渠道 SKU · 正式价</span>` : ""}</div>`;
-        return `<div class="pkg-card${state.selectedPkg === s.key ? " selected" : ""}" data-pkg="${s.key}">
-          <h4>${s.name}</h4>
-          ${priceHtml}
-          <div class="desc">${s.desc}</div>
-        </div>`;
-      }).join("");
-      const sku = skuSource[state.selectedPkg] || skuSource.month;
-      const useChannel = !isLeaseWl && attr && sku.channelSku;
-      const pkgAmount = isLeaseWl ? sku.price : (useChannel ? sku.channel : sku.official);
+
+      let cards = "";
+      let sku = null;
+      let useChannel = false;
+      let pkgAmount = 0;
+
+      if (isLeaseWl) {
+        const skuSource = LEASE_PKG_SKUS;
+        cards = Object.values(skuSource).map(s => {
+          const price = s.price;
+          return `<div class="pkg-card${state.selectedPkg === s.key ? " selected" : ""}" data-pkg="${s.key}">
+            <h4>${s.name}</h4>
+            <div class="price-row"><span class="price">¥${price}</span></div>
+            <div class="desc">${s.desc}</div>
+          </div>`;
+        }).join("");
+        sku = skuSource[state.selectedPkg] || skuSource.month;
+        pkgAmount = sku.price;
+      } else {
+        const opId = seller?.operatorId || u.operator || state.session.contextOperatorId || "OP-SX";
+        const city = resolvePurchaseCity(u);
+        const models = activeBatteryModelsForPurchase(opId, city);
+        initPkgSelectionForPurchase(opId, city);
+        if (!models.length) {
+          body.innerHTML = sellerBanner + banner + `<p style="font-size:13px;color:var(--muted);margin:12px 0">当前城市暂无可购套餐（无生效 SKU 的电池型号不展示）</p>`;
+          return;
+        }
+        const modelPicker = models.length > 1
+          ? `<div class="model-picker"><span class="model-label">电池型号</span><div class="model-chips">${models.map(m =>
+              `<button type="button" class="model-chip${state.selectedBatteryModel === m ? " active" : ""}" data-model="${m}">${m}</button>`
+            ).join("")}</div></div>`
+          : `<p style="font-size:12px;color:var(--muted);margin:0 0 10px">电池型号：<strong>${models[0]}</strong></p>`;
+        const pkgs = pkgsForBatteryModel(opId, city, state.selectedBatteryModel);
+        cards = pkgs.map(row => {
+          const key = pkgSelectionKey(row);
+          const official = row.retailPrice;
+          const ch = attr ? channelPriceForPkg(attr.channelId, row.batteryModel, row.pkg, official) : null;
+          const channelSku = !!(ch && ch.channelSku);
+          const price = channelSku ? ch.channel : official;
+          const priceHtml = channelSku
+            ? `<div class="price-row"><span class="price-official">¥${official}</span><span class="price">¥${price}</span><span class="price-tag">渠道专享</span></div>`
+            : `<div class="price-row"><span class="price">¥${price}</span>${attr ? `<span class="price-tag" style="background:#f5f5f5;color:var(--muted)">非渠道 SKU · 正式价</span>` : ""}</div>`;
+          return `<div class="pkg-card${state.selectedPkg === key ? " selected" : ""}" data-pkg="${key}">
+            <h4>${row.pkg}</h4>
+            ${priceHtml}
+            <div class="desc">${pkgDesc(row)} · ${row.batteryModel}</div>
+          </div>`;
+        }).join("");
+        const selected = pkgs.find(p => pkgSelectionKey(p) === state.selectedPkg) || pkgs[0];
+        if (selected) {
+          const ch = attr ? channelPriceForPkg(attr.channelId, selected.batteryModel, selected.pkg, selected.retailPrice) : null;
+          useChannel = !!(ch && ch.channelSku);
+          pkgAmount = useChannel ? ch.channel : selected.retailPrice;
+          sku = {
+            name: selected.pkg,
+            days: pkgDays(selected),
+            batteryModel: selected.batteryModel,
+            pkg: selected.pkg,
+            retailPrice: selected.retailPrice
+          };
+        }
+        cards = modelPicker + cards;
+      }
+
       const alreadyDeposit = isDepositSettled(u) && u.entitlement === "个人套餐";
       const depositHtml = isLeaseWl
         ? `<div class="deposit-block"><h5>电池押金</h5><p class="hint">设备租赁白名单 · 押金责任在渠道（渠道担保），购套餐不另收个人押金</p></div>`
@@ -1379,8 +1531,18 @@
       const kycBlock = u.loggedIn && !u.kyc
         ? `<p style="font-size:12px;color:#cf1322;margin:8px 0 0">请先完成实名认证后再购套餐</p>
            <button type="button" class="btn-block" id="btnGoKycFromPkg" style="margin-top:8px;background:#fff;color:var(--brand);border:1px solid var(--brand)">去实名认证</button>`
-        : `<button type="button" class="btn-block" id="btnPayPkg" style="margin-top:8px">${payLabel}</button>`;
+        : (sku
+          ? `<button type="button" class="btn-block" id="btnPayPkg" style="margin-top:8px">${payLabel}</button>`
+          : "");
       body.innerHTML = sellerBanner + banner + cards + depositHtml + kycBlock;
+      body.querySelectorAll(".model-chip").forEach(btn => {
+        btn.onclick = () => {
+          state.selectedBatteryModel = btn.dataset.model;
+          const opId = seller?.operatorId || u.operator || state.session.contextOperatorId || "OP-SX";
+          initPkgSelectionForPurchase(opId, resolvePurchaseCity(u));
+          renderPkgOverlay();
+        };
+      });
       body.querySelectorAll(".pkg-card").forEach(c => {
         c.onclick = () => {
           state.selectedPkg = c.dataset.pkg;
@@ -1402,10 +1564,20 @@
       if (!seller) { toast("无法确定收款方"); return; }
       const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist;
       const attr = channelAttrForUser(u);
-      const skuSource = isLeaseWl ? LEASE_PKG_SKUS : CHANNEL_CARD_ATTR.skus;
-      const sku = skuSource[state.selectedPkg] || skuSource.month;
-      const useChannel = !isLeaseWl && attr && sku.channelSku;
-      const pkgAmount = isLeaseWl ? sku.price : (useChannel ? sku.channel : sku.official);
+      let sku;
+      let useChannel = false;
+      let pkgAmount;
+      if (isLeaseWl) {
+        const skuSource = LEASE_PKG_SKUS;
+        sku = skuSource[state.selectedPkg] || skuSource.month;
+        pkgAmount = sku.price;
+      } else {
+        const resolved = resolveSelectedPersonalSku(u, seller, attr);
+        if (!resolved) { toast("请选择套餐"); return; }
+        sku = resolved;
+        useChannel = resolved.useChannel;
+        pkgAmount = resolved.pkgAmount;
+      }
       let depositAmount = 0;
       let depositMethod = u.depositMethod;
       let depositStatus = u.depositStatus;
@@ -1429,6 +1601,7 @@
         depositMethod, depositStatus, time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId,
         contextSource: seller.source
       };
+      if (sku.batteryModel) order.batteryModel = sku.batteryModel;
       if (isLeaseWl && CHANNELS[seller.channelId]) {
         const ch = CHANNELS[seller.channelId];
         order.sellerChannelId = ch.id;
@@ -1455,6 +1628,7 @@
         u.entitlement = "个人套餐";
         u.pkg = sku.name;
         u.daysLeft = sku.days;
+        u.batteryModel = sku.batteryModel || null;
         u.swapUsed = 0;
         u.operator = seller.operatorId;
         if (!u.holdsBattery) u.pendingPickup = true;
@@ -1594,8 +1768,9 @@
         card = `<div class="service-card channel"><div><h3>渠道人天额度</h3><p>${u.channel}${u.team ? " · " + u.team : ""}<br>${quotaLine}${todayLine}${depHint}</p><p style="font-size:11px;margin-top:4px;opacity:.85">可在全网换电 · 额度售卖方 OP-SX</p></div>${!u.holdsBattery && isDepositSettled(u) ? `<button type="button" class="btn-gold" data-action="scan">扫码领取</button>` : (!isDepositSettled(u) ? `<button type="button" class="btn-gold" data-action="deposit">办理押金</button>` : "")}</div>`;
       } else {
         const batHint = u.holdsBattery ? " · 持有电池" : "";
+        const modelHint = u.batteryModel ? ` · ${u.batteryModel}` : "";
         const chHint = u.channelPurchase ? ` · ${u.channelPurchase}专享价购入` : "";
-        card = `<div class="service-card"><div><h3>${u.pkg}</h3><p>剩余 ${u.daysLeft} 天 · 已换电 ${u.swapUsed} 次 · 服务中${batHint}${chHint}</p></div><button type="button" class="btn-gold" data-action="buy">续费</button></div>`;
+        card = `<div class="service-card"><div><h3>${u.pkg}</h3><p>剩余 ${u.daysLeft} 天 · 已换电 ${u.swapUsed} 次 · 服务中${modelHint}${batHint}${chHint}</p></div><button type="button" class="btn-gold" data-action="buy">续费</button></div>`;
       }
 
       el.innerHTML = `

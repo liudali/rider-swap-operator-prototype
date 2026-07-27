@@ -133,7 +133,7 @@
 
     const CHANNEL_REGISTRY = {
       "CH-SF": { id: "CH-SF", name: "顺丰同城渠道", settlementMode: "人天池", logo: "🚚", tree: "向运营商采购人天额度 · 团队登记 · 预占确认消耗" },
-      "CH-CARD": { id: "CH-CARD", name: "骑士卡渠道", settlementMode: "卡差价", logo: "🟡", tree: "推广链接 · 用户直购 · 渠道标记 · 佣金结算" },
+      "CH-CARD": { id: "CH-CARD", name: "骑士卡渠道", settlementMode: "链接类", logo: "🟡", tree: "推广链接 · 用户直购 · 渠道标记 · 佣金结算" },
       "CH-RENT": { id: "CH-RENT", name: "京东物流租赁渠道", settlementMode: "设备租赁", logo: "🔴", tree: "租赁设备+月租 · 白名单套餐 · 渠道收款" },
       "CH-ACT": { id: "CH-ACT", name: "蜂鸟激活码渠道", settlementMode: "激活码", logo: "🎫", tree: "批发激活码 · 骑手核销获套餐 · 不经平台收款" }
     };
@@ -325,11 +325,11 @@
       data_drill_panel: { title: "换电订单数", content: "紧凑卡片：按日换电订单数（含当日）。<br>· <strong>平台总览</strong>：先筛运营商，再筛该运营商下站点（切换运营商时站点重置为全部）<br>· 时间范围默认近 7 天，可选近 30 天或自定义（最多 31 天）" },
       data_drill_spark: { title: "换电订单折线图", content: "按所选站点与日期区间生成每日 Mock 换电订单数；右侧合计为区间之和；最高/最低取自序列。正式环境对接按日聚合 API（含当日）。" },
       platform_no_share: { title: "平台运营分成", content: "骑手套餐/换电应分台账记录运营商本站经营应得。平台收取 1% 技术服务费（C 端支付分账 + B 端确认消耗计提），见「平台服务费」。" },
-      pricing_pkg: { title: "个人套餐定价", content: "默认按<strong>运营商×城市×SKU</strong>维护城市底价。<strong>一期可选 SKU（暂定）</strong>：包月30天、7天套餐、1天套餐、单次换电（名称仅可选、编辑时不可改名）。渠道骑手<strong>不</strong>走个人套餐自费兜底。<strong>价格分区</strong>为<strong>二期</strong>。押金见「押金设置」。" },
+      pricing_pkg: { title: "个人套餐定价", content: "唯一键=<strong>运营商×城市×电池型号×SKU</strong>（decision-085）。电池型号为规格串（48V20Ah / 48V30Ah / 60V30Ah），与台账对齐；不同型号可独立有效期/零售价/状态。<strong>无一单通兑</strong>。一期可选套餐名（暂定）：包月30天、7天套餐、1天套餐、单次换电。渠道骑手<strong>不</strong>走个人套餐自费兜底。<strong>价格分区</strong>为<strong>二期</strong>。" },
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
       channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
-      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。卡差价：按渠道×SKU 配置专享价与佣金；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。平台仅查询监管。" },
+      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。<strong>分销商-链接类</strong>（结算模式=链接类）：授权套餐与专享价在「平台设置 → 渠道分销价」维护；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。<strong>分销商-激活码</strong>为二期。平台仅查询监管。" },
       login_portal: { title: "登录分流与改密", content: "登录页区分<strong>运营商登录</strong>与<strong>渠道商登录</strong>。账号均为手机号+密码。修改密码页：手机号 → 获取验证码 → 新密码（≥6 位）→ 返回登录；演示验证码固定 888888。" },
       day_pool_one_per_operator: { title: "一运营商一池", content: "渠道商 × 运营商 = <strong>唯一</strong> `DayPool`。向第二家运营商签约才新增池；增购、赠送、退款、分配、预占/确认等均写入<strong>额度变动记录</strong>，不新建第二池。" },
       day_pool_b2b_settlement: { title: "B2B 资金与平台计提", content: "渠道<strong>采购/到账时</strong>批发款已是运营商收入（在线 T+0/T+1 或线下确认）。骑手<strong>确认消耗</strong>仅扣池余额，<strong>不向运营商二次打款</strong>；平台按标准人天价 × 1% 向额度售卖方计提（见「平台服务费」）。" },
@@ -480,7 +480,7 @@
       channel_card_margin: { title: "佣金对账", content: "按<strong>自然月</strong>汇总经推广链接成交订单。<br><strong>佣金及时到付</strong>：支付成功已分账至渠道子商户，月度汇总「结算状态」展示「已即时分账」。<br><strong>线下结算</strong>：应结佣金=Σ commission；由运营商与渠道线下结；月度汇总「结算状态」为 ——（decision-074）。平台 1%=Σ pay×1%。" },
       channel_card_accounts: { title: "骑士卡收款账户", content: "一期能力（decision-064）。<strong>即时到付</strong>：须开通微信/支付宝子商户并绑定对公，接收佣金分账。<strong>线下结算</strong>：购卡款进运营商；渠道仍须维护对公账户，供运营商按对账线下打佣。" },
       channel_instant_commission: { title: "佣金及时到付", content: "仅<strong>渠道分销（骑士卡）</strong>签约可开。运营商在「渠道管理 → 签约渠道」开启；须渠道绑定收款账户并完成微信/支付宝进件。开启后设置<strong>渠道佣金比例</strong>。<br><strong>变更（decision-065）</strong>：即时↔线下切换于<strong>次日 00:00</strong>生效，保存时须确认提示；历史订单不回溯；对账月度汇总按结算方式<strong>拆行</strong>。" },
-      pricing_card: { title: "渠道分销价", content: "同一运营商可签<strong>多个分销渠道</strong>，各渠道独立维护授权 SKU、正式价、<strong>专享价</strong>与佣金。「平台设置 → 渠道分销价」操作仅<strong>编辑</strong>价格；签约档案在「渠道管理 → 签约渠道」。专享价 ≤ 正式零售价。" },
+      pricing_card: { title: "渠道分销价", content: "同一运营商可签多个<strong>分销商-链接类</strong>渠道，各渠道独立维护授权 SKU（须绑定<strong>电池型号</strong>，继承城市底价型号）、正式价、<strong>专享价</strong>与佣金。「平台设置 → 渠道分销价」为<strong>唯一</strong>维护入口（签约资料页不再配价，decision-084/085）；签约档案在「渠道管理 → 签约渠道」。专享价 ≤ 正式零售价。" },
       day_pool_panel: { title: "人天额度池", content: "渠道商向签约运营商批发换电人天额度。<br><strong>可用</strong>=Σ DayPool.availableDays；<strong>预占中</strong>=Σ frozenDays。00:00 预占 → 换电/持电池确认消耗 → 日终释放未消耗预占。" },
       day_pool_reserve: { title: "预占与确认消耗", content: "天级模式：每日 00:00 预占 1 人天。当日<strong>有换电或持有电池</strong>→确认消耗 1 人天（每骑手每日 1 条记录）；<strong>无换电且未持电池</strong>→日终释放。同一骑手同一天只扣 1 人天，但记录当日换电次数。" },
       day_pool_consume: { title: "骑手日消耗（渠道商说明）", content: "每骑手每个自然日最多 1 条确认消耗记录，含<strong>当日换电次数</strong>与<strong>持有电池数</strong>。<br><br><strong>判定规则</strong>：① 当天有换电 → 确认消耗；② 当天未换电但<strong>持有电池</strong> → 仍视为使用服务，确认消耗；③ 不持有电池且未换电 → 不产生消耗，日终释放预占。" },
@@ -2045,16 +2045,16 @@
     const channelContracts = [
       { id: "CC-SF-01", channelId: "CH-SF", channelName: "顺丰同城渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "人天池", wholesalePrice: 8.5, minDays: 1000, sites: ["浦东骑手驿站", "世博换电服务点"], status: "启用", validFrom: "2026-01-01", validTo: "2026-12-31" },
       { id: "CC-TEMP-01", channelId: "CH-TEMP", channelName: "临时渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "人天池", wholesalePrice: 8.5, minDays: 500, sites: ["浦东骑手驿站"], status: "启用", validFrom: "2026-03-01", validTo: "2026-12-31" },
-      { id: "CC-CARD-01", channelId: "CH-CARD", channelName: "骑士卡渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "卡差价", wholesalePrice: 249, minDays: null, cardSkus: ["SKU-30D", "SKU-7D"], sites: ["浦东骑手驿站", "世博换电服务点", "陆家嘴分站"], status: "启用", validFrom: "2026-03-01", validTo: "2027-02-28", instantCommissionPayout: true, commissionRate: 0.09, instantCommissionEnabledAt: "2026-05-01" },
-      { id: "CC-DELIV-01", channelId: "CH-DELIV", channelName: "闪送骑士卡", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "卡差价", wholesalePrice: 235, minDays: null, cardSkus: ["SKU-DEL-30D", "SKU-DEL-7D"], sites: ["浦东骑手驿站", "世博换电服务点"], status: "启用", validFrom: "2026-04-01", validTo: "2027-03-31", instantCommissionPayout: false, commissionRate: null },
+      { id: "CC-CARD-01", channelId: "CH-CARD", channelName: "骑士卡渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "链接类", wholesalePrice: 249, minDays: null, cardSkus: ["SKU-30D", "SKU-7D"], sites: ["浦东骑手驿站", "世博换电服务点", "陆家嘴分站"], status: "启用", validFrom: "2026-03-01", validTo: "2027-02-28", instantCommissionPayout: true, commissionRate: 0.09, instantCommissionEnabledAt: "2026-05-01" },
+      { id: "CC-DELIV-01", channelId: "CH-DELIV", channelName: "闪送骑士卡", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "链接类", wholesalePrice: 235, minDays: null, cardSkus: ["SKU-DEL-30D", "SKU-DEL-7D"], sites: ["浦东骑手驿站", "世博换电服务点"], status: "启用", validFrom: "2026-04-01", validTo: "2027-03-31", instantCommissionPayout: false, commissionRate: null },
       { id: "CC-RENT-01", channelId: "CH-RENT", channelName: "京东物流租赁渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "设备租赁", wholesalePrice: null, minDays: null, monthlyRent: 12000, dedicatedSiteId: "ST-SH-JD", dedicatedSiteName: "京东物流专属站", whitelistCount: 50, whitelistDefaultAccess: "paid", billingStatus: "6月已缴", crossNetworkEnabled: true, crossNetworkDepositPaid: true, crossNetworkDepositAmount: 20000, status: "启用", validFrom: "2026-04-01", validTo: "2027-03-31" },
       { id: "CC-ACT-01", channelId: "CH-ACT", channelName: "蜂鸟激活码渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "激活码", wholesalePrice: 255, minDays: null, minCodes: 100, codeSkuName: "30天包月", codeValidityDays: 30, codeInventory: 420, codesRedeemed: 86, status: "启用", validFrom: "2026-05-01", validTo: "2027-04-30" }
     ];
 
     const channelSettlementModes = [
       { id: "CSM-DAY", channelId: "CH-SF", mode: "人天池", status: "启用", desc: "向签约运营商采购人天额度，换电或持电池均扣天", wholesalePrice: 8.5, poolId: "QP-2601", activeRiders: 6 },
-      { id: "CSM-CARD", channelId: "CH-CARD", mode: "卡差价", status: "启用", desc: "推广链接分销 · 用户直购 · 佣金即时分账", cardSku: "包月30天卡", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25, commissionRate: 0.09, instantCommissionPayout: true, linkOrders: 85, monthCommission: 2125, linkClicks: 3420 },
-      { id: "CSM-DELIV", channelId: "CH-DELIV", mode: "卡差价", status: "启用", desc: "推广链接分销 · 用户直购 · 佣金结算", cardSku: "包月30天卡", officialPrice: 299, channelPrice: 269, commissionPerOrder: 30, linkOrders: 38, monthCommission: 1140, linkClicks: 980 },
+      { id: "CSM-CARD", channelId: "CH-CARD", mode: "链接类", status: "启用", desc: "推广链接分销 · 用户直购 · 佣金即时分账", cardSku: "包月30天卡", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25, commissionRate: 0.09, instantCommissionPayout: true, linkOrders: 85, monthCommission: 2125, linkClicks: 3420 },
+      { id: "CSM-DELIV", channelId: "CH-DELIV", mode: "链接类", status: "启用", desc: "推广链接分销 · 用户直购 · 佣金结算", cardSku: "包月30天卡", officialPrice: 299, channelPrice: 269, commissionPerOrder: 30, linkOrders: 38, monthCommission: 1140, linkClicks: 980 },
       { id: "CSM-RENT", channelId: "CH-RENT", mode: "设备租赁", status: "启用", desc: "租赁设备+月租 · 白名单免费/付费 · 可跨网", monthlyRent: 12000, devicesCovered: 8, whitelistCount: 50, dedicatedSite: "京东物流专属站", billingStatus: "6月已缴", nextDue: "2026-07-01", monthSwaps: 428, pkgOrdersMonth: 12, crossNetworkEnabled: true },
       { id: "CSM-ACT", channelId: "CH-ACT", mode: "激活码", status: "启用", desc: "批发激活码 · 骑手核销获套餐 · 不经平台收款", codeSkuName: "30天包月", wholesalePrice: 255, codeValidityDays: 30, codeInventory: 420, codesRedeemed: 86, codesIssued: 320, monthRedemptions: 42 }
     ];
@@ -2088,10 +2088,10 @@
     ];
 
     const channelSalePackages = [
-      { id: "PKG-30D", channelId: "CH-CARD", skuId: "SKU-30D", name: "包月30天卡", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25, validityDays: 30, status: "启用" },
-      { id: "PKG-7D", channelId: "CH-CARD", skuId: "SKU-7D", name: "7天卡", officialPrice: 89, channelPrice: 79, commissionPerOrder: 8, validityDays: 7, status: "启用" },
-      { id: "PKG-DEL-30D", channelId: "CH-DELIV", skuId: "SKU-DEL-30D", name: "包月30天卡", officialPrice: 299, channelPrice: 269, commissionPerOrder: 30, validityDays: 30, status: "启用" },
-      { id: "PKG-DEL-7D", channelId: "CH-DELIV", skuId: "SKU-DEL-7D", name: "7天卡", officialPrice: 89, channelPrice: 75, commissionPerOrder: 7, validityDays: 7, status: "启用" }
+      { id: "PKG-30D", channelId: "CH-CARD", skuId: "SKU-30D", name: "包月30天卡", batteryModel: "48V30Ah", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25, validityDays: 30, status: "启用" },
+      { id: "PKG-7D", channelId: "CH-CARD", skuId: "SKU-7D", name: "7天卡", batteryModel: "48V30Ah", officialPrice: 89, channelPrice: 79, commissionPerOrder: 8, validityDays: 7, status: "启用" },
+      { id: "PKG-DEL-30D", channelId: "CH-DELIV", skuId: "SKU-DEL-30D", name: "包月30天卡", batteryModel: "48V30Ah", officialPrice: 299, channelPrice: 269, commissionPerOrder: 30, validityDays: 30, status: "启用" },
+      { id: "PKG-DEL-7D", channelId: "CH-DELIV", skuId: "SKU-DEL-7D", name: "7天卡", batteryModel: "48V30Ah", officialPrice: 89, channelPrice: 75, commissionPerOrder: 7, validityDays: 7, status: "启用" }
     ];
     const channelLinkSkus = channelSalePackages;
 
@@ -2106,15 +2106,15 @@
     const channelCardSkus = channelSalePackages;
 
     const channelLinkOrders = [
-      { id: "LO-260501", channelId: "CH-CARD", linkId: "LNK-C001", linkPurpose: "App 首页 Banner", linkCode: "qsk-30d-home", skuId: "SKU-30D", riderName: "骑手M1", phone: "138****2101", userId: "U-L101", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-05-03 10:12", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-06-03" },
-      { id: "LO-260515", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", riderName: "骑手M2", phone: "139****2102", userId: "U-L102", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-05-15 14:20", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-06-15" },
-      { id: "LO-260520", channelId: "CH-CARD", linkId: "LNK-C004", linkPurpose: "新客试用入口", linkCode: "qsk-7d-trial", skuId: "SKU-7D", riderName: "骑手M3", phone: "137****2103", userId: "U-L103", skuName: "7天卡", officialPrice: 89, paidPrice: 79, commission: 7.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-05-20 08:05", status: "已清分", platformFee: 0.79, operatorNet: 71.1, pkgValidTo: "2026-05-27" },
-      { id: "LO-260601", channelId: "CH-CARD", linkId: "LNK-C001", linkPurpose: "App 首页 Banner", linkCode: "qsk-30d-home", skuId: "SKU-30D", riderName: "骑手A", phone: "138****2001", userId: "U-L001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-01 09:12", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-07-01" },
-      { id: "LO-260605", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", riderName: "骑手B", phone: "139****2002", userId: "U-L002", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-05 14:20", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-07-05" },
-      { id: "LO-260608", channelId: "CH-CARD", linkId: "LNK-C004", linkPurpose: "新客试用入口", linkCode: "qsk-7d-trial", skuId: "SKU-7D", riderName: "骑手C", phone: "137****2003", userId: "U-L003", skuName: "7天卡", officialPrice: 89, paidPrice: 79, commission: 7.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-08 08:05", status: "已清分", platformFee: 0.79, operatorNet: 71.1, pkgValidTo: "2026-06-15" },
-      { id: "LO-260610", channelId: "CH-CARD", linkId: "LNK-C003", linkPurpose: "社群福利帖", linkCode: "qsk-30d-wx", skuId: "SKU-30D", riderName: "刘骑士", phone: "138****3001", userId: "U3001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-10 16:30", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-07-10" },
-      { id: "LO-260612", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", riderName: "骑手D", phone: "136****2004", userId: "U-L004", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25, commissionRate: null, commissionSettlement: "线下结算", channelTagged: true, payTime: "2026-06-12 11:08", status: "已清分", platformFee: 2.79, operatorNet: 251.21, pkgValidTo: "2026-07-12" },
-      { id: "LO-260611", channelId: "CH-DELIV", linkId: "LNK-D001", linkPurpose: "闪送 App 内嵌", linkCode: "ssk-30d-app", skuId: "SKU-DEL-30D", riderName: "闪送骑手D", phone: "136****4001", userId: "U-D001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 269, commission: 30, commissionSettlement: "线下结算", channelTagged: true, payTime: "2026-06-11 10:00", status: "已清分", platformFee: 2.69, operatorNet: 266.31, pkgValidTo: "2026-07-11" }
+      { id: "LO-260501", channelId: "CH-CARD", linkId: "LNK-C001", linkPurpose: "App 首页 Banner", linkCode: "qsk-30d-home", skuId: "SKU-30D", batteryModel: "48V30Ah", riderName: "骑手M1", phone: "138****2101", userId: "U-L101", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-05-03 10:12", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-06-03" },
+      { id: "LO-260515", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", batteryModel: "48V30Ah", riderName: "骑手M2", phone: "139****2102", userId: "U-L102", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-05-15 14:20", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-06-15" },
+      { id: "LO-260520", channelId: "CH-CARD", linkId: "LNK-C004", linkPurpose: "新客试用入口", linkCode: "qsk-7d-trial", skuId: "SKU-7D", batteryModel: "48V30Ah", riderName: "骑手M3", phone: "137****2103", userId: "U-L103", skuName: "7天卡", officialPrice: 89, paidPrice: 79, commission: 7.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-05-20 08:05", status: "已清分", platformFee: 0.79, operatorNet: 71.1, pkgValidTo: "2026-05-27" },
+      { id: "LO-260601", channelId: "CH-CARD", linkId: "LNK-C001", linkPurpose: "App 首页 Banner", linkCode: "qsk-30d-home", skuId: "SKU-30D", batteryModel: "48V30Ah", riderName: "骑手A", phone: "138****2001", userId: "U-L001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-01 09:12", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-07-01" },
+      { id: "LO-260605", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", batteryModel: "48V30Ah", riderName: "骑手B", phone: "139****2002", userId: "U-L002", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-05 14:20", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-07-05" },
+      { id: "LO-260608", channelId: "CH-CARD", linkId: "LNK-C004", linkPurpose: "新客试用入口", linkCode: "qsk-7d-trial", skuId: "SKU-7D", batteryModel: "48V30Ah", riderName: "骑手C", phone: "137****2003", userId: "U-L003", skuName: "7天卡", officialPrice: 89, paidPrice: 79, commission: 7.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-08 08:05", status: "已清分", platformFee: 0.79, operatorNet: 71.1, pkgValidTo: "2026-06-15" },
+      { id: "LO-260610", channelId: "CH-CARD", linkId: "LNK-C003", linkPurpose: "社群福利帖", linkCode: "qsk-30d-wx", skuId: "SKU-30D", batteryModel: "48V30Ah", riderName: "刘骑士", phone: "138****3001", userId: "U3001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25.11, commissionRate: 0.09, commissionSettlement: "即时分账", channelTagged: true, payTime: "2026-06-10 16:30", status: "已清分", platformFee: 2.79, operatorNet: 251.1, pkgValidTo: "2026-07-10" },
+      { id: "LO-260612", channelId: "CH-CARD", linkId: "LNK-C002", linkPurpose: "短信召回活动", linkCode: "qsk-30d-sms", skuId: "SKU-30D", batteryModel: "48V30Ah", riderName: "骑手D", phone: "136****2004", userId: "U-L004", skuName: "包月30天卡", officialPrice: 299, paidPrice: 279, commission: 25, commissionRate: null, commissionSettlement: "线下结算", channelTagged: true, payTime: "2026-06-12 11:08", status: "已清分", platformFee: 2.79, operatorNet: 251.21, pkgValidTo: "2026-07-12" },
+      { id: "LO-260611", channelId: "CH-DELIV", linkId: "LNK-D001", linkPurpose: "闪送 App 内嵌", linkCode: "ssk-30d-app", skuId: "SKU-DEL-30D", batteryModel: "48V30Ah", riderName: "闪送骑手D", phone: "136****4001", userId: "U-D001", skuName: "包月30天卡", officialPrice: 299, paidPrice: 269, commission: 30, commissionSettlement: "线下结算", channelTagged: true, payTime: "2026-06-11 10:00", status: "已清分", platformFee: 2.69, operatorNet: 266.31, pkgValidTo: "2026-07-11" }
     ];
     const channelCardRetailOrders = channelLinkOrders;
 
@@ -2315,12 +2315,15 @@
     ];
 
     const operatorPkgPrices = [
-      { id: "OP-P-01", operatorId: "OP-SX", city: "上海", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
-      { id: "OP-P-03", operatorId: "OP-SX", city: "上海", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
-      { id: "OP-P-04", operatorId: "OP-SX", city: "上海", pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-05", operatorId: "OP-SX", city: "上海", pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-06", operatorId: "OP-SX", city: "上海", pkg: "次卡10次", pkgType: "times", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-04-15" },
-      { id: "OP-P-07", operatorId: "OP-SX", city: "上海", pkg: "30天畅换", pkgType: "monthly", validityHours: null, retailPrice: 329, status: "生效", updatedAt: "2026-05-15" }
+      { id: "OP-P-01", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
+      { id: "OP-P-01B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 349, status: "生效", updatedAt: "2026-07-27" },
+      { id: "OP-P-03", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
+      { id: "OP-P-03B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 109, status: "生效", updatedAt: "2026-07-27" },
+      { id: "OP-P-04", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
+      { id: "OP-P-05", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9, status: "生效", updatedAt: "2026-06-01" },
+      { id: "OP-P-06", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "次卡10次", pkgType: "times", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-04-15" },
+      { id: "OP-P-07", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "30天畅换", pkgType: "monthly", validityHours: null, retailPrice: 329, status: "生效", updatedAt: "2026-05-15" },
+      { id: "OP-P-08", operatorId: "OP-SX", city: "上海", batteryModel: "48V20Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 269, status: "停用", updatedAt: "2026-07-01" }
     ];
 
     /** 同城价格分区：站点挂区 → 区价覆盖城市底价（可高可低）；未配 SKU 继承底价 */
@@ -2542,7 +2545,7 @@
         staffCount: 2, riderCount: 6, teamCount: 2, monthConsume: 186
       },
       {
-        id: "CH-CARD", name: "骑士卡渠道", city: "上海", status: "在营", settlementMode: "卡差价",
+        id: "CH-CARD", name: "骑士卡渠道", city: "上海", status: "在营", settlementMode: "链接类",
         contactName: "王卡务", contactPhone: "139****3201", loginAccount: "13900003201",
         onboardDate: "2026-03-01", createdByOperatorId: "OP-SX", createdByOperatorName: PAYEE_OPERATOR,
         signedOperators: ["绿色出行"],
@@ -2551,7 +2554,7 @@
         linkOrders: 85, monthCommission: 2125, linkClicks: 3420, staffCount: 1, riderCount: 85, teamCount: 0, monthConsume: 0
       },
       {
-        id: "CH-DELIV", name: "闪送骑士卡", city: "上海", status: "在营", settlementMode: "卡差价",
+        id: "CH-DELIV", name: "闪送骑士卡", city: "上海", status: "在营", settlementMode: "链接类",
         contactName: "李卡务", contactPhone: "139****3210", loginAccount: "13900003210",
         onboardDate: "2026-04-01", createdByOperatorId: "OP-SX", createdByOperatorName: PAYEE_OPERATOR,
         signedOperators: ["绿色出行"],
@@ -2728,6 +2731,7 @@
     ];
 
     const PF_DEFAULTS = {
+      pricingPkg: { city: "全部", batteryModel: "全部", status: "全部" },
       overview: { range: "30" },
       drillSwap: { operatorId: "全部", site: "全部", range: "7", dateFrom: "", dateTo: "" },
       overviewPower: { dateFrom: "2026-06-01", dateTo: "2026-06-15", range: "30", site: "全部" },

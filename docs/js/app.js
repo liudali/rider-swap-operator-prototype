@@ -326,11 +326,11 @@
     }
 
     function isCardChannel() {
-      return isChannelRole() && channelProfile().settlementMode === "卡差价";
+      return isChannelRole() && channelProfile().settlementMode === "链接类";
     }
 
     function cardContractForChannel(channelId) {
-      return channelContracts.find(c => c.channelId === channelId && contractSettlementMode(c) === "卡差价");
+      return channelContracts.find(c => c.channelId === channelId && contractSettlementMode(c) === "链接类");
     }
 
     function protoBusinessDate() {
@@ -435,7 +435,7 @@
 
     function channelUsesCreditEval(channelId) {
       const contract = channelContracts.find(c => c.channelId === channelId);
-      return contract ? contractSettlementMode(contract) !== "卡差价" : true;
+      return contract ? contractSettlementMode(contract) !== "链接类" : true;
     }
 
     function payMonthKey(payTime) {
@@ -471,6 +471,17 @@
 
     function channelPackagesFor(cid) {
       return channelSalePackages.filter(p => p.channelId === cid);
+    }
+
+    function resolveChannelSkuBatteryModel(channelId, skuId, packageId) {
+      const pkg = channelSalePackages.find(p =>
+        p.channelId === channelId && (p.id === packageId || p.skuId === skuId)
+      );
+      return pkg ? normalizeBatteryModel(pkg.batteryModel) : "—";
+    }
+
+    function channelPkgLabel(p) {
+      return `${p.name} · ${normalizeBatteryModel(p.batteryModel)} · ¥${p.channelPrice}`;
     }
 
     function channelPromoLinksFor(cid, packageId) {
@@ -1188,7 +1199,7 @@
         + Object.values(CHANNEL_REGISTRY).map(ch => {
           const p2 = ch.settlementMode === "激活码" || ch.settlementMode === "设备租赁";
           const prefix = p2 ? "【二期】" : "";
-          return `<option value="entity:${ch.id}">${prefix}渠道商 · ${ch.name}（${ch.settlementMode}）</option>`;
+          return `<option value="entity:${ch.id}">${prefix}${channelTypeLabel(ch.settlementMode)} · ${ch.name}</option>`;
         }).join("");
       let adminOpts = "";
       let staffOpts = "";
@@ -2742,7 +2753,7 @@
       const ch = isChannelRole() ? channelProfile() : null;
       return {
         displayName: ch ? ch.name : (ent.name || r.name),
-        roleLabel: ch ? `${r.type} · ${ch.settlementMode}` : r.type,
+        roleLabel: ch ? channelTypeLabel(ch.settlementMode) : r.type,
         entity: ch ? ch.name : (ent.name || r.name),
         account: state.auth.phone || state.loginKey.replace("entity:", "").replace("emp:", ""),
         loginAt: "演示会话"
@@ -3149,12 +3160,12 @@
 
     function contractPricingCell(c) {
       const mode = contractSettlementMode(c);
-      if (mode === "卡差价") {
+      if (mode === "链接类") {
         const skus = channelLinkSkus.filter(s => s.channelId === c.channelId);
         const instant = c.instantCommissionPayout ? `<br><small style="color:var(--green)">佣金及时到付 · ${formatCommissionRate(c.commissionRate)}</small>` : "";
         return skus.length
-          ? skus.map(s => `${s.name}<br><small>正式 ¥${s.officialPrice} / 专享 ¥${s.channelPrice} / 佣 ¥${s.commissionPerOrder}</small>`).join("<br>") + instant
-          : "推广链接分销" + instant;
+          ? skus.map(s => `${s.name}<br><small>${normalizeBatteryModel(s.batteryModel)} · 正式 ¥${s.officialPrice} / 专享 ¥${s.channelPrice} / 佣 ¥${s.commissionPerOrder}</small>`).join("<br>") + instant
+          : ("待在渠道分销价配置" + instant);
       }
       if (mode === "设备租赁") {
         const pool = channelRentPoolData.find(p => p.channelId === c.channelId);
@@ -3168,11 +3179,14 @@
 
     function contractTermsCell(c) {
       const mode = contractSettlementMode(c);
-      if (mode === "卡差价") {
+      if (mode === "链接类") {
         const skus = channelLinkSkus.filter(s => s.channelId === c.channelId);
         const settle = c.instantCommissionPayout
           ? `佣金及时到付 · ${formatCommissionRate(c.commissionRate)}`
           : "佣金线下结算";
+        if (!skus.length) {
+          return `授权 0 个 SKU<br><small>待在「平台设置 → 渠道分销价」配置 · ${settle}</small>`;
+        }
         return `授权 ${skus.length} 个 SKU<br><small>推广链接 · ${settle} · 24h 归因</small>`;
       }
       if (mode === "设备租赁") {
@@ -5440,7 +5454,7 @@
       if (mode === "激活码") {
         return {
           short: "二期",
-          label: "渠道商 · 激活码",
+          label: "分销商-激活码",
           detail: "激活码：渠道申请批发 → 确认到账按单造码 → 标记发放 / 核销 / 作废审批。整条模式标为二期，一期不交付，原型演示闭环。"
         };
       }
@@ -5529,6 +5543,16 @@
       const m = mode || "人天池";
       if (m === "设备租赁" || m === "激活码") return `${tag(m)}${phase2BadgeHtml()}`;
       return tag(m);
+    }
+
+    /** 角色/类型展示名（与结算模式列区分；decision-084） */
+    function channelTypeLabel(mode) {
+      const m = mode || "人天池";
+      if (m === "链接类") return "分销商-链接类";
+      if (m === "激活码") return "分销商-激活码";
+      if (m === "设备租赁") return "渠道商 · 设备租赁";
+      if (m === "人天池") return "渠道商 · 人天池";
+      return "渠道商 · " + m;
     }
 
     function phase2BannerHtml() {
@@ -5732,7 +5756,7 @@
           document.querySelector("#treeHint").textContent = `运营商：${entityNameById(p?.operatorId)} · ${r.tree}`;
         } else {
           document.querySelector("#tenantName").textContent = ch ? ch.name : (ent.name || r.name);
-          document.querySelector("#tenantType").textContent = ch ? `${r.type} · ${ch.settlementMode}` : r.type;
+          document.querySelector("#tenantType").textContent = ch ? channelTypeLabel(ch.settlementMode) : r.type;
           document.querySelector("#treeHint").textContent = ch ? ch.tree : r.tree;
         }
       }
@@ -5747,7 +5771,7 @@
       if (view === "channelSettlement") {
         const ch = isChannelRole() ? channelProfile() : null;
         const mode = ch?.settlementMode;
-        if (mode === "卡差价") return ["channel_settlement_card", "channel_card_margin", "module_channel_links"];
+        if (mode === "链接类") return ["channel_settlement_card", "channel_card_margin", "module_channel_links"];
         if (mode === "设备租赁") return ["channel_settlement_rent", "lease_whitelist", "lease_whitelist_pkg", "lease_battery_hold"];
         if (mode === "激活码") return ["channel_settlement_activation", "platform_fee_trigger"];
         return ["day_pool_panel", "day_pool_contract", "entitlement_api"];
@@ -5855,6 +5879,11 @@
       { pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29 },
       { pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9 }
     ];
+    /** 个人套餐电池型号（规格串 · decision-085，与台账对齐） */
+    const BATTERY_MODEL_OPTIONS = ["48V20Ah", "48V30Ah", "60V30Ah"];
+    function normalizeBatteryModel(m) {
+      return m && BATTERY_MODEL_OPTIONS.includes(m) ? m : "48V30Ah";
+    }
 
     function paginateList(rows, page, pageSize) {
       const size = Math.max(1, pageSize || 10);
@@ -5949,7 +5978,7 @@
       const cs = myChannelContracts();
       const day = cs.filter(c => contractSettlementMode(c) === "人天池").length;
       const rent = cs.filter(c => contractSettlementMode(c) === "设备租赁").length;
-      const card = cs.filter(c => contractSettlementMode(c) === "卡差价").length;
+      const card = cs.filter(c => contractSettlementMode(c) === "链接类").length;
       const act = cs.filter(c => contractSettlementMode(c) === "激活码").length;
       return { total: cs.length, day, rent, card, act, sub: `人天池 ${day} · 设备租赁 ${rent}（二期） · 骑士卡 ${card}${act ? " · 激活码 " + act + "（二期）" : ""}` };
     }
@@ -7738,57 +7767,6 @@
       window.alert("演示：运营商信息已保存（Mock）");
     }
 
-    function cardSkuPricingFieldsHtml(channelId) {
-      const skus = channelId
-        ? channelLinkSkus.filter(s => s.channelId === channelId)
-        : [
-          { id: "new-30D", name: "包月30天卡", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25 },
-          { id: "new-7D", name: "7天卡", officialPrice: 89, channelPrice: 79, commissionPerOrder: 8 }
-        ];
-      return `<div class="field-card card-sku-pricing form-span-2" style="padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-soft)">
-        <p style="font-size:12px;font-weight:600;margin:0 0 10px">授权套餐 · 正式零售价 / 渠道专享价 / 佣金（单）</p>
-        <div class="orders-table-wrap">
-        <table style="width:100%;font-size:13px;border-collapse:collapse">
-          <thead><tr><th style="text-align:left;padding:8px 6px">SKU</th><th style="padding:8px 6px">正式价</th><th style="padding:8px 6px">渠道专享价</th><th style="padding:8px 6px">佣金/单</th></tr></thead>
-          <tbody>${skus.map(s => `<tr>
-            <td style="padding:8px 6px"><strong>${s.name}</strong></td>
-            <td style="padding:8px 6px"><input name="sku_o_${s.id}" type="number" min="1" step="0.01" value="${s.officialPrice}" /></td>
-            <td style="padding:8px 6px"><input name="sku_c_${s.id}" type="number" min="1" step="0.01" value="${s.channelPrice}" /></td>
-            <td style="padding:8px 6px"><input name="sku_m_${s.id}" type="number" min="0" step="0.01" value="${s.commissionPerOrder}" /></td>
-          </tr>`).join("")}</tbody>
-        </table>
-        </div>
-        <p style="font-size:12px;color:var(--muted);margin:10px 0 0">专享价须 ≤ 正式价；各分销渠道可配置<strong>不同</strong>专享价与佣金。</p>
-      </div>`;
-    }
-
-    function applyCardSkuPricingFromForm(channelId, formData, isNew) {
-      const templates = isNew
-        ? [
-          { id: "new-30D", skuId: "SKU-" + channelId.slice(-4) + "-30D", name: "包月30天卡", validityDays: 30, linkCode: "lnk-30d" },
-          { id: "new-7D", skuId: "SKU-" + channelId.slice(-4) + "-7D", name: "7天卡", validityDays: 7, linkCode: "lnk-7d" }
-        ]
-        : channelSalePackages.filter(s => s.channelId === channelId).map(s => ({ id: s.id, skuId: s.skuId, name: s.name, validityDays: s.validityDays }));
-      templates.forEach(t => {
-        const o = parseFloat(formData["sku_o_" + t.id]);
-        const c = parseFloat(formData["sku_c_" + t.id]);
-        const m = parseFloat(formData["sku_m_" + t.id]);
-        if (!Number.isFinite(o) || !Number.isFinite(c) || !Number.isFinite(m) || c > o) return;
-        const existing = channelSalePackages.find(s => s.skuId === t.skuId || s.id === t.id);
-        if (existing) {
-          existing.officialPrice = o;
-          existing.channelPrice = c;
-          existing.commissionPerOrder = m;
-        } else {
-          channelSalePackages.push({
-            id: "PKG-" + channelId.replace(/-/g, "") + "-" + t.skuId.slice(-3),
-            channelId, skuId: t.skuId, name: t.name, officialPrice: o, channelPrice: c, commissionPerOrder: m,
-            validityDays: t.validityDays, status: "启用"
-          });
-        }
-      });
-    }
-
     function openChannelPartnerForm(contractId) {
       const op = currentEntity();
       const contract = contractId ? channelContracts.find(c => c.id === contractId && c.operatorId === op.id) : null;
@@ -7800,7 +7778,7 @@
         ? `<label>结算模式<input value="${mode}${mode === "设备租赁" || mode === "激活码" ? "（二期）" : ""}" readonly /></label>`
         : `<label>结算模式<select name="settlementMode" id="channelPartnerMode">
             <option value="人天池">人天池</option>
-            <option value="卡差价">卡差价</option>
+            <option value="链接类">链接类</option>
             <option value="设备租赁">设备租赁（二期）</option>
             <option value="激活码">激活码（二期）</option>
           </select></label>`;
@@ -7831,7 +7809,7 @@
         </select></label>
         <label class="field-act">服务人天（计提用）<input name="codeValidityDays" type="number" min="1" step="1" value="${contract?.codeValidityDays ?? 30}" /></label>
         <p class="field-act form-span-2" style="font-size:12px;color:var(--muted);margin:0">${phase2BadgeHtml()} 激活码（二期）：渠道批发码库存；骑手核销获套餐；平台 1% 在核销时按标准人天价×服务人天×B 端费率计提。</p>
-        ${cardSkuPricingFieldsHtml(contract?.channelId)}
+        <p class="field-card form-span-2" style="font-size:12px;color:var(--muted);margin:0;padding:10px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--surface-soft)">授权套餐与专享价请在「平台设置 → 渠道分销价」维护（decision-084）。</p>
         <div class="field-card field-card-instant form-span-2" style="padding:12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc">
           <p style="font-size:12px;font-weight:600;margin:0 0 10px">${noteBtn("channel_instant_commission")} 佣金及时到付（仅渠道分销）</p>
           <label>开启即时到付<select name="instantCommissionPayout" id="instantCommissionPayout">
@@ -7866,20 +7844,20 @@
         <label>合同有效期起<input name="validFrom" type="date" value="${contract?.validFrom || "2026-01-01"}" required /></label>
         <label>合同有效期止<input name="validTo" type="date" value="${contract?.validTo || "2026-12-31"}" required /></label>
         <label>签约状态<select name="contractStatus"><option ${(!contract || contract.status === "启用") ? "selected" : ""}>启用</option><option ${contract?.status === "停用" ? "selected" : ""}>停用</option></select></label>
-        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">人天池：自动建池 · 渠道分销：配置授权 SKU 专享价/佣金 · <span class="badge-p2">二期</span>设备租赁：统一月租与专属站 · <span class="badge-p2">二期</span>激活码：批发码库存</p>`;
+        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">人天池：自动建池 · 链接类：授权 SKU 在「渠道分销价」维护 · <span class="badge-p2">二期</span>设备租赁：统一月租与专属站 · <span class="badge-p2">二期</span>激活码：批发码库存</p>`;
       const syncModeFields = () => {
         const m = contract ? mode : (document.querySelector("#channelPartnerMode")?.value || "人天池");
         document.querySelectorAll(".field-day, .field-card, .field-rent, .field-act").forEach(el => { el.style.display = "none"; });
         if (m === "人天池") document.querySelectorAll(".field-day").forEach(el => { el.style.display = ""; });
-        if (m === "卡差价") document.querySelectorAll(".field-card").forEach(el => { el.style.display = ""; });
+        if (m === "链接类") document.querySelectorAll(".field-card").forEach(el => { el.style.display = ""; });
         if (m === "设备租赁") document.querySelectorAll(".field-rent").forEach(el => { el.style.display = ""; });
         if (m === "激活码") document.querySelectorAll(".field-act").forEach(el => { el.style.display = ""; });
         const instantOn = document.querySelector("#instantCommissionPayout")?.value === "1";
         document.querySelectorAll(".field-card-instant-on").forEach(el => {
-          el.style.display = (m === "卡差价" && instantOn) ? "" : "none";
+          el.style.display = (m === "链接类" && instantOn) ? "" : "none";
         });
         const modal = document.querySelector("#channelPartnerModal");
-        if (modal) modal.style.width = m === "卡差价" ? "min(720px,calc(100vw - 32px))" : "min(640px,calc(100vw - 32px))";
+        if (modal) modal.style.width = "min(640px,calc(100vw - 32px))";
       };
       syncModeFields();
       document.querySelector("#channelPartnerMode")?.addEventListener("change", syncModeFields);
@@ -7916,7 +7894,7 @@
       data.loginAccount = loginPhone;
       const settlementMode = data.settlementMode || channelContracts.find(c => c.id === state.channelPartnerContractId)?.settlementMode || "人天池";
       let wholesalePrice = parseFloat(data.wholesalePrice);
-      if (settlementMode === "卡差价") {
+      if (settlementMode === "链接类") {
         wholesalePrice = null;
       } else if (settlementMode === "激活码") {
         wholesalePrice = parseFloat(data.wholesalePriceAct) || parseFloat(data.wholesalePrice) || 255;
@@ -7926,10 +7904,10 @@
       const codeSkuName = settlementMode === "激活码" ? (data.codeSkuName || "30天包月") : null;
       const codeValidityDays = settlementMode === "激活码" ? parseInt(data.codeValidityDays, 10) || 30 : null;
       const monthlyRent = settlementMode === "设备租赁" ? parseFloat(data.monthlyRent) : null;
-      const instantCommissionPayout = settlementMode === "卡差价" && data.instantCommissionPayout === "1";
+      const instantCommissionPayout = settlementMode === "链接类" && data.instantCommissionPayout === "1";
       const commissionRatePct = parseFloat(data.commissionRatePct);
       const commissionRate = instantCommissionPayout && Number.isFinite(commissionRatePct) ? commissionRatePct / 100 : null;
-      if (settlementMode === "卡差价" && instantCommissionPayout) {
+      if (settlementMode === "链接类" && instantCommissionPayout) {
         if (!Number.isFinite(commissionRatePct) || commissionRatePct <= 0 || commissionRatePct > 50) {
           window.alert("请填写有效的渠道佣金比例（0.1%～50%）");
           return;
@@ -7954,7 +7932,7 @@
       if (state.channelPartnerContractId === "new") {
         const channelId = "CH-" + Date.now().toString().slice(-6);
         const contractId = "CC-" + Date.now().toString().slice(-6);
-        const paySummary = settlementMode === "卡差价" ? "推广链接分销"
+        const paySummary = settlementMode === "链接类" ? "推广链接分销"
           : settlementMode === "设备租赁" ? "设备月租 B2B"
           : settlementMode === "激活码" ? "激活码批发" : "向运营商付款";
         platformChannels.push({
@@ -7967,8 +7945,8 @@
           paySummary,
           poolCount: settlementMode === "人天池" ? 0 : 0,
           purchasedDays: 0, availableDays: 0, consumedDays: 0,
-          linkOrders: settlementMode === "卡差价" ? 0 : undefined,
-          monthCommission: settlementMode === "卡差价" ? 0 : undefined,
+          linkOrders: settlementMode === "链接类" ? 0 : undefined,
+          monthCommission: settlementMode === "链接类" ? 0 : undefined,
           whitelistCount: settlementMode === "设备租赁" ? 0 : undefined,
           codeInventory: settlementMode === "激活码" ? 0 : undefined,
           codesRedeemed: settlementMode === "激活码" ? 0 : undefined,
@@ -7985,9 +7963,9 @@
           crossNetworkEnabled: settlementMode === "设备租赁" ? data.crossNetworkEnabled === "1" : undefined,
           crossNetworkDepositPaid: settlementMode === "设备租赁" && data.crossNetworkEnabled === "1" ? false : undefined,
           crossNetworkDepositAmount: settlementMode === "设备租赁" ? 20000 : undefined,
-          instantCommissionPayout: settlementMode === "卡差价" ? instantCommissionPayout : false,
-          commissionRate: settlementMode === "卡差价" && instantCommissionPayout ? commissionRate : null,
-          instantCommissionEnabledAt: settlementMode === "卡差价" && instantCommissionPayout ? new Date().toISOString().slice(0, 10) : null,
+          instantCommissionPayout: settlementMode === "链接类" ? instantCommissionPayout : false,
+          commissionRate: settlementMode === "链接类" && instantCommissionPayout ? commissionRate : null,
+          instantCommissionEnabledAt: settlementMode === "链接类" && instantCommissionPayout ? new Date().toISOString().slice(0, 10) : null,
           status: data.contractStatus, validFrom: data.validFrom, validTo: data.validTo
         });
         if (settlementMode === "人天池") {
@@ -8016,12 +7994,11 @@
             crossSwapEnabled: false, hostOperatorId: op.id
           };
         }
-        if (settlementMode === "卡差价") {
-          applyCardSkuPricingFromForm(channelId, data, true);
+        if (settlementMode === "链接类") {
           channelSettlementModes.push({
-            id: "CSM-" + channelId.slice(-4), channelId, mode: "卡差价", status: "启用",
+            id: "CSM-" + channelId.slice(-4), channelId, mode: "链接类", status: "启用",
             desc: instantCommissionPayout ? "推广链接分销 · 佣金即时分账" : "推广链接分销 · 佣金线下结算",
-            cardSku: "包月30天卡", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25,
+            cardSku: "—", officialPrice: null, channelPrice: null, commissionPerOrder: null,
             commissionRate, instantCommissionPayout, linkOrders: 0, monthCommission: 0, linkClicks: 0
           });
         }
@@ -8060,7 +8037,7 @@
         contract.status = data.contractStatus;
         contract.validFrom = data.validFrom;
         contract.validTo = data.validTo;
-        if (contractSettlementMode(contract) === "卡差价") {
+        if (contractSettlementMode(contract) === "链接类") {
           const prevInstant = !!contract.instantCommissionPayout;
           const settleChanged = prevInstant !== instantCommissionPayout;
           const finishCardSettleAndRest = () => {
@@ -8164,9 +8141,6 @@
             pol.crossSwapEnabled = true;
             pol.hostOperatorId = op.id;
           }
-        }
-        if (contractSettlementMode(contract) === "卡差价") {
-          applyCardSkuPricingFromForm(contract.channelId, data, false);
         }
       closeChannelPartnerForm();
       state.view = "channelSales";
@@ -9733,7 +9707,7 @@
                 <th>采购支付</th><th>经营摘要</th><th>人员</th>
               </tr></thead>
               <tbody>${rows.map(c => {
-                const summary = c.settlementMode === "卡差价"
+                const summary = c.settlementMode === "链接类"
                   ? `链接成交 ${c.linkOrders || 0} 单 · 应结佣 ¥${c.monthCommission || 0}`
                   : c.settlementMode === "设备租赁"
                     ? `月租 ¥${(c.monthlyRent || 0).toLocaleString()} · 设备 ${channelRentDevices.filter(d => d.channelId === c.id).length} 台 · 白名单 ${c.riderCount || 0}`
@@ -10130,7 +10104,7 @@
               <div class="detail-grid">
                 <div class="detail-item"><span>运营商</span><strong>${contract.operatorName}</strong></div>
                 <div class="detail-item"><span>结算模式</span><strong>${contract.settlementMode}</strong></div>
-                ${contract.settlementMode === "卡差价" ? `<div class="detail-item"><span>卡批发价</span><strong>见 SKU 定价</strong></div>`
+                ${contract.settlementMode === "链接类" ? `<div class="detail-item"><span>卡批发价</span><strong>见 SKU 定价</strong></div>`
                   : contract.settlementMode === "设备租赁"
                     ? `<div class="detail-item"><span>月租合计</span><strong>¥${(contract.monthlyRent || 0).toLocaleString()}/月</strong></div>
                        <div class="detail-item"><span>专属站点</span><strong>${contract.dedicatedSiteName || "—"}</strong></div>
@@ -13713,18 +13687,36 @@
       ) || null;
     }
 
-    /** 售价解析：区价 ?? 城市底价；价格不限高低 */
-    function resolvePkgRetailPrice(pkg, siteId, city) {
+    /** 售价解析：区价 ?? 城市底价（同型号）；价格不限高低 */
+    function resolvePkgRetailPrice(pkg, siteId, city, batteryModel) {
       const opId = currentEntity().id;
       const c = city || "上海";
-      const cityRow = operatorPkgPrices.find(r => r.operatorId === opId && r.city === c && r.pkg === pkg && r.status === "生效");
+      const model = normalizeBatteryModel(batteryModel);
+      const cityRow = operatorPkgPrices.find(r =>
+        r.operatorId === opId && r.city === c && normalizeBatteryModel(r.batteryModel) === model && r.pkg === pkg && r.status === "生效"
+      );
       const cityPrice = cityRow?.retailPrice;
-      if (!siteId) return { price: cityPrice, source: "city", cityPrice, zone: null };
+      if (!siteId) return { price: cityPrice, source: "city", cityPrice, zone: null, batteryModel: model };
       const zone = zoneBySiteId(siteId);
-      if (!zone) return { price: cityPrice, source: "city", cityPrice, zone: null };
+      if (!zone) return { price: cityPrice, source: "city", cityPrice, zone: null, batteryModel: model };
       const zp = operatorZonePkgPrices.find(p => p.zoneId === zone.id && p.pkg === pkg && p.status === "生效");
-      if (zp) return { price: zp.retailPrice, source: "zone", cityPrice, zone, zonePrice: zp.retailPrice };
-      return { price: cityPrice, source: "city", cityPrice, zone, zonePrice: null };
+      if (zp) return { price: zp.retailPrice, source: "zone", cityPrice, zone, zonePrice: zp.retailPrice, batteryModel: model };
+      return { price: cityPrice, source: "city", cityPrice, zone, zonePrice: null, batteryModel: model };
+    }
+
+    function activeBatteryModelsForOperator(opId, city) {
+      const set = new Set();
+      operatorPkgPrices.forEach(r => {
+        if (r.operatorId === opId && r.city === city && r.status === "生效") {
+          set.add(normalizeBatteryModel(r.batteryModel));
+        }
+      });
+      return BATTERY_MODEL_OPTIONS.filter(m => set.has(m));
+    }
+
+    function getPricingPkgPf() {
+      if (!state.pf.pricingPkg) state.pf.pricingPkg = { city: "全部", batteryModel: "全部", status: "全部" };
+      return state.pf.pricingPkg;
     }
 
     function selectedPriceZone() {
@@ -13956,20 +13948,25 @@
       if (isNew) {
         document.querySelector("#pricingFormTitle").textContent = "新增 SKU · 个人套餐";
         document.querySelector("#pricingForm").innerHTML = `
-          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">套餐名称仅可从固定列表选择（暂定：包月30天 / 7天套餐 / 1天套餐 / 单次换电）；名称编辑时不可改。</p>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">唯一键：城市 × 电池型号 × 套餐。套餐名称仅可从固定列表选择；编辑时不可改型号与套餐名。无生效 SKU 的型号不对骑手展示。</p>
           <label>城市<select name="city">${cities.map(c => `<option>${c}</option>`).join("")}</select></label>
+          <label>电池型号<select name="batteryModel" id="pricingBatteryModel">${BATTERY_MODEL_OPTIONS.map(m => `<option value="${m}">${m}</option>`).join("")}</select></label>
           <label>套餐 SKU<select name="pkgPreset" id="pricingPkgPreset"></select></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="299" required /></label>
           <label>状态<select name="status"><option selected>生效</option><option>停用</option></select></label>`;
         const syncPreset = () => {
           const city = document.querySelector("#pricingForm [name=city]")?.value || "上海";
+          const model = document.querySelector("#pricingForm [name=batteryModel]")?.value || BATTERY_MODEL_OPTIONS[1];
+          const opId = currentEntity().id;
           const presets = PERSONAL_PKG_SKU_PRESETS.filter(p =>
-            !operatorPkgPrices.some(r => r.operatorId === currentEntity().id && r.city === city && r.pkg === p.pkg)
+            !operatorPkgPrices.some(r =>
+              r.operatorId === opId && r.city === city && normalizeBatteryModel(r.batteryModel) === model && r.pkg === p.pkg
+            )
           );
           const sel = document.querySelector("#pricingPkgPreset");
           if (!sel) return;
           if (!presets.length) {
-            sel.innerHTML = `<option value="">（该城市可选 SKU 已配齐）</option>`;
+            sel.innerHTML = `<option value="">（该型号下可选 SKU 已配齐）</option>`;
             return;
           }
           sel.innerHTML = presets.map(p =>
@@ -13980,6 +13977,7 @@
         };
         syncPreset();
         document.querySelector("#pricingForm [name=city]")?.addEventListener("change", syncPreset);
+        document.querySelector("#pricingForm [name=batteryModel]")?.addEventListener("change", syncPreset);
         document.querySelector("#pricingPkgPreset")?.addEventListener("change", e => {
           const opt = e.target.selectedOptions[0];
           if (!opt?.dataset.price) return;
@@ -13989,8 +13987,9 @@
         const allowed = PERSONAL_PKG_SKU_PRESETS.some(p => p.pkg === row.pkg);
         document.querySelector("#pricingFormTitle").textContent = "编辑零售价 · " + row.pkg;
         document.querySelector("#pricingForm").innerHTML = `
-          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">套餐名称不可改（仅可选固定 SKU）；本页只改零售价与状态。</p>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">城市 / 电池型号 / 套餐名不可改；仅改零售价与状态。</p>
           <label>城市<input name="city" value="${row.city}" readonly /></label>
+          <label>电池型号<input name="batteryModel" value="${normalizeBatteryModel(row.batteryModel)}" readonly /></label>
           <label>套餐<select name="pkg" id="pricingPkgEdit" disabled>${allowed
             ? skuOptionsHtml(row.pkg)
             : `<option selected>${row.pkg}</option>`}</select></label>
@@ -14017,14 +14016,18 @@
       }
       if (state.pricingEditId === "new") {
         const city = form.querySelector("[name=city]")?.value || "上海";
+        const batteryModel = form.querySelector("[name=batteryModel]")?.value || BATTERY_MODEL_OPTIONS[1];
         const opt = form.querySelector("[name=pkgPreset]")?.selectedOptions[0];
         const pkg = opt?.value;
         if (!pkg) {
-          window.alert("请选择套餐 SKU，或该城市已无可用 SKU 模板");
+          window.alert("请选择套餐 SKU，或该型号下已无可用 SKU 模板");
           return;
         }
-        if (operatorPkgPrices.some(r => r.operatorId === currentEntity().id && r.city === city && r.pkg === pkg)) {
-          window.alert("该城市已存在同名 SKU");
+        if (operatorPkgPrices.some(r =>
+          r.operatorId === currentEntity().id && r.city === city
+            && normalizeBatteryModel(r.batteryModel) === batteryModel && r.pkg === pkg
+        )) {
+          window.alert("该城市 × 型号下已存在同名 SKU");
           return;
         }
         const id = "OP-P-" + String(Date.now()).slice(-6);
@@ -14032,6 +14035,7 @@
           id,
           operatorId: currentEntity().id,
           city,
+          batteryModel,
           pkg,
           pkgType: opt.dataset.type || "monthly",
           validityHours: opt.dataset.hours ? parseInt(opt.dataset.hours, 10) : null,
@@ -14058,7 +14062,7 @@
     }
 
     function cardPricingContracts() {
-      return myChannelContracts().filter(c => contractSettlementMode(c) === "卡差价");
+      return myChannelContracts().filter(c => contractSettlementMode(c) === "链接类");
     }
 
     function openCardPricingForm(id) {
@@ -14070,14 +14074,14 @@
       const pkgRows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id && r.status === "生效");
       if (isNew) {
         if (!contracts.length) {
-          window.alert("请先在「渠道管理 → 签约渠道」新增卡差价签约");
+          window.alert("请先在「渠道管理 → 签约渠道」新增链接类签约");
           return;
         }
         document.querySelector("#cardPricingFormTitle").textContent = "新增渠道分销价";
         document.querySelector("#cardPricingForm").innerHTML = `
           <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">基于个人套餐 SKU 为分销渠道配置正式价、专享价与佣金；专享价须 ≤ 正式价。</p>
           <label>渠道商<select name="channelId" required>${contracts.map(c => `<option value="${c.channelId}">${c.channelName}</option>`).join("")}</select></label>
-          <label>关联 SKU<select name="basePkg" id="cardPricingBasePkg">${pkgRows.map(p => `<option value="${p.id}" data-price="${p.retailPrice}" data-name="${p.pkg}">${p.city} · ${p.pkg}（零售 ¥${p.retailPrice}）</option>`).join("")}</select></label>
+          <label>关联 SKU<select name="basePkg" id="cardPricingBasePkg">${pkgRows.map(p => `<option value="${p.id}" data-price="${p.retailPrice}" data-name="${p.pkg}" data-model="${normalizeBatteryModel(p.batteryModel)}">${p.city} · ${normalizeBatteryModel(p.batteryModel)} · ${p.pkg}（¥${p.retailPrice}）</option>`).join("")}</select></label>
           <label>正式零售价（元）<input name="officialPrice" type="number" min="0.1" step="0.1" value="${pkgRows[0]?.retailPrice ?? 299}" required /></label>
           <label>渠道专享价（元）<input name="channelPrice" type="number" min="0.1" step="0.1" value="${Math.max(1, (pkgRows[0]?.retailPrice ?? 299) - 20)}" required /></label>
           <label>佣金/单（元）<input name="commissionPerOrder" type="number" min="0" step="0.1" value="25" required /></label>
@@ -14132,8 +14136,10 @@
           window.alert("请选择渠道与 SKU");
           return;
         }
-        if (channelSalePackages.some(s => s.channelId === channelId && s.name === base.pkg)) {
-          window.alert("该渠道已配置此 SKU 分销价");
+        if (channelSalePackages.some(s =>
+          s.channelId === channelId && s.name === base.pkg && normalizeBatteryModel(s.batteryModel) === normalizeBatteryModel(base.batteryModel)
+        )) {
+          window.alert("该渠道已配置此型号×SKU 分销价");
           return;
         }
         const suffix = String(Date.now()).slice(-4);
@@ -14142,6 +14148,7 @@
           channelId,
           skuId: "SKU-" + channelId.slice(-4) + "-" + suffix,
           name: base.pkg,
+          batteryModel: normalizeBatteryModel(base.batteryModel),
           officialPrice,
           channelPrice,
           commissionPerOrder,
@@ -14454,20 +14461,44 @@
             </div>
           </section>`;
         } else {
-          const rows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id);
+          const pf = getPricingPkgPf();
+          const opId = currentEntity().id;
+          const allRows = operatorPkgPrices.filter(r => r.operatorId === opId);
+          const rows = allRows.filter(r =>
+            (pf.city === "全部" || r.city === pf.city)
+            && (pf.batteryModel === "全部" || normalizeBatteryModel(r.batteryModel) === pf.batteryModel)
+            && (pf.status === "全部" || r.status === pf.status)
+          );
           body = `<section class="panel panel-with-top-tabs">
             ${topTabs}
-            ${panelHead("城市底价（个人套餐）", "运营商×城市×SKU · 未挂分区的站点用此价", "pricing_pkg", `<button type="button" class="btn primary" data-new-pricing-sku>+ 新增 SKU</button>`)}
+            ${panelHead("城市底价（个人套餐）", "运营商×城市×电池型号×SKU · 未挂分区的站点用此价", "pricing_pkg", `<button type="button" class="btn primary" data-new-pricing-sku>+ 新增 SKU</button>`)}
             <div class="panel-body orders-table-wrap">
-              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg")}${noteBtn("pricing_deposit")} 同城差异价请到「价格分区」。个人用户信用不足须实缴电池押金 <strong>¥${depCfg.amount}</strong>。</p>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg")}${noteBtn("pricing_deposit")} 套餐须绑定电池型号，<strong>无一单通兑</strong>；无生效 SKU 的型号不对骑手展示。同城差异价请到「价格分区」。</p>
+              <div class="filter-row" style="display:flex;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px;align-items:center">
+                <label style="font-size:13px">城市<select data-pricing-pkg-pf="city" style="margin-left:6px">
+                  <option value="全部" ${pf.city === "全部" ? "selected" : ""}>全部</option>
+                  ${["上海", "杭州"].map(c => `<option value="${c}" ${pf.city === c ? "selected" : ""}>${c}</option>`).join("")}
+                </select></label>
+                <label style="font-size:13px">电池型号<select data-pricing-pkg-pf="batteryModel" style="margin-left:6px">
+                  <option value="全部" ${pf.batteryModel === "全部" ? "selected" : ""}>全部</option>
+                  ${BATTERY_MODEL_OPTIONS.map(m => `<option value="${m}" ${pf.batteryModel === m ? "selected" : ""}>${m}</option>`).join("")}
+                </select></label>
+                <label style="font-size:13px">状态<select data-pricing-pkg-pf="status" style="margin-left:6px">
+                  <option value="全部" ${pf.status === "全部" ? "selected" : ""}>全部</option>
+                  <option value="生效" ${pf.status === "生效" ? "selected" : ""}>生效</option>
+                  <option value="停用" ${pf.status === "停用" ? "selected" : ""}>停用</option>
+                </select></label>
+              </div>
               <table>
-                <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
-                <tbody>${rows.map(r => `<tr>
-                  <td>${r.city}</td><td>${r.pkg}</td>
+                <thead><tr><th>城市</th><th>电池型号</th><th>套餐</th><th>有效期</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+                <tbody>${rows.length ? rows.map(r => `<tr>
+                  <td>${r.city}</td>
+                  <td><strong>${normalizeBatteryModel(r.batteryModel)}</strong></td>
+                  <td>${r.pkg}</td>
                   <td>${r.validityHours ? r.validityHours + "h" : "按 SKU"}</td>
                   <td>¥${r.retailPrice}</td><td>${tag(r.status)}</td><td>${r.updatedAt}</td>
                   <td><button type="button" class="link-btn" data-edit-pricing="${r.id}">编辑</button></td>
-                </tr>`).join("")}</tbody>
+                </tr>`).join("") : `<tr><td colspan="8">暂无匹配 SKU</td></tr>`}</tbody>
               </table>
             </div>
           </section>`;
@@ -14553,16 +14584,17 @@
           </div>
         </section>`;
       } else if (tab === "card") {
-        const contracts = myChannelContracts().filter(c => contractSettlementMode(c) === "卡差价");
+        const contracts = myChannelContracts().filter(c => contractSettlementMode(c) === "链接类");
         const rows = contracts.flatMap(c => channelLinkSkus.filter(s => s.channelId === c.channelId).map(s => ({ ...s, channelName: c.channelName, contractId: c.id, validTo: c.validTo, status: c.status })));
         body = `<section class="panel">
           ${panelHead("渠道分销价", "按签约渠道分别设定正式价、专享价与佣金", "pricing_card", `<button type="button" class="btn primary" data-new-card-pricing>+ 新增分销价</button>`)}
           <div class="panel-body orders-table-wrap">
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_card")} 多分销渠道（如骑士卡、闪送骑士卡）<strong>各签各价</strong>；本页仅维护价格与佣金。签约渠道档案请至「渠道管理 → 签约渠道」。</p>
             <table>
-              <thead><tr><th>渠道商</th><th>SKU</th><th>正式零售价</th><th>渠道专享价</th><th>佣金/单</th><th>有效期至</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>渠道商</th><th>电池型号</th><th>SKU</th><th>正式零售价</th><th>渠道专享价</th><th>佣金/单</th><th>有效期至</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${rows.map(r => `<tr>
                 <td>${r.channelName}</td>
+                <td>${normalizeBatteryModel(r.batteryModel)}</td>
                 <td>${r.name}</td>
                 <td>¥${r.officialPrice}</td>
                 <td>¥${r.channelPrice}</td>
@@ -14572,7 +14604,7 @@
                 <td>
                   <button type="button" class="link-btn" data-edit-card-pricing="${r.id}">编辑</button>
                 </td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无渠道分销签约</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='9'>暂无渠道分销签约</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -14660,7 +14692,7 @@
         body = `<section class="panel">
           ${panelHead("签约渠道商", "签约信息 · 权益概要 · 信用额度（人天池/设备租赁适用）", "channel_sales", addBtn)}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_partner_manage")}${noteBtn("channel_partner_rights")} 同一运营商可签多个分销渠道，<strong>各渠道独立配置套餐与专享价</strong>；汇总对比见「定价管理 → 渠道分销价」。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_partner_manage")}${noteBtn("channel_partner_rights")} 同一运营商可签多个<strong>分销商-链接类</strong>渠道；授权套餐与专享价仅在「平台设置 → 渠道分销价」维护。</p>
             <table>
               <thead><tr>
                 <th>渠道商</th><th>结算模式</th><th>批发/定价</th><th>权益概要</th>
@@ -14785,7 +14817,7 @@
         const topTabs = panelTopTabs(subTabs, sub, "csasset-sub");
         const pools = mySoldDayPools();
         const ledgerRows = dayPoolLedger.filter(l => pools.some(p => p.id === l.poolId));
-        const cardContracts = myChannelContracts().filter(c => contractSettlementMode(c) === "卡差价");
+        const cardContracts = myChannelContracts().filter(c => contractSettlementMode(c) === "链接类");
         const rentContracts = myChannelContracts().filter(c => contractSettlementMode(c) === "设备租赁");
         const actContracts = myChannelContracts().filter(c => contractSettlementMode(c) === "激活码");
         const pageSize = state.channelAssetsPageSize || 5;
@@ -14794,7 +14826,7 @@
           const cardRows = cardContracts.flatMap(c =>
             channelSalePackages.filter(s => s.channelId === c.channelId).map(s => {
               const conv = channelLinkOrders.filter(o => o.channelId === c.channelId && o.skuId === s.skuId).length;
-              return { channelName: c.channelName, name: s.name, channelPrice: s.channelPrice, commissionPerOrder: s.commissionPerOrder, conv, status: s.status };
+              return { channelName: c.channelName, batteryModel: normalizeBatteryModel(s.batteryModel), name: s.name, channelPrice: s.channelPrice, commissionPerOrder: s.commissionPerOrder, conv, status: s.status };
             })
           );
           const pg = paginateList(cardRows, state.channelAssetsPage, pageSize);
@@ -14802,13 +14834,13 @@
           content = `${panelHead("渠道分销概况", `推广链接成交与佣金（无批发入库）· 共 ${pg.total} 条`, "channel_settlement_card")}
             <div class="panel-body orders-table-wrap">
               <table>
-                <thead><tr><th>渠道商</th><th>SKU</th><th>专享价</th><th>佣金/单</th><th>链接成交</th><th>状态</th></tr></thead>
+                <thead><tr><th>渠道商</th><th>电池型号</th><th>SKU</th><th>专享价</th><th>佣金/单</th><th>链接成交</th><th>状态</th></tr></thead>
                 <tbody>${pg.slice.map(s => `<tr>
-                    <td>${s.channelName}</td><td>${s.name}</td>
+                    <td>${s.channelName}</td><td>${s.batteryModel}</td><td>${s.name}</td>
                     <td>¥${s.channelPrice}</td><td>¥${s.commissionPerOrder}</td>
                     <td>${s.conv} 单</td>
                     <td>${tag(s.status)}</td>
-                  </tr>`).join("") || "<tr><td colspan='6'>暂无渠道分销签约</td></tr>"}</tbody>
+                  </tr>`).join("") || "<tr><td colspan='7'>暂无渠道分销签约</td></tr>"}</tbody>
               </table>
               ${renderTablePager(pg, "csasset-page")}
             </div>`;
@@ -15423,8 +15455,9 @@
             ${panelHead("SKU 与专享价", "正式价 / 渠道专享价 / 佣金", "channel_settlement_card")}
             <div class="panel-body orders-table-wrap">
               <table>
-                <thead><tr><th>SKU</th><th>正式零售价</th><th>渠道专享价</th><th>佣金/单</th><th>有效期</th></tr></thead>
+                <thead><tr><th>电池型号</th><th>SKU</th><th>正式零售价</th><th>渠道专享价</th><th>佣金/单</th><th>有效期</th></tr></thead>
                 <tbody>${skus.map(s => `<tr>
+                  <td><strong>${normalizeBatteryModel(s.batteryModel)}</strong></td>
                   <td><strong>${s.name}</strong><br><small>${s.id}</small></td>
                   <td>¥${s.officialPrice}</td><td><strong>¥${s.channelPrice}</strong></td>
                   <td>¥${s.commissionPerOrder}</td><td>${s.validityDays} 天</td>
@@ -15529,7 +15562,7 @@
           <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end">
             <label style="font-size:12px">所属套餐
               <select id="newLinkPackage" style="width:100%;margin-top:4px">
-                ${packages.map(p => `<option value="${p.id}"${p.id === form.packageId ? " selected" : ""}>${p.name} · ¥${p.channelPrice}</option>`).join("")}
+                ${packages.map(p => `<option value="${p.id}"${p.id === form.packageId ? " selected" : ""}>${channelPkgLabel(p)}</option>`).join("")}
               </select>
             </label>
             <label style="font-size:12px">链接用途
@@ -15554,11 +15587,12 @@
             ${newLinkForm}
             <div class="orders-table-wrap">
               <table>
-                <thead><tr><th>套餐</th><th>链接用途</th><th>链接码</th><th>点击</th><th>成交</th><th>创建日</th><th>状态</th><th>小程序链接</th><th>操作</th></tr></thead>
+                <thead><tr><th>套餐</th><th>电池型号</th><th>链接用途</th><th>链接码</th><th>点击</th><th>成交</th><th>创建日</th><th>状态</th><th>小程序链接</th><th>操作</th></tr></thead>
                 <tbody>${pg.slice.map(l => {
                   const pkg = packages.find(p => p.id === l.packageId);
                   return `<tr>
                     <td>${pkg ? pkg.name : l.skuId}<br><small>¥${pkg?.channelPrice || "—"}</small></td>
+                    <td>${pkg ? normalizeBatteryModel(pkg.batteryModel) : resolveChannelSkuBatteryModel(cid, l.skuId, l.packageId)}</td>
                     <td><strong>${l.purpose}</strong></td>
                     <td><small>${l.linkCode}</small></td>
                     <td>${l.clicks}</td>
@@ -15572,7 +15606,7 @@
                       ${l.status === "启用" ? `<button type="button" class="link-btn" data-toggle-promo-link="${l.id}">停用</button>` : `<button type="button" class="link-btn" data-toggle-promo-link="${l.id}">启用</button>`}
                     </td>
                   </tr>`;
-                }).join("") || "<tr><td colspan='9'>暂无推广链接，点击「+ 新建链接」</td></tr>"}</tbody>
+                }).join("") || "<tr><td colspan='10'>暂无推广链接，点击「+ 新建链接」</td></tr>"}</tbody>
               </table>
               ${renderTablePager(pg, "chlinks-link-page")}
             </div>
@@ -15589,10 +15623,11 @@
           ${panelHead("可销售套餐", "价格由运营商签约配置 · 渠道可为本套餐生成多条推广链接", "channel_settlement_card", `<button type="button" class="btn" data-goto-promo-links>+ 新建链接</button>`)}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>套餐</th><th>正式价</th><th>渠道专享价</th><th>佣金/单</th><th>推广链接数</th><th>累计点击</th><th>累计成交</th><th>状态</th></tr></thead>
+              <thead><tr><th>电池型号</th><th>套餐</th><th>正式价</th><th>渠道专享价</th><th>佣金/单</th><th>推广链接数</th><th>累计点击</th><th>累计成交</th><th>状态</th></tr></thead>
               <tbody>${pkgPg.slice.map(p => {
                 const st = packageLinkStats(p.id);
                 return `<tr>
+                  <td><strong>${normalizeBatteryModel(p.batteryModel)}</strong></td>
                   <td><strong>${p.name}</strong><br><small style="color:var(--muted)">${p.skuId}</small></td>
                   <td>¥${p.officialPrice}</td>
                   <td><strong>¥${p.channelPrice}</strong></td>
@@ -15602,7 +15637,7 @@
                   <td>${st.conversions}</td>
                   <td>${tag(p.status)}</td>
                 </tr>`;
-              }).join("") || "<tr><td colspan='8'>暂无可售套餐</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='9'>暂无可售套餐</td></tr>"}</tbody>
             </table>
             ${renderTablePager(pkgPg, "chlinks-pkg-page")}
           </div>
@@ -15619,10 +15654,11 @@
           ${panelHead("购卡记录", "仅展示经本渠道推广链接成交的套餐购买 · 共 " + all.length + " 笔，筛选后 " + orders.length + " 笔", "module_channel_orders")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算</th><th>链接用途</th><th>链接码</th><th>支付时间</th><th>状态</th></tr></thead>
+              <thead><tr><th>订单</th><th>用户</th><th>电池型号</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算</th><th>链接用途</th><th>链接码</th><th>支付时间</th><th>状态</th></tr></thead>
               <tbody>${orders.map(o => `<tr>
                 <td>${o.id}</td>
                 <td>${o.riderName}<br><small>${o.phone}</small></td>
+                <td>${o.batteryModel ? normalizeBatteryModel(o.batteryModel) : resolveChannelSkuBatteryModel(cid, o.skuId)}</td>
                 <td>${o.skuName}<br><small style="color:var(--muted)">正式 ¥${o.officialPrice}</small></td>
                 <td><strong>¥${o.paidPrice}</strong></td>
                 <td>¥${o.commission}${o.commissionRate ? `<br><small>${formatCommissionRate(o.commissionRate)}</small>` : ""}</td>
@@ -15631,7 +15667,7 @@
                 <td><small>${o.linkCode}</small></td>
                 <td>${o.payTime}</td>
                 <td>${linkOrderStatusCell(o, cid)}</td>
-              </tr>`).join("") || "<tr><td colspan='10'>暂无购卡记录</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='11'>暂无购卡记录</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -15688,13 +15724,15 @@
           ${panelHead(isSingleMonth ? (f.month + " 明细") : (rangeLabel + " 明细"), "范围内经链接购卡订单 · 订单级结算方式", "module_channel_orders")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算方式</th><th>链接用途</th><th>支付时间</th></tr></thead>
+              <thead><tr><th>订单</th><th>用户</th><th>电池型号</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算方式</th><th>链接用途</th><th>支付时间</th></tr></thead>
               <tbody>${pg.slice.map(o => `<tr>
-                <td>${o.id}</td><td>${o.riderName}<br><small>${o.phone}</small></td><td>${o.skuName}</td>
+                <td>${o.id}</td><td>${o.riderName}<br><small>${o.phone}</small></td>
+                <td>${o.batteryModel ? normalizeBatteryModel(o.batteryModel) : resolveChannelSkuBatteryModel(cid, o.skuId)}</td>
+                <td>${o.skuName}</td>
                 <td>¥${o.paidPrice}</td><td>¥${o.commission}</td>
                 <td>${linkOrderSettleCell(o, cid)}</td>
                 <td>${o.linkPurpose || "—"}</td><td>${o.payTime}</td>
-              </tr>`).join("") || "<tr><td colspan='8'>该范围内暂无明细</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='9'>该范围内暂无明细</td></tr>"}</tbody>
             </table>
             ${renderTablePager(pg, "comm-detail-page")}
           </div>
@@ -18793,6 +18831,13 @@
       if (expenseEl && state.view === "overview") {
         const ep = getOverviewExpensePf();
         ep[expenseEl.dataset.overviewExpensePf] = expenseEl.value;
+        render();
+        return;
+      }
+      const pricingPkgEl = e.target.closest("[data-pricing-pkg-pf]");
+      if (pricingPkgEl && state.view === "pricing" && state.pricingTab === "pkg") {
+        const pf = getPricingPkgPf();
+        pf[pricingPkgEl.dataset.pricingPkgPf] = pricingPkgEl.value;
         render();
         return;
       }
