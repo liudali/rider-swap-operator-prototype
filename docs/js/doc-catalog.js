@@ -10,7 +10,8 @@
         { file: "功能结构与业务流程.md", label: "功能结构与业务流程" },
         { file: "角色与功能清单.md", label: "角色与功能清单" },
         { file: "业务整体预览图.md", label: "业务整体预览图" },
-        { file: "用户-运营商归属模型.md", label: "用户 · 运营商归属模型" }
+        { file: "用户-运营商归属模型.md", label: "用户 · 运营商归属模型" },
+        { file: "用户与角色关系.md", label: "用户 · 与各角色关系" }
       ]
     },
     {
@@ -154,7 +155,7 @@
     orderAudit: ["PRD.md", "功能结构与业务流程.md"],
     refundManage: ["个人套餐定价与退款.md", "骑手电池押金.md"],
     flows: ["合作模式与分账.md", "换电场景与运营商结算.md", "运营商提现规则.md"],
-    users: ["用户-运营商归属模型.md", "骑手电池押金.md", "骑手端PRD.md"],
+    users: ["用户与角色关系.md", "用户-运营商归属模型.md", "骑手电池押金.md", "骑手端PRD.md"],
     employees: ["角色与功能清单.md", "PRD.md"],
     pricing: ["个人套餐定价与退款.md", "骑手电池押金.md", "换电范围策略.md", "渠道结算模式规则.md"],
     channelSales: ["渠道结算模式规则.md", "合作模式与分账.md", "渠道信用评估方案.md"],
@@ -183,7 +184,7 @@
     depositManage: ["运营商信用评估方案.md", "合作模式与分账.md"],
     deviceBinding: ["PRD.md", "功能结构与业务流程.md"],
     l1Pricing: ["渠道结算模式规则.md", "天数池.md", "换电场景与运营商结算.md"],
-    platformUsers: ["用户-运营商归属模型.md", "骑手电池押金.md", "骑手端PRD.md"],
+    platformUsers: ["用户与角色关系.md", "用户-运营商归属模型.md", "骑手电池押金.md", "骑手端PRD.md"],
     platformOrders: ["PRD.md"],
     platformDevices: ["PRD.md", "功能结构与业务流程.md"],
     platformChannels: ["渠道结算模式规则.md", "渠道信用评估方案.md"],
@@ -1661,6 +1662,7 @@
       { summary: "场费与电费属于运营商付给场地方的经营成本，与合伙人分润是不同账目。", file: "站点合伙人.md", heading: "和渠道商、站点支出的区别" },
     ],
     users: [
+      { summary: "骑手与各角色的建立/解除：运营商归属、人天池离职回池、链接归因、白名单、激活码；合伙人无直接用户关系。", file: "用户与角色关系.md", heading: "总览矩阵" },
       { summary: "用户商业归属等于售卖或收款的运营商，支付成功后写入，不绑定具体站点。", file: "用户-运营商归属模型.md", heading: "一句话" },
       { summary: "列表可按电池押金类型筛选，区分实付在押、信用免押与渠道担保等。", file: "骑手电池押金.md", heading: "各后台落在哪" },
       { summary: "同一用户可因换运营商产生多笔实付押金，旧押退掉后再交新押。", file: "骑手电池押金.md", heading: "各后台落在哪" },
