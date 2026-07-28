@@ -274,7 +274,7 @@
       rentPool: ["月租账单", "向运营商支付设备月租（MO-）；欠费停服。"],
       rentDevices: ["租赁设备", "柜机/电池 SN 与部署站点；月租为签约统一价。"],
       leaseWhitelist: ["白名单用户", "扁平名单 · 无团队 · 渠道自行维护；区分<strong>白名单免费</strong>与<strong>白名单付费</strong>（须购白名单套餐）。"],
-      leasePkgPricing: ["白名单套餐", "渠道自定 SKU · 绑定<strong>电池型号</strong>与零售价；<strong>仅白名单用户</strong>可购；款项进入<strong>本渠道收款账户</strong>。"],
+      leasePkgPricing: ["白名单套餐", "与个人套餐同 SKU 预设 · 绑定<strong>电池型号</strong>与零售价；<strong>仅白名单用户</strong>可购；款项进入<strong>本渠道收款账户</strong>。"],
       leasePkgOrders: ["白名单订单", "白名单用户购套餐流水；订单快照含<strong>电池型号</strong>；收款方为本渠道子商户。"],
       channelInterOp: ["渠道跨网往来账", "设备租赁渠道开通跨网后，骑手在他网换电的跨网设备服务费经平台代收代付。"],
       platformFee: ["平台服务费", "页内 Tab：费用总览 / C 端支付分账 / B 端消耗计提。"],
@@ -471,7 +471,7 @@
 
       channel_settlement_card: { title: "渠道分销（骑士卡）", content: "渠道为<strong>推广销售渠道</strong>：用户经推广链接/二维码进入<strong>运营商小程序</strong>，24h 内购套餐享<strong>渠道专享价</strong>。<br><strong>本月成交</strong>=筛选月 channelLinkOrders 笔数；<strong>本月应结佣</strong>=Σ commission；<strong>推广链接</strong>点击/成交=各 link 累计 clicks/conversions。" },
       channel_settlement_rent: { title: "设备租赁", content: "运营商维护<strong>租赁设备清单</strong>与<strong>专属站点</strong>；签约<strong>统一月租</strong>（MO→运营商）。渠道视为<strong>小型运营商</strong>：设备为租赁资产，可配置<strong>跨网换电</strong>（须向平台缴纳保证金）。白名单分<strong>免费</strong>（B2B 覆盖）与<strong>付费</strong>（须购白名单套餐）。" },
-      lease_whitelist_pkg: { title: "白名单套餐", content: "仅<strong>白名单付费</strong>类型用户须购买。渠道在「白名单套餐」维护 SKU（须绑定<strong>电池型号</strong>）；「白名单订单」查购套餐流水。支付进<strong>渠道收款账户</strong>。白名单免费用户无需购套餐。无一单通兑全型号。" },
+      lease_whitelist_pkg: { title: "白名单套餐", content: "仅<strong>白名单付费</strong>类型用户须购买。渠道在「白名单套餐」维护 SKU，口径与运营商<strong>个人套餐</strong>一致：固定套餐名（包月30天/7天套餐/1天套餐/单次换电）× 电池型号 × 零售价；「白名单订单」查流水。支付进<strong>渠道收款账户</strong>。无一单通兑。" },
       lease_whitelist: { title: "白名单用户", content: "渠道自行维护扁平名单。<strong>白名单免费</strong>：入名单即可换电（月租 B2B 覆盖）。<strong>白名单付费</strong>：须购有效白名单套餐方可换电。添加时选择类型。" },
       lease_whitelist_access: { title: "白名单类型", content: "<strong>白名单免费</strong>：渠道 B2B 月租已覆盖，名单内骑手免 C 端购套餐即可换电。<br><strong>白名单付费</strong>：名单内骑手须购买「白名单套餐」（款进渠道子商户）后换电；未购套餐扫码引导购买。" },
       channel_lease_crossnet: { title: "设备租赁 · 跨网换电", content: "渠道商在设备租赁模式下可视为<strong>小型运营商</strong>：名下骑手 userOwner=渠道。开通跨网后，骑手在他网换电产生<strong>跨网设备服务费</strong>，由渠道向平台保证金/信用额度支付（规则同运营商）。<br><strong>开通条件</strong>：向平台缴纳跨网保证金（演示 ¥20,000）。" },
@@ -2325,14 +2325,16 @@
       { id: "U4004", channelId: "CH-RENT", name: "赵夜配", phone: "136****4004", whitelistAccess: "paid", pkgStatus: "已失效", swaps: 0, status: "已移除", addedAt: "2026-01-20", addedBy: "渠道管理员", lastSwap: "—" }
     ];
     const channelLeasePkgSkus = [
-      { channelId: "CH-RENT", id: "LP-30", name: "30天畅换 · 白名单专享", batteryModel: "48V30Ah", price: 299, validityDays: 30, status: "上架", updatedAt: "2026-06-01" },
-      { channelId: "CH-RENT", id: "LP-30B", name: "30天畅换 · 白名单专享", batteryModel: "60V30Ah", price: 349, validityDays: 30, status: "上架", updatedAt: "2026-07-28" },
-      { channelId: "CH-RENT", id: "LP-7", name: "7天体验套餐", batteryModel: "48V30Ah", price: 89, validityDays: 7, status: "上架", updatedAt: "2026-06-01" }
+      { channelId: "CH-RENT", id: "LP-P01", pkg: "包月30天", batteryModel: "48V30Ah", pkgType: "monthly", validityHours: null, retailPrice: 299, status: "生效", updatedAt: "2026-06-01" },
+      { channelId: "CH-RENT", id: "LP-P01B", pkg: "包月30天", batteryModel: "60V30Ah", pkgType: "monthly", validityHours: null, retailPrice: 349, status: "生效", updatedAt: "2026-07-28" },
+      { channelId: "CH-RENT", id: "LP-P03", pkg: "7天套餐", batteryModel: "48V30Ah", pkgType: "weekly", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-06-01" },
+      { channelId: "CH-RENT", id: "LP-P04", pkg: "1天套餐", batteryModel: "48V30Ah", pkgType: "daily", validityHours: 24, retailPrice: 29, status: "生效", updatedAt: "2026-06-15" },
+      { channelId: "CH-RENT", id: "LP-P05", pkg: "单次换电", batteryModel: "48V30Ah", pkgType: "single", validityHours: 24, retailPrice: 9.9, status: "停用", updatedAt: "2026-07-01" }
     ];
     const channelLeasePkgOrders = [
-      { id: "LC-260610-01", channelId: "CH-RENT", userId: "U4001", userName: "张配送", phone: "139****4001", skuId: "LP-30", skuName: "30天畅换 · 白名单专享", batteryModel: "48V30Ah", amount: 299, payTime: "2026-06-10 09:12", status: "已支付", subMch: "1678901234***" },
-      { id: "LC-260605-02", channelId: "CH-RENT", userId: "U4002", userName: "李配送", phone: "138****4002", skuId: "LP-30", skuName: "30天畅换 · 白名单专享", batteryModel: "48V30Ah", amount: 299, payTime: "2026-06-05 18:40", status: "已支付", subMch: "1678901234***" },
-      { id: "LC-260720-03", channelId: "CH-RENT", userId: "U4002", userName: "李配送", phone: "138****4002", skuId: "LP-30B", skuName: "30天畅换 · 白名单专享", batteryModel: "60V30Ah", amount: 349, payTime: "2026-07-20 11:05", status: "已支付", subMch: "1678901234***" }
+      { id: "LC-260610-01", channelId: "CH-RENT", userId: "U4001", userName: "张配送", phone: "139****4001", skuId: "LP-P01", skuName: "包月30天", batteryModel: "48V30Ah", amount: 299, payTime: "2026-06-10 09:12", status: "已支付", subMch: "1678901234***" },
+      { id: "LC-260605-02", channelId: "CH-RENT", userId: "U4002", userName: "李配送", phone: "138****4002", skuId: "LP-P01", skuName: "包月30天", batteryModel: "48V30Ah", amount: 299, payTime: "2026-06-05 18:40", status: "已支付", subMch: "1678901234***" },
+      { id: "LC-260720-03", channelId: "CH-RENT", userId: "U4002", userName: "李配送", phone: "138****4002", skuId: "LP-P01B", skuName: "包月30天", batteryModel: "60V30Ah", amount: 349, payTime: "2026-07-20 11:05", status: "已支付", subMch: "1678901234***" }
     ];
     const channelRentRiders = channelLeaseWhitelist;
     const channelRentLedger = [
@@ -2812,6 +2814,7 @@
 
     const PF_DEFAULTS = {
       pricingPkg: { city: "全部", batteryModel: "全部", status: "全部" },
+      leasePkg: { batteryModel: "全部", status: "全部" },
       overview: { range: "30" },
       drillSwap: { operatorId: "全部", site: "全部", range: "7", dateFrom: "", dateTo: "" },
       overviewPower: { dateFrom: "2026-06-01", dateTo: "2026-06-15", range: "30", site: "全部" },

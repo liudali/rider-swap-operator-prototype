@@ -649,8 +649,9 @@
     };
 
     const LEASE_PKG_SKUS = {
-      month: { key: "month", name: "30天畅换 · 白名单专享", price: 299, days: 30, desc: "京东物流专属 · 款入渠道账户" },
-      weekly: { key: "weekly", name: "7天体验套餐", price: 89, days: 7, desc: "短期试用" }
+      month: { key: "month", name: "包月30天", price: 299, days: 30, batteryModel: "48V30Ah", desc: "京东物流专属 · 款入渠道账户" },
+      month60: { key: "month60", name: "包月30天", price: 349, days: 30, batteryModel: "60V30Ah", desc: "60V 型号 · 款入渠道账户" },
+      weekly: { key: "weekly", name: "7天套餐", price: 89, days: 7, batteryModel: "48V30Ah", desc: "短期试用" }
     };
 
     const SITES = {
@@ -815,7 +816,7 @@
       },
       lease_whitelist: {
         loggedIn: true, phone: "139****4001", name: "张配送", userId: "U4001",
-        kyc: true, entitlement: "设备租赁白名单", pkg: "30天畅换 · 白名单专享", daysLeft: 22, swapUsed: 42,
+        kyc: true, entitlement: "设备租赁白名单", pkg: "包月30天", batteryModel: "48V30Ah", daysLeft: 22, swapUsed: 42,
         status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
         channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "paid", holdsBattery: true,
         depositMethod: "渠道担保", depositStatus: "——", depositAmount: 0, depositChannel: "渠道担保"

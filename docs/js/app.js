@@ -14091,6 +14091,102 @@
       return BATTERY_MODEL_OPTIONS.filter(m => set.has(m));
     }
 
+    function getLeasePkgPf() {
+      if (!state.pf.leasePkg) state.pf.leasePkg = { ...(PF_DEFAULTS.leasePkg || { batteryModel: "全部", status: "全部" }) };
+      return state.pf.leasePkg;
+    }
+    function pkgValidityLabel(row) {
+      return row.validityHours ? row.validityHours + "h" : "按 SKU";
+    }
+
+    function openLeasePkgForm(id) {
+      const cid = channelEntityId();
+      const isNew = !id || id === "new";
+      const row = isNew ? null : channelLeasePkgSkus.find(s => s.channelId === cid && s.id === id);
+      if (!isNew && !row) return;
+      const modelOpts = BATTERY_MODEL_OPTIONS.length ? BATTERY_MODEL_OPTIONS.slice() : ["48V30Ah"];
+      if (isNew) {
+        const syncPreset = (formRoot) => {
+          const model = formRoot.querySelector("[name=batteryModel]")?.value || modelOpts[0];
+          const presets = PERSONAL_PKG_SKU_PRESETS.filter(p =>
+            !channelLeasePkgSkus.some(s =>
+              s.channelId === cid && normalizeBatteryModel(s.batteryModel) === model && s.pkg === p.pkg
+            )
+          );
+          const sel = formRoot.querySelector("[name=pkgPreset]");
+          if (!sel) return;
+          if (!presets.length) {
+            sel.innerHTML = `<option value="">（该型号下可选 SKU 已配齐）</option>`;
+            return;
+          }
+          sel.innerHTML = presets.map(p =>
+            `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-price="${p.retailPrice}">${p.pkg}</option>`
+          ).join("");
+          const priceEl = formRoot.querySelector("[name=retailPrice]");
+          if (priceEl && presets[0]) priceEl.value = presets[0].retailPrice;
+        };
+        openProtoForm({
+          title: "新增 SKU · 白名单套餐",
+          fields: [
+            { name: "hint", label: "说明", value: "唯一键：渠道 × 电池型号 × 套餐。套餐名仅可从个人套餐固定列表选择；编辑时不可改型号与套餐名。", readonly: true, required: false },
+            { name: "batteryModel", label: "电池型号", type: "select", options: modelOpts, value: modelOpts.includes("48V30Ah") ? "48V30Ah" : modelOpts[0] },
+            { name: "pkgPreset", label: "套餐 SKU", type: "select", options: PERSONAL_PKG_SKU_PRESETS.map(p => p.pkg), value: PERSONAL_PKG_SKU_PRESETS[0]?.pkg },
+            { name: "retailPrice", label: "零售价（元）", type: "number", value: PERSONAL_PKG_SKU_PRESETS[0]?.retailPrice || 299 },
+            { name: "status", label: "状态", type: "select", options: ["生效", "停用"], value: "生效" }
+          ],
+          submitLabel: "保存",
+          afterOpen: (formRoot) => {
+            syncPreset(formRoot);
+            formRoot.querySelector("[name=batteryModel]")?.addEventListener("change", () => syncPreset(formRoot));
+            formRoot.querySelector("[name=pkgPreset]")?.addEventListener("change", e => {
+              const opt = e.target.selectedOptions[0];
+              const preset = PERSONAL_PKG_SKU_PRESETS.find(p => p.pkg === opt?.value);
+              if (preset) formRoot.querySelector("[name=retailPrice]").value = preset.retailPrice;
+            });
+          },
+          onSubmit: (data) => {
+            const batteryModel = normalizeBatteryModel(data.batteryModel);
+            const pkg = data.pkgPreset;
+            const preset = PERSONAL_PKG_SKU_PRESETS.find(p => p.pkg === pkg);
+            if (!preset) return "请选择套餐 SKU，或该型号下已无可用 SKU 模板";
+            const retailPrice = parseFloat(data.retailPrice);
+            if (!Number.isFinite(retailPrice) || retailPrice <= 0) return "请填写有效零售价";
+            if (channelLeasePkgSkus.some(s =>
+              s.channelId === cid && normalizeBatteryModel(s.batteryModel) === batteryModel && s.pkg === pkg
+            )) return "该渠道 × 型号下已存在同名 SKU";
+            const newId = "LP-P" + Date.now().toString(36).slice(-4).toUpperCase();
+            channelLeasePkgSkus.push({
+              channelId: cid, id: newId, pkg, batteryModel,
+              pkgType: preset.pkgType, validityHours: preset.validityHours,
+              retailPrice, status: data.status || "生效",
+              updatedAt: new Date().toISOString().slice(0, 10)
+            });
+            return { successMessage: "已新增 " + pkg + " · " + batteryModel + " · ¥" + retailPrice, afterClose: () => render() };
+          }
+        });
+        return;
+      }
+      openProtoForm({
+        title: "编辑零售价 · " + row.pkg,
+        fields: [
+          { name: "hint", label: "说明", value: "电池型号 / 套餐名不可改；仅改零售价与状态。", readonly: true, required: false },
+          { name: "batteryModel", label: "电池型号", value: normalizeBatteryModel(row.batteryModel), readonly: true },
+          { name: "pkg", label: "套餐", value: row.pkg, readonly: true },
+          { name: "retailPrice", label: "零售价（元）", type: "number", value: row.retailPrice },
+          { name: "status", label: "状态", type: "select", options: ["生效", "停用"], value: row.status || "生效" }
+        ],
+        submitLabel: "保存",
+        onSubmit: (data) => {
+          const retailPrice = parseFloat(data.retailPrice);
+          if (!Number.isFinite(retailPrice) || retailPrice <= 0) return "请填写有效零售价";
+          row.retailPrice = retailPrice;
+          row.status = data.status || row.status;
+          row.updatedAt = new Date().toISOString().slice(0, 10);
+          return { successMessage: "已更新 " + row.pkg + " · ¥" + retailPrice, afterClose: () => render() };
+        }
+      });
+    }
+
     function getPricingPkgPf() {
       if (!state.pf.pricingPkg) state.pf.pricingPkg = { city: "全部", batteryModel: "全部", status: "全部" };
       return state.pf.pricingPkg;
@@ -16248,22 +16344,41 @@
 
     function renderLeasePkgPricing() {
       const cid = channelEntityId();
-      const skus = channelLeasePkgSkus.filter(s => s.channelId === cid);
+      const pf = getLeasePkgPf();
+      const allRows = channelLeasePkgSkus.filter(s => s.channelId === cid);
+      const rows = allRows.filter(s =>
+        (pf.batteryModel === "全部" || normalizeBatteryModel(s.batteryModel) === pf.batteryModel)
+        && (pf.status === "全部" || s.status === pf.status)
+      );
+      const addBtn = isChannelRole() ? `<button type="button" class="btn primary" data-new-lease-pkg>+ 新增 SKU</button>` : "";
       return `
         ${ownScopeBanner()}
-        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("lease_whitelist_pkg")}${noteBtn("platform_battery_models")} 以下套餐<strong>仅白名单用户</strong>可在小程序购买；支付进入<strong>本渠道收款账户</strong>（演示：1678901234***）。SKU 须绑定<strong>电池型号</strong>（平台字典），权益仅支持同型号换电。</div>
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("lease_whitelist_pkg")}${noteBtn("platform_battery_models")}${noteBtn("pricing_pkg")} 以下套餐<strong>仅白名单用户</strong>可在小程序购买；支付进入<strong>本渠道收款账户</strong>（演示：1678901234***）。SKU 口径与运营商<strong>个人套餐</strong>一致：固定套餐名 × 电池型号 × 零售价；无一单通兑。</div>
         <section class="panel">
-          ${panelHead("白名单套餐定价", "渠道自定 · 绑定电池型号 · 运营商不代设 C 端价", "lease_whitelist_pkg")}
+          ${panelHead("白名单套餐定价", "渠道 × 电池型号 × 套餐 · 与个人套餐同 SKU 预设", "lease_whitelist_pkg", addBtn)}
           <div class="panel-body orders-table-wrap">
+            <div class="filter-row" style="display:flex;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px;align-items:center">
+              <label style="font-size:13px">电池型号<select data-lease-pkg-pf="batteryModel" style="margin-left:6px">
+                <option value="全部" ${pf.batteryModel === "全部" ? "selected" : ""}>全部</option>
+                ${BATTERY_MODEL_OPTIONS.map(m => `<option value="${m}" ${pf.batteryModel === m ? "selected" : ""}>${m}</option>`).join("")}
+              </select></label>
+              <label style="font-size:13px">状态<select data-lease-pkg-pf="status" style="margin-left:6px">
+                <option value="全部" ${pf.status === "全部" ? "selected" : ""}>全部</option>
+                <option value="生效" ${pf.status === "生效" ? "selected" : ""}>生效</option>
+                <option value="停用" ${pf.status === "停用" ? "selected" : ""}>停用</option>
+              </select></label>
+            </div>
             <table>
-              <thead><tr><th>SKU</th><th>电池型号</th><th>套餐名</th><th>零售价</th><th>有效期</th><th>状态</th><th>操作</th></tr></thead>
-              <tbody>${skus.map(s => `<tr>
-                <td>${s.id}</td>
+              <thead><tr><th>电池型号</th><th>套餐</th><th>有效期</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+              <tbody>${rows.length ? rows.map(s => `<tr>
                 <td><strong>${normalizeBatteryModel(s.batteryModel)}</strong></td>
-                <td>${s.name}</td><td>¥${s.price}</td>
-                <td>${s.validityDays} 天</td><td>${tag(s.status)}</td>
-                <td><button type="button" class="link-btn" data-edit-lease-pkg="${s.id}">编辑</button></td>
-              </tr>`).join("") || "<tr><td colspan='7'>暂无上架套餐</td></tr>"}</tbody>
+                <td>${s.pkg}</td>
+                <td>${pkgValidityLabel(s)}</td>
+                <td>¥${s.retailPrice}</td>
+                <td>${tag(s.status)}</td>
+                <td>${s.updatedAt || "—"}</td>
+                <td>${isChannelRole() ? `<button type="button" class="link-btn" data-edit-lease-pkg="${s.id}">编辑</button>` : "—"}</td>
+              </tr>`).join("") : `<tr><td colspan="7">暂无匹配 SKU</td></tr>`}</tbody>
             </table>
           </div>
         </section>`;
@@ -17881,46 +17996,11 @@
       root.querySelectorAll("[data-confirm-act-order]").forEach(btn => {
         btn.onclick = () => { if (confirmChannelActivationOrder(btn.dataset.confirmActOrder)) render(); };
       });
+      root.querySelectorAll("[data-new-lease-pkg]").forEach(btn => {
+        btn.onclick = () => openLeasePkgForm("new");
+      });
       root.querySelectorAll("[data-edit-lease-pkg]").forEach(btn => {
-        btn.onclick = () => {
-          const cid = channelEntityId();
-          const skuId = btn.dataset.editLeasePkg;
-          const main = channelLeasePkgSkus.find(s => s.channelId === cid && s.id === skuId);
-          if (!main) return;
-          const modelOpts = BATTERY_MODEL_OPTIONS.length ? BATTERY_MODEL_OPTIONS.slice() : ["48V30Ah"];
-          openProtoForm({
-            title: "编辑白名单套餐",
-            fields: [
-              { name: "skuId", label: "SKU", value: main.id, readonly: true },
-              { name: "batteryModel", label: "电池型号", type: "select", options: modelOpts, value: normalizeBatteryModel(main.batteryModel) },
-              { name: "name", label: "套餐名", value: main.name },
-              { name: "price", label: "零售价（元）", type: "number", value: main.price },
-              { name: "validityDays", label: "有效期（天）", type: "number", value: main.validityDays }
-            ],
-            submitLabel: "保存",
-            onSubmit: (data) => {
-              const price = parseFloat(data.price);
-              const days = parseInt(data.validityDays, 10);
-              const name = (data.name || "").trim() || main.name;
-              const batteryModel = normalizeBatteryModel(data.batteryModel);
-              if (!Number.isFinite(price) || price <= 0) return "请填写有效零售价";
-              if (!Number.isFinite(days) || days <= 0) return "请填写有效天数";
-              if (!modelOpts.includes(batteryModel)) return "请选择启用中的电池型号";
-              const conflict = channelLeasePkgSkus.some(s =>
-                s.channelId === cid && s.id !== main.id
-                && normalizeBatteryModel(s.batteryModel) === batteryModel
-                && s.name === name
-              );
-              if (conflict) return "该渠道下已存在同型号同名套餐";
-              main.name = name;
-              main.batteryModel = batteryModel;
-              main.price = price;
-              main.validityDays = days;
-              main.updatedAt = new Date().toISOString().slice(0, 10);
-              return { successMessage: "已更新 " + main.id + " · " + batteryModel + " · ¥" + price, afterClose: () => render() };
-            }
-          });
-        };
+        btn.onclick = () => openLeasePkgForm(btn.dataset.editLeasePkg);
       });
       root.querySelectorAll("[data-add-whitelist-user]").forEach(btn => {
         btn.onclick = () => {
@@ -19266,6 +19346,13 @@
       if (pricingPkgEl && state.view === "pricing" && state.pricingTab === "pkg") {
         const pf = getPricingPkgPf();
         pf[pricingPkgEl.dataset.pricingPkgPf] = pricingPkgEl.value;
+        render();
+        return;
+      }
+      const leasePkgPfEl = e.target.closest("[data-lease-pkg-pf]");
+      if (leasePkgPfEl && state.view === "leasePkgPricing") {
+        const pf = getLeasePkgPf();
+        pf[leasePkgPfEl.dataset.leasePkgPf] = leasePkgPfEl.value;
         render();
         return;
       }
