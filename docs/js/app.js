@@ -558,7 +558,7 @@
         <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
           <div class="qr-preview" aria-hidden="true">${renderFakeQrCells(link.linkCode)}</div>
           <div style="flex:1;min-width:220px">
-            <p style="margin:0 0 8px;font-size:13px;color:var(--muted)">扫码打开<strong>运营商小程序</strong>（${operatorIdForChannel(link.channelId)}）<br>用户点击链接后 <strong>24h</strong> 内购套餐均享渠道专享价</p>
+            <p style="margin:0 0 8px;font-size:13px;color:var(--muted)">扫码打开<strong>运营商小程序</strong>（${operatorIdForChannel(link.channelId)}）<br>用户点击链接后 <strong>24h</strong> 内<strong>首笔</strong>购套餐享渠道专享价；续费/再次购卡走正式零售价</p>
             <p style="word-break:break-all;font-size:12px;background:var(--surface-soft);padding:8px;border-radius:6px;margin:0">${link.linkUrl}</p>
             <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
               <button type="button" class="btn primary" id="qrDownloadBtn">下载二维码（Mock）</button>
@@ -15847,7 +15847,7 @@
             <div class="panel-body"><ol style="margin:0;padding-left:20px;font-size:13px;color:var(--muted);line-height:1.8">
               <li>运营商与渠道协商各 SKU <strong>渠道专享价</strong>（≤ 正式零售价）与<strong>佣金</strong></li>
               <li>渠道在「套餐与链接」为各套餐<strong>新建多条推广链接</strong>并标注用途；可<strong>生成二维码</strong>；用户扫码/点击<strong>直达运营商小程序</strong></li>
-              <li>用户完成<strong>注册登录与实名认证</strong>后购套餐；点击链接起 <strong>24h</strong> 内购买授权 SKU 均享<strong>渠道专享价</strong></li>
+              <li>用户完成<strong>注册登录与实名认证</strong>后购套餐；点击链接起 <strong>24h</strong> 内<strong>首笔</strong>购授权 SKU 享<strong>渠道专享价</strong>（须无在服个人套餐且此前无个人购卡成交）；<strong>续费与再次购卡</strong>按运营商正式零售价</li>
               <li>支付由<strong>平台代收</strong>至运营商子商户，成功<strong>实时清分</strong> 1%</li>
               <li>${instant
                 ? `已开启<strong>佣金及时到付</strong>：渠道佣金 = 实付 × ${formatCommissionRate(contract?.commissionRate || mode.commissionRate)}，支付成功<strong>即时分账</strong>至渠道收款账户`

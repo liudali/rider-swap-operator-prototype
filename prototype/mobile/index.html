@@ -463,6 +463,7 @@
             <option value="card_link_guest">⋯ 二期 · 骑士卡链接 · 未登录</option>
             <option value="card_link_kyc">⋯ 二期 · 骑士卡链接 · 未实名</option>
             <option value="card_link_attr">⋯ 二期 · 骑士卡链接 · 专享价</option>
+            <option value="card_link_rebuy">⋯ 二期 · 骑士卡链接 · 再次购卡（正式价）</option>
           </optgroup>
         </select>
         <label>扫码站点</label>
@@ -620,6 +621,7 @@
               <option value="card_link_guest">⋯ 骑士卡链接·未登录</option>
               <option value="card_link_kyc">⋯ 骑士卡链接·未实名</option>
               <option value="card_link_attr">⋯ 骑士卡链接·渠道专享价</option>
+              <option value="card_link_rebuy">⋯ 骑士卡链接·再次购卡正式价</option>
             </optgroup>
           </select>
         </div>
@@ -858,6 +860,12 @@
         loggedIn: true, phone: "138****3101", name: "新骑士", userId: "U-L201",
         kyc: true, entitlement: null, status: "未开通", operator: "OP-SX",
         channelAttr: CHANNEL_CARD_ATTR
+      },
+      card_link_rebuy: {
+        loggedIn: true, phone: "138****3102", name: "李复购", userId: "U-L202",
+        kyc: true, entitlement: null, status: "未开通", operator: "OP-SX",
+        channelAttr: CHANNEL_CARD_ATTR,
+        landingNote: "再次从骑士卡链接进入 · 演示重新购卡走正式零售价"
       }
     };
 
@@ -871,7 +879,7 @@
           { id: "P04", title: "购买套餐", role: "none", geo: "auto_unique", hint: "● SKU + 押金二选一（支付分免押/实缴）同笔支付", autoOpen: "pkg" },
           { id: "P05", title: "首次领取电池", role: "pending_pickup", hint: "● 解冻/开通后首次为领取电池（非换电）；押金已在购套餐办结", autoOpen: "scan" },
           { id: "P06", title: "日常换电", role: "personal", hint: "● 扫码换电主路径；写入换电订单", autoOpen: "scan" },
-          { id: "P07", title: "续费", role: "personal", hint: "● 续费原运营商；已办结押金不重复收（演示）", autoOpen: "pkg" },
+          { id: "P07", title: "续费", role: "personal", hint: "● 续费原运营商 · 正式零售价（不适用渠道专享价）", autoOpen: "pkg" },
           { id: "P08", title: "冻结与解冻", role: "frozen", hint: "●/◆ 须先还电；解冻后待领电池并顺延有效期", autoOpen: "mine" },
           { id: "P09", title: "退款/退租/完结", role: "cooling_refund", hint: "● 冷静期申请退款（须还电）；建议退套餐+押金", autoOpen: "mine" }
         ]
@@ -905,7 +913,8 @@
         { id: "SW2605241188", site: "浦东骑手驿站", time: "2026-05-24 08:30", status: "成功", type: "个人套餐", userId: "U1028" }
       ],
       purchaseOrders: [
-        { id: "SUB260524001", pkg: "30天畅换", amount: 398, pkgAmount: 299, depositAmount: 99, time: "2026-05-01 09:12", status: "已支付", userId: "U1028", depositMethod: "实付", depositStatus: "在押" }
+        { id: "SUB260524001", pkg: "30天畅换", amount: 398, pkgAmount: 299, depositAmount: 99, time: "2026-05-01 09:12", status: "已支付", userId: "U1028", depositMethod: "实付", depositStatus: "在押" },
+        { id: "SUB260601088", pkg: "30天畅换·渠道专享", amount: 378, pkgAmount: 279, depositAmount: 99, time: "2026-06-01 14:20", status: "已支付", userId: "U-L202", channel: "骑士卡渠道", linkCode: "qsk-30d-home", depositMethod: "实付", depositStatus: "已退" }
       ],
       returnOrders: [],
       geoScenario: "auto_unique",
@@ -1248,8 +1257,21 @@
       if (tab === "home") renderMapPins();
     }
 
+    function hasPersonalPurchaseHistory(userId) {
+      if (!userId) return false;
+      return state.purchaseOrders.some(o => o.userId === userId);
+    }
+
+    /** 渠道专享价：仅归因窗口内、无在服个人套餐、且从未成交过个人购卡 */
+    function canApplyChannelPrice(u) {
+      if (!u?.channelAttr) return false;
+      if (u.entitlement === "个人套餐" && u.status === "服务中") return false;
+      if (hasPersonalPurchaseHistory(u.userId)) return false;
+      return true;
+    }
+
     function channelAttrForUser(u) {
-      return u?.channelAttr || null;
+      return canApplyChannelPrice(u) ? u.channelAttr : null;
     }
 
     function depositPolicyFor(opId) {
@@ -1446,6 +1468,7 @@
       const u = user();
       const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist;
       const attr = isLeaseWl ? null : channelAttrForUser(u);
+      const attrBlocked = !isLeaseWl && u.channelAttr && !attr;
       const seller = resolveSellerOperator(u);
       const body = document.getElementById("pkgSheetBody");
       const sellerBanner = isLeaseWl && CHANNELS[seller?.channelId]
@@ -1453,7 +1476,11 @@
         : (seller && OPERATORS[seller.operatorId]
           ? `<div class="service-scope-banner" style="margin-bottom:12px">收款方：<strong>${OPERATORS[seller.operatorId].name}</strong> · 子商户 ${OPERATORS[seller.operatorId].subMch}</div>`
           : "");
-      const banner = attr ? `<div class="channel-attr-banner">🟡 <strong>${attr.channelName}</strong> 推广 · ${attr.expiresLabel} 内购套餐享渠道专享价<br><small>首触链接：${attr.linkPurpose}（${attr.linkCode}）</small></div>` : "";
+      const banner = attr
+        ? `<div class="channel-attr-banner">🟡 <strong>${attr.channelName}</strong> 推广 · ${attr.expiresLabel} 内<strong>首笔</strong>购套餐享渠道专享价<br><small>首触链接：${attr.linkPurpose}（${attr.linkCode}）· 续费/再次购卡走正式零售价</small></div>`
+        : (attrBlocked
+          ? `<div class="channel-attr-banner" style="background:#f6f6f6;border-color:#e0e0e0;color:#595959">ℹ️ 当前为<strong>续费或再次购卡</strong>，按运营商<strong>正式零售价</strong>，不适用渠道专享价</div>`
+          : "");
 
       let cards = "";
       let sku = null;
