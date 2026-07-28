@@ -140,7 +140,7 @@
     const CHANNEL_NAV = {
       "CH-SF": ["overview", "channelSettlement", "dayPool", "orderAudit", "channelCredit", "employees"],
       "CH-CARD": ["overview", "channelSettlement", "channelLinks", "channelOrders", "commissionStatement", "accounts", "orderAudit"],
-      "CH-RENT": ["overview", "channelSettlement", "leasePkgPricing", "accounts", "rentPool", "rentDevices", "leaseBatteryHold", "leaseWhitelist", "channelInterOp", "orderAudit", "channelCredit", "employees"],
+      "CH-RENT": ["overview", "channelSettlement", "leasePkgPricing", "leasePkgOrders", "accounts", "rentPool", "rentDevices", "leaseBatteryHold", "leaseWhitelist", "channelInterOp", "orderAudit", "channelCredit", "employees"],
       "CH-ACT": ["overview", "channelSettlement", "activationCodes", "activationRecords", "orderAudit", "channelCredit", "employees"]
     };
 
@@ -165,7 +165,7 @@
       leaseAgreements: "协议与设备", leaseCollect: "租金收缴", leaseRent: "月租金",
       financeManage: "融资管理", financeDrawdown: "放款申请",
       accounts: "收款账户", dayPool: "人天额度池", channelSettlement: "结算模式说明", channelCredit: "渠道信用额度",
-      channelLinks: "套餐与链接", channelOrders: "购卡记录", commissionStatement: "佣金对账", rentPool: "月租账单", rentDevices: "租赁设备", leaseBatteryHold: "电池持有", leaseWhitelist: "白名单用户", leasePkgPricing: "白名单套餐", channelInterOp: "跨网往来账",
+      channelLinks: "套餐与链接", channelOrders: "购卡记录", commissionStatement: "佣金对账", rentPool: "月租账单", rentDevices: "租赁设备", leaseBatteryHold: "电池持有", leaseWhitelist: "白名单用户", leasePkgPricing: "白名单套餐", leasePkgOrders: "白名单订单", channelInterOp: "跨网往来账",
       activationCodes: "激活码", activationRecords: "核销记录",
       pricing: "平台设置", channelSales: "渠道管理", platformService: "平台服务", depositAccount: "服务保证金账户", interOp: "运营商往来账", platformFee: "平台服务费",
       operators: "运营商管理", platformLeasing: "租赁公司", operatorCreditEval: "运营商信用评估", depositManage: "保证金管理", deviceBinding: "设备绑定", l1Pricing: "平台统价",
@@ -203,7 +203,7 @@
       "rent_devices.view": ["rentDevices", "orderAudit"],
       "lease_whitelist.view": ["leaseWhitelist", "orderAudit"],
       "channel_inter_op.view": ["channelInterOp", "orderAudit"],
-      "lease_pkg.view": ["leasePkgPricing", "orderAudit"],
+      "lease_pkg.view": ["leasePkgPricing", "leasePkgOrders", "orderAudit"],
       "lease_battery.view": ["leaseBatteryHold", "orderAudit"],
       "pricing.view": ["pricing"], "pricing.edit": ["pricing"],
       "channel_sales.view": ["channelSales"],
@@ -274,7 +274,8 @@
       rentPool: ["月租账单", "向运营商支付设备月租（MO-）；欠费停服。"],
       rentDevices: ["租赁设备", "柜机/电池 SN 与部署站点；月租为签约统一价。"],
       leaseWhitelist: ["白名单用户", "扁平名单 · 无团队 · 渠道自行维护；区分<strong>白名单免费</strong>与<strong>白名单付费</strong>（须购白名单套餐）。"],
-      leasePkgPricing: ["白名单套餐", "渠道自定 SKU 与零售价；<strong>仅白名单用户</strong>可购；款项进入<strong>本渠道收款账户</strong>。"],
+      leasePkgPricing: ["白名单套餐", "渠道自定 SKU · 绑定<strong>电池型号</strong>与零售价；<strong>仅白名单用户</strong>可购；款项进入<strong>本渠道收款账户</strong>。"],
+      leasePkgOrders: ["白名单订单", "白名单用户购套餐流水；订单快照含<strong>电池型号</strong>；收款方为本渠道子商户。"],
       channelInterOp: ["渠道跨网往来账", "设备租赁渠道开通跨网后，骑手在他网换电的跨网设备服务费经平台代收代付。"],
       platformFee: ["平台服务费", "页内 Tab：费用总览 / C 端支付分账 / B 端消耗计提。"],
       operators: ["运营商管理", "二级：运营商列表 / 提现审核 / 平台服务费 / 渠道商管理。主体维护、账户汇总、准入档位；渠道商全平台只读监管。"],
@@ -285,7 +286,7 @@
       l1Pricing: ["平台统价", "二级：跨网服务费（含城市覆盖） / 人天标准日值（含城市覆盖） / 预警短信。"],
       platformUsers: ["用户管理", "二级菜单：用户信息 / 用户押金统计 / 服务变更。"],
       platformOrders: ["订单管理", "全平台套餐购买、换电与渠道批发订单查询与追溯。"],
-      platformDevices: ["设备管理", "二级：电柜 / 电池。全量台账；「批量导入」弹窗：先选运营商，再手工填 SN 或上传 SN 表格（类型/参数 IoT 回填）。"],
+      platformDevices: ["设备管理", "二级：电柜 / 电池 / 电池型号管理。台账批量导入；型号字典由平台统一设定。"],
       platformChannels: ["渠道商管理", "已并入「运营商管理 → 渠道商管理」；全平台渠道商查询与监管；主体由签约运营商创建维护，平台只读。"],
       platformMarketing: ["平台营销", "【二期】立减券获客；购时锁 OP；款进运营商（不代收）；券面价差默认运营商让利；1% + 营销服务费协议结算。一期不交付，原型仅演示。"],
       platformFlows: ["流水管理", "用户支付记录、运营商间跨网清分、平台提成。"],
@@ -325,11 +326,11 @@
       data_drill_panel: { title: "换电订单数", content: "紧凑卡片：按日换电订单数（含当日）。<br>· <strong>平台总览</strong>：先筛运营商，再筛该运营商下站点（切换运营商时站点重置为全部）<br>· 时间范围默认近 7 天，可选近 30 天或自定义（最多 31 天）" },
       data_drill_spark: { title: "换电订单折线图", content: "按所选站点与日期区间生成每日 Mock 换电订单数；右侧合计为区间之和；最高/最低取自序列。正式环境对接按日聚合 API（含当日）。" },
       platform_no_share: { title: "平台运营分成", content: "骑手套餐/换电应分台账记录运营商本站经营应得。平台收取 1% 技术服务费（C 端支付分账 + B 端确认消耗计提），见「平台服务费」。" },
-      pricing_pkg: { title: "个人套餐定价", content: "唯一键=<strong>运营商×城市×电池型号×SKU</strong>（decision-085）。电池型号为规格串（48V20Ah / 48V30Ah / 60V30Ah），与台账对齐；不同型号可独立有效期/零售价/状态。<strong>无一单通兑</strong>。一期可选套餐名（暂定）：包月30天、7天套餐、1天套餐、单次换电。渠道骑手<strong>不</strong>走个人套餐自费兜底。<strong>价格分区</strong>为<strong>二期</strong>。" },
+      pricing_pkg: { title: "个人套餐定价", content: "唯一键=<strong>运营商×城市×电池型号×SKU</strong>（decision-085/088）。电池型号取自平台「设备管理 → 电池型号管理」启用字典；不同型号可独立有效期/零售价/状态。<strong>无一单通兑</strong>。一期可选套餐名（暂定）：包月30天、7天套餐、1天套餐、单次换电。渠道骑手<strong>不</strong>走个人套餐自费兜底。<strong>价格分区</strong>为<strong>二期</strong>。" },
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
       channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
-      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。<strong>分销商-链接类</strong>（结算模式=链接类）：授权套餐与专享价在「平台设置 → 渠道分销价」维护；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。<strong>分销商-激活码</strong>为二期。平台仅查询监管。" },
+      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。<strong>分销商·链接类</strong>（结算模式=链接类）：授权套餐与专享价在「平台设置 → 渠道分销价」维护；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。<strong>分销商·激活码</strong>为二期。平台仅查询监管。" },
       login_portal: { title: "登录分流与改密", content: "登录页区分<strong>运营商登录</strong>与<strong>渠道商登录</strong>。账号均为手机号+密码。修改密码页：手机号 → 获取验证码 → 新密码（≥6 位）→ 返回登录；演示验证码固定 888888。" },
       day_pool_one_per_operator: { title: "一运营商一池", content: "渠道商 × 运营商 = <strong>唯一</strong> `DayPool`。向第二家运营商签约才新增池；增购、赠送、退款、分配、预占/确认等均写入<strong>额度变动记录</strong>，不新建第二池。" },
       day_pool_b2b_settlement: { title: "B2B 资金与平台计提", content: "渠道<strong>采购/到账时</strong>批发款已是运营商收入（在线 T+0/T+1 或线下确认）。骑手<strong>确认消耗</strong>仅扣池余额，<strong>不向运营商二次打款</strong>；平台按标准人天价 × 1% 向额度售卖方计提（见「平台服务费」）。" },
@@ -470,7 +471,7 @@
 
       channel_settlement_card: { title: "渠道分销（骑士卡）", content: "渠道为<strong>推广销售渠道</strong>：用户经推广链接/二维码进入<strong>运营商小程序</strong>，24h 内购套餐享<strong>渠道专享价</strong>。<br><strong>本月成交</strong>=筛选月 channelLinkOrders 笔数；<strong>本月应结佣</strong>=Σ commission；<strong>推广链接</strong>点击/成交=各 link 累计 clicks/conversions。" },
       channel_settlement_rent: { title: "设备租赁", content: "运营商维护<strong>租赁设备清单</strong>与<strong>专属站点</strong>；签约<strong>统一月租</strong>（MO→运营商）。渠道视为<strong>小型运营商</strong>：设备为租赁资产，可配置<strong>跨网换电</strong>（须向平台缴纳保证金）。白名单分<strong>免费</strong>（B2B 覆盖）与<strong>付费</strong>（须购白名单套餐）。" },
-      lease_whitelist_pkg: { title: "白名单套餐", content: "仅<strong>白名单付费</strong>类型用户须购买。渠道在「白名单套餐」维护 SKU；支付进<strong>渠道收款账户</strong>。白名单免费用户无需购套餐。" },
+      lease_whitelist_pkg: { title: "白名单套餐", content: "仅<strong>白名单付费</strong>类型用户须购买。渠道在「白名单套餐」维护 SKU（须绑定<strong>电池型号</strong>）；「白名单订单」查购套餐流水。支付进<strong>渠道收款账户</strong>。白名单免费用户无需购套餐。无一单通兑全型号。" },
       lease_whitelist: { title: "白名单用户", content: "渠道自行维护扁平名单。<strong>白名单免费</strong>：入名单即可换电（月租 B2B 覆盖）。<strong>白名单付费</strong>：须购有效白名单套餐方可换电。添加时选择类型。" },
       lease_whitelist_access: { title: "白名单类型", content: "<strong>白名单免费</strong>：渠道 B2B 月租已覆盖，名单内骑手免 C 端购套餐即可换电。<br><strong>白名单付费</strong>：名单内骑手须购买「白名单套餐」（款进渠道子商户）后换电；未购套餐扫码引导购买。" },
       channel_lease_crossnet: { title: "设备租赁 · 跨网换电", content: "渠道商在设备租赁模式下可视为<strong>小型运营商</strong>：名下骑手 userOwner=渠道。开通跨网后，骑手在他网换电产生<strong>跨网设备服务费</strong>，由渠道向平台保证金/信用额度支付（规则同运营商）。<br><strong>开通条件</strong>：向平台缴纳跨网保证金（演示 ¥20,000）。" },
@@ -480,7 +481,7 @@
       channel_card_margin: { title: "佣金对账", content: "按<strong>自然月</strong>汇总经推广链接成交订单。<br><strong>佣金及时到付</strong>：支付成功已分账至渠道子商户，月度汇总「结算状态」展示「已即时分账」。<br><strong>线下结算</strong>：应结佣金=Σ commission；由运营商与渠道线下结；月度汇总「结算状态」为 ——（decision-074）。平台 1%=Σ pay×1%。" },
       channel_card_accounts: { title: "骑士卡收款账户", content: "一期能力（decision-064）。<strong>即时到付</strong>：须开通微信/支付宝子商户并绑定对公，接收佣金分账。<strong>线下结算</strong>：购卡款进运营商；渠道仍须维护对公账户，供运营商按对账线下打佣。" },
       channel_instant_commission: { title: "佣金及时到付", content: "仅<strong>渠道分销（骑士卡）</strong>签约可开。运营商在「渠道管理 → 签约渠道」开启；须渠道绑定收款账户并完成微信/支付宝进件。开启后设置<strong>渠道佣金比例</strong>。<br><strong>变更（decision-065）</strong>：即时↔线下切换于<strong>次日 00:00</strong>生效，保存时须确认提示；历史订单不回溯；对账月度汇总按结算方式<strong>拆行</strong>。" },
-      pricing_card: { title: "渠道分销价", content: "同一运营商可签多个<strong>分销商-链接类</strong>渠道，各渠道独立维护授权 SKU（须绑定<strong>电池型号</strong>，继承城市底价型号）、正式价、<strong>专享价</strong>与佣金。「平台设置 → 渠道分销价」为<strong>唯一</strong>维护入口（签约资料页不再配价，decision-084/085）；签约档案在「渠道管理 → 签约渠道」。专享价 ≤ 正式零售价。" },
+      pricing_card: { title: "渠道分销价", content: "同一运营商可签多个<strong>分销商·链接类</strong>渠道，各渠道独立维护授权 SKU（须绑定<strong>电池型号</strong>，继承城市底价型号）、正式价、<strong>专享价</strong>与佣金。「平台设置 → 渠道分销价」为<strong>唯一</strong>维护入口（签约资料页不再配价，decision-084/085）；签约档案在「渠道管理 → 签约渠道」。专享价 ≤ 正式零售价。" },
       day_pool_panel: { title: "人天额度池", content: "渠道商向签约运营商批发换电人天额度。<br><strong>可用</strong>=Σ DayPool.availableDays；<strong>预占中</strong>=Σ frozenDays。00:00 预占 → 换电/持电池确认消耗 → 日终释放未消耗预占。" },
       day_pool_reserve: { title: "预占与确认消耗", content: "天级模式：每日 00:00 预占 1 人天。当日<strong>有换电或持有电池</strong>→确认消耗 1 人天（每骑手每日 1 条记录）；<strong>无换电且未持电池</strong>→日终释放。同一骑手同一天只扣 1 人天，但记录当日换电次数。" },
       day_pool_consume: { title: "骑手日消耗（渠道商说明）", content: "每骑手每个自然日最多 1 条确认消耗记录，含<strong>当日换电次数</strong>与<strong>持有电池数</strong>。<br><br><strong>判定规则</strong>：① 当天有换电 → 确认消耗；② 当天未换电但<strong>持有电池</strong> → 仍视为使用服务，确认消耗；③ 不持有电池且未换电 → 不产生消耗，日终释放预占。" },
@@ -506,7 +507,8 @@
       platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、进件账户摘要、平台保证金与信用额度。运营商在登录页选「运营商登录」凭手机号进入；登录后仅见本人经营数据。" },
       platform_leasing_companies: { title: "设备租赁公司", content: "平台管理员维护出租方主体档案（可<strong>多家并存</strong>）。前期演示环境以「华东设备租赁公司」为主；架构支持后续接入更多租赁公司。" },
       platform_lease_binding: { title: "租赁关系绑定", content: "平台管理员建立「租赁公司 ↔ 运营商」绑定后，该租赁公司方可向该运营商发起租赁协议签约。<strong>运营商</strong>承租信息来源于平台运营商档案；一运营商可同时与多家租赁公司建立绑定并分别签约。" },
-      platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。<br>设备管理分 <strong>电柜 / 电池</strong> 两个二级 Tab；电池列表含 SOC、SOH、<strong>当前位置</strong>（电柜 / 用户 / 柜外）、归属日、导入日期。" },
+      platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。<br>设备管理分 <strong>电柜 / 电池 / 电池型号管理</strong>；电池列表规格取自平台型号字典。" },
+      platform_battery_models: { title: "电池型号管理", content: "由<strong>平台管理员</strong>统一维护电池型号字典（规格串如 48V30Ah）。运营商定价、套餐 SKU、设备台账规格均引用本字典启用项；停用后不可再新建定价，已有数据仍可展示历史型号。" },
       platform_l1_pricing: { title: "跨网服务费", content: "柜机/电池服务费<strong>全网默认价</strong> + <strong>城市覆盖价</strong>由平台发布；跨运营商换电清分按此单价；城市价优先；改价不追溯。" },
       platform_day_standard: { title: "人天标准日值", content: "全网默认日值 + <strong>城市覆盖</strong>；B 端 1% 计提基数；亦为运营商默认批发价（可改）。" },
       platform_stats: { title: "业务汇总", content: "全平台 Mock 汇总：<br>· <strong>业务快照（不受统计范围）</strong>：运营商、渠道商、在营站点、设备<br>· <strong>经营指标（随统计范围缩放）</strong>：用户、套餐订单、换电成功、业务流水、平台营收（演示：今日×1 / 近7日×5.2 / 近30日×18）<br>· 业务流水=套餐实付+渠道 B2B 批发 · 平台营收=Σ(C 端实付×1%) + Σ(B 端确认消耗×标准人天价×1%)" },
@@ -576,7 +578,8 @@
       rentDevices: ["module_rent_devices", "channel_settlement_rent", "lease_dedicated_site"],
       leaseBatteryHold: ["lease_battery_hold", "channel_settlement_rent"],
       leaseWhitelist: ["lease_whitelist", "lease_whitelist_access", "channel_settlement_rent", "lease_whitelist_pkg"],
-      leasePkgPricing: ["lease_whitelist_pkg", "lease_whitelist_access", "channel_settlement_rent"],
+      leasePkgPricing: ["lease_whitelist_pkg", "lease_whitelist_access", "channel_settlement_rent", "platform_battery_models"],
+      leasePkgOrders: ["lease_whitelist_pkg", "channel_settlement_rent"],
       channelInterOp: ["channel_inter_op", "channel_lease_crossnet", "inter_op_privacy"],
       operators: ["platform_operators", "operator_credit_eval", "accounts", "platform_withdraw_review", "platform_operator_fee_rate", "platform_channels", "channel_partner_manage", "channel_no_receipt"],
       operatorCreditEval: ["operator_credit_eval"],
@@ -585,7 +588,7 @@
       l1Pricing: ["platform_l1_pricing", "platform_day_standard", "platform_standard_day_price", "day_pool_warn", "inter_op_pricing"],
       platformUsers: ["platform_users", "platform_users_info", "platform_users_deposit_stats", "rider_battery_deposit", "platform_users_battery", "platform_users_freeze", "orders_service_change"],
       platformOrders: ["platform_orders", "platform_channel_po"],
-      platformDevices: ["platform_device_bind", "platform_devices_import", "platform_operator_device_gate", "platform_devices_battery_belong", "platform_device_bound_at", "platform_device_imported_at"],
+      platformDevices: ["platform_device_bind", "platform_devices_import", "platform_operator_device_gate", "platform_devices_battery_belong", "platform_device_bound_at", "platform_device_imported_at", "platform_battery_models"],
       platformChannels: ["platform_channels", "channel_partner_manage", "channel_no_receipt"],
       platformMarketing: ["platform_marketing", "platform_marketing_collect", "platform_marketing_payout"],
       platformFlows: ["platform_flows", "platform_fee"],
@@ -824,6 +827,31 @@
       { sn: "BAT-SH-0901", site: "浦东骑手驿站", city: "上海", soc: 96, soh: 99, health: "正常", inCab: "CAB-22018", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
       { sn: "BAT-BJ-1001", site: "滨江换电站", city: "上海", soc: 94, soh: 99, health: "正常", inCab: "CAB-BJ-01", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" }
     ];
+
+    /** 平台统一电池型号字典（decision-088；定价/台账规格串同源） */
+    const platformBatteryModels = [
+      { id: "BM-48V20", code: "48V20Ah", name: "48V20Ah", voltage: 48, capacityAh: 20, status: "启用", updatedAt: "2026-05-01", remark: "轻载规格" },
+      { id: "BM-48V30", code: "48V30Ah", name: "48V30Ah", voltage: 48, capacityAh: 30, status: "启用", updatedAt: "2026-05-01", remark: "主流规格" },
+      { id: "BM-60V30", code: "60V30Ah", name: "60V30Ah", voltage: 60, capacityAh: 30, status: "启用", updatedAt: "2026-05-01", remark: "大容量规格" }
+    ];
+
+    (function seedBatterySpecsFromModels() {
+      const codes = platformBatteryModels.filter(m => m.status === "启用").map(m => m.code);
+      if (!codes.length) return;
+      const seen = new Set();
+      batteries.forEach((b, i) => {
+        if (seen.has(b.sn)) return;
+        seen.add(b.sn);
+        if (!b.specs && !b.batteryModel) {
+          b.specs = codes[i % codes.length];
+          b.batteryModel = b.specs;
+        } else if (b.specs && !b.batteryModel) {
+          b.batteryModel = b.specs;
+        } else if (b.batteryModel && !b.specs) {
+          b.specs = b.batteryModel;
+        }
+      });
+    })();
 
     /** 平台台账日期：importedAt=首次导入平台；boundAt=归属当前运营商之日（无运营商则空） */
     (function seedPlatformDeviceDates() {
@@ -2297,12 +2325,14 @@
       { id: "U4004", channelId: "CH-RENT", name: "赵夜配", phone: "136****4004", whitelistAccess: "paid", pkgStatus: "已失效", swaps: 0, status: "已移除", addedAt: "2026-01-20", addedBy: "渠道管理员", lastSwap: "—" }
     ];
     const channelLeasePkgSkus = [
-      { channelId: "CH-RENT", id: "LP-30", name: "30天畅换 · 白名单专享", price: 299, validityDays: 30, status: "上架", updatedAt: "2026-06-01" },
-      { channelId: "CH-RENT", id: "LP-7", name: "7天体验套餐", price: 89, validityDays: 7, status: "上架", updatedAt: "2026-06-01" }
+      { channelId: "CH-RENT", id: "LP-30", name: "30天畅换 · 白名单专享", batteryModel: "48V30Ah", price: 299, validityDays: 30, status: "上架", updatedAt: "2026-06-01" },
+      { channelId: "CH-RENT", id: "LP-30B", name: "30天畅换 · 白名单专享", batteryModel: "60V30Ah", price: 349, validityDays: 30, status: "上架", updatedAt: "2026-07-28" },
+      { channelId: "CH-RENT", id: "LP-7", name: "7天体验套餐", batteryModel: "48V30Ah", price: 89, validityDays: 7, status: "上架", updatedAt: "2026-06-01" }
     ];
     const channelLeasePkgOrders = [
-      { id: "LC-260610-01", channelId: "CH-RENT", userId: "U4001", userName: "张配送", phone: "139****4001", skuName: "30天畅换 · 白名单专享", amount: 299, payTime: "2026-06-10 09:12", status: "已支付", subMch: "1678901234***" },
-      { id: "LC-260605-02", channelId: "CH-RENT", userId: "U4002", userName: "李配送", phone: "138****4002", skuName: "30天畅换 · 白名单专享", amount: 299, payTime: "2026-06-05 18:40", status: "已支付", subMch: "1678901234***" }
+      { id: "LC-260610-01", channelId: "CH-RENT", userId: "U4001", userName: "张配送", phone: "139****4001", skuId: "LP-30", skuName: "30天畅换 · 白名单专享", batteryModel: "48V30Ah", amount: 299, payTime: "2026-06-10 09:12", status: "已支付", subMch: "1678901234***" },
+      { id: "LC-260605-02", channelId: "CH-RENT", userId: "U4002", userName: "李配送", phone: "138****4002", skuId: "LP-30", skuName: "30天畅换 · 白名单专享", batteryModel: "48V30Ah", amount: 299, payTime: "2026-06-05 18:40", status: "已支付", subMch: "1678901234***" },
+      { id: "LC-260720-03", channelId: "CH-RENT", userId: "U4002", userName: "李配送", phone: "138****4002", skuId: "LP-30B", skuName: "30天畅换 · 白名单专享", batteryModel: "60V30Ah", amount: 349, payTime: "2026-07-20 11:05", status: "已支付", subMch: "1678901234***" }
     ];
     const channelRentRiders = channelLeaseWhitelist;
     const channelRentLedger = [
@@ -2843,6 +2873,7 @@
       platformOrders_channel: { orderId: "", channelId: "全部", payChannel: "全部", orderStatus: "全部", payStatus: "全部" },
       platformDevices_cabinet: { keyword: "", operatorId: "全部", online: "全部" },
       platformDevices_battery: { keyword: "", operatorId: "全部", belong: "全部" },
+      platformDevices_models: { keyword: "", status: "全部" },
       platformDevices_ledger: { keyword: "", operatorId: "全部" },
       platformDevices_import: {},
       platformDevices_pending: { keyword: "", type: "全部" },

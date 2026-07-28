@@ -105,76 +105,16 @@
 
   <script src="vendor/marked.min.js"></script>
   <script src="vendor/mermaid.min.js"></script>
+  <script src="../js/doc-catalog.js"></script>
   <script>
-    const DOC_GROUPS = [
-      {
-        title: "结构与清单",
-        items: [
-          { file: "功能结构与业务流程.md", label: "功能结构与业务流程" },
-          { file: "角色与功能清单.md", label: "角色与功能清单" },
-          { file: "业务整体预览图.md", label: "业务整体预览图" }
-        ]
-      },
-      {
-        title: "产品需求",
-        items: [
-          { file: "PRD.md", label: "后台 PRD" },
-          { file: "产品变更记录.md", label: "产品变更记录" },
-          { file: "站点经营分析-Mock字段清单.md", label: "站点经营分析 · Mock 字段" },
-          { file: "骑手端PRD.md", label: "骑手端 PRD" },
-          { file: "user-stories.md", label: "用户故事" },
-          { file: "acceptance-criteria.md", label: "验收标准" },
-          { file: "最小埋点清单.md", label: "最小埋点清单" },
-          { file: "设计评审报告.md", label: "设计评审报告" },
-          { file: "2026-06-16会议对齐决议.md", label: "会议对齐决议" },
-          { file: "需求评审决策记录.md", label: "需求评审决策记录" },
-          { file: "税筹与分账结构参考方案.md", label: "税筹参考方案" }
-        ]
-      },
-      {
-        title: "业务与结算",
-        items: [
-          { file: "换电场景与运营商结算.md", label: "换电场景与运营商结算" },
-          { file: "合作模式与分账.md", label: "合作模式与分账" },
-          { file: "运营商提现规则.md", label: "运营商提现规则" },
-          { file: "换电范围策略.md", label: "换电范围策略" },
-          { file: "天数池.md", label: "人天额度池" },
-          { file: "渠道结算模式规则.md", label: "渠道结算模式规则" },
-          { file: "渠道信用评估方案.md", label: "渠道信用评估方案" },
-          { file: "渠道骑手可换电校验.md", label: "渠道骑手可换电校验" },
-          { file: "额度池PRD差异清单.md", label: "额度池 PRD 差异清单" },
-          { file: "个人套餐定价与退款.md", label: "个人套餐定价与退款" }
-        ]
-      },
-      {
-        title: "竞品与任务",
-        items: [
-          { file: "站点合伙人.md", label: "站点合伙人" },
-          { file: "站点合伙人-Mock字段清单.md", label: "站点合伙人 · Mock 字段" },
-          { file: "站点合伙人-待定.md", label: "站点合伙人 · 历史索引" },
-          { file: "合伙人站点分佣.md", label: "合伙人站点分佣" },
-          { file: "竞品功能清单.md", label: "竞品功能清单" },
-          { file: "竞品借鉴决策记录.md", label: "竞品借鉴决策" },
-          { file: "竞品借鉴-待评审拍板.md", label: "竞品借鉴 · 拍板决议" },
-          { file: "任务-订单变更审计.md", label: "任务 · 订单变更审计" },
-          { file: "任务-设备告警与ICCID.md", label: "任务 · 设备告警与 ICCID" }
-        ]
-      },
-      {
-        title: "待确认",
-        items: [
-          { file: "待考虑内容.md", label: "待考虑内容" }
-        ]
-      }
-    ];
+    const DOC_GROUPS = DocCatalog.DOC_GROUPS;
 
     function docFileUrl(file) {
-      const parts = file.split("/").map(encodeURIComponent);
-      return new URL("md/" + parts.join("/"), location.href).href;
+      return DocCatalog.docFileUrlFromDocsPage(file);
     }
 
     function allDocs() {
-      return DOC_GROUPS.flatMap(g => g.items);
+      return DocCatalog.allDocs();
     }
 
     let currentDocFile = "";
@@ -219,6 +159,14 @@
       const match = raw.match(/^(.+?\.md)(?:#(.*))?$/);
       if (match) return { file: match[1], anchor: match[2] || "" };
       return { file: raw.endsWith(".md") ? raw : "PRD.md", anchor: "" };
+    }
+
+    function parseFileQuery() {
+      try {
+        const f = new URLSearchParams(location.search).get("file");
+        if (f && f.endsWith(".md")) return decodeURIComponent(f);
+      } catch (_) { /* ignore */ }
+      return "";
     }
 
     function resolveDocLink(href, baseFile) {
@@ -394,8 +342,14 @@
       loadDoc(resolved.file, true, resolved.anchor);
     });
 
-    const { file: initialFile, anchor: initialAnchor } = parseLocationHash();
-    loadDoc(initialFile.endsWith(".md") ? initialFile : "PRD.md", false, initialAnchor);
+    const fileFromQuery = parseFileQuery();
+    const { file: hashFile, anchor: initialAnchor } = parseLocationHash();
+    const initialFile = fileFromQuery || (hashFile.endsWith(".md") ? hashFile : "PRD.md");
+    loadDoc(initialFile, !fileFromQuery, initialAnchor);
+    if (fileFromQuery) {
+      history.replaceState(null, "", "?file=" + encodeURIComponent(fileFromQuery) + (initialAnchor ? "#" + initialAnchor : ""));
+      setDocHash(fileFromQuery, initialAnchor || "", false);
+    }
     window.addEventListener("hashchange", () => {
       const { file, anchor } = parseLocationHash();
       if (file && file.endsWith(".md")) loadDoc(file, false, anchor);

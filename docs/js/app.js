@@ -1321,7 +1321,9 @@
       if (state.view === "l1Pricing") return "l1Pricing_" + (state.l1PricingTab || "crossNet");
       if (state.view === "platformFlows") return "platformFlows_" + state.platformFlowTab;
       if (state.view === "platformDevices") {
-        const t = state.platformDeviceTab === "battery" ? "battery" : "cabinet";
+        const t = state.platformDeviceTab === "battery" ? "battery"
+          : state.platformDeviceTab === "models" ? "models"
+          : "cabinet";
         return "platformDevices_" + t;
       }
       if (state.view === "platformChannels") return "platformChannels_list";
@@ -3996,6 +3998,10 @@
         { key: "operatorId", label: "归属运营商", type: "select", options: () => platformOperatorOptions() },
         { key: "belong", label: "当前位置", type: "select", options: [{ v: "全部", t: "全部" }, { v: "电柜", t: "电柜" }, { v: "用户", t: "用户" }, { v: "柜外", t: "柜外" }] }
       ],
+      platformDevices_models: [
+        { key: "keyword", label: "型号/备注", placeholder: "48V30Ah" },
+        { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "启用", t: "启用" }, { v: "停用", t: "停用" }] }
+      ],
       platformDevices_ledger: [
         { key: "keyword", label: "设备 SN", placeholder: "CAB-/BAT-" },
         { key: "operatorId", label: "归属运营商", type: "select", options: () => platformOperatorOptions() }
@@ -5391,7 +5397,7 @@
       "financeManage", "financeDrawdown", "platformLeasing", "operatorCreditEval",
       "leaseAgreements", "leaseCollect", "leaseRent",
       "activationCodes", "activationRecords",
-      "leasePkgPricing", "rentPool", "rentDevices", "leaseBatteryHold", "leaseWhitelist", "channelInterOp",
+      "leasePkgPricing", "leasePkgOrders", "rentPool", "rentDevices", "leaseBatteryHold", "leaseWhitelist", "channelInterOp",
       "platformMarketing",
       "channelSettlement", "channelCredit",
       "partnerOverview", "partnerBindings", "partnerLedger", "partnerWithdraw", "partnerAccount"
@@ -5450,14 +5456,14 @@
       if (mode === "激活码") {
         return {
           short: "二期",
-          label: "分销商-激活码",
+          label: "分销商·激活码",
           detail: "激活码：渠道申请批发 → 确认到账按单造码 → 标记发放 / 核销 / 作废审批。整条模式标为二期，一期不交付，原型演示闭环。"
         };
       }
       if (mode === "设备租赁") {
         return {
           short: "二期",
-          label: "渠道商 · 设备租赁",
+          label: "客户·设备租赁",
           detail: "白名单套餐、月租账单、租赁设备、电池持有等整条渠道模式标为二期。一期不交付，原型仅演示。"
         };
       }
@@ -5544,11 +5550,11 @@
     /** 角色/类型展示名（与结算模式列区分；decision-084） */
     function channelTypeLabel(mode) {
       const m = mode || "人天池";
-      if (m === "链接类") return "分销商-链接类";
-      if (m === "激活码") return "分销商-激活码";
-      if (m === "设备租赁") return "渠道商 · 设备租赁";
-      if (m === "人天池") return "渠道商 · 人天池";
-      return "渠道商 · " + m;
+      if (m === "链接类") return "分销商·链接类";
+      if (m === "激活码") return "分销商·激活码";
+      if (m === "设备租赁") return "客户·设备租赁";
+      if (m === "人天池") return "客户·人天池";
+      return "客户·" + m;
     }
 
     function phase2BannerHtml() {
@@ -5626,7 +5632,7 @@
           tabs: [["crossNet", "跨网服务费"], ["dayPrice", "人天标准日值"], ["sms", "预警短信"]]
         },
         platformUsers: { stateKey: "platformUsersTab", tabs: [["info", "用户信息"], ["depositStats", "用户押金统计"], ["serviceChange", "服务变更"]] },
-        platformDevices: { stateKey: "platformDeviceTab", tabs: [["cabinet", "电柜"], ["battery", "电池"]] },
+        platformDevices: { stateKey: "platformDeviceTab", tabs: [["cabinet", "电柜"], ["battery", "电池"], ["models", "电池型号管理"]] },
         platformLeasing: { stateKey: "platformLeasingTab", tabs: [["companies", "租赁公司"], ["bindings", "租赁关系绑定"]] },
         platformOrders: { stateKey: "platformOrderTab", tabs: [["package", "套餐购买订单"], ["swap", "换电订单"], ["channel", "渠道商订单"]] },
         platformMarketing: { stateKey: "platformMarketingTab", tabs: [["campaigns", "活动管理"], ["agreements", "运营商签约"], ["links", "链接与二维码"], ["pending", "成交订单"], ["settlements", "券核销结算"], ["statements", "营销对账"]] },
@@ -5763,6 +5769,252 @@
       return "";
     }
 
+    /** 文档搜索面板：解析当前页上下文 key（与 Tab 对齐） */
+    function resolveDocSearchViewKey() {
+      if (state.view === "orderService") {
+        const t = state.orderServiceTab || "package";
+        const map = {
+          package: "orderPackage", swap: "orderSwap", userDeposit: "orderUserDeposit",
+          freeze: "orderFreeze", audit: "orderAudit", refund: "refundManage"
+        };
+        return map[t] || "orderService";
+      }
+      if (state.view === "refundManage") return "refundManage";
+      if (state.view === "dayPool") {
+        const tab = state.dayPoolTab || "pools";
+        if (tab === "pools") {
+          return (state.dayPoolPoolsSubTab || "list") === "ledger" ? "dayPool_ledger" : "dayPool_pools";
+        }
+        if (tab === "riders") {
+          return (state.dayPoolRidersSubTab || "list") === "teams" ? "dayPool_teams" : "dayPool_riders";
+        }
+        if (tab === "allocations") {
+          return (state.dayPoolAllocSubTab || "riders") === "logs" ? "dayPool_alloc_logs" : "dayPool_alloc";
+        }
+        if (tab === "consume") return "dayPool_consume";
+        if (tab === "retail") return "dayPool_retail";
+        if (tab === "exceptions") return "dayPool_exceptions";
+        return "dayPool";
+      }
+      if (state.view === "sites") {
+        const t = state.siteManageTab || "info";
+        if (t === "partners") return "sitePartners";
+        if (t === "fees" || t === "bills") return "siteExpenses";
+        return "sites";
+      }
+      if (state.view === "platformService") {
+        const tab = state.platformServiceTab || "deposit";
+        if (tab === "fee") return "platformFee";
+        if (tab === "deposit") return "depositAccount";
+        if (String(tab).startsWith("inter")) return "interOp";
+        return "platformService";
+      }
+      if (state.view === "operators" && (state.operatorsTab || "list") === "channels") return "platformChannels";
+      return state.view;
+    }
+
+    function notifyDocSearchContext(pageTitle, pageDesc) {
+      if (!window.DocSearchPanel || typeof DocSearchPanel.setContext !== "function") return;
+      const key = resolveDocSearchViewKey();
+      const title = pageTitle || navLabel(key) || navLabel(state.view) || "";
+      const keywords = (window.DocCatalog && DocCatalog.keywordsForView)
+        ? DocCatalog.keywordsForView(key, title)
+        : (title ? [title] : []);
+
+      const roleMeta = ROLE[state.role] || ROLE.operator;
+      let roleLabel = roleMeta.type || "—";
+      if (state.role === "channel") {
+        const ch = channelProfile();
+        roleLabel = ch ? channelTypeLabel(ch.settlementMode) : roleLabel;
+      } else if (currentEmployee()) {
+        roleLabel = (isPlatformAdminEmployee(currentEmployee()) ? "平台管理员" : roleLabel) + " · 员工";
+      }
+
+      const pageLabel = navLabel(state.view) || title;
+      const l2 = getNavL2(state.view);
+      let moduleLabel = pageLabel;
+      let featureLabel = title;
+      if (l2) {
+        const cur = state[l2.stateKey];
+        const tabs = typeof l2.tabs === "function" ? l2.tabs() : l2.tabs;
+        const hit = (tabs || []).find(([k]) => k === cur);
+        const tabName = hit ? String(hit[1]).replace(/\s*[!(].*$/, "").trim() : title;
+        moduleLabel = pageLabel;
+        featureLabel = tabName || title;
+      }
+      if (window.DocCatalog && typeof DocCatalog.featureLabelForView === "function") {
+        const refined = DocCatalog.featureLabelForView(key, featureLabel);
+        if (refined) featureLabel = refined;
+      }
+
+      const meaningFromCatalog = (window.DocCatalog && DocCatalog.meaningForView)
+        ? DocCatalog.meaningForView(key, title)
+        : "";
+      const meaning = meaningFromCatalog || (pageDesc || "").trim() || `${roleLabel}在「${featureLabel}」中查看与办理相关业务。`;
+      const scope = (window.DocCatalog && typeof DocCatalog.scopeForView === "function")
+        ? DocCatalog.scopeForView(key)
+        : { does: "", notDoes: "" };
+
+      try {
+        DocSearchPanel.setContext({
+          key,
+          title: featureLabel || title,
+          keywords,
+          explain: {
+            role: roleLabel,
+            page: pageLabel,
+            module: moduleLabel,
+            feature: featureLabel || title,
+            meaning,
+            does: scope.does || "",
+            notDoes: scope.notDoes || "",
+            path: [roleLabel, pageLabel, featureLabel || title].filter((v, i, arr) => v && arr.indexOf(v) === i)
+          }
+        });
+      } catch (err) {
+        console.warn("[DocSearch]", err);
+      }
+    }
+
+    /** 文档面板「相关页」跳转：viewKey → 原型路由 */
+    function navigateDocPanelView(viewKey) {
+      if (!viewKey) return;
+
+      if (viewKey.indexOf("dayPool_") === 0) {
+        state.view = "dayPool";
+        const tail = viewKey.slice("dayPool_".length);
+        if (tail === "pools") {
+          state.dayPoolTab = "pools";
+          state.dayPoolPoolsSubTab = "list";
+        } else if (tail === "ledger") {
+          state.dayPoolTab = "pools";
+          state.dayPoolPoolsSubTab = "ledger";
+        } else if (tail === "riders") {
+          state.dayPoolTab = "riders";
+          state.dayPoolRidersSubTab = "list";
+          state.dayPoolRiderFocus = null;
+        } else if (tail === "teams") {
+          state.dayPoolTab = "riders";
+          state.dayPoolRidersSubTab = "teams";
+        } else if (tail === "alloc") {
+          state.dayPoolTab = "allocations";
+          state.dayPoolAllocSubTab = "riders";
+        } else if (tail === "alloc_logs") {
+          state.dayPoolTab = "allocations";
+          state.dayPoolAllocSubTab = "logs";
+        } else if (tail === "consume") {
+          state.dayPoolTab = "consume";
+        } else if (tail === "retail") {
+          state.dayPoolTab = "retail";
+        } else if (tail === "exceptions") {
+          state.dayPoolTab = "exceptions";
+        }
+        render();
+        return;
+      }
+
+      if (viewKey === "dayPool") {
+        state.view = "dayPool";
+        state.dayPoolTab = "pools";
+        state.dayPoolPoolsSubTab = "list";
+        render();
+        return;
+      }
+
+      const orderKeys = ["orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit", "refundManage"];
+      if (isOperatorRole() && orderKeys.includes(viewKey)) {
+        const map = {
+          orderPackage: "package", orderSwap: "swap", orderUserDeposit: "userDeposit",
+          orderFreeze: "freeze", orderAudit: "audit", refundManage: "refund"
+        };
+        state.view = "orderService";
+        state.orderServiceTab = map[viewKey];
+        if (viewKey === "orderPackage" || viewKey === "orderSwap" || viewKey === "orderFreeze") {
+          state.orderTab = map[viewKey];
+        }
+        if (viewKey === "refundManage") state.refundTab = state.refundTab || "queue";
+        if (viewKey === "orderUserDeposit") state.userDepositPage = 1;
+        render();
+        return;
+      }
+      if (orderKeys.includes(viewKey)) {
+        state.view = viewKey;
+        render();
+        return;
+      }
+
+      if (viewKey === "orderService") {
+        state.view = "orderService";
+        state.orderServiceTab = "package";
+        state.orderTab = "package";
+        render();
+        return;
+      }
+
+      if (viewKey === "sitePartners") {
+        state.view = "sites";
+        state.siteManageTab = "partners";
+        render();
+        return;
+      }
+      if (viewKey === "siteExpenses") {
+        state.view = "sites";
+        state.siteManageTab = "bills";
+        render();
+        return;
+      }
+      if (viewKey === "sites") {
+        state.view = "sites";
+        state.siteManageTab = "info";
+        render();
+        return;
+      }
+
+      if (viewKey === "depositAccount") {
+        state.view = "platformService";
+        state.platformServiceTab = "deposit";
+        render();
+        return;
+      }
+      if (viewKey === "platformFee") {
+        state.view = "platformService";
+        state.platformServiceTab = "fee";
+        render();
+        return;
+      }
+      if (viewKey === "interOp") {
+        state.view = "platformService";
+        state.platformServiceTab = "interOverview";
+        state.interOpTab = "overview";
+        render();
+        return;
+      }
+      if (viewKey === "platformService") {
+        state.view = "platformService";
+        state.platformServiceTab = "deposit";
+        render();
+        return;
+      }
+
+      if (viewKey === "platformChannels") {
+        state.view = "operators";
+        state.operatorsTab = "channels";
+        render();
+        return;
+      }
+
+      if (viewKey === "channelOrders" && isOperatorRole()) {
+        state.view = "channelSales";
+        state.channelSalesTab = "orders";
+        render();
+        return;
+      }
+
+      state.view = viewKey;
+      render();
+    }
+    window.navigateDocPanelView = navigateDocPanelView;
+
     function getViewModuleNoteIds(view) {
       if (view === "channelSettlement") {
         const ch = isChannelRole() ? channelProfile() : null;
@@ -5875,10 +6127,38 @@
       { pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29 },
       { pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9 }
     ];
-    /** 个人套餐电池型号（规格串 · decision-085，与台账对齐） */
-    const BATTERY_MODEL_OPTIONS = ["48V20Ah", "48V30Ah", "60V30Ah"];
+    /** 个人套餐/台账电池型号：取自平台字典启用项（decision-085/088） */
+    const BATTERY_MODEL_OPTIONS = [];
+    function syncBatteryModelOptions() {
+      BATTERY_MODEL_OPTIONS.length = 0;
+      platformBatteryModels.filter(m => m.status === "启用").forEach(m => BATTERY_MODEL_OPTIONS.push(m.code));
+      if (!BATTERY_MODEL_OPTIONS.length) {
+        platformBatteryModels.forEach(m => BATTERY_MODEL_OPTIONS.push(m.code));
+      }
+    }
+    syncBatteryModelOptions();
     function normalizeBatteryModel(m) {
-      return m && BATTERY_MODEL_OPTIONS.includes(m) ? m : "48V30Ah";
+      const allCodes = platformBatteryModels.map(x => x.code);
+      if (m && allCodes.includes(m)) return m;
+      if (BATTERY_MODEL_OPTIONS.includes("48V30Ah")) return "48V30Ah";
+      return BATTERY_MODEL_OPTIONS[0] || "48V30Ah";
+    }
+    function batteryModelUsageCount(code) {
+      let n = 0;
+      operatorPkgPrices.forEach(r => {
+        if (normalizeBatteryModel(r.batteryModel) === code) n += 1;
+      });
+      channelSalePackages.forEach(r => {
+        if (normalizeBatteryModel(r.batteryModel) === code) n += 1;
+      });
+      channelLeasePkgSkus.forEach(r => {
+        if (normalizeBatteryModel(r.batteryModel) === code) n += 1;
+      });
+      batteries.forEach(b => {
+        const spec = b.batteryModel || b.specs;
+        if (spec === code) n += 1;
+      });
+      return n;
     }
 
     function paginateList(rows, page, pageSize) {
@@ -8354,7 +8634,10 @@
     function lookupIotDeviceBySn(sn) {
       const hit = platformDeviceInventory.find(i => i.sn === sn);
       if (hit) return { type: hit.type, city: hit.city, specs: hit.specs, source: hit.source || "物联网平台" };
-      if (/^BAT[-_]/i.test(sn)) return { type: "battery", city: "上海", specs: "60V30Ah", source: "物联网平台·前缀推断" };
+      if (/^BAT[-_]/i.test(sn)) {
+        const defModel = BATTERY_MODEL_OPTIONS.includes("60V30Ah") ? "60V30Ah" : (BATTERY_MODEL_OPTIONS[0] || "60V30Ah");
+        return { type: "battery", city: "上海", specs: defModel, source: "物联网平台·前缀推断" };
+      }
       if (/^CAB[-_]/i.test(sn)) return { type: "cabinet", city: "上海", specs: "12 仓", source: "物联网平台·前缀推断" };
       return null;
     }
@@ -8381,7 +8664,8 @@
         batteries.push({
           sn, site: "未分配站点", city: iot.city, soc: 100, soh: 100, health: "正常",
           inCab: "待入柜", deviceOwnerId: op.id, deviceOwnerName: op.name,
-          platformBound: true, boundAt: day, importedAt: day, specs: iot.specs, iotSource: iot.source
+          platformBound: true, boundAt: day, importedAt: day,
+          specs: iot.specs, batteryModel: iot.specs, iotSource: iot.source
         });
       }
       const idx = platformDeviceInventory.findIndex(i => i.sn === sn);
@@ -9599,14 +9883,64 @@
     }
 
     function allPlatformBatteryRows() {
-      return batteries.map(b => ({
-        sn: b.sn, operatorId: b.deviceOwnerId, operatorName: b.deviceOwnerName || "—",
-        site: b.site, city: b.city,
-        boundAt: b.boundAt || "—",
-        importedAt: b.importedAt || b.boundAt || "—",
-        soc: b.soc, soh: batterySohPercent(b), specs: b.specs || "—",
-        belong: platformBatteryBelongKind(b), raw: b
-      }));
+      return batteries.map(b => {
+        const model = b.batteryModel || b.specs || "—";
+        return {
+          sn: b.sn, operatorId: b.deviceOwnerId, operatorName: b.deviceOwnerName || "—",
+          site: b.site, city: b.city,
+          boundAt: b.boundAt || "—",
+          importedAt: b.importedAt || b.boundAt || "—",
+          soc: b.soc, soh: batterySohPercent(b),
+          specs: model === "—" ? "—" : normalizeBatteryModel(model),
+          belong: platformBatteryBelongKind(b), raw: b
+        };
+      });
+    }
+
+    function openBatteryModelForm(editId) {
+      const row = editId ? platformBatteryModels.find(m => m.id === editId) : null;
+      const isEdit = !!row;
+      openProtoForm({
+        title: isEdit ? "编辑电池型号" : "新增电池型号",
+        submitLabel: isEdit ? "保存" : "创建",
+        html: `
+          <label>型号编码（规格串）<input name="code" required pattern="[0-9]+V[0-9]+Ah" placeholder="如 48V30Ah" value="${row ? row.code : ""}" ${isEdit ? "readonly" : ""} /></label>
+          <label>显示名称<input name="name" required placeholder="同编码或简称" value="${row ? (row.name || row.code) : ""}" /></label>
+          <label>电压（V）<input name="voltage" type="number" min="1" required value="${row ? row.voltage : ""}" /></label>
+          <label>容量（Ah）<input name="capacityAh" type="number" min="1" required value="${row ? row.capacityAh : ""}" /></label>
+          <label>状态<select name="status"><option value="启用" ${!row || row.status === "启用" ? "selected" : ""}>启用</option><option value="停用" ${row && row.status === "停用" ? "selected" : ""}>停用</option></select></label>
+          <label style="grid-column:1/-1">备注<textarea name="remark" rows="2" placeholder="可选">${row ? (row.remark || "") : ""}</textarea></label>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">${noteBtn("platform_battery_models")} 编码创建后不可改；停用后运营商不可再选该型号新建套餐价，历史数据仍可展示。</p>
+        `,
+        onSubmit: (data) => {
+          const code = String(data.code || "").trim();
+          if (!/^\d+V\d+Ah$/.test(code)) return "型号编码须为如 48V30Ah 的规格串";
+          const name = String(data.name || code).trim();
+          const voltage = Number(data.voltage);
+          const capacityAh = Number(data.capacityAh);
+          if (!Number.isFinite(voltage) || voltage <= 0) return "请填写有效电压";
+          if (!Number.isFinite(capacityAh) || capacityAh <= 0) return "请填写有效容量";
+          const status = data.status === "停用" ? "停用" : "启用";
+          const today = new Date().toISOString().slice(0, 10);
+          if (isEdit) {
+            row.name = name;
+            row.voltage = voltage;
+            row.capacityAh = capacityAh;
+            row.status = status;
+            row.remark = data.remark || "";
+            row.updatedAt = today;
+          } else {
+            if (platformBatteryModels.some(m => m.code === code)) return "型号编码已存在";
+            platformBatteryModels.push({
+              id: "BM-" + code.replace(/[^A-Za-z0-9]/g, ""),
+              code, name, voltage, capacityAh, status,
+              updatedAt: today, remark: data.remark || ""
+            });
+          }
+          syncBatteryModelOptions();
+          return { successMessage: isEdit ? "型号已保存" : "型号已创建", afterClose: () => render() };
+        }
+      });
     }
 
     function renderPlatformDevices() {
@@ -9618,11 +9952,50 @@
       if (state.platformDeviceTab === "ledger" || !state.platformDeviceTab) {
         state.platformDeviceTab = "cabinet";
       }
-      const tab = state.platformDeviceTab === "battery" ? "battery" : "cabinet";
+      const tab = state.platformDeviceTab === "battery" ? "battery"
+        : state.platformDeviceTab === "models" ? "models"
+        : "cabinet";
       state.platformDeviceTab = tab;
       const f = getPf();
       const importBtn = `<button type="button" class="btn primary" data-open-device-import>批量导入</button>`;
       const hint = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_operator_device_gate")}${noteBtn("platform_devices_import")} 归属运营商后，方可在「我的设备」维护并分配至站点。新设备请点击「批量导入」：先选运营商，再手工填 SN 或上传 SN 表格。</p>`;
+
+      if (tab === "models") {
+        const rows = platformBatteryModels.filter(m => {
+          if (f.status && f.status !== "全部" && m.status !== f.status) return false;
+          if (f.keyword && !matchKw(m.code, f.keyword) && !matchKw(m.name, f.keyword) && !matchKw(m.remark, f.keyword)) return false;
+          return true;
+        });
+        const addBtn = `<button type="button" class="btn primary" data-new-battery-model>+ 新增型号</button>`;
+        return `${ownScopeBanner()}<section class="panel">
+          ${panelHead("电池型号管理", `共 ${rows.length} 个 · 全平台统一字典`, "platform_battery_models", addBtn)}
+          <div class="panel-body orders-table-wrap">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_battery_models")} 当前启用：${BATTERY_MODEL_OPTIONS.join("、") || "无"}。运营商个人套餐价 / 分销价下拉仅可选<strong>启用</strong>型号。</p>
+            <table>
+              <thead><tr>
+                <th>型号编码</th><th>显示名称</th><th>电压</th><th>容量</th><th>引用数</th><th>状态</th><th>更新日</th><th>备注</th><th>操作</th>
+              </tr></thead>
+              <tbody>${rows.map(m => {
+                const used = batteryModelUsageCount(m.code);
+                return `<tr>
+                  <td><strong>${m.code}</strong></td>
+                  <td>${m.name || m.code}</td>
+                  <td>${m.voltage}V</td>
+                  <td>${m.capacityAh}Ah</td>
+                  <td>${used}</td>
+                  <td>${tag(m.status)}</td>
+                  <td>${m.updatedAt || "—"}</td>
+                  <td style="font-size:12px;color:var(--muted);max-width:160px;white-space:normal">${m.remark || "—"}</td>
+                  <td class="row-actions" style="white-space:nowrap">
+                    <button type="button" class="link-btn" data-edit-battery-model="${m.id}">编辑</button>
+                    <button type="button" class="link-btn" data-toggle-battery-model="${m.id}">${m.status === "启用" ? "停用" : "启用"}</button>
+                  </td>
+                </tr>`;
+              }).join("") || "<tr><td colspan='9'>暂无型号，请新增</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+      }
 
       if (tab === "battery") {
         const rows = allPlatformBatteryRows().filter(r => {
@@ -9637,7 +10010,7 @@
             ${hint}
             <table>
               <thead><tr>
-                <th>SN</th><th>规格</th><th>归属运营商</th><th>城市</th><th>站点</th>
+                <th>SN</th><th>型号 ${noteBtn("platform_battery_models")}</th><th>归属运营商</th><th>城市</th><th>站点</th>
                 <th>SOC</th><th>SOH</th><th>当前位置 ${noteBtn("platform_devices_battery_belong")}</th>
                 <th>归属日 ${noteBtn("platform_device_bound_at")}</th>
                 <th>导入日期 ${noteBtn("platform_device_imported_at")}</th>
@@ -14696,7 +15069,7 @@
         body = `<section class="panel">
           ${panelHead("签约渠道商", "签约信息 · 权益概要 · 信用额度（人天池/设备租赁适用）", "channel_sales", addBtn)}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_partner_manage")}${noteBtn("channel_partner_rights")} 同一运营商可签多个<strong>分销商-链接类</strong>渠道；授权套餐与专享价仅在「平台设置 → 渠道分销价」维护。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_partner_manage")}${noteBtn("channel_partner_rights")} 同一运营商可签多个<strong>分销商·链接类</strong>渠道；授权套餐与专享价仅在「平台设置 → 渠道分销价」维护。</p>
             <table>
               <thead><tr>
                 <th>渠道商</th><th>结算模式</th><th>批发/定价</th><th>权益概要</th>
@@ -15876,31 +16249,42 @@
     function renderLeasePkgPricing() {
       const cid = channelEntityId();
       const skus = channelLeasePkgSkus.filter(s => s.channelId === cid);
+      return `
+        ${ownScopeBanner()}
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("lease_whitelist_pkg")}${noteBtn("platform_battery_models")} 以下套餐<strong>仅白名单用户</strong>可在小程序购买；支付进入<strong>本渠道收款账户</strong>（演示：1678901234***）。SKU 须绑定<strong>电池型号</strong>（平台字典），权益仅支持同型号换电。</div>
+        <section class="panel">
+          ${panelHead("白名单套餐定价", "渠道自定 · 绑定电池型号 · 运营商不代设 C 端价", "lease_whitelist_pkg")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>SKU</th><th>电池型号</th><th>套餐名</th><th>零售价</th><th>有效期</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>${skus.map(s => `<tr>
+                <td>${s.id}</td>
+                <td><strong>${normalizeBatteryModel(s.batteryModel)}</strong></td>
+                <td>${s.name}</td><td>¥${s.price}</td>
+                <td>${s.validityDays} 天</td><td>${tag(s.status)}</td>
+                <td><button type="button" class="link-btn" data-edit-lease-pkg="${s.id}">编辑</button></td>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无上架套餐</td></tr>"}</tbody>
+            </table>
+          </div>
+        </section>`;
+    }
+
+    function renderLeasePkgOrders() {
+      const cid = channelEntityId();
       const orders = channelLeasePkgOrders.filter(o => o.channelId === cid);
       return `
         ${ownScopeBanner()}
-        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("lease_whitelist_pkg")} 以下套餐<strong>仅白名单用户</strong>可在小程序购买；支付进入<strong>本渠道收款账户</strong>（演示：1678901234***）。</div>
-        <section class="panel">
-          ${panelHead("白名单套餐定价", "渠道自定 · 运营商不代设 C 端价", "lease_whitelist_pkg", `<button type="button" class="btn primary" data-edit-lease-pkg>编辑价格（演示）</button>`)}
-          <div class="panel-body orders-table-wrap">
-            <table>
-              <thead><tr><th>SKU</th><th>套餐名</th><th>零售价</th><th>有效期</th><th>状态</th></tr></thead>
-              <tbody>${skus.map(s => `<tr>
-                <td>${s.id}</td><td><strong>${s.name}</strong></td><td>¥${s.price}</td>
-                <td>${s.validityDays} 天</td><td>${tag(s.status)}</td>
-              </tr>`).join("")}</tbody>
-            </table>
-          </div>
-        </section>
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("lease_whitelist_pkg")} 白名单用户购套餐流水；收款方 = <strong>本渠道子商户</strong>。订单快照含购买时<strong>电池型号</strong>。</div>
         <section class="panel">
           ${panelHead("白名单购套餐订单", "收款方 = 本渠道子商户", "lease_whitelist_pkg")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>实付</th><th>子商户</th><th>支付时间</th></tr></thead>
+              <thead><tr><th>订单</th><th>用户</th><th>套餐</th><th>电池型号</th><th>实付</th><th>子商户</th><th>支付时间</th></tr></thead>
               <tbody>${orders.map(o => `<tr>
                 <td>${o.id}</td><td>${o.userName}<br><small>${o.phone}</small></td><td>${o.skuName}</td>
+                <td><strong>${normalizeBatteryModel(o.batteryModel)}</strong></td>
                 <td>¥${o.amount}</td><td>${o.subMch}</td><td>${o.payTime}</td>
-              </tr>`).join("")}</tbody>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无购套餐订单</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -16976,6 +17360,29 @@
       root.querySelectorAll("[data-open-device-import]").forEach(btn => {
         btn.onclick = () => openDeviceImportModal();
       });
+      root.querySelectorAll("[data-new-battery-model]").forEach(btn => {
+        btn.onclick = () => openBatteryModelForm(null);
+      });
+      root.querySelectorAll("[data-edit-battery-model]").forEach(btn => {
+        btn.onclick = () => openBatteryModelForm(btn.dataset.editBatteryModel);
+      });
+      root.querySelectorAll("[data-toggle-battery-model]").forEach(btn => {
+        btn.onclick = () => {
+          const m = platformBatteryModels.find(x => x.id === btn.dataset.toggleBatteryModel);
+          if (!m) return;
+          if (m.status === "启用") {
+            const used = batteryModelUsageCount(m.code);
+            if (used > 0 && !window.confirm(`型号 ${m.code} 已被引用 ${used} 次，停用后不可再新建定价，确认停用？`)) return;
+            m.status = "停用";
+          } else {
+            m.status = "启用";
+          }
+          m.updatedAt = new Date().toISOString().slice(0, 10);
+          syncBatteryModelOptions();
+          showProtoToast(m.status === "启用" ? "已启用" : "已停用");
+          render();
+        };
+      });
       root.querySelectorAll("[data-pftab]").forEach(btn => {
         btn.onclick = () => { state.platformFlowTab = btn.dataset.pftab; render(); };
       });
@@ -17477,13 +17884,15 @@
       root.querySelectorAll("[data-edit-lease-pkg]").forEach(btn => {
         btn.onclick = () => {
           const cid = channelEntityId();
-          const skus = channelLeasePkgSkus.filter(s => s.channelId === cid);
-          const main = skus.find(s => s.id === "LP-30") || skus[0];
+          const skuId = btn.dataset.editLeasePkg;
+          const main = channelLeasePkgSkus.find(s => s.channelId === cid && s.id === skuId);
           if (!main) return;
+          const modelOpts = BATTERY_MODEL_OPTIONS.length ? BATTERY_MODEL_OPTIONS.slice() : ["48V30Ah"];
           openProtoForm({
-            title: "编辑白名单套餐价格",
+            title: "编辑白名单套餐",
             fields: [
               { name: "skuId", label: "SKU", value: main.id, readonly: true },
+              { name: "batteryModel", label: "电池型号", type: "select", options: modelOpts, value: normalizeBatteryModel(main.batteryModel) },
               { name: "name", label: "套餐名", value: main.name },
               { name: "price", label: "零售价（元）", type: "number", value: main.price },
               { name: "validityDays", label: "有效期（天）", type: "number", value: main.validityDays }
@@ -17492,13 +17901,23 @@
             onSubmit: (data) => {
               const price = parseFloat(data.price);
               const days = parseInt(data.validityDays, 10);
+              const name = (data.name || "").trim() || main.name;
+              const batteryModel = normalizeBatteryModel(data.batteryModel);
               if (!Number.isFinite(price) || price <= 0) return "请填写有效零售价";
               if (!Number.isFinite(days) || days <= 0) return "请填写有效天数";
-              main.name = (data.name || "").trim() || main.name;
+              if (!modelOpts.includes(batteryModel)) return "请选择启用中的电池型号";
+              const conflict = channelLeasePkgSkus.some(s =>
+                s.channelId === cid && s.id !== main.id
+                && normalizeBatteryModel(s.batteryModel) === batteryModel
+                && s.name === name
+              );
+              if (conflict) return "该渠道下已存在同型号同名套餐";
+              main.name = name;
+              main.batteryModel = batteryModel;
               main.price = price;
               main.validityDays = days;
               main.updatedAt = new Date().toISOString().slice(0, 10);
-              return { successMessage: "已更新 " + main.id + " · ¥" + price, afterClose: () => render() };
+              return { successMessage: "已更新 " + main.id + " · " + batteryModel + " · ¥" + price, afterClose: () => render() };
             }
           });
         };
@@ -18437,6 +18856,7 @@
       leaseBatteryHold: renderLeaseBatteryHold,
       leaseWhitelist: renderLeaseWhitelist,
       leasePkgPricing: renderLeasePkgPricing,
+      leasePkgOrders: renderLeasePkgOrders,
       channelInterOp: renderChannelInterOp,
       operators: renderOperators,
       platformLeasing: renderPlatformLeasing,
@@ -18559,6 +18979,7 @@
         state.platformDeviceOpenImportModal = false;
         openDeviceImportModal();
       }
+      notifyDocSearchContext(pageMeta[0], pageMeta[1]);
     }
 
     document.querySelector("#nav").addEventListener("click", e => {
