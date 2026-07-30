@@ -2,2374 +2,496 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>智格换电 · 骑手端</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>智格换电 · 骑手端流程原型</title>
   <style>
     :root {
-      --blue: #2f6bff;
-      --blue-dark: #1a4fd6;
-      --gold: #e8c9a0;
-      --gold-text: #8b6914;
-      --bg: #f4f6f8;
-      --text: #1a2233;
-      --muted: #8a94a6;
-      --border: #e8ecf0;
-      --warn: #fff8e6;
-      --warn-border: #f0d878;
-      --danger: #e34d4d;
-      --safe-top: env(safe-area-inset-top, 0px);
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-      --phone-w: 390px;
+      --blue: #2f6bff; --blue-dark: #1a4fd6; --gold: #e8c9a0; --gold-text: #8b6914;
+      --bg: #f4f6f8; --text: #1a2233; --muted: #8a94a6; --border: #e8ecf0; --danger: #e34d4d;
+      --frame-w: 220px; --frame-h: 420px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
-      background: #dfe3ea;
-      color: var(--text);
-      min-height: 100vh;
-    }
-    .workspace {
-      display: flex;
-      gap: 20px;
-      padding: 16px;
-      justify-content: center;
-      align-items: flex-start;
-      flex-wrap: wrap;
-    }
-    .demo-panel {
-      width: 280px;
-      background: #fff;
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 4px 20px rgba(0,0,0,.08);
-      font-size: 13px;
-    }
-    .demo-panel h2 { font-size: 14px; margin-bottom: 10px; }
-    .demo-panel label { display: block; margin: 8px 0 4px; color: var(--muted); }
-    .demo-panel select, .demo-panel button {
-      width: 100%; padding: 8px 10px; border-radius: 8px;
-      border: 1px solid var(--border); font-size: 13px;
-    }
-    .demo-panel button.primary {
-      background: var(--blue); color: #fff; border: none; margin-top: 10px; cursor: pointer;
-    }
-    .demo-panel a { color: var(--blue); font-size: 12px; }
-    .phone-wrap {
-      width: var(--phone-w);
-      height: calc(100vh - 32px);
-      max-height: 844px;
-      border-radius: 28px;
-      overflow: hidden;
-      box-shadow: 0 16px 48px rgba(15,23,42,.18);
-      background: #fff;
-      display: flex;
-      flex-direction: column;
-    }
-    .status-bar {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: calc(6px + var(--safe-top)) 16px 4px;
-      font-size: 14px; font-weight: 600; background: #fff; flex-shrink: 0;
-    }
-    .status-icons { display: flex; gap: 4px; font-size: 12px; align-items: center; }
-    .wx-capsule {
-      display: flex; border: 1px solid #ddd; border-radius: 16px; overflow: hidden; margin-left: 8px;
-    }
-    .wx-capsule span { padding: 4px 10px; font-size: 12px; }
-    .wx-capsule span + span { border-left: 1px solid #ddd; }
-    .app-header {
-      text-align: center; font-size: 17px; font-weight: 600;
-      padding: 6px 0 8px; background: #fff; flex-shrink: 0;
-    }
-    .service-banner {
-      background: #fffbe8; color: #7a6520; font-size: 11px;
-      text-align: center; padding: 6px 12px; flex-shrink: 0;
-    }
-    .screen {
-      flex: 1; overflow: hidden; display: none; flex-direction: column;
-      background: var(--bg); position: relative;
-    }
-    .screen.active { display: flex; }
-
-    /* 首页地图 */
-    .map-area {
-      flex: 1; position: relative;
-      background: linear-gradient(180deg, #dce8f5 0%, #e8eef4 40%, #d4e4d0 100%);
-      overflow: hidden;
-    }
-    .map-area::before {
-      content: ""; position: absolute; inset: 0; opacity: .35;
-      background-image:
-        linear-gradient(#b8c8d8 1px, transparent 1px),
-        linear-gradient(90deg, #b8c8d8 1px, transparent 1px);
-      background-size: 48px 48px;
-    }
-    .map-label {
-      position: absolute; font-size: 11px; color: #5a7088; font-weight: 500;
-    }
-    .map-pin {
-      position: absolute; width: 28px; height: 36px;
-      transform: translate(-50%, -100%); cursor: pointer;
-    }
-    .map-pin::before {
-      content: ""; position: absolute; left: 50%; bottom: 0;
-      width: 10px; height: 10px; background: var(--blue);
-      border-radius: 50%; transform: translateX(-50%);
-      box-shadow: 0 0 0 4px rgba(47,107,255,.25);
-    }
-    .map-pin.dedicated::before { background: #1677ff; box-shadow: 0 0 0 4px rgba(22,119,255,.25); }
-    .map-legend { position: absolute; left: 10px; bottom: 72px; font-size: 10px; color: var(--muted); background: rgba(255,255,255,.92); padding: 6px 8px; border-radius: 6px; max-width: 148px; line-height: 1.5; }
-    .map-pin::after {
-      content: ""; position: absolute; left: 50%; top: 0;
-      width: 22px; height: 22px; background: var(--danger);
-      border-radius: 50% 50% 50% 0; transform: translateX(-50%) rotate(-45deg);
-      border: 2px solid #fff;
-    }
-    .map-pin.dedicated::after { background: #1677ff; }
-    .map-provider {
-      position: absolute; right: 8px; bottom: 100px;
-      font-size: 10px; color: var(--muted); background: rgba(255,255,255,.8);
-      padding: 2px 6px; border-radius: 4px;
-    }
-    .map-fab-row {
-      position: absolute; left: 0; right: 0; bottom: 12px;
-      display: flex; align-items: flex-end; justify-content: center; gap: 12px; padding: 0 16px;
-    }
-    .fab-circle {
-      width: 44px; height: 44px; border-radius: 50%; background: #fff;
-      box-shadow: 0 2px 12px rgba(0,0,0,.12); border: none;
-      font-size: 18px; cursor: pointer; display: grid; place-items: center;
-    }
-    .fab-scan {
-      flex: 1; max-width: 200px; height: 48px; border-radius: 24px;
-      background: var(--blue); color: #fff; border: none; font-size: 16px; font-weight: 600;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      box-shadow: 0 4px 16px rgba(47,107,255,.4); cursor: pointer;
-    }
-
-    /* 底部导航 */
-    .tab-bar {
-      display: flex; background: #fff; border-top: 1px solid var(--border);
-      padding-bottom: var(--safe-bottom); flex-shrink: 0;
-    }
-    .tab-item {
-      flex: 1; display: flex; flex-direction: column; align-items: center;
-      padding: 8px 0 6px; font-size: 11px; color: var(--muted);
-      border: none; background: none; cursor: pointer;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; background: #e8ecf2; color: var(--text); min-height: 100vh; }
+    .flow-header { position: sticky; top: 0; z-index: 50; background: #fff; border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .flow-header h1 { font-size: 18px; font-weight: 700; }
+    .flow-header p { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .flow-header nav { display: flex; gap: 12px; font-size: 13px; flex-shrink: 0; }
+    .flow-header a { color: var(--blue); text-decoration: none; }
+    .flow-board { padding: 20px 24px 48px; overflow-x: auto; }
+    .flow-section { background: #fff; border-radius: 16px; padding: 20px 20px 28px; margin-bottom: 24px; box-shadow: 0 4px 24px rgba(15,23,42,.06); }
+    .flow-section h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+    .flow-section h2 .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #eef3ff; color: var(--blue); }
+    .flow-section h3 { font-size: 13px; font-weight: 600; margin: 18px 0 10px; color: var(--text); }
+    .flow-section .section-desc { font-size: 12px; color: var(--muted); margin-bottom: 18px; line-height: 1.6; }
+    .flow-track { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding-bottom: 8px; min-height: calc(var(--frame-h) + 56px); }
+    .flow-cell { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; width: calc(var(--frame-w) + 8px); }
+    .frame-label { font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 6px; text-align: center; line-height: 1.35; min-height: 30px; }
+    .frame-label .step-id { display: block; font-size: 10px; color: var(--muted); font-weight: 600; }
+    .frame-hint { margin-top: 6px; color: var(--muted); font-weight: 400; font-size: 9px; min-height: auto; text-align: center; line-height: 1.4; max-width: var(--frame-w); }
+    .phone-frame { width: var(--frame-w); height: var(--frame-h); border-radius: 20px; overflow: hidden; box-shadow: 0 8px 28px rgba(15,23,42,.14); background: #fff; border: 2px solid #fff; display: flex; flex-direction: column; }
+    .phone-frame.highlight { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47,107,255,.2), 0 8px 28px rgba(15,23,42,.14); }
+    .phone-frame.wireframe { border: 2px dashed #c5cad3; background: #fafbfc; display: grid; place-items: center; color: var(--muted); min-height: var(--frame-h); }
+    .phone-frame.wireframe .wf-x { font-size: 48px; opacity: .25; }
+    .phone-frame.wireframe .wf-text { font-size: 13px; font-weight: 600; margin-top: 8px; text-align: center; padding: 0 12px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 4px 10px 2px; font-size: 10px; font-weight: 600; background: #fff; flex-shrink: 0; }
+    .app-header { text-align: center; font-size: 13px; font-weight: 600; padding: 4px 0 6px; background: #fff; flex-shrink: 0; }
+    .service-banner { background: #fffbe8; color: #7a6520; font-size: 9px; text-align: center; padding: 4px 8px; flex-shrink: 0; }
+    .screen-body { flex: 1; overflow: hidden; background: var(--bg); font-size: 10px; line-height: 1.45; position: relative; }
+    .tab-bar { display: flex; background: #fff; border-top: 1px solid var(--border); flex-shrink: 0; }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 5px 0 4px; font-size: 9px; color: var(--muted); }
     .tab-item.active { color: var(--blue); font-weight: 600; }
-    .tab-item .icon { font-size: 22px; line-height: 1; margin-bottom: 2px; }
-
-    /* 我的 */
-    .mine-scroll { flex: 1; overflow-y: auto; }
-    .login-hero {
-      padding: 48px 24px 32px; text-align: center; background: #fff;
-    }
-    .logo {
-      width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 16px;
-      background: linear-gradient(135deg, #1a2233, #3d4f6f);
-      display: grid; place-items: center; color: #fff; font-size: 28px; font-weight: 800;
-    }
-    .login-hero h1 { font-size: 26px; letter-spacing: 2px; margin-bottom: 8px; }
-    .login-hero p { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
-    .btn-login {
-      width: 100%; max-width: 320px; height: 48px; border-radius: 24px;
-      background: var(--blue); color: #fff; border: none; font-size: 16px; font-weight: 600; cursor: pointer;
-    }
-    .agree-row {
-      display: flex; gap: 8px; align-items: flex-start; margin-top: 20px;
-      font-size: 12px; color: var(--muted); text-align: left; max-width: 320px; margin-left: auto; margin-right: auto;
-    }
-    .agree-row a { color: var(--blue); }
-    .profile-head {
-      display: flex; align-items: center; padding: 16px; background: #fff; gap: 12px;
-    }
-    .avatar {
-      width: 48px; height: 48px; border-radius: 50%; background: #e8ecf0;
-      display: grid; place-items: center; font-size: 20px;
-    }
-    .profile-head .phone { font-size: 18px; font-weight: 600; }
-    .tag-sm {
-      display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px;
-      background: #f0f2f5; color: var(--muted); margin-left: 8px;
-    }
+    .tab-item .icon { font-size: 14px; line-height: 1; margin-bottom: 1px; }
+    .sub-tabs { display: flex; background: #fff; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .sub-tab { flex: 1; padding: 8px 0; font-size: 10px; color: var(--muted); text-align: center; position: relative; }
+    .sub-tab.active { color: var(--blue); font-weight: 600; }
+    .sub-tab.active::after { content: ""; position: absolute; left: 20%; right: 20%; bottom: 0; height: 2px; background: var(--blue); }
+    .map-area { height: 100%; position: relative; background: linear-gradient(180deg, #dce8f5, #d4e4d0); }
+    .map-area::before { content: ""; position: absolute; inset: 0; opacity: .35; background-image: linear-gradient(#b8c8d8 1px, transparent 1px), linear-gradient(90deg, #b8c8d8 1px, transparent 1px); background-size: 32px 32px; }
+    .map-pin { position: absolute; width: 18px; height: 22px; transform: translate(-50%, -100%); }
+    .map-pin::before { content: ""; position: absolute; left: 50%; bottom: 0; width: 6px; height: 6px; background: var(--blue); border-radius: 50%; transform: translateX(-50%); box-shadow: 0 0 0 3px rgba(47,107,255,.25); }
+    .map-pin.dedicated::before { background: #1677ff; }
+    .map-pin::after { content: ""; position: absolute; left: 50%; top: 0; width: 14px; height: 14px; background: var(--danger); border-radius: 50% 50% 50% 0; transform: translateX(-50%) rotate(-45deg); border: 1px solid #fff; }
+    .map-pin.dedicated::after { background: #1677ff; }
+    .map-legend { position: absolute; left: 8px; bottom: 52px; font-size: 8px; color: var(--muted); background: rgba(255,255,255,.92); padding: 4px 6px; border-radius: 4px; max-width: 120px; line-height: 1.4; }
+    .map-fab-row { position: absolute; left: 0; right: 0; bottom: 8px; display: flex; align-items: flex-end; justify-content: center; gap: 8px; padding: 0 10px; }
+    .fab-circle { width: 28px; height: 28px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.12); border: none; font-size: 12px; display: grid; place-items: center; }
+    .fab-scan { flex: 1; max-width: 120px; height: 32px; border-radius: 16px; background: var(--blue); color: #fff; border: none; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; box-shadow: 0 2px 10px rgba(47,107,255,.35); }
+    .login-hero { padding: 28px 16px 20px; text-align: center; background: #fff; }
+    .logo { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 10px; background: linear-gradient(135deg, #1a2233, #3d4f6f); display: grid; place-items: center; color: #fff; font-size: 18px; font-weight: 800; }
+    .login-hero h3 { font-size: 16px; margin-bottom: 6px; }
+    .login-hero p { color: var(--muted); font-size: 10px; margin-bottom: 16px; }
+    .btn-login { width: 100%; height: 34px; border-radius: 17px; background: var(--blue); color: #fff; border: none; font-size: 12px; font-weight: 600; }
+    .agree-row { display: flex; gap: 6px; align-items: flex-start; margin-top: 12px; font-size: 9px; color: var(--muted); text-align: left; }
+    .profile-head { display: flex; align-items: center; padding: 10px; background: #fff; gap: 8px; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #e8ecf0; display: grid; place-items: center; font-size: 14px; }
+    .profile-head .phone { font-size: 13px; font-weight: 600; }
+    .tag-sm { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #f0f2f5; color: var(--muted); margin-left: 4px; }
     .tag-sm.ok { background: #e6f7ee; color: #1a8f4a; }
-    .settings-btn {
-      margin-left: auto; border: none; background: none; font-size: 22px; cursor: pointer; color: var(--muted);
-    }
-    .service-card {
-      margin: 12px 16px; padding: 18px 16px; border-radius: 12px;
-      background: linear-gradient(135deg, #3d7bff 0%, #2f6bff 50%, #1a4fd6 100%);
-      color: #fff; display: flex; align-items: center; justify-content: space-between;
-      min-height: 88px; position: relative; overflow: hidden;
-    }
-    .service-card::after {
-      content: "⚡"; position: absolute; right: 12px; bottom: -8px;
-      font-size: 64px; opacity: .15;
-    }
-    .service-card h3 { font-size: 17px; margin-bottom: 6px; }
-    .service-card p { font-size: 12px; opacity: .9; }
+    .service-card { margin: 8px 10px; padding: 12px 10px; border-radius: 10px; background: linear-gradient(135deg, #3d7bff, #1a4fd6); color: #fff; min-height: 64px; position: relative; overflow: hidden; }
+    .service-card::after { content: "⚡"; position: absolute; right: 8px; bottom: -6px; font-size: 40px; opacity: .15; }
+    .service-card h4 { font-size: 12px; margin-bottom: 4px; }
+    .service-card p { font-size: 9px; opacity: .92; line-height: 1.45; }
     .service-card.warn { background: linear-gradient(135deg, #f59e0b, #d97706); }
     .service-card.channel { background: linear-gradient(135deg, #6366f1, #4f46e5); }
     .service-card.done { background: linear-gradient(135deg, #8a94a6, #5c6575); }
-    .story-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-    .story-tabs button {
-      flex: 1; padding: 8px 6px; border-radius: 8px; border: 1px solid var(--border);
-      background: #fff; font-size: 12px; cursor: pointer; color: var(--muted);
-    }
-    .story-tabs button.active { background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; }
-    .mainline-steps {
-      list-style: none; margin: 0 0 10px; padding: 0; max-height: 280px; overflow-y: auto;
-      border: 1px solid var(--border); border-radius: 8px;
-    }
-    .mainline-steps li {
-      padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 12px;
-      cursor: pointer; display: flex; gap: 8px; align-items: flex-start;
-    }
-    .mainline-steps li:last-child { border-bottom: none; }
-    .mainline-steps li.active { background: #eef3ff; color: var(--blue); font-weight: 600; }
-    .mainline-steps li .sid { flex-shrink: 0; font-weight: 700; min-width: 32px; }
-    .mainline-hint {
-      font-size: 11px; color: var(--muted); line-height: 1.5; margin: 0 0 10px;
-      min-height: 32px; background: #f8fafc; border-radius: 8px; padding: 8px;
-    }
-    .mainline-actions { display: flex; gap: 8px; margin-bottom: 12px; }
-    .mainline-actions button {
-      flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
-      background: #fff; font-size: 13px; cursor: pointer;
-    }
-    .mainline-actions button.primary { background: var(--blue); color: #fff; border: none; }
-    .supplement-details {
-      border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px;
-    }
-    .supplement-details summary {
-      cursor: pointer; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text);
-    }
-    .btn-gold {
-      background: var(--gold); color: var(--gold-text); border: none;
-      padding: 10px 18px; border-radius: 20px; font-size: 14px; font-weight: 600;
-      cursor: pointer; flex-shrink: 0; z-index: 1;
-    }
-    .section-card {
-      margin: 0 16px 12px; background: #fff; border-radius: 12px; padding: 14px 12px;
-    }
-    .section-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; padding-left: 4px; }
-    .grid-4 {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 4px;
-    }
-    .grid-item {
-      display: flex; flex-direction: column; align-items: center; gap: 6px;
-      padding: 8px 4px; border: none; background: none; cursor: pointer; font-size: 11px; color: var(--text);
-    }
-    .grid-item .gi {
-      width: 40px; height: 40px; border-radius: 10px;
-      display: grid; place-items: center; font-size: 20px;
-      background: #eef3ff; color: var(--blue);
-    }
-    .grid-item .gi.orange { background: #fff4e6; color: #f97316; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .grid-2 .grid-item { flex-direction: row; justify-content: flex-start; padding: 12px; gap: 10px; }
-    .grid-2 .gi { width: 36px; height: 36px; font-size: 18px; flex-shrink: 0; }
-
-    /* 订单 */
-    .sub-tabs {
-      display: flex; background: #fff; padding: 0 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-    }
-    .sub-tab {
-      flex: 1; padding: 12px 0; border: none; background: none; font-size: 14px;
-      color: var(--muted); cursor: pointer; position: relative;
-    }
-    .sub-tab.active { color: var(--blue); font-weight: 600; }
-    .sub-tab.active::after {
-      content: ""; position: absolute; left: 20%; right: 20%; bottom: 0;
-      height: 2px; background: var(--blue); border-radius: 1px;
-    }
-    .order-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
-    .order-card {
-      background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px;
-      box-shadow: 0 1px 4px rgba(0,0,0,.04);
-    }
-    .order-card .top { display: flex; justify-content: space-between; margin-bottom: 8px; }
-    .order-card .id { font-size: 13px; font-weight: 600; }
-    .order-card .status { font-size: 12px; color: var(--blue); }
-    .order-card .status.fail { color: var(--danger); }
-    .order-card .meta { font-size: 12px; color: var(--muted); line-height: 1.6; }
-    .empty {
-      text-align: center; padding: 48px 24px; color: var(--muted); font-size: 14px;
-    }
-    .empty .icon { font-size: 48px; margin-bottom: 12px; opacity: .4; }
-
-    /* 弹层 */
-    .overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100;
-      display: none; align-items: flex-end; justify-content: center;
-    }
-    .overlay.open { display: flex; }
-    .sheet {
-      width: 100%; max-width: var(--phone-w); max-height: 85vh;
-      background: #fff; border-radius: 16px 16px 0 0; overflow: hidden;
-      display: flex; flex-direction: column; animation: slideUp .25s ease;
-    }
-    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-    .sheet-head {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-    }
-    .sheet-head h3 { font-size: 16px; }
-    .sheet-close { border: none; background: none; font-size: 22px; cursor: pointer; color: var(--muted); }
-    .sheet-body { padding: 16px; overflow-y: auto; flex: 1; }
-    .pkg-card {
-      border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px;
-      cursor: pointer; transition: border-color .15s;
-    }
-    .pkg-card:hover, .pkg-card.selected { border-color: var(--blue); background: #f8faff; }
-    .pkg-card h4 { font-size: 15px; margin-bottom: 4px; }
-    .pkg-card .price { color: var(--danger); font-size: 18px; font-weight: 700; }
-    .pkg-card .desc { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    .btn-block {
-      width: 100%; height: 44px; border-radius: 22px; border: none;
-      background: var(--blue); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
-    }
-    .btn-block:disabled { opacity: .45; cursor: not-allowed; }
-    .scan-box {
-      text-align: center; padding: 32px 16px;
-    }
-    .scan-frame {
-      width: 200px; height: 200px; margin: 0 auto 20px; border: 2px solid var(--blue);
-      border-radius: 12px; position: relative; overflow: hidden;
-      background: #000;
-    }
-    .scan-line {
-      position: absolute; left: 8px; right: 8px; height: 2px; background: var(--blue);
-      box-shadow: 0 0 8px var(--blue); animation: scan 2s linear infinite;
-    }
-    @keyframes scan { 0%,100% { top: 10%; } 50% { top: 85%; } }
-    .toast {
-      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      background: rgba(0,0,0,.78); color: #fff; padding: 12px 20px; border-radius: 8px;
-      font-size: 14px; z-index: 200; display: none; max-width: 280px; text-align: center;
-    }
-    .toast.show { display: block; }
-    .result-ok { text-align: center; padding: 24px; }
-    .result-ok .big { font-size: 48px; margin-bottom: 12px; }
-    .form-row { margin-bottom: 14px; }
-    .form-row label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-    .form-row input {
-      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px;
-    }
-    .channel-attr-banner {
-      background: linear-gradient(90deg, #fff7e6, #fff);
-      border: 1px solid #ffd666; border-radius: 10px; padding: 10px 12px;
-      font-size: 12px; line-height: 1.6; color: #7a6520; margin-bottom: 12px;
-    }
-    .pkg-card .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-    .pkg-card .price-official { font-size: 13px; color: var(--muted); text-decoration: line-through; }
-    .pkg-card .price-tag { font-size: 10px; background: #fff1f0; color: #cf1322; padding: 2px 6px; border-radius: 4px; }
-    .model-picker { margin-bottom: 12px; }
-    .model-picker .model-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-    .model-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-    .model-chip {
-      border: 1px solid var(--border); background: #fff; border-radius: 8px;
-      padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--text);
-    }
-    .model-chip.active { border-color: var(--blue); background: #f0f5ff; color: var(--blue); font-weight: 600; }
-    .deposit-block {
-      margin-top: 14px; padding: 12px; border-radius: 10px; background: #f8fafc;
-      border: 1px solid var(--border);
-    }
-    .deposit-block h5 { font-size: 13px; margin-bottom: 8px; }
-    .deposit-block .hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
-    .deposit-opt {
-      display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
-      border: 1.5px solid var(--border); border-radius: 8px; margin-bottom: 8px;
-      background: #fff; cursor: pointer;
-    }
-    .deposit-opt.selected { border-color: var(--blue); background: #f8faff; }
-    .deposit-opt input { margin-top: 2px; }
-    .deposit-opt .opt-title { font-size: 14px; font-weight: 600; }
-    .deposit-opt .opt-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
-    .pay-summary {
-      margin-top: 12px; padding: 10px 12px; background: #fff; border-radius: 8px;
-      border: 1px dashed var(--border); font-size: 13px; line-height: 1.7;
-    }
-    .pay-summary .total { font-size: 16px; font-weight: 700; color: var(--danger); }
-    .deposit-status-card {
-      margin: 0 16px 12px; padding: 12px 14px; background: #fff; border-radius: 12px;
-      font-size: 13px; line-height: 1.6; border: 1px solid var(--border);
-    }
-    .deposit-status-card .ds-title { font-weight: 600; margin-bottom: 4px; }
-    .deposit-status-card .ds-muted { font-size: 11px; color: var(--muted); }
-    .service-scope-banner {
-      margin: 0 12px 10px; padding: 10px 12px; border-radius: 10px; background: #ecfdf5;
-      border: 1px solid #99f6e4; font-size: 12px; color: #0f766e; line-height: 1.5;
-    }
+    .btn-gold { display: inline-block; margin-top: 8px; background: var(--gold); color: var(--gold-text); border: none; padding: 6px 12px; border-radius: 14px; font-size: 10px; font-weight: 600; }
+    .service-scope-banner { margin: 0 10px 8px; padding: 8px 10px; border-radius: 8px; background: #ecfdf5; border: 1px solid #99f6e4; font-size: 9px; color: #0f766e; line-height: 1.45; }
     .service-scope-banner strong { color: #115e59; }
-    .op-pick-item {
-      display: flex; justify-content: space-between; align-items: center; padding: 14px 12px;
-      border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; cursor: pointer;
-    }
-    .op-pick-item:hover { border-color: var(--brand); background: #f0fdf9; }
-    .op-pick-item small { color: var(--muted); display: block; margin-top: 4px; }
-    @media (max-width: 720px) {
-      .demo-panel { width: 100%; order: 2; }
-      .phone-wrap { width: 100%; max-width: var(--phone-w); height: 100vh; max-height: none; border-radius: 0; }
-      .workspace { padding: 0; }
-    }
+    .channel-attr-banner { background: linear-gradient(90deg, #fff7e6, #fff); border: 1px solid #ffd666; border-radius: 8px; padding: 8px; font-size: 9px; line-height: 1.5; color: #7a6520; margin: 0 10px 8px; }
+    .section-card { margin: 0 10px 8px; background: #fff; border-radius: 10px; padding: 10px 8px; }
+    .section-title { font-size: 11px; font-weight: 600; margin-bottom: 8px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .grid-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; font-size: 8px; color: var(--text); }
+    .grid-item .gi { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 14px; background: #eef3ff; color: var(--blue); }
+    .deposit-status-card { margin: 0 10px 8px; padding: 10px; background: #fff; border-radius: 10px; font-size: 9px; line-height: 1.5; border: 1px solid var(--border); }
+    .deposit-status-card .ds-title { font-weight: 600; margin-bottom: 3px; font-size: 10px; }
+    .sheet-page { padding: 10px; background: #fff; height: 100%; overflow: hidden; }
+    .form-row { margin-bottom: 10px; }
+    .form-row label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+    .form-row input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 11px; }
+    .btn-block { width: 100%; height: 32px; border-radius: 16px; border: none; background: var(--blue); color: #fff; font-size: 11px; font-weight: 600; }
+    .pkg-card { border: 1px solid var(--blue); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #f8faff; }
+    .pkg-card h5 { font-size: 11px; margin-bottom: 2px; }
+    .pkg-card .price { color: var(--danger); font-size: 14px; font-weight: 700; }
+    .pkg-card .desc { font-size: 9px; color: var(--muted); margin-top: 2px; }
+    .deposit-block { margin-top: 8px; padding: 8px; border-radius: 8px; background: #f8fafc; border: 1px solid var(--border); }
+    .deposit-block h5 { font-size: 10px; margin-bottom: 6px; }
+    .deposit-opt { display: flex; gap: 8px; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 6px; margin-bottom: 6px; background: #fff; font-size: 9px; }
+    .deposit-opt.selected { border-color: var(--blue); background: #f8faff; }
+    .deposit-opt .opt-title { font-weight: 600; font-size: 10px; }
+    .pay-summary { margin-top: 8px; padding: 8px; background: #fff; border-radius: 6px; border: 1px dashed var(--border); font-size: 10px; line-height: 1.6; }
+    .pay-summary .total { font-size: 13px; font-weight: 700; color: var(--danger); }
+    .op-pick-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 8px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; font-size: 10px; }
+    .op-pick-item small { color: var(--muted); display: block; margin-top: 2px; font-size: 9px; }
+    .scan-box { text-align: center; padding: 16px 10px; }
+    .scan-frame { width: 110px; height: 110px; margin: 0 auto 10px; border: 2px solid var(--blue); border-radius: 8px; background: #111; position: relative; }
+    .scan-line { position: absolute; left: 6px; right: 6px; height: 2px; background: var(--blue); top: 30%; box-shadow: 0 0 6px var(--blue); }
+    .result-ok { text-align: center; padding: 14px 10px; }
+    .result-ok .big { font-size: 32px; margin-bottom: 8px; color: #1a8f4a; }
+    .result-ok .big.fail { color: var(--danger); }
+    .result-ok h4 { font-size: 12px; margin-bottom: 6px; }
+    .result-ok p { font-size: 9px; color: var(--muted); line-height: 1.55; }
+    .order-list { padding: 8px 10px; }
+    .order-card { background: #fff; border-radius: 8px; padding: 10px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+    .order-card .top { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10px; font-weight: 600; }
+    .order-card .status { color: var(--blue); font-size: 9px; }
+    .order-card .meta { font-size: 9px; color: var(--muted); line-height: 1.5; }
+    .empty { text-align: center; padding: 36px 16px; color: var(--muted); font-size: 11px; }
+    .empty .icon { font-size: 36px; margin-bottom: 8px; opacity: .4; }
+    .toast-block { margin: 20px 12px; padding: 12px; background: rgba(0,0,0,.78); color: #fff; border-radius: 8px; font-size: 10px; text-align: center; line-height: 1.5; }
+    .flow-connector { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 52px; padding-top: 36px; align-self: flex-start; }
+    .arrow-h { width: 36px; height: 3px; background: var(--blue); position: relative; border-radius: 2px; }
+    .arrow-h::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 7px solid var(--blue); }
+    .connector-label { font-size: 9px; color: var(--blue); font-weight: 600; margin-top: 5px; text-align: center; line-height: 1.3; max-width: 48px; }
+    .flow-branch-area { margin-top: 8px; padding-top: 12px; border-top: 1px dashed var(--border); display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+    .flow-note { flex: 1; min-width: 240px; max-width: 480px; background: #eef6ff; border: 1px solid #b3d4ff; border-radius: 12px; padding: 14px 16px; font-size: 11px; line-height: 1.65; color: #1a3a6b; }
+    .flow-note h4 { font-size: 12px; margin-bottom: 8px; color: var(--blue-dark); }
+    .flow-note ul { padding-left: 16px; margin-top: 6px; }
+    .branch-v-connector { display: flex; flex-direction: column; align-items: center; margin-bottom: 4px; }
+    .arrow-v { width: 3px; height: 28px; background: var(--blue); position: relative; border-radius: 2px; }
+    .arrow-v::after { content: ""; position: absolute; bottom: -1px; left: -4px; border: 5px solid transparent; border-top: 7px solid var(--blue); }
+    .supplement-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--frame-w) + 24px), 1fr)); gap: 16px 12px; }
+    .supplement-grid .flow-cell { width: auto; }
+    .legend-bar { display: flex; flex-wrap: wrap; gap: 12px 20px; font-size: 11px; color: var(--muted); margin-bottom: 16px; padding: 10px 14px; background: #f8fafc; border-radius: 10px; }
+    .legend-bar span::before { content: "●"; margin-right: 4px; color: var(--blue); }
+    .legend-bar span.sys::before { content: "◆"; }
+    .legend-bar span.warn::before { content: "!"; color: #d97706; }
+    .legend-bar span.phase2::before { content: "⋯"; color: #8a94a6; }
+    @media (max-width: 720px) { .flow-header { flex-direction: column; align-items: flex-start; } :root { --frame-w: 200px; --frame-h: 380px; } }
   </style>
 </head>
 <body>
-  <div class="workspace">
-    <aside class="demo-panel">
-      <h2>主线导览</h2>
-      <p style="color:var(--muted);margin-bottom:10px;font-size:12px">个人套餐 P01–P09 · 人天池 C01–C08。二期身份收入补充场景。</p>
-      <div class="story-tabs">
-        <button type="button" data-story="personal" class="active">个人套餐</button>
-        <button type="button" data-story="channel">人天池</button>
-      </div>
-      <ol id="mainlineSteps" class="mainline-steps"></ol>
-      <p id="mainlineHint" class="mainline-hint"></p>
-      <div class="mainline-actions">
-        <button type="button" id="btnMainlinePrev">上一步</button>
-        <button type="button" class="primary" id="btnMainlineNext">下一步</button>
-      </div>
-      <details class="supplement-details">
-        <summary>补充场景</summary>
-        <label>场景身份</label>
-        <select id="demoRole">
-          <optgroup label="主线相关">
-            <option value="guest">未登录</option>
-            <option value="personal" selected>个人套餐 · 张骑手 U1028</option>
-            <option value="none">已登录 · 未开通服务</option>
-            <option value="pending_pickup">个人套餐 · 解冻待领电池</option>
-            <option value="frozen">个人套餐 · 已冻结</option>
-            <option value="cooling_refund">冷静期退款 · 李骑手 U2188</option>
-            <option value="channel">渠道人天 · 待办押金 · U2110</option>
-            <option value="channel_deposit_done">渠道人天 · 押金已办 · 持电池</option>
-            <option value="channel_fail">渠道预占失败·待还电 · 赵骑手 U2103</option>
-            <option value="channel_no_quota">个人无额度·待还电 · 吴骑手 U2112</option>
-            <option value="channel_resign">渠道离职回池 · 孙骑手 U2110</option>
-          </optgroup>
-          <optgroup label="个人 / 人天池异常">
-            <option value="personal_cross3">个人跨网·案例3 · U1028</option>
-            <option value="channel_cross3">渠道跨网·案例3 · 王骑手 U2088</option>
-            <option value="geo_ambiguous">冷启动 · 定位两 OP 接近</option>
-          </optgroup>
-          <optgroup label="⋯ 二期">
-            <option value="lease_whitelist">⋯ 二期 · 设备租赁白名单 · 付费已购</option>
-            <option value="lease_whitelist_new">⋯ 二期 · 设备租赁 · 付费未购</option>
-            <option value="lease_whitelist_free">⋯ 二期 · 设备租赁 · 免费</option>
-            <option value="lease_suspended">⋯ 二期 · 渠道停服·持电池</option>
-            <option value="lease_suspended_nobat">⋯ 二期 · 渠道停服·未持电池</option>
-            <option value="lease_blocked">⋯ 二期 · 非白名单拦截</option>
-            <option value="card_link_guest">⋯ 二期 · 骑士卡链接 · 未登录</option>
-            <option value="card_link_kyc">⋯ 二期 · 骑士卡链接 · 未实名</option>
-            <option value="card_link_attr">⋯ 二期 · 骑士卡链接 · 专享价</option>
-            <option value="card_link_rebuy">⋯ 二期 · 骑士卡链接 · 再次购卡（正式价）</option>
-          </optgroup>
-        </select>
-        <label>扫码站点</label>
-        <select id="demoSite">
-          <option value="ST-SH-01">浦东骑手驿站（OP-SX）</option>
-          <option value="ST-SH-02">世博换电服务点（OP-SX）</option>
-          <option value="ST-SH-04">陆家嘴分站（跨运营商 · OP-LJZ）</option>
-          <option value="ST-SH-JD">⋯ 二期 · 京东物流专属站</option>
-          <option value="ST-BJ-01">滨江换电站（案例3·跨网¥0.6）</option>
-        </select>
-        <label style="margin-top:10px">定位场景（方案乙）</label>
-        <select id="demoGeo">
-          <option value="auto_unique">自动命中 · 最近 OP-SX（1.2km）</option>
-          <option value="ambiguous">两 OP 接近 · 需手动选择</option>
-          <option value="denied">用户拒绝定位</option>
-          <option value="no_nearby">15km 内无在营站</option>
-        </select>
-        <label style="margin-top:10px;display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="policyCrossNet" checked /> 允许跨网换电</label>
-        <button type="button" class="primary" id="applyDemo">应用补充场景</button>
-      </details>
-      <p style="margin-top:14px"><a href="../index.html">← 返回运营商后台原型</a></p>
-      <p style="margin-top:6px"><a id="navDocsLink" href="../docs/index.html">📄 产品文档（全部）</a></p>
-    </aside>
-
-    <div class="phone-wrap" id="phone">
-      <div class="status-bar">
-        <span id="clock">11:24</span>
-        <div class="status-icons">
-          <span>5G</span><span>▮▮▮</span><span>75%</span>
-          <div class="wx-capsule"><span>···</span><span>◎</span></div>
-        </div>
-      </div>
-      <div class="app-header" id="pageTitle">首页</div>
-      <div class="service-banner">客服电话 400-607-2666　服务时间 8:00-24:00</div>
-
-      <!-- 首页 -->
-      <div class="screen active" id="screen-home" data-title="首页">
-        <div class="map-area" id="mapArea">
-          <span class="map-label" style="left:18%;top:22%">博奥路</span>
-          <span class="map-label" style="left:55%;top:38%">机场公路</span>
-          <span class="map-label" style="left:30%;top:55%">绿色出行</span>
-          <div class="map-pin" style="left:42%;top:48%" data-site="ST-SH-01" title="浦东骑手驿站"></div>
-          <div class="map-pin" style="left:52%;top:62%" data-site="ST-SH-02" title="世博换电服务点"></div>
-          <div class="map-pin" style="left:68%;top:35%" data-site="ST-SH-04" title="陆家嘴分站"></div>
-          <div class="map-pin" style="left:25%;top:70%" data-site="ST-BJ-01" title="滨江换电站"></div>
-          <div id="mapPins"></div>
-          <div class="map-legend" id="mapLegend"></div>
-          <span class="map-provider">腾讯地图 · 演示</span>
-          <div class="map-fab-row">
-            <button type="button" class="fab-circle" id="btnHelp" title="帮助">?</button>
-            <button type="button" class="fab-scan" id="btnScan">⊞ 扫一扫</button>
-            <button type="button" class="fab-circle" id="btnLocate" title="定位">⌖</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 订单 -->
-      <div class="screen" id="screen-orders" data-title="订单">
-        <div class="sub-tabs" id="orderTabs">
-          <button type="button" class="sub-tab active" data-otab="swap">换电订单</button>
-          <button type="button" class="sub-tab" data-otab="purchase">服务购买</button>
-          <button type="button" class="sub-tab" data-otab="return">退租订单</button>
-        </div>
-        <div class="order-list" id="orderList"></div>
-      </div>
-
-      <!-- 我的 -->
-      <div class="screen" id="screen-mine" data-title="我的">
-        <div class="mine-scroll" id="mineContent"></div>
-      </div>
-
-      <nav class="tab-bar">
-        <button type="button" class="tab-item active" data-tab="home"><span class="icon">⌂</span>首页</button>
-        <button type="button" class="tab-item" data-tab="orders"><span class="icon">☰</span>订单</button>
-        <button type="button" class="tab-item" data-tab="mine"><span class="icon">☺</span>我的</button>
-      </nav>
+  <header class="flow-header">
+    <div>
+      <h1>智格换电 · 骑手端流程原型</h1>
+      <p>平铺展示 · 箭头串联业务 · 覆盖三 Tab + 主线 + 全部补充场景 · 对齐 <a id="navDocsLink" href="../docs/index.html">骑手端 PRD</a></p>
     </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <!-- 扫码换电 -->
-  <div class="overlay" id="overlayScan">
-    <div class="sheet">
-      <div class="sheet-head"><h3>扫码换电</h3><button type="button" class="sheet-close" data-close="overlayScan">×</button></div>
-      <div class="sheet-body" id="scanBody"></div>
-    </div>
-  </div>
-
-  <!-- 套餐购买 -->
-  <div class="overlay" id="overlayPkg">
-    <div class="sheet">
-      <div class="sheet-head"><h3>服务购买</h3><button type="button" class="sheet-close" data-close="overlayPkg">×</button></div>
-      <div class="sheet-body" id="pkgSheetBody">
-        <p style="font-size:12px;color:var(--muted)">加载套餐…</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- 选择服务运营商 -->
-  <div class="overlay" id="overlayOpPick">
-    <div class="sheet">
-      <div class="sheet-head"><h3>选择服务运营商</h3><button type="button" class="sheet-close" data-close="overlayOpPick">×</button></div>
-      <div class="sheet-body" id="opPickBody">
-        <p style="font-size:12px;color:var(--muted);margin:0 0 12px">您附近有多个换电服务提供商，请选择本次购套餐的运营商（支付将进入所选运营商账户）。</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- 实名 -->
-  <div class="overlay" id="overlayKyc">
-    <div class="sheet">
-      <div class="sheet-head"><h3>实名认证</h3><button type="button" class="sheet-close" data-close="overlayKyc">×</button></div>
-      <div class="sheet-body">
-        <div class="form-row"><label>真实姓名</label><input type="text" id="kycName" placeholder="与身份证一致" /></div>
-        <div class="form-row"><label>身份证号</label><input type="text" id="kycId" placeholder="18位身份证号" maxlength="18" /></div>
-        <button type="button" class="btn-block" id="btnKycSubmit">提交认证</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 设置 -->
-  <div class="overlay" id="overlaySettings">
-    <div class="sheet">
-      <div class="sheet-head"><h3>设置</h3><button type="button" class="sheet-close" data-close="overlaySettings">×</button></div>
-      <div class="sheet-body">
-        <div class="form-row"><label>消息通知</label><input type="checkbox" checked /> 换电结果通知</div>
-        <div class="form-row"><label>演示身份</label>
-          <select id="settingsRole" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border)">
-            <optgroup label="主线相关">
-              <option value="guest">未登录</option>
-              <option value="personal">个人套餐</option>
-              <option value="none">未开通</option>
-              <option value="pending_pickup">解冻待领电池</option>
-              <option value="frozen">已冻结 · U1041</option>
-              <option value="cooling_refund">冷静期退款·U2188</option>
-              <option value="channel">渠道人天</option>
-              <option value="channel_deposit_done">渠道·押金已办</option>
-              <option value="channel_fail">渠道预占失败·待还电·U2103</option>
-              <option value="channel_no_quota">个人无额度·待还电·U2112</option>
-              <option value="channel_resign">渠道离职回池</option>
-            </optgroup>
-            <optgroup label="异常">
-              <option value="personal_cross3">个人跨网·案例3</option>
-              <option value="channel_cross3">渠道跨网·案例3</option>
-              <option value="geo_ambiguous">定位两 OP 接近</option>
-            </optgroup>
-            <optgroup label="⋯ 二期">
-              <option value="lease_whitelist">⋯ 设备租赁·付费已购</option>
-              <option value="lease_whitelist_new">⋯ 设备租赁·付费未购</option>
-              <option value="lease_whitelist_free">⋯ 设备租赁·白名单免费</option>
-              <option value="lease_suspended">⋯ 渠道停服·持电池</option>
-              <option value="lease_suspended_nobat">⋯ 渠道停服·未持电池</option>
-              <option value="lease_blocked">⋯ 非白名单拦截</option>
-              <option value="card_link_guest">⋯ 骑士卡链接·未登录</option>
-              <option value="card_link_kyc">⋯ 骑士卡链接·未实名</option>
-              <option value="card_link_attr">⋯ 骑士卡链接·渠道专享价</option>
-              <option value="card_link_rebuy">⋯ 骑士卡链接·再次购卡正式价</option>
-            </optgroup>
-          </select>
-        </div>
-        <button type="button" class="btn-block" id="btnLogout" style="margin-top:16px;background:#f0f2f5;color:var(--text)">退出登录</button>
-      </div>
-    </div>
-  </div>
-
+    <nav><a href="../index.html">← 运营商后台</a><a id="navDocsLink2" href="../docs/index.html">产品文档</a></nav>
+  </header>
+  <main class="flow-board" id="flowBoard"></main>
   <script>
-    const OPERATORS = {
-      "OP-SX": { id: "OP-SX", name: "绿色出行", subMch: "19000001***" },
-      "OP-LJZ": { id: "OP-LJZ", name: "陆家嘴联营", subMch: "19000002***" },
-      "OP-BJ": { id: "OP-BJ", name: "滨江换电", subMch: "19000003***" }
-    };
-
-    /** 运营商押金设置（与后台「押金设置」对齐） */
-    const DEPOSIT_POLICY = {
-      "OP-SX": { amount: 99, wechatPayScoreMin: 500, zhimaScoreMin: 500, enabled: true },
-      "OP-LJZ": { amount: 199, wechatPayScoreMin: 500, zhimaScoreMin: 500, enabled: true },
-      "OP-BJ": { amount: 99, wechatPayScoreMin: 500, zhimaScoreMin: 500, enabled: true }
-    };
-
-    const CHANNELS = {
-      "CH-RENT": { id: "CH-RENT", name: "京东物流租赁渠道", subMch: "1678901234***", operatorId: "OP-SX" }
-    };
-
-    const LEASE_PKG_SKUS = {
-      month: { key: "month", name: "包月30天", price: 299, days: 30, batteryModel: "48V30Ah", desc: "京东物流专属 · 款入渠道账户" },
-      month60: { key: "month60", name: "包月30天", price: 349, days: 30, batteryModel: "60V30Ah", desc: "60V 型号 · 款入渠道账户" },
-      weekly: { key: "weekly", name: "7天套餐", price: 89, days: 7, batteryModel: "48V30Ah", desc: "短期试用" }
-    };
-
-    const SITES = {
-      "ST-SH-01": { id: "ST-SH-01", name: "浦东骑手驿站", operator: "OP-SX", signed: true },
-      "ST-SH-02": { id: "ST-SH-02", name: "世博换电服务点", operator: "OP-SX", signed: true },
-      "ST-SH-04": { id: "ST-SH-04", name: "陆家嘴分站", operator: "OP-LJZ", signed: true },
-      "ST-SH-JD": { id: "ST-SH-JD", name: "京东物流专属站", operator: "OP-SX", signed: true, channelDedicated: "CH-RENT", publicOpen: false, visibilityMode: "whitelist_only" },
-      "ST-BJ-01": { id: "ST-BJ-01", name: "滨江换电站", operator: "OP-BJ", batteryOperator: "OP-LJZ", signed: false }
-    };
-
-    const CHANNEL_SWAP_POLICY = {
-      "CH-RENT": {
-        crossNetworkEnabled: true, crossNetworkDepositPaid: true, crossNetworkDepositAmount: 20000,
-        depositBalance: 18000, crossSwapEnabled: true, hostOperatorId: "OP-SX"
-      }
-    };
-
-    const OPERATOR_POLICY = {
-      "OP-SX": { crossNetworkEnabled: true },
-      "OP-LJZ": { crossNetworkEnabled: true },
-      "OP-BJ": { crossNetworkEnabled: true }
-    };
-
-    const OPERATOR_CREDIT = {
-      "OP-SX": { crossSwapEnabled: true },
-      "OP-LJZ": { crossSwapEnabled: true },
-      "OP-BJ": { crossSwapEnabled: false }
-    };
-
-    const CHANNEL_CARD_ATTR = {
-      channelId: "CH-CARD", channelName: "骑士卡渠道", operatorId: "OP-SX",
-      linkCode: "qsk-30d-home", linkPurpose: "App 首页 Banner", expiresLabel: "剩余 18h32m",
-      skus: {
-        month: { key: "month", name: "30天畅换 · 不限次", official: 299, channel: 279, days: 30, desc: "绿色出行 · 浦东骑手驿站 · 含电池服务", channelSku: true, batteryModel: "48V30Ah", pkg: "30天畅换" },
-        weekly: { key: "weekly", name: "7天套餐 · 不限次", official: 89, channel: 79, days: 7, desc: "短期试用", channelSku: true, batteryModel: "48V30Ah", pkg: "7天套餐" },
-        times: { key: "times", name: "10次卡 · 30天有效", official: 79, channel: 79, days: 30, desc: "按次计费，换电成功扣次", channelSku: false, batteryModel: "48V30Ah", pkg: "次卡10次" }
-      }
-    };
-
-    /** 与后台「个人套餐价」Mock 对齐；套餐必须与电池型号绑定，无一单通兑 */
-    const BATTERY_MODEL_OPTIONS = ["48V20Ah", "48V30Ah", "60V30Ah"];
-    const OPERATOR_PKG_PRICES = [
-      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 299, status: "生效" },
-      { operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 349, status: "生效" },
-      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 89, status: "生效" },
-      { operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 109, status: "生效" },
-      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29, status: "生效" },
-      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9, status: "生效" },
-      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "次卡10次", pkgType: "times", validityHours: null, retailPrice: 89, status: "生效" },
-      { operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "30天畅换", pkgType: "monthly", validityHours: null, retailPrice: 329, status: "生效" },
-      { operatorId: "OP-SX", city: "上海", batteryModel: "48V20Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 269, status: "停用" }
-    ];
-    const CHANNEL_PKG_OVERRIDES = {
-      "CH-CARD": {
-        "48V30Ah": {
-          "30天畅换": { channel: 279, channelSku: true },
-          "7天套餐": { channel: 79, channelSku: true },
-          "次卡10次": { channel: 79, channelSku: false }
-        }
-      }
-    };
-
-    const USERS = {
-      guest: { loggedIn: false },
-      card_link_guest: {
-        loggedIn: false, channelAttr: CHANNEL_CARD_ATTR,
-        landingNote: "您通过骑士卡推广链接进入绿色出行小程序"
-      },
-      personal: {
-        loggedIn: true, phone: "138****1028", name: "张骑手", userId: "U1028",
-        kyc: false, entitlement: "个人套餐", pkg: "30天畅换", batteryModel: "48V30Ah", daysLeft: 18, swapUsed: 42,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: null, holdsBattery: true,
-        depositMethod: "实付", depositStatus: "在押", depositAmount: 99, depositChannel: "实缴",
-        mockWechatPayScore: 720, mockZhimaScore: 680
-      },
-      personal_cross3: {
-        loggedIn: true, phone: "138****1028", name: "张骑手", userId: "U1028",
-        kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 18, swapUsed: 42,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: null,
-        demoCase3: true, holdsBattery: true,
-        depositMethod: "信用免押", depositStatus: "——", depositAmount: 0, depositChannel: "微信支付分",
-        mockWechatPayScore: 720, mockZhimaScore: 680
-      },
-      cooling_refund: {
-        loggedIn: true, phone: "136****2188", name: "李骑手", userId: "U2188",
-        kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 28, swapUsed: 5,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", holdsBattery: false,
-        coolingPeriod: true, coolingDaysLeft: 1, payTime: "2026-06-10", payAmount: 299,
-        depositMethod: "实付", depositStatus: "在押", depositAmount: 99, depositChannel: "实缴",
-        mockWechatPayScore: 580, mockZhimaScore: 600
-      },
-      channel: {
-        loggedIn: true, phone: "136****2110", name: "孙骑手", userId: "U2110",
-        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 13, swapUsed: 0,
-        status: "服务中", todayEligibility: "已预占", operator: "OP-SX", homeSite: "ST-SH-02",
-        channel: "顺丰同城渠道", team: "世博车队", poolId: "QP-2601", holdsBattery: false,
-        depositStatus: null, depositAmount: 0, depositMethod: null,
-        mockWechatPayScore: 700, mockZhimaScore: 660
-      },
-      channel_deposit_done: {
-        loggedIn: true, phone: "136****2110", name: "孙骑手", userId: "U2110",
-        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 13, swapUsed: 1,
-        status: "服务中", todayEligibility: "已确认消耗", operator: "OP-SX", homeSite: "ST-SH-02",
-        channel: "顺丰同城渠道", team: "世博车队", poolId: "QP-2601", holdsBattery: true,
-        depositMethod: "信用免押", depositStatus: "——", depositAmount: 0, depositChannel: "微信支付分",
-        mockWechatPayScore: 700, mockZhimaScore: 660, currentBatterySn: "BAT-SF-2110"
-      },
-      channel_fail: {
-        loggedIn: true, phone: "137****2103", name: "赵骑手", userId: "U2103",
-        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 0, swapUsed: 1,
-        status: "待还电", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601",
-        preOccupyFail: true, failReason: "渠道额度池余额不足，今日预占失败",
-        gateReason: "预占失败", holdsBattery: true, currentBatterySn: "BAT-SF-2103",
-        depositMethod: "实付", depositStatus: "在押", depositAmount: 99, depositChannel: "实缴",
-        mockWechatPayScore: 600, mockZhimaScore: 620
-      },
-      channel_no_quota: {
-        loggedIn: true, phone: "134****2112", name: "吴骑手", userId: "U2112",
-        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 0, swapUsed: 0,
-        status: "待还电", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601",
-        preOccupyFail: false, gateReason: "个人无额度",
-        failReason: "个人分配人天已用尽", holdsBattery: true, currentBatterySn: "BAT-SF-2112",
-        depositMethod: "信用免押", depositStatus: "——", depositAmount: 0, depositChannel: "微信支付分",
-        mockWechatPayScore: 650, mockZhimaScore: 640
-      },
-      channel_cross3: {
-        loggedIn: true, phone: "137****2088", name: "王骑手", userId: "U2088",
-        kyc: true, entitlement: "渠道人天", pkg: "人天额度", daysLeft: null, swapUsed: 2,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-01", channel: "顺丰同城渠道", poolId: "QP-2601", demoCase3: true, holdsBattery: true,
-        depositMethod: "信用免押", depositStatus: "——", depositAmount: 0, depositChannel: "微信支付分",
-        mockWechatPayScore: 710, mockZhimaScore: 670
-      },
-      channel_resign: {
-        loggedIn: true, phone: "136****2110", name: "孙骑手", userId: "U2110",
-        kyc: true, entitlement: "渠道人天", pkg: "人天额度", remainingDays: 0, swapUsed: 0,
-        status: "已离职", operator: "OP-SX", homeSite: "ST-SH-02",
-        channel: "顺丰同城渠道", team: "世博车队", poolId: "QP-2601",
-        holdsBattery: true, channelResigned: true, currentBatterySn: "BAT-SF-2110",
-        depositMethod: "实付", depositStatus: "在押", depositAmount: 99, depositChannel: "实缴"
-      },
-      none: {
-        loggedIn: true, phone: "188****1850", name: "新用户", userId: "U0001",
-        kyc: false, entitlement: null, status: "未开通"
-      },
-      geo_ambiguous: {
-        loggedIn: true, phone: "188****1851", name: "定位用户", userId: "U0002",
-        kyc: true, entitlement: null, status: "未开通", geoAmbiguous: true
-      },
-      frozen: {
-        loggedIn: true, phone: "139****1041", name: "赵骑手", userId: "U1041",
-        kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 21, swapUsed: 28,
-        status: "已冻结", operator: "OP-SX", homeSite: "ST-SH-01", holdsBattery: false,
-        frozenDays: 7,
-        depositMethod: "实付", depositStatus: "在押", depositAmount: 99, depositChannel: "实缴"
-      },
-      pending_pickup: {
-        loggedIn: true, phone: "136****1055", name: "钱骑手", userId: "U1055",
-        kyc: true, entitlement: "个人套餐", pkg: "30天畅换", daysLeft: 26, swapUsed: 12,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-02", holdsBattery: false,
-        pendingPickup: true,
-        depositMethod: "实付", depositStatus: "在押", depositAmount: 99, depositChannel: "实缴"
-      },
-      lease_whitelist: {
-        loggedIn: true, phone: "139****4001", name: "张配送", userId: "U4001",
-        kyc: true, entitlement: "设备租赁白名单", pkg: "包月30天", batteryModel: "48V30Ah", daysLeft: 22, swapUsed: 42,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
-        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "paid", holdsBattery: true,
-        depositMethod: "渠道担保", depositStatus: "——", depositAmount: 0, depositChannel: "渠道担保"
-      },
-      lease_whitelist_new: {
-        loggedIn: true, phone: "137****4003", name: "王夜配", userId: "U4003",
-        kyc: true, entitlement: "设备租赁白名单", pkg: null, swapUsed: 0,
-        status: "未开通", operator: "OP-SX", homeSite: "ST-SH-JD",
-        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "paid", holdsBattery: false
-      },
-      lease_whitelist_free: {
-        loggedIn: true, phone: "135****4005", name: "陈配送", userId: "U4005",
-        kyc: true, entitlement: "设备租赁白名单", pkg: null, swapUsed: 18,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
-        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true, whitelistAccess: "free", holdsBattery: true
-      },
-      lease_suspended: {
-        loggedIn: true, phone: "139****4001", name: "张配送", userId: "U4001",
-        kyc: true, entitlement: "设备租赁白名单", pkg: "白名单权益", swapUsed: 42,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
-        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true,
-        channelSuspended: true, holdsBattery: true, currentBatterySn: "BAT-JD-050"
-      },
-      lease_suspended_nobat: {
-        loggedIn: true, phone: "137****4003", name: "王夜配", userId: "U4003",
-        kyc: true, entitlement: "设备租赁白名单", pkg: "白名单权益", swapUsed: 28,
-        status: "服务中", operator: "OP-SX", homeSite: "ST-SH-JD",
-        channel: "京东物流租赁渠道", channelId: "CH-RENT", whitelist: true,
-        channelSuspended: true, holdsBattery: false
-      },
-      lease_blocked: {
-        loggedIn: true, phone: "159****9999", name: "路人骑手", userId: "U9999",
-        kyc: true, entitlement: null, status: "未授权",
-        operator: "OP-SX", leaseBlocked: true, blockReason: "非渠道白名单用户（E_WHITELIST），请联系京东物流租赁渠道管理员"
-      },
-      card_link_kyc: {
-        loggedIn: true, phone: "138****3101", name: "新骑士", userId: "U-L201",
-        kyc: false, entitlement: null, status: "未开通", operator: "OP-SX",
-        channelAttr: CHANNEL_CARD_ATTR
-      },
-      card_link_attr: {
-        loggedIn: true, phone: "138****3101", name: "新骑士", userId: "U-L201",
-        kyc: true, entitlement: null, status: "未开通", operator: "OP-SX",
-        channelAttr: CHANNEL_CARD_ATTR
-      },
-      card_link_rebuy: {
-        loggedIn: true, phone: "138****3102", name: "李复购", userId: "U-L202",
-        kyc: true, entitlement: null, status: "未开通", operator: "OP-SX",
-        channelAttr: CHANNEL_CARD_ATTR,
-        landingNote: "再次从骑士卡链接进入 · 演示重新购卡走正式零售价"
-      }
-    };
+    const OP = { "OP-SX": "绿色出行", "OP-LJZ": "陆家嘴联营", "OP-BJ": "滨江换电" };
 
     const MAINLINE = {
-      personal: {
-        story: "personal",
-        steps: [
-          { id: "P01", title: "登录授权", role: "guest", hint: "● 勾选协议后微信一键登录", autoOpen: "mine" },
-          { id: "P02", title: "实名认证", role: "none", hint: "● 填写姓名与身份证；未实名不可购套餐", autoOpen: "kyc" },
-          { id: "P03", title: "确定服务运营商", role: "none", geo: "auto_unique", hint: "●/◆ 扫柜优先，其次定位匹配运营商", autoOpen: "mine" },
-          { id: "P04", title: "购买套餐", role: "none", geo: "auto_unique", hint: "● SKU + 押金二选一（支付分免押/实缴）同笔支付", autoOpen: "pkg" },
-          { id: "P05", title: "首次领取电池", role: "pending_pickup", hint: "● 解冻/开通后首次为领取电池（非换电）；押金已在购套餐办结", autoOpen: "scan" },
-          { id: "P06", title: "日常换电", role: "personal", hint: "● 扫码换电主路径；写入换电订单", autoOpen: "scan" },
-          { id: "P07", title: "续费", role: "personal", hint: "● 续费原运营商 · 正式零售价（不适用渠道专享价）", autoOpen: "pkg" },
-          { id: "P08", title: "冻结与解冻", role: "frozen", hint: "●/◆ 须先还电；解冻后待领电池并顺延有效期", autoOpen: "mine" },
-          { id: "P09", title: "退款/退租/完结", role: "cooling_refund", hint: "● 冷静期申请退款（须还电）；建议退套餐+押金", autoOpen: "mine" }
-        ]
-      },
-      channel: {
-        story: "channel",
-        steps: [
-          { id: "C01", title: "登录授权", role: "guest", hint: "● 登录后进入渠道成员态，不引导购主套餐", autoOpen: "mine" },
-          { id: "C02", title: "权益到账", role: "channel", hint: "◆ 渠道/团队/池/剩余人天；押金待首次领电前办理", autoOpen: "mine" },
-          { id: "C03", title: "今日预占", role: "channel", hint: "◆ 服务卡展示「今日已预占」方可换电", autoOpen: "mine" },
-          { id: "C04", title: "首次领取电池", role: "channel", hint: "● 先完成支付分免押或缴押，再扫码领取", autoOpen: "scan" },
-          { id: "C05", title: "日常换电与确认消耗", role: "channel_deposit_done", hint: "●/◆ 押金已办结；换电成功后「今日已确认」", autoOpen: "scan" },
-          { id: "C06", title: "额度异常 · 仅可还电", role: "channel_fail", hint: "! 无人天额度：禁止换电，持电池仅可还电；联系渠道续配", autoOpen: "scan" },
-          { id: "C07", title: "离职/移除", role: "channel_resign", hint: "■→只读 服务终止；持电池仅可还电", autoOpen: "mine" },
-          { id: "C08", title: "还电与回池完结", role: "channel_resign", hint: "●/◆ 还电后剩余人天回池，不向骑手退款", autoOpen: "scan" }
-        ]
-      }
+      personal: { story: "personal", steps: [
+        { id: "P01", title: "登录授权" }, { id: "P02", title: "实名认证" }, { id: "P03", title: "确定服务运营商" },
+        { id: "P04", title: "购买套餐" }, { id: "P05", title: "首次领取电池" }, { id: "P06", title: "日常换电" },
+        { id: "P07", title: "续费" }, { id: "P08", title: "冻结与解冻" }, { id: "P09", title: "退款/退租/完结" }
+      ]},
+      channel: { story: "channel", steps: [
+        { id: "C01", title: "登录授权" }, { id: "C02", title: "权益到账" }, { id: "C03", title: "今日预占" },
+        { id: "C04", title: "首次领取电池" }, { id: "C05", title: "日常换电与确认消耗" }, { id: "C06", title: "额度异常·仅还电" },
+        { id: "C07", title: "离职/移除" }, { id: "C08", title: "还电与回池完结" }
+      ]}
     };
 
-    let state = {
-      role: "personal",
-      scanSite: "ST-SH-01",
-      orderTab: "swap",
-      selectedPkg: "48V30Ah::30天畅换",
-      selectedBatteryModel: "48V30Ah",
-      depositChoice: "waiver_wechat",
-      depositFlow: null,
-      mainline: { story: "personal", stepId: "P06" },
-      swapOrders: [
-        { id: "SW2605241201", site: "浦东骑手驿站", time: "2026-05-24 12:05", status: "成功", type: "个人套餐", userId: "U1028" },
-        { id: "SW2605241188", site: "浦东骑手驿站", time: "2026-05-24 08:30", status: "成功", type: "个人套餐", userId: "U1028" }
-      ],
-      purchaseOrders: [
-        { id: "SUB260524001", pkg: "30天畅换", amount: 398, pkgAmount: 299, depositAmount: 99, time: "2026-05-01 09:12", status: "已支付", userId: "U1028", depositMethod: "实付", depositStatus: "在押" },
-        { id: "SUB260601088", pkg: "30天畅换·渠道专享", amount: 378, pkgAmount: 279, depositAmount: 99, time: "2026-06-01 14:20", status: "已支付", userId: "U-L202", channel: "骑士卡渠道", linkCode: "qsk-30d-home", depositMethod: "实付", depositStatus: "已退" }
-      ],
-      returnOrders: [],
-      geoScenario: "auto_unique",
-      session: {
-        contextOperatorId: null,
-        contextSource: null,
-        nearestSiteId: null,
-        nearestDistanceM: null,
-        launchOp: null,
-        scanCabinetOp: null
-      }
+    function phoneShell(title, tab, body, opts = {}) {
+      const tabs = [{ id: "home", label: "首页", icon: "⌂" }, { id: "orders", label: "订单", icon: "☰" }, { id: "mine", label: "我的", icon: "☺" }];
+      const tabHtml = opts.hideTab ? "" : `<nav class="tab-bar">${tabs.map(t => `<div class="tab-item${t.id === tab ? " active" : ""}"><span class="icon">${t.icon}</span>${t.label}</div>`).join("")}</nav>`;
+      if (opts.wireframe) return `<div class="phone-frame wireframe${opts.highlight ? " highlight" : ""}"><div class="wf-x">✕</div><div class="wf-text">${opts.wireframeText || title}</div></div>`;
+      return `<div class="phone-frame${opts.highlight ? " highlight" : ""}">
+        <div class="status-bar"><span>11:24</span><span>5G ▮▮▮</span></div>
+        <div class="app-header">${title}</div><div class="service-banner">客服 400-607-2666 · 8:00-24:00</div>
+        <div class="screen-body">${body}</div>${tabHtml}</div>`;
+    }
+    function ordersShell(subTab, listHtml) {
+      return phoneShell("订单", "orders", `
+        <div class="sub-tabs">
+          <div class="sub-tab${subTab === "swap" ? " active" : ""}">换电订单</div>
+          <div class="sub-tab${subTab === "purchase" ? " active" : ""}">服务购买</div>
+          <div class="sub-tab${subTab === "return" ? " active" : ""}">退租订单</div>
+        </div><div class="order-list">${listHtml}</div>`);
+    }
+    function connector(label) { return `<div class="flow-connector"><div class="arrow-h"></div>${label ? `<span class="connector-label">${label}</span>` : ""}</div>`; }
+    function flowCell(id, title, html, hint) {
+      return `<div class="flow-cell" data-step="${id}"><div class="frame-label"><span class="step-id">${id}</span>${title}</div>${html}${hint ? `<div class="frame-hint">${hint}</div>` : ""}</div>`;
+    }
+
+    const SCREENS = {
+      home: () => phoneShell("首页", "home", `
+        <div class="map-area">
+          <div class="map-pin" style="left:42%;top:48%"></div><div class="map-pin" style="left:58%;top:62%"></div>
+          <div class="map-legend">图例：蓝钉=可换电站 · 扫一扫换电</div>
+          <div class="map-fab-row"><button class="fab-circle">?</button><button class="fab-scan">⊞ 扫一扫</button><button class="fab-circle">⌖</button></div>
+        </div>`),
+      homeDedicated: () => phoneShell("首页", "home", `
+        <div class="map-area">
+          <div class="map-pin" style="left:42%;top:48%"></div><div class="map-pin dedicated" style="left:36%;top:56%"></div>
+          <div class="map-legend">图例：含 1 个渠道专属站（白名单）</div>
+          <div class="map-fab-row"><button class="fab-scan">⊞ 扫一扫</button></div>
+        </div>`),
+      ordersSwap: () => ordersShell("swap", `
+        <div class="order-card"><div class="top"><span>SW2605241201</span><span class="status">成功</span></div>
+          <div class="meta">浦东骑手驿站<br>2026-05-24 12:05<br>权益：个人套餐</div></div>
+        <div class="order-card"><div class="top"><span>SW2605241188</span><span class="status">成功</span></div>
+          <div class="meta">浦东骑手驿站<br>2026-05-24 08:30<br>权益：个人套餐</div></div>`),
+      ordersPurchase: () => ordersShell("purchase", `
+        <div class="order-card"><div class="top"><span>SUB260524001</span><span class="status">已支付</span></div>
+          <div class="meta">30天畅换 · ¥398<br>套餐 ¥299 + 押金 ¥99（实付·在押）<br>服务：绿色出行 · 2026-05-01</div></div>`),
+      ordersReturn: () => ordersShell("return", `<div class="empty"><div class="icon">📋</div>暂无退租记录</div>`),
+      ordersEmptySwap: () => ordersShell("swap", `<div class="empty"><div class="icon">🔋</div>暂无换电记录</div>`),
+      login: () => phoneShell("我的", "mine", `
+        <div class="login-hero"><div class="logo">智</div><h3>智格换电</h3><p>安全出行 放心骑行</p>
+          <button class="btn-login">微信一键登录</button>
+          <div class="agree-row"><span>☑</span><span>同意《隐私政策》《智格换电服务协议》</span></div></div>`),
+      loginCardLink: () => phoneShell("我的", "mine", `
+        <div class="channel-attr-banner">您通过骑士卡推广链接进入绿色出行小程序</div>
+        <div class="login-hero"><div class="logo">智</div><h3>智格换电</h3>
+          <button class="btn-login">微信一键登录</button>
+          <div class="agree-row"><span>☑</span><span>登录后 24h 内享渠道专享价</span></div></div>`),
+      kyc: () => phoneShell("实名认证", "mine", `
+        <div class="sheet-page"><div class="form-row"><label>真实姓名</label><input value="张骑手" readonly /></div>
+          <div class="form-row"><label>身份证号</label><input value="310***********1234" readonly /></div>
+          <button class="btn-block">提交认证</button></div>`, { hideTab: true }),
+      opPick: () => phoneShell("选择服务运营商", "mine", `
+        <div class="sheet-page"><p style="font-size:9px;color:var(--muted);margin-bottom:10px">附近有多个换电服务提供商，请选择本次购套餐的运营商。</p>
+          <div class="op-pick-item"><div><strong>${OP["OP-SX"]}</strong><small>最近：浦东骑手驿站 · 800m</small></div><span style="color:var(--blue)">选择</span></div>
+          <div class="op-pick-item"><div><strong>${OP["OP-LJZ"]}</strong><small>最近：陆家嘴分站 · 950m</small></div><span style="color:var(--blue)">选择</span></div></div>`, { hideTab: true }),
+      mineNone: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">188****1850</span><span class="tag-sm">未认证</span></div></div>
+        <div class="service-scope-banner">当前服务：<strong>${OP["OP-SX"]}</strong><br><small>定位自动匹配 · 距最近站 1.2km</small></div>
+        <div class="service-card"><h4>暂未开通服务</h4><p>请先完成实名认证，再购买套餐。</p><span class="btn-gold">实名认证</span></div>`),
+      minePersonal: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">138****1028</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card"><h4>30天畅换</h4><p>剩余 18 天 · 已换电 42 次 · 48V30Ah · 持有电池</p><span class="btn-gold">续费</span></div>
+        <div class="deposit-status-card"><div class="ds-title">电池押金 · 实付 ¥99</div>状态 在押 · 实缴</div>
+        <div class="section-card"><div class="section-title">常用功能</div><div class="grid-4">
+          <div class="grid-item"><span class="gi">⊞</span>扫码换电</div><div class="grid-item"><span class="gi">🛒</span>购买套餐</div>
+          <div class="grid-item"><span class="gi">🔋</span>电池退还</div><div class="grid-item"><span class="gi">❄</span>申请冻结</div></div></div>`),
+      minePendingPickup: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****1055</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>待领取电池</h4><p>30天畅换 · 剩余 26 天 · 解冻后首次服务</p><span class="btn-gold">扫码领取</span></div>`),
+      mineFrozen: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">139****1041</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>服务已冻结</h4><p>30天畅换 · 剩余 21 天 · 未持有电池</p><span class="btn-gold">解除冻结</span></div>`),
+      mineCooling: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****2188</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>30天畅换</h4><p>剩余 28 天 · 冷静期剩余 1 天 · 未持电池</p><span class="btn-gold">申请退款</span></div>`),
+      mineChannel: (opts = {}) => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****2110</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card channel"><h4>渠道人天额度</h4><p>顺丰同城 · 世博车队<br>剩余人天 13 · ${opts.today || "今日已预占"}${opts.depositPending ? " · 押金待办理" : ""}${opts.confirmed ? " · 换电 1 次" : ""}</p>
+          ${opts.depositPending ? `<span class="btn-gold">办理押金</span>` : opts.pickup ? `<span class="btn-gold">扫码领取</span>` : ""}</div>
+        ${opts.depositPending ? `<div class="deposit-status-card"><div class="ds-title">电池押金 · 待办理</div>首次领电前须免押或实缴</div>` : ""}`),
+      mineChannelFail: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">137****2103</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>预占失败 · 额度池余额不足<br>持有电池：仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
+      mineChannelNoQuota: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">134****2112</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>个人无额度 · 分配人天已用尽<br>持有电池：仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
+      mineResigned: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****2110</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card done"><h4>服务已终止（离职）</h4><p>请还电入柜后完结 · 仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
+      mineGeoAmbiguous: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">188****1851</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card"><h4>暂未开通服务</h4><p>定位两 OP 接近，需手动选择运营商</p><span class="btn-gold">服务购买</span></div>`),
+      mineLeasePaid: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">139****4001</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card channel"><h4>设备租赁 · 白名单付费</h4><p>京东物流 · 包月30天 · 专属站可见</p></div>
+        <div class="deposit-status-card"><div class="ds-title">电池押金 · 渠道担保</div>状态 —— · 责任在渠道</div>`),
+      mineLeaseNew: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">137****4003</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card channel"><h4>设备租赁 · 白名单付费</h4><p>请购买渠道套餐开通换电</p><span class="btn-gold">购买套餐</span></div>`),
+      mineLeaseFree: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">135****4005</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card channel"><h4>设备租赁 · 白名单免费</h4><p>B2B 月租覆盖 · 免购套餐换电</p></div>`),
+      mineLeaseSuspended: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">139****4001</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>渠道服务已暂停</h4><p>渠道商已停用 · 持电池可还电</p></div>`),
+      mineLeaseBlocked: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">159****9999</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>未授权用户</h4><p>非渠道白名单（E_WHITELIST）</p></div>`),
+      purchaseNew: () => phoneShell("服务购买", "mine", `
+        <div class="sheet-page"><div class="service-scope-banner" style="margin:0 0 8px">收款方：<strong>${OP["OP-SX"]}</strong> · 子商户 19000001***</div>
+          <p style="font-size:9px;margin-bottom:6px">电池型号：<strong>48V30Ah</strong> · 60V30Ah</p>
+          <div class="pkg-card"><h5>30天畅换</h5><div class="price">¥299</div><div class="desc">30天不限次 · 48V30Ah</div></div>
+          <div class="deposit-block"><h5>电池押金</h5>
+            <div class="deposit-opt selected"><div class="opt-title">☑ 微信支付分免押</div></div>
+            <div class="deposit-opt"><div class="opt-title">支付押金 ¥99</div></div>
+            <div class="pay-summary">套餐 ¥299 + 押金 ¥0<br><span class="total">应付 ¥299</span></div></div>
+          <button class="btn-block" style="margin-top:8px">确认支付</button>
+          <p style="font-size:9px;color:var(--blue);margin-top:6px;text-align:center">申请免押 ›</p></div>`, { hideTab: true, highlight: true }),
+      purchasePaidDeposit: () => phoneShell("服务购买", "mine", `
+        <div class="sheet-page"><div class="service-scope-banner" style="margin:0 0 8px">收款方：<strong>${OP["OP-SX"]}</strong></div>
+          <div class="pkg-card"><h5>30天畅换</h5><div class="price">¥299</div></div>
+          <div class="deposit-block"><div class="deposit-opt selected"><div class="opt-title">☑ 支付押金 ¥99</div></div>
+            <div class="pay-summary">套餐 ¥299 + 押金 ¥99<br><span class="total">应付 ¥398</span></div></div>
+          <button class="btn-block" style="margin-top:8px">确认支付 ¥398</button></div>`, { hideTab: true }),
+      purchaseRenew: () => phoneShell("服务购买 · 续费", "mine", `
+        <div class="sheet-page"><div class="service-scope-banner" style="margin:0 0 8px">续费原运营商 · <strong>${OP["OP-SX"]}</strong></div>
+          <div class="pkg-card"><h5>30天畅换</h5><div class="price">¥299</div><div class="desc">正式零售价 · 押金已办结</div></div>
+          <div class="pay-summary"><span class="total">应付 ¥299</span></div>
+          <button class="btn-block" style="margin-top:8px">确认支付</button></div>`, { hideTab: true }),
+      purchaseCardAttr: () => phoneShell("服务购买", "mine", `
+        <div class="sheet-page"><div class="channel-attr-banner" style="margin:0 0 8px">🟡 骑士卡 · 首笔渠道专享价 · 剩余 18h</div>
+          <div class="pkg-card"><h5>30天畅换</h5><div class="price"><span style="text-decoration:line-through;color:var(--muted);font-size:11px">¥299</span> ¥279</div></div>
+          <button class="btn-block" style="margin-top:8px">确认支付 ¥279</button></div>`, { hideTab: true }),
+      purchaseCardRebuy: () => phoneShell("服务购买", "mine", `
+        <div class="sheet-page"><div style="background:#f6f6f6;border:1px solid #e0e0e0;border-radius:8px;padding:8px;font-size:9px;margin-bottom:8px">ℹ️ 再次购卡走<strong>正式零售价</strong></div>
+          <div class="pkg-card"><h5>30天畅换</h5><div class="price">¥299</div></div>
+          <button class="btn-block" style="margin-top:8px">确认支付 ¥299</button></div>`, { hideTab: true }),
+      depositWaiver: () => phoneShell("缴纳押金", "mine", `
+        <div class="sheet-page"><p style="font-weight:600;margin-bottom:8px">骑手电池押金 · ¥99</p>
+          <div class="deposit-opt selected"><div class="opt-title">☑ 微信支付分 | 信用免押 · 分 720</div></div>
+          <button class="btn-block" style="margin-top:12px">立即免押</button></div>`, { hideTab: true }),
+      scanPickup: () => phoneShell("扫码换电", "home", `
+        <div class="scan-box"><div class="scan-frame"><div class="scan-line"></div></div>
+          <p style="color:var(--muted)">领取电池（出电，非换电）</p>
+          <p style="font-size:9px;color:#d97706;margin-top:8px">浦东骑手驿站</p></div>`, { hideTab: true }),
+      scanSwap: () => phoneShell("扫码换电", "home", `
+        <div class="scan-box"><div class="scan-frame"><div class="scan-line"></div></div>
+          <p style="color:var(--muted)">对准换电柜二维码</p><button class="btn-block" style="margin-top:12px;width:80%">模拟扫描成功</button></div>`, { hideTab: true }),
+      resultPickup: () => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big">✓</div><h4>领取电池成功</h4>
+          <p>浦东骑手驿站 · BAT-SH-8821<br>押金：实付 ¥99 · 在押</p></div>`, { hideTab: true }),
+      resultSwap: (channel) => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big">✓</div><h4>换电成功</h4>
+          <p>SW2605241201 · SOC 96%${channel ? "<br><small style='color:#1a8f4a'>✓ 今日人天：已确认消耗</small>" : ""}</p></div>`, { hideTab: true }),
+      resultReturn: () => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big">✓</div><h4>还电成功</h4>
+          <p>剩余人天已回池 · 不向骑手退款</p></div>`, { hideTab: true }),
+      scanReturnOnly: () => phoneShell("扫码换电", "home", `
+        <div class="scan-box"><div class="scan-frame"><div class="scan-line"></div></div>
+          <p style="color:#d97706">无人天额度：仅可还电</p><button class="btn-block" style="margin-top:10px">模拟还电入柜</button></div>`, { hideTab: true }),
+      channelDeposit: () => phoneShell("扫码换电", "home", `
+        <div class="sheet-page"><p style="margin-bottom:8px">渠道人天 · 首次领电前须办押金</p>
+          <div class="deposit-opt selected"><div class="opt-title">☑ 微信支付分免押</div></div>
+          <button class="btn-block" style="margin-top:10px">确认办理并领取</button></div>`, { hideTab: true }),
+      failCrossNet: () => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big fail">✕</div><h4>换电失败</h4>
+          <p>案例3 · U=${OP["OP-SX"]} C=${OP["OP-BJ"]} B=${OP["OP-LJZ"]}<br>跨网服务费 ¥0.6（后台记账）</p></div>`, { hideTab: true }),
+      failLeasePkg: () => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big fail">✕</div><h4>换电失败</h4>
+          <p>E_LEASE_PKG_REQUIRED<br>须购买白名单套餐</p></div>`, { hideTab: true }),
+      failWhitelist: () => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big fail">✕</div><h4>换电失败</h4>
+          <p>E_WHITELIST · 专属站仅白名单可见</p></div>`, { hideTab: true }),
+      failSuspended: () => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big fail">✕</div><h4>换电失败</h4>
+          <p>渠道停服 · 不可取电/不出电</p></div>`, { hideTab: true }),
+      geoDenied: () => phoneShell("我的", "mine", `
+        <div class="toast-block">请开启定位，或扫描换电柜二维码后再购套餐</div>
+        <div class="service-card"><h4>暂未开通服务</h4><p>无法自动匹配运营商</p></div>`),
+      geoNoNearby: () => phoneShell("我的", "mine", `
+        <div class="toast-block">附近暂无换电服务，请移步换电柜扫码</div>
+        <div class="map-area" style="height:160px"><div class="map-legend" style="bottom:8px">附近无在营站</div></div>`),
+      wirePaymentFail: () => phoneShell("服务购买", "mine", ``, { hideTab: true, wireframe: true, wireframeText: "支付失败\n请重试或换支付方式" }),
+      wireCabinetTimeout: () => phoneShell("扫码换电", "home", ``, { hideTab: true, wireframe: true, wireframeText: "柜机超时\n请重试或换柜" }),
+      settings: () => phoneShell("设置", "mine", `
+        <div class="sheet-page"><div class="form-row"><label>消息通知</label><span>☑ 换电结果通知</span></div>
+          <div class="form-row"><label>演示身份</label><span style="font-size:10px;color:var(--muted)">personal · U1028</span></div>
+          <button class="btn-block" style="margin-top:16px;background:#f0f2f5;color:var(--text)">退出登录</button></div>`, { hideTab: true })
     };
 
-    function canSeeDedicatedSite(u, site) {
-      if (!site.channelDedicated) return true;
-      return !!(u.whitelist && u.channelId === site.channelDedicated);
+    function buildIATrack() {
+      return [
+        flowCell("IA-01", "首页 · 地图", SCREENS.home(), "站点 Marker · 扫一扫 · 定位"),
+        connector(""),
+        flowCell("IA-02", "订单 · 换电", SCREENS.ordersSwap(), "换电订单列表"),
+        connector(""),
+        flowCell("IA-03", "订单 · 服务购买", SCREENS.ordersPurchase(), "套餐+押金明细"),
+        connector(""),
+        flowCell("IA-04", "订单 · 退租", SCREENS.ordersReturn(), "空态"),
+        connector(""),
+        flowCell("IA-05", "我的 · 服务中", SCREENS.minePersonal(), "状态卡 · 押金 · 常用功能"),
+        connector(""),
+        flowCell("IA-06", "设置", SCREENS.settings(), "演示身份 · 退出")
+      ].join("");
     }
 
-    const MAP_PIN_LAYOUT = {
-      "ST-SH-JD": { left: "36%", top: "56%", dedicated: true }
-    };
-
-    function renderMapPins() {
-      const u = user();
-      const host = document.getElementById("mapPins");
-      const legend = document.getElementById("mapLegend");
-      if (!host || !legend) return;
-      const dedicatedPins = Object.entries(MAP_PIN_LAYOUT).filter(([id]) => canSeeDedicatedSite(u, SITES[id]));
-      host.innerHTML = dedicatedPins.map(([id, pos]) =>
-        `<div class="map-pin dedicated" style="left:${pos.left};top:${pos.top}" data-site="${id}" title="${SITES[id].name}（渠道专用）"></div>`
-      ).join("");
-      host.querySelectorAll(".map-pin").forEach(p => {
-        p.onclick = () => {
-          state.scanSite = p.dataset.site;
-          document.getElementById("demoSite").value = state.scanSite;
-          toast("已选站点：" + SITES[state.scanSite].name);
-        };
-      });
-      const hiddenDedicated = Object.keys(SITES).filter(id => SITES[id].channelDedicated && !canSeeDedicatedSite(u, SITES[id]));
-      if (u.whitelist && dedicatedPins.length) {
-        legend.textContent = "图例：蓝钉=可换电站 · 含 1 个渠道专属站（白名单）";
-      } else if (hiddenDedicated.length) {
-        legend.textContent = "图例：蓝钉=可换电站 · 专属站已隐藏（⋯二期）";
-      } else {
-        legend.textContent = "图例：蓝色钉 = 可换电站 · 扫一扫换电";
-      }
+    function buildPersonalTrack() {
+      return [
+        flowCell("P01", "登录授权", SCREENS.login(), "● guest"),
+        connector(""), flowCell("P02", "实名认证", SCREENS.kyc(), "● none"),
+        connector(""), flowCell("P03", "确定运营商", SCREENS.opPick(), "◆ 定位/扫柜"),
+        connector(""), flowCell("P04", "购买套餐", SCREENS.purchaseNew(), "● SKU+押金"),
+        connector("支付成功"), flowCell("P05a", "待领取电池", SCREENS.minePendingPickup(), "● pending_pickup"),
+        connector(""), flowCell("P05b", "扫码领取", SCREENS.scanPickup(), "● 出电"),
+        connector(""), flowCell("P05c", "领取成功", SCREENS.resultPickup(), "● 持电池"),
+        connector(""), flowCell("P06", "日常换电", SCREENS.resultSwap(false), "● 写换电单"),
+        connector(""), flowCell("P07", "续费", SCREENS.purchaseRenew(), "● 正式零售价"),
+        connector(""), flowCell("P08a", "已冻结", SCREENS.mineFrozen(), "● 须先还电"),
+        connector("解除冻结"), flowCell("P08b", "解冻待领电", SCREENS.minePendingPickup(), "◆ 顺延有效期"),
+        connector(""), flowCell("P09", "冷静期退款", SCREENS.mineCooling(), "● 须还电")
+      ].join("");
     }
 
-    function user() { return USERS[state.role] || USERS.guest; }
-
-    function mainlineSteps() {
-      return (MAINLINE[state.mainline.story] || MAINLINE.personal).steps;
-    }
-
-    function renderMainlineSteps() {
-      const host = document.getElementById("mainlineSteps");
-      const hint = document.getElementById("mainlineHint");
-      if (!host) return;
-      const steps = mainlineSteps();
-      const cur = state.mainline.stepId;
-      host.innerHTML = steps.map(s =>
-        `<li data-step="${s.id}" class="${s.id === cur ? "active" : ""}"><span class="sid">${s.id}</span><span>${s.title}</span></li>`
-      ).join("");
-      host.querySelectorAll("[data-step]").forEach(el => {
-        el.onclick = () => applyMainlineStep(el.dataset.step);
-      });
-      document.querySelectorAll("[data-story]").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.story === state.mainline.story);
-      });
-      const step = steps.find(s => s.id === cur);
-      if (hint) hint.textContent = step ? (step.id + " · " + (step.hint || step.title)) : "补充场景模式：步骤高亮已清除";
-    }
-
-    function prepareStepRole(step) {
-      const u = USERS[step.role];
-      if (!u) return;
-      if (step.id === "P02" || step.id === "P03") {
-        u.kyc = step.id === "P03" ? true : false;
-        u.entitlement = null;
-        u.status = "未开通";
-      }
-      if (step.id === "P04") {
-        u.kyc = true;
-        u.entitlement = null;
-        u.status = "未开通";
-      }
-      if (step.id === "C04" && step.role === "channel") {
-        u.holdsBattery = false;
-        u.pendingPickup = true;
-        u.todayEligibility = "已预占";
-        u.status = "服务中";
-      }
-      if (step.id === "C05" && step.role === "channel") {
-        u.holdsBattery = true;
-        u.pendingPickup = false;
-        u.todayEligibility = "已预占";
-        u.status = "服务中";
-        u.preOccupyFail = false;
-      }
-      if (step.id === "C08" && step.role === "channel_resign") {
-        u.holdsBattery = false;
-        u.channelResigned = true;
-        u.status = "已完结";
-        u.remainingDays = 0;
-      }
-      if (step.id === "C07" && step.role === "channel_resign") {
-        u.holdsBattery = true;
-        u.channelResigned = true;
-        u.status = "已离职";
-      }
-    }
-
-    function applyMainlineStep(stepId, opts) {
-      const openUi = !opts || opts.openUi !== false;
-      const steps = mainlineSteps();
-      const step = steps.find(s => s.id === stepId);
-      if (!step) return;
-      state.mainline.stepId = stepId;
-      prepareStepRole(step);
-      state.role = step.role;
-      if (step.scanSite) {
-        state.scanSite = step.scanSite;
-        document.getElementById("demoSite").value = step.scanSite;
-      }
-      if (step.geo) {
-        state.geoScenario = step.geo;
-        document.getElementById("demoGeo").value = step.geo;
-      } else {
-        state.geoScenario = document.getElementById("demoGeo").value || "auto_unique";
-      }
-      document.getElementById("demoRole").value = step.role;
-      resetSessionContext();
-      if (step.role === "none" || step.id === "P03" || step.id === "P04") {
-        const geo = geoResolve();
-        if (geo.auto) setSessionOperator(geo.operatorId, "geo_auto", geo.nearestSiteId, geo.distanceM);
-      }
-      closeOverlay("overlayScan");
-      closeOverlay("overlayPkg");
-      closeOverlay("overlayKyc");
-      closeOverlay("overlayOpPick");
-      renderMainlineSteps();
-      renderMine();
-      renderOrders();
-      renderMapPins();
-      if (openUi) {
-        if (step.autoOpen === "pkg") {
-          switchTab("mine");
-          const u = user();
-          if (u.loggedIn && !u.kyc) openOverlay("overlayKyc");
-          else openPurchaseFlow();
-        } else if (step.autoOpen === "scan") {
-          switchTab("home");
-          startScan();
-        } else if (step.autoOpen === "kyc") {
-          switchTab("mine");
-          openOverlay("overlayKyc");
-        } else if (step.autoOpen === "mine") {
-          switchTab("mine");
-        }
-        toast("主线 " + step.id + " · " + step.title);
-      }
-    }
-
-    function goMainline(delta) {
-      const steps = mainlineSteps();
-      let idx = steps.findIndex(s => s.id === state.mainline.stepId);
-      if (idx < 0) idx = delta > 0 ? -1 : 0;
-      const next = idx + delta;
-      if (next < 0) { toast("已到起点"); return; }
-      if (next >= steps.length) { toast("已到终点"); return; }
-      applyMainlineStep(steps[next].id);
-    }
-
-    function resetSessionContext() {
-      state.session.contextOperatorId = null;
-      state.session.contextSource = null;
-      state.session.nearestSiteId = null;
-      state.session.nearestDistanceM = null;
-      state.session.launchOp = null;
-      state.session.scanCabinetOp = null;
-    }
-
-    function setSessionOperator(opId, source, siteId, distanceM) {
-      state.session.contextOperatorId = opId;
-      state.session.contextSource = source;
-      state.session.nearestSiteId = siteId || null;
-      state.session.nearestDistanceM = distanceM != null ? distanceM : null;
-    }
-
-    function activePackageOperator(u) {
-      if (u.entitlement === "个人套餐" && (u.status === "服务中" || u.status === "已冻结") && u.operator) return u.operator;
-      return null;
-    }
-
-    function geoResolve() {
-      const scenario = state.geoScenario || "auto_unique";
-      if (scenario === "denied") return { blocked: true, reason: "denied" };
-      if (scenario === "no_nearby") return { blocked: true, reason: "no_nearby" };
-      if (scenario === "ambiguous" || user().geoAmbiguous) {
-        return {
-          needPick: true,
-          candidates: [
-            { operatorId: "OP-SX", name: OPERATORS["OP-SX"].name, nearestSiteId: "ST-SH-01", distanceM: 800 },
-            { operatorId: "OP-LJZ", name: OPERATORS["OP-LJZ"].name, nearestSiteId: "ST-SH-04", distanceM: 950 }
-          ]
-        };
-      }
-      return {
-        auto: true,
-        operatorId: "OP-SX",
-        name: OPERATORS["OP-SX"].name,
-        nearestSiteId: "ST-SH-01",
-        distanceM: 1200
-      };
-    }
-
-    function resolveSellerOperator(u) {
-      if (u.entitlement === "设备租赁白名单" && u.whitelist) {
-        const chId = u.channelId || "CH-RENT";
-        return { channelId: chId, source: "lease_whitelist" };
-      }
-      const pkgOp = activePackageOperator(u);
-      if (pkgOp) return { operatorId: pkgOp, source: "active_pkg" };
-      if (u.channelAttr?.operatorId) return { operatorId: u.channelAttr.operatorId, source: "launch" };
-      if (state.session.launchOp) return { operatorId: state.session.launchOp, source: "launch" };
-      if (state.session.scanCabinetOp) return { operatorId: state.session.scanCabinetOp, source: "scan" };
-      if (state.session.contextOperatorId) {
-        return { operatorId: state.session.contextOperatorId, source: state.session.contextSource || "geo_auto" };
-      }
-      return null;
-    }
-
-    function formatDistance(m) {
-      return m >= 1000 ? (m / 1000).toFixed(1) + "km" : m + "m";
-    }
-
-    function renderServiceScopeBanner() {
-      const u = user();
-      const resolved = resolveSellerOperator(u);
-      if (!resolved) return "";
-      if (resolved.channelId && CHANNELS[resolved.channelId]) {
-        const ch = CHANNELS[resolved.channelId];
-        const accessHint = u.whitelistAccess === "free" ? "白名单免费 · B2B 月租覆盖" : "白名单付费 · 购套餐款入渠道";
-        return `<div class="service-scope-banner">当前服务：<strong>${ch.name}</strong> · ${accessHint}<br><small>子商户 ${ch.subMch}${u.whitelistAccess === "free" ? " · 免购套餐换电" : ""}</small></div>`;
-      }
-      const op = OPERATORS[resolved.operatorId];
-      if (!op) return "";
-      const site = state.session.nearestSiteId ? SITES[state.session.nearestSiteId] : null;
-      const dist = state.session.nearestDistanceM != null ? formatDistance(state.session.nearestDistanceM) : "";
-      const srcLabel = {
-        active_pkg: "续费原运营商",
-        launch: "推广链接",
-        scan: "扫柜进入",
-        geo_auto: "定位自动匹配",
-        geo_manual: "您已选择"
-      }[resolved.source] || "";
-      const siteLine = site && dist ? ` · 距您最近 ${site.name} ${dist}` : "";
-      return `<div class="service-scope-banner">当前服务：<strong>${op.name}</strong>${siteLine}${srcLabel ? `<br><small>${srcLabel} · 支付将进入该运营商账户</small>` : ""}</div>`;
-    }
-
-    function openOperatorPicker(candidates, onReady) {
-      const body = document.getElementById("opPickBody");
-      body.innerHTML = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">您附近有多个换电服务提供商，请选择本次购套餐的运营商。</p>`
-        + candidates.map(c => {
-          const site = SITES[c.nearestSiteId];
-          return `<div class="op-pick-item" data-op-pick="${c.operatorId}" data-site="${c.nearestSiteId}" data-dist="${c.distanceM}">
-            <div><strong>${c.name}</strong><small>最近站点：${site?.name || "—"} · ${formatDistance(c.distanceM)}</small></div>
-            <span style="color:var(--brand)">选择</span>
-          </div>`;
-        }).join("");
-      body.querySelectorAll("[data-op-pick]").forEach(el => {
-        el.onclick = () => {
-          setSessionOperator(el.dataset.opPick, "geo_manual", el.dataset.site, Number(el.dataset.dist));
-          closeOverlay("overlayOpPick");
-          renderMine();
-          if (onReady) onReady();
-        };
-      });
-      openOverlay("overlayOpPick");
-    }
-
-    function ensureContextForPurchase(onReady) {
-      const u = user();
-      if (!u.loggedIn) { toast("请先登录"); switchTab("mine"); return; }
-      if (u.entitlement === "设备租赁白名单" && u.whitelist) { onReady(); return; }
-      const existing = resolveSellerOperator(u);
-      if (existing?.source === "active_pkg") { onReady(); return; }
-      if (existing && state.session.contextOperatorId) { onReady(); return; }
-      if (u.channelAttr?.operatorId) {
-        setSessionOperator(u.channelAttr.operatorId, "launch");
-        onReady();
-        return;
-      }
-      const geo = geoResolve();
-      if (geo.blocked) {
-        toast(geo.reason === "denied" ? "请开启定位，或扫描换电柜二维码后再购套餐" : "附近暂无换电服务，请移步换电柜扫码");
-        return;
-      }
-      if (geo.needPick) {
-        openOperatorPicker(geo.candidates, onReady);
-        return;
-      }
-      if (geo.auto) {
-        setSessionOperator(geo.operatorId, "geo_auto", geo.nearestSiteId, geo.distanceM);
-        renderMine();
-        onReady();
-        return;
-      }
-      toast("无法确定服务运营商，请扫描换电柜二维码");
-    }
-
-    function openPurchaseFlow() {
-      ensureContextForPurchase(() => {
-        const u = user();
-        if (!u.kyc) { openOverlay("overlayKyc"); return; }
-        renderPkgOverlay();
-        openOverlay("overlayPkg");
-      });
-    }
-
-    function toast(msg) {
-      const el = document.getElementById("toast");
-      el.textContent = msg;
-      el.classList.add("show");
-      setTimeout(() => el.classList.remove("show"), 2200);
-    }
-
-    function openOverlay(id) { document.getElementById(id).classList.add("open"); }
-    function closeOverlay(id) { document.getElementById(id).classList.remove("open"); }
-
-    function renderHome() { renderMapPins(); }
-
-    function switchTab(tab) {
-      document.querySelectorAll(".tab-item").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-      document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === "screen-" + tab));
-      const scr = document.getElementById("screen-" + tab);
-      document.getElementById("pageTitle").textContent = scr.dataset.title;
-      if (tab === "orders") renderOrders();
-      if (tab === "mine") renderMine();
-      if (tab === "home") renderMapPins();
-    }
-
-    function hasPersonalPurchaseHistory(userId) {
-      if (!userId) return false;
-      return state.purchaseOrders.some(o => o.userId === userId);
-    }
-
-    /** 渠道专享价：仅归因窗口内、无在服个人套餐、且从未成交过个人购卡 */
-    function canApplyChannelPrice(u) {
-      if (!u?.channelAttr) return false;
-      if (u.entitlement === "个人套餐" && u.status === "服务中") return false;
-      if (hasPersonalPurchaseHistory(u.userId)) return false;
-      return true;
-    }
-
-    function channelAttrForUser(u) {
-      return canApplyChannelPrice(u) ? u.channelAttr : null;
-    }
-
-    function depositPolicyFor(opId) {
-      return DEPOSIT_POLICY[opId] || DEPOSIT_POLICY["OP-SX"];
-    }
-
-    function isDepositSettled(u) {
-      if (!u) return false;
-      const m = u.depositMethod;
-      if (m === "实付" || m === "信用免押" || m === "渠道担保") return true;
-      /* 已退仍算办结过（不再要求重办） */
-      return u.depositStatus === "已退";
-    }
-
-    function needsDepositBeforePickup(u) {
-      if (!u || u.holdsBattery) return false;
-      if (u.entitlement === "渠道人天") return !isDepositSettled(u);
-      return false;
-    }
-
-    function isPaidDepositInHold(u) {
-      return !!(u && u.depositMethod === "实付" && (u.depositStatus === "在押" || u.depositStatus === "退押中"));
-    }
-
-    function canApplyDepositRefund(u) {
-      return !!(u && u.depositMethod === "实付" && u.depositStatus === "在押");
-    }
-
-    function depositChoiceLabel(choice) {
-      if (choice === "waiver_wechat") return "微信支付分免押";
-      if (choice === "waiver_zhima") return "芝麻信用免押";
-      return "支付押金";
-    }
-
-    function resolveDepositOutcome(u, opId, choice) {
-      const pol = depositPolicyFor(opId);
-      const wx = u.mockWechatPayScore ?? 700;
-      const zhima = u.mockZhimaScore ?? 660;
-      if (choice === "waiver_wechat") {
-        if (wx >= pol.wechatPayScoreMin) {
-          return { ok: true, method: "信用免押", status: "——", amount: 0, channel: "微信支付分", msg: `微信支付分 ${wx} ≥ ${pol.wechatPayScoreMin}，免押成功` };
-        }
-        return { ok: false, msg: `微信支付分 ${wx} 未达门槛 ${pol.wechatPayScoreMin}，请改用芝麻或实缴押金` };
-      }
-      if (choice === "waiver_zhima") {
-        if (zhima >= pol.zhimaScoreMin) {
-          return { ok: true, method: "信用免押", status: "——", amount: 0, channel: "芝麻信用", msg: `芝麻信用 ${zhima} ≥ ${pol.zhimaScoreMin}，免押成功` };
-        }
-        return { ok: false, msg: `芝麻信用 ${zhima} 未达门槛 ${pol.zhimaScoreMin}，请改用支付分或实缴押金` };
-      }
-      return { ok: true, method: "实付", status: "在押", amount: pol.amount, channel: "实缴", msg: `已缴纳电池押金 ¥${pol.amount}` };
-    }
-
-    function renderDepositOptionsHtml(opId, opts = {}) {
-      const pol = depositPolicyFor(opId);
-      const choice = state.depositChoice || "waiver_wechat";
-      const showPkg = opts.pkgAmount != null;
-      const depositLine = choice === "pay" ? pol.amount : 0;
-      const total = showPkg ? (opts.pkgAmount + depositLine) : depositLine;
-      return `
-        <div class="deposit-block">
-          <h5>电池押金</h5>
-          <p class="hint">可微信支付分/芝麻免押，或实缴押金 ¥${pol.amount}（平台统一：支付分≥${pol.wechatPayScoreMin} / 芝麻≥${pol.zhimaScoreMin}）</p>
-          <label class="deposit-opt${choice === "waiver_wechat" ? " selected" : ""}">
-            <input type="radio" name="depChoice" value="waiver_wechat"${choice === "waiver_wechat" ? " checked" : ""} />
-            <div><div class="opt-title">微信支付分免押</div><div class="opt-desc">达标则押金 ¥0，方式记「信用免押」、状态 ——</div></div>
-          </label>
-          <label class="deposit-opt${choice === "waiver_zhima" ? " selected" : ""}">
-            <input type="radio" name="depChoice" value="waiver_zhima"${choice === "waiver_zhima" ? " checked" : ""} />
-            <div><div class="opt-title">芝麻信用免押</div><div class="opt-desc">达标则押金 ¥0，方式记「信用免押」、状态 ——</div></div>
-          </label>
-          <label class="deposit-opt${choice === "pay" ? " selected" : ""}">
-            <input type="radio" name="depChoice" value="pay"${choice === "pay" ? " checked" : ""} />
-            <div><div class="opt-title">支付押金 ¥${pol.amount}</div><div class="opt-desc">方式「实付」、状态「在押」；还电后可申请退押</div></div>
-          </label>
-          <div class="pay-summary">
-            ${showPkg ? `套餐费 ¥${opts.pkgAmount}<br>` : ""}电池押金 ¥${depositLine}${choice !== "pay" ? "（免押）" : ""}<br>
-            <span class="total">应付合计 ¥${total}</span>
-          </div>
-        </div>`;
-    }
-
-    function bindDepositChoice(root, onChange) {
-      if (!root) return;
-      root.querySelectorAll('input[name="depChoice"]').forEach(inp => {
-        inp.onchange = () => {
-          state.depositChoice = inp.value;
-          if (onChange) onChange();
-        };
-      });
-    }
-
-    function applyDepositToUser(u, outcome) {
-      u.depositMethod = outcome.method;
-      u.depositStatus = outcome.status;
-      u.depositAmount = outcome.amount;
-      u.depositChannel = outcome.channel || null;
-    }
-
-    function depositStatusHtml(u) {
-      if (!u.loggedIn || u.status === "未开通") return "";
-      if (u.entitlement === "设备租赁白名单" && u.depositMethod === "渠道担保") {
-        return `<div class="deposit-status-card"><div class="ds-title">电池押金 · 渠道担保</div><div class="ds-muted">状态 —— · 设备租赁白名单 · 押金责任在渠道（B 端）</div></div>`;
-      }
-      if (u.entitlement === "渠道人天" && !isDepositSettled(u)) {
-        return `<div class="deposit-status-card"><div class="ds-title">电池押金 · 待办理</div><div class="ds-muted">首次领取电池前须完成支付分免押或实缴押金</div>
-          <button type="button" class="btn-block" style="margin-top:10px" data-action="deposit">去办理押金</button></div>`;
-      }
-      if (!u.depositMethod) return "";
-      const method = u.depositMethod;
-      const status = method === "实付" ? (u.depositStatus || "在押") : "——";
-      const amt = method === "实付" && u.depositAmount ? ` ¥${u.depositAmount}` : "";
-      const channel = u.depositChannel ? ` · ${u.depositChannel}` : "";
-      const refundBtn = canApplyDepositRefund(u) && !u.holdsBattery
-        ? `<button type="button" class="btn-block" style="margin-top:10px;background:#fff;color:var(--blue);border:1px solid var(--blue)" data-action="refund_deposit">申请退押</button>`
-        : (canApplyDepositRefund(u) && u.holdsBattery
-          ? `<p class="ds-muted" style="margin-top:6px">请先归还电池后再申请退押</p>` : "");
-      return `<div class="deposit-status-card"><div class="ds-title">电池押金 · ${method}${amt}</div><div class="ds-muted">状态 ${status}${channel}</div>${refundBtn}</div>`;
-    }
-
-    function resolvePurchaseCity() {
-      return "上海";
-    }
-
-    function activeBatteryModelsForPurchase(opId, city) {
-      const set = new Set();
-      OPERATOR_PKG_PRICES.forEach(r => {
-        if (r.operatorId === opId && r.city === city && r.status === "生效") set.add(r.batteryModel);
-      });
-      return BATTERY_MODEL_OPTIONS.filter(m => set.has(m));
-    }
-
-    function pkgsForBatteryModel(opId, city, model) {
-      return OPERATOR_PKG_PRICES.filter(r =>
-        r.operatorId === opId && r.city === city && r.batteryModel === model && r.status === "生效"
-      );
-    }
-
-    function pkgSelectionKey(row) {
-      return `${row.batteryModel}::${row.pkg}`;
-    }
-
-    function pkgDays(row) {
-      const map = { monthly: 30, weekly: 7, daily: 1, single: 1, times: 30 };
-      return map[row.pkgType] || 30;
-    }
-
-    function pkgDesc(row) {
-      if (row.validityHours) return `购买后 ${row.validityHours}h 有效`;
-      const d = pkgDays(row);
-      if (row.pkgType === "times") return "30天内按次扣减";
-      if (row.pkgType === "single") return "单次换电";
-      return d >= 30 ? `${d}天不限次换电` : `${d}天有效`;
-    }
-
-    function channelPriceForPkg(channelId, model, pkgName, official) {
-      const ch = CHANNEL_PKG_OVERRIDES[channelId]?.[model]?.[pkgName];
-      if (!ch) return null;
-      return { ...ch, official };
-    }
-
-    function initPkgSelectionForPurchase(opId, city) {
-      const models = activeBatteryModelsForPurchase(opId, city);
-      if (!state.selectedBatteryModel || !models.includes(state.selectedBatteryModel)) {
-        state.selectedBatteryModel = models[0] || null;
-      }
-      const pkgs = state.selectedBatteryModel ? pkgsForBatteryModel(opId, city, state.selectedBatteryModel) : [];
-      if (!state.selectedPkg || !pkgs.some(p => pkgSelectionKey(p) === state.selectedPkg)) {
-        state.selectedPkg = pkgs[0] ? pkgSelectionKey(pkgs[0]) : null;
-      }
-    }
-
-    function resolveSelectedPersonalSku(u, seller, attr) {
-      const opId = seller?.operatorId || u.operator || state.session.contextOperatorId || "OP-SX";
-      const city = resolvePurchaseCity(u);
-      initPkgSelectionForPurchase(opId, city);
-      const pkgs = pkgsForBatteryModel(opId, city, state.selectedBatteryModel);
-      const selected = pkgs.find(p => pkgSelectionKey(p) === state.selectedPkg) || pkgs[0];
-      if (!selected) return null;
-      const ch = attr ? channelPriceForPkg(attr.channelId, selected.batteryModel, selected.pkg, selected.retailPrice) : null;
-      const useChannel = !!(ch && ch.channelSku);
-      return {
-        name: selected.pkg,
-        days: pkgDays(selected),
-        batteryModel: selected.batteryModel,
-        pkg: selected.pkg,
-        retailPrice: selected.retailPrice,
-        pkgAmount: useChannel ? ch.channel : selected.retailPrice,
-        useChannel
-      };
-    }
-
-    function renderPkgOverlay() {
-      const u = user();
-      const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist;
-      const attr = isLeaseWl ? null : channelAttrForUser(u);
-      const attrBlocked = !isLeaseWl && u.channelAttr && !attr;
-      const seller = resolveSellerOperator(u);
-      const body = document.getElementById("pkgSheetBody");
-      const sellerBanner = isLeaseWl && CHANNELS[seller?.channelId]
-        ? `<div class="service-scope-banner" style="margin-bottom:12px">收款方：<strong>${CHANNELS[seller.channelId].name}</strong> · 子商户 ${CHANNELS[seller.channelId].subMch}<br><small>仅白名单用户可购</small></div>`
-        : (seller && OPERATORS[seller.operatorId]
-          ? `<div class="service-scope-banner" style="margin-bottom:12px">收款方：<strong>${OPERATORS[seller.operatorId].name}</strong> · 子商户 ${OPERATORS[seller.operatorId].subMch}</div>`
-          : "");
-      const banner = attr
-        ? `<div class="channel-attr-banner">🟡 <strong>${attr.channelName}</strong> 推广 · ${attr.expiresLabel} 内<strong>首笔</strong>购套餐享渠道专享价<br><small>首触链接：${attr.linkPurpose}（${attr.linkCode}）· 续费/再次购卡走正式零售价</small></div>`
-        : (attrBlocked
-          ? `<div class="channel-attr-banner" style="background:#f6f6f6;border-color:#e0e0e0;color:#595959">ℹ️ 当前为<strong>续费或再次购卡</strong>，按运营商<strong>正式零售价</strong>，不适用渠道专享价</div>`
-          : "");
-
-      let cards = "";
-      let sku = null;
-      let useChannel = false;
-      let pkgAmount = 0;
-
-      if (isLeaseWl) {
-        const skuSource = LEASE_PKG_SKUS;
-        cards = Object.values(skuSource).map(s => {
-          const price = s.price;
-          return `<div class="pkg-card${state.selectedPkg === s.key ? " selected" : ""}" data-pkg="${s.key}">
-            <h4>${s.name}</h4>
-            <div class="price-row"><span class="price">¥${price}</span></div>
-            <div class="desc">${s.desc}</div>
-          </div>`;
-        }).join("");
-        sku = skuSource[state.selectedPkg] || skuSource.month;
-        pkgAmount = sku.price;
-      } else {
-        const opId = seller?.operatorId || u.operator || state.session.contextOperatorId || "OP-SX";
-        const city = resolvePurchaseCity(u);
-        const models = activeBatteryModelsForPurchase(opId, city);
-        initPkgSelectionForPurchase(opId, city);
-        if (!models.length) {
-          body.innerHTML = sellerBanner + banner + `<p style="font-size:13px;color:var(--muted);margin:12px 0">当前城市暂无可购套餐（无生效 SKU 的电池型号不展示）</p>`;
-          return;
-        }
-        const modelPicker = models.length > 1
-          ? `<div class="model-picker"><span class="model-label">电池型号</span><div class="model-chips">${models.map(m =>
-              `<button type="button" class="model-chip${state.selectedBatteryModel === m ? " active" : ""}" data-model="${m}">${m}</button>`
-            ).join("")}</div></div>`
-          : `<p style="font-size:12px;color:var(--muted);margin:0 0 10px">电池型号：<strong>${models[0]}</strong></p>`;
-        const pkgs = pkgsForBatteryModel(opId, city, state.selectedBatteryModel);
-        cards = pkgs.map(row => {
-          const key = pkgSelectionKey(row);
-          const official = row.retailPrice;
-          const ch = attr ? channelPriceForPkg(attr.channelId, row.batteryModel, row.pkg, official) : null;
-          const channelSku = !!(ch && ch.channelSku);
-          const price = channelSku ? ch.channel : official;
-          const priceHtml = channelSku
-            ? `<div class="price-row"><span class="price-official">¥${official}</span><span class="price">¥${price}</span><span class="price-tag">渠道专享</span></div>`
-            : `<div class="price-row"><span class="price">¥${price}</span>${attr ? `<span class="price-tag" style="background:#f5f5f5;color:var(--muted)">非渠道 SKU · 正式价</span>` : ""}</div>`;
-          return `<div class="pkg-card${state.selectedPkg === key ? " selected" : ""}" data-pkg="${key}">
-            <h4>${row.pkg}</h4>
-            ${priceHtml}
-            <div class="desc">${pkgDesc(row)} · ${row.batteryModel}</div>
-          </div>`;
-        }).join("");
-        const selected = pkgs.find(p => pkgSelectionKey(p) === state.selectedPkg) || pkgs[0];
-        if (selected) {
-          const ch = attr ? channelPriceForPkg(attr.channelId, selected.batteryModel, selected.pkg, selected.retailPrice) : null;
-          useChannel = !!(ch && ch.channelSku);
-          pkgAmount = useChannel ? ch.channel : selected.retailPrice;
-          sku = {
-            name: selected.pkg,
-            days: pkgDays(selected),
-            batteryModel: selected.batteryModel,
-            pkg: selected.pkg,
-            retailPrice: selected.retailPrice
-          };
-        }
-        cards = modelPicker + cards;
-      }
-
-      const alreadyDeposit = isDepositSettled(u) && u.entitlement === "个人套餐";
-      const depositHtml = isLeaseWl
-        ? `<div class="deposit-block"><h5>电池押金</h5><p class="hint">设备租赁白名单 · 押金责任在渠道（渠道担保），购套餐不另收个人押金</p></div>`
-        : (alreadyDeposit
-          ? `<div class="deposit-block"><h5>电池押金</h5><p class="hint">已办结（${u.depositMethod}${u.depositMethod === "实付" && u.depositAmount ? " ¥" + u.depositAmount : ""} · 状态 ${u.depositMethod === "实付" ? (u.depositStatus || "在押") : "——"}），续费不重复收押</p>
-             <div class="pay-summary">套餐费 ¥${pkgAmount}<br><span class="total">应付合计 ¥${pkgAmount}</span></div></div>`
-          : renderDepositOptionsHtml(seller?.operatorId || u.operator || "OP-SX", { pkgAmount }));
-      const payLabel = isLeaseWl || alreadyDeposit
-        ? `确认支付 ¥${pkgAmount}（Mock）`
-        : `确认支付 ¥${pkgAmount + (state.depositChoice === "pay" ? depositPolicyFor(seller?.operatorId || u.operator || "OP-SX").amount : 0)}（Mock）`;
-      const kycBlock = u.loggedIn && !u.kyc
-        ? `<p style="font-size:12px;color:#cf1322;margin:8px 0 0">请先完成实名认证后再购套餐</p>
-           <button type="button" class="btn-block" id="btnGoKycFromPkg" style="margin-top:8px;background:#fff;color:var(--brand);border:1px solid var(--brand)">去实名认证</button>`
-        : (sku
-          ? `<button type="button" class="btn-block" id="btnPayPkg" style="margin-top:8px">${payLabel}</button>`
-          : "");
-      body.innerHTML = sellerBanner + banner + cards + depositHtml + kycBlock;
-      body.querySelectorAll(".model-chip").forEach(btn => {
-        btn.onclick = () => {
-          state.selectedBatteryModel = btn.dataset.model;
-          const opId = seller?.operatorId || u.operator || state.session.contextOperatorId || "OP-SX";
-          initPkgSelectionForPurchase(opId, resolvePurchaseCity(u));
-          renderPkgOverlay();
-        };
-      });
-      body.querySelectorAll(".pkg-card").forEach(c => {
-        c.onclick = () => {
-          state.selectedPkg = c.dataset.pkg;
-          renderPkgOverlay();
-        };
-      });
-      bindDepositChoice(body, () => renderPkgOverlay());
-      const payBtn = document.getElementById("btnPayPkg");
-      if (payBtn) payBtn.onclick = paySelectedPkg;
-      const kycBtn = document.getElementById("btnGoKycFromPkg");
-      if (kycBtn) kycBtn.onclick = () => { closeOverlay("overlayPkg"); openOverlay("overlayKyc"); };
-    }
-
-    function paySelectedPkg() {
-      const u = user();
-      if (!u.loggedIn) { toast("请先登录"); return; }
-      if (!u.kyc) { toast("请先完成实名认证"); openOverlay("overlayKyc"); return; }
-      const seller = resolveSellerOperator(u);
-      if (!seller) { toast("无法确定收款方"); return; }
-      const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist;
-      const attr = channelAttrForUser(u);
-      let sku;
-      let useChannel = false;
-      let pkgAmount;
-      if (isLeaseWl) {
-        const skuSource = LEASE_PKG_SKUS;
-        sku = skuSource[state.selectedPkg] || skuSource.month;
-        pkgAmount = sku.price;
-      } else {
-        const resolved = resolveSelectedPersonalSku(u, seller, attr);
-        if (!resolved) { toast("请选择套餐"); return; }
-        sku = resolved;
-        useChannel = resolved.useChannel;
-        pkgAmount = resolved.pkgAmount;
-      }
-      let depositAmount = 0;
-      let depositMethod = u.depositMethod;
-      let depositStatus = u.depositStatus;
-      if (isLeaseWl) {
-        applyDepositToUser(u, { method: "渠道担保", status: "——", amount: 0, channel: "渠道担保" });
-        depositMethod = "渠道担保";
-        depositStatus = "——";
-      } else if (!(isDepositSettled(u) && u.entitlement === "个人套餐")) {
-        const outcome = resolveDepositOutcome(u, seller.operatorId, state.depositChoice || "waiver_wechat");
-        if (!outcome.ok) { toast(outcome.msg); return; }
-        applyDepositToUser(u, outcome);
-        depositAmount = outcome.amount;
-        depositMethod = outcome.method;
-        depositStatus = outcome.status;
-        toast(outcome.msg);
-      }
-      const amount = pkgAmount + depositAmount;
-      const id = "SUB" + Date.now().toString().slice(-8);
-      const order = {
-        id, pkg: sku.name + (useChannel ? "·渠道专享" : ""), amount, pkgAmount, depositAmount,
-        depositMethod, depositStatus, time: new Date().toLocaleString("zh-CN"), status: "已支付", userId: u.userId,
-        contextSource: seller.source
-      };
-      if (sku.batteryModel) order.batteryModel = sku.batteryModel;
-      if (isLeaseWl && CHANNELS[seller.channelId]) {
-        const ch = CHANNELS[seller.channelId];
-        order.sellerChannelId = ch.id;
-        order.sellerChannelName = ch.name;
-        order.subMch = ch.subMch;
-      } else {
-        const op = OPERATORS[seller.operatorId];
-        order.sellerOperatorId = seller.operatorId;
-        order.sellerOperatorName = op?.name;
-        order.subMch = op?.subMch;
-      }
-      if (useChannel) {
-        order.channel = attr.channelName;
-        order.linkCode = attr.linkCode;
-      }
-      state.purchaseOrders.unshift(order);
-      u.status = "服务中";
-      if (isLeaseWl) {
-        u.entitlement = "设备租赁白名单";
-        u.pkg = sku.name;
-        u.daysLeft = sku.days;
-        u.swapUsed = u.swapUsed || 0;
-      } else {
-        u.entitlement = "个人套餐";
-        u.pkg = sku.name;
-        u.daysLeft = sku.days;
-        u.batteryModel = sku.batteryModel || null;
-        u.swapUsed = 0;
-        u.operator = seller.operatorId;
-        if (!u.holdsBattery) u.pendingPickup = true;
-      }
-      if (useChannel) {
-        u.channelPurchase = attr.channelName;
-        u.channelAttr = null;
-      }
-      closeOverlay("overlayPkg");
-      const payee = isLeaseWl ? CHANNELS[seller.channelId]?.name : OPERATORS[seller.operatorId]?.name;
-      toast("支付成功 · ¥" + amount + " → " + (payee || "—"));
-      renderMine();
-    }
-
-    function renderChannelDepositSheet(site) {
-      const u = user();
-      const opId = u.operator || "OP-SX";
-      const body = document.getElementById("scanBody");
-      body.innerHTML = `
-        <div style="padding:4px 0 8px">
-          <p style="font-size:13px;line-height:1.6;margin-bottom:8px">渠道人天 · <strong>首次领取电池前</strong>须办理电池押金（支付分/芝麻免押或实缴）。</p>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:4px">当前柜机：${site.name}</p>
-          ${renderDepositOptionsHtml(opId)}
-          <button type="button" class="btn-block" style="margin-top:12px" id="btnSettleDeposit">确认办理并领取</button>
-          <button type="button" class="btn-block" style="margin-top:8px;background:#fff;color:var(--muted);border:1px solid var(--border)" data-close-scan>取消</button>
-        </div>`;
-      bindDepositChoice(body, () => renderChannelDepositSheet(site));
-      body.querySelector("#btnSettleDeposit").onclick = () => {
-        const outcome = resolveDepositOutcome(u, opId, state.depositChoice || "waiver_wechat");
-        if (!outcome.ok) { toast(outcome.msg); return; }
-        applyDepositToUser(u, outcome);
-        toast(outcome.msg);
-        if (outcome.amount > 0) {
-          state.purchaseOrders.unshift({
-            id: "DEP" + Date.now().toString().slice(-8),
-            pkg: "渠道首次领电 · 电池押金",
-            amount: outcome.amount,
-            pkgAmount: 0,
-            depositAmount: outcome.amount,
-            depositMethod: outcome.method,
-            depositStatus: outcome.status,
-            time: new Date().toLocaleString("zh-CN"),
-            status: "已支付",
-            userId: u.userId
-          });
-        }
-        runPickupBattery(site);
-      };
-      body.querySelector("[data-close-scan]").onclick = () => closeOverlay("overlayScan");
-    }
-
-    function renderMine() {
-      const u = user();
-      const el = document.getElementById("mineContent");
-      if (!u.loggedIn) {
-        const attrBanner = u.channelAttr || u.landingNote
-          ? `<div class="channel-attr-banner" style="margin:0 16px 12px">${u.landingNote || ("来自 " + u.channelAttr.channelName + " 推广 · 登录后 24h 内享渠道专享价")}</div>`
-          : "";
-        el.innerHTML = `
-          ${attrBanner}
-          <div class="login-hero">
-            <div class="logo">智</div>
-            <h1>智格换电</h1>
-            <p>安全出行 放心骑行 · 绿色出行小程序</p>
-            <button type="button" class="btn-login" id="btnLogin">微信一键登录</button>
-            <div class="agree-row">
-              <input type="checkbox" id="agreeChk" checked />
-              <label for="agreeChk">同意<a href="#">《隐私政策》</a>、<a href="#">《数字证书使用协议》</a>和<a href="#">《智格换电服务协议》</a></label>
-            </div>
-          </div>`;
-        document.getElementById("btnLogin").onclick = () => {
-          if (!document.getElementById("agreeChk").checked) { toast("请先同意服务协议"); return; }
-          if (state.role === "card_link_guest") {
-            state.role = "card_link_kyc";
-            document.getElementById("demoRole").value = "card_link_kyc";
-            renderMine();
-            toast("登录成功，请完成实名认证");
-            return;
-          }
-          if (state.mainline.story === "channel") {
-            applyMainlineStep("C02");
-            toast("登录成功 · 渠道权益已到账");
-            return;
-          }
-          state.role = "none";
-          document.getElementById("demoRole").value = "none";
-          if (state.mainline.stepId === "P01") state.mainline.stepId = "P02";
-          renderMainlineSteps();
-          renderMine();
-          toast("登录成功，请完成实名认证");
-        };
-        return;
-      }
-
-      let card = "";
-      const attrBanner = u.channelAttr && u.status === "未开通"
-        ? `<div class="channel-attr-banner">🟡 ${u.channelAttr.channelName} · ${u.channelAttr.expiresLabel} 内购套餐享渠道专享价</div>`
-        : "";
-      if (u.status === "已完结" || (u.channelResigned && !u.holdsBattery && u.status !== "已离职")) {
-        card = `<div class="service-card done"><div><h3>服务已完结</h3><p>${u.channel || ""} · 剩余人天已回池 · 不向骑手退款</p></div></div>`;
-      } else if (u.channelResigned || u.status === "已离职") {
-        card = `<div class="service-card done"><div><h3>服务已终止（离职）</h3><p>${u.channel || ""} · ${u.holdsBattery ? "请还电入柜后完结" : "剩余人天已回池"}</p><p style="font-size:11px;margin-top:6px;opacity:.85">不向骑手退款 · 仅可还电不可出电</p></div>${u.holdsBattery ? `<button type="button" class="btn-gold" data-action="scan">扫码还电</button>` : ""}</div>`;
-      } else if (u.status === "未开通") {
-        card = `${attrBanner}<div class="service-card"><div><h3>暂未开通服务</h3><p>${u.kyc ? "选择套餐开通换电服务。" : "请先完成实名认证，再购买套餐。"}</p></div><button type="button" class="btn-gold" data-action="buy">${u.kyc ? "服务购买" : "实名认证"}</button></div>`;
-      } else if (u.status === "已冻结") {
-        card = `<div class="service-card warn"><div><h3>服务已冻结</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 未持有电池</p><p style="font-size:11px;margin-top:6px;opacity:.85">符合解冻条件可立即解除；解冻后首次须领取电池</p></div><button type="button" class="btn-gold" data-action="unfreeze">解除冻结</button></div>`;
-      } else if (u.pendingPickup && !u.holdsBattery) {
-        card = `<div class="service-card warn"><div><h3>待领取电池</h3><p>${u.pkg} · 剩余 ${u.daysLeft} 天 · 解冻后首次服务</p><p style="font-size:11px;margin-top:6px;opacity:.85">请扫码领取电池（非换电），领取后可正常换电</p></div><button type="button" class="btn-gold" data-action="scan">扫码领取</button></div>`;
-      } else if (u.preOccupyFail || u.status === "权益不可用" || u.status === "待还电" || isChannelQuotaBlocked(u)) {
-        const reason = u.gateReason || u.failReason || "今日无人天额度";
-        const batHint = u.holdsBattery
-          ? "持有电池：仅可还电入柜，不可换电/出电"
-          : "未持电池：不可换电，请联系渠道管理员续配额度";
-        card = `<div class="service-card warn"><div><h3>渠道人天 · 今日不可用</h3><p>${u.channel}<br>${reason}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">${batHint}</p></div>${u.holdsBattery ? `<button type="button" class="btn-gold" data-action="scan">扫码还电</button>` : ""}</div>`;
-      } else if (u.coolingPeriod) {
-        const batHint = u.holdsBattery ? " · 持有电池" : "";
-        const coolLine = u.refundApplied ? "已提交冷静期退款，等待运营商审核"
-          : `冷静期剩余 ${u.coolingDaysLeft ?? "—"} 天 · 可申请退大部分费用（扣已用天数）`;
-        card = `<div class="service-card warn"><div><h3>${u.pkg}</h3><p>剩余 ${u.daysLeft} 天 · 已换电 ${u.swapUsed} 次${batHint}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">${coolLine}</p></div>${u.refundApplied ? "" : `<button type="button" class="btn-gold" data-action="cooling_refund">申请退款</button>`}</div>`;
-      } else if (u.entitlement === "设备租赁白名单" && u.channelSuspended) {
-        const batHint = u.holdsBattery ? " · 持有电池，可还电入柜" : " · 未持有电池";
-        card = `<div class="service-card warn"><div><h3>渠道服务已暂停</h3><p>${u.channel}<br>渠道商已停用 · 不可取电/不出电${batHint}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">扫码换电提示：当前站点已到期，请联系管理员续费</p></div></div>`;
-      } else if (u.entitlement === "设备租赁白名单") {
-        const isFree = u.whitelistAccess === "free";
-        const svcLine = isFree
-          ? "白名单免费 · B2B 月租覆盖 · 免购套餐换电"
-          : (u.status === "未开通" ? "白名单付费 · 请购买渠道套餐开通换电" : u.pkg + " · 剩余 " + u.daysLeft + " 天");
-        card = `<div class="service-card channel"><div><h3>设备租赁 · 白名单${isFree ? "免费" : "付费"}</h3><p>${u.channel}<br>${svcLine} · 已换电 ${u.swapUsed || 0} 次</p><p style="font-size:11px;margin-top:4px;opacity:.85">专属站：京东物流专属站${isFree ? "" : " · 款入渠道账户"}</p></div>${!isFree && u.status === "未开通" ? `<button type="button" class="btn-gold" data-action="buy">购买套餐</button>` : ""}</div>`;
-      } else if (u.leaseBlocked) {
-        card = `<div class="service-card warn"><div><h3>未授权用户</h3><p>${u.blockReason || "非白名单用户"}</p><p style="font-size:11px;margin-top:6px;color:#7a6520">非本渠道白名单，不可购买设备租赁套餐</p></div></div>`;
-      } else if (u.entitlement === "渠道人天") {
-        const quotaLine = u.remainingDays != null ? `剩余 ${u.remainingDays} 人天 · ` : "";
-        const todayLine = u.todayEligibility === "已预占" ? "今日已预占（分配即开通）"
-          : u.todayEligibility === "已确认消耗" || u.swapUsed > 0 ? `今日已确认消耗 · 换电 ${u.swapUsed} 次`
-          : "今日资格待确认";
-        const depHint = !isDepositSettled(u) ? " · 押金待办理" : (u.holdsBattery ? "" : " · 可领取电池");
-        card = `<div class="service-card channel"><div><h3>渠道人天额度</h3><p>${u.channel}${u.team ? " · " + u.team : ""}<br>${quotaLine}${todayLine}${depHint}</p><p style="font-size:11px;margin-top:4px;opacity:.85">可在全网换电 · 额度售卖方 OP-SX</p></div>${!u.holdsBattery && isDepositSettled(u) ? `<button type="button" class="btn-gold" data-action="scan">扫码领取</button>` : (!isDepositSettled(u) ? `<button type="button" class="btn-gold" data-action="deposit">办理押金</button>` : "")}</div>`;
-      } else {
-        const batHint = u.holdsBattery ? " · 持有电池" : "";
-        const modelHint = u.batteryModel ? ` · ${u.batteryModel}` : "";
-        const chHint = u.channelPurchase ? ` · ${u.channelPurchase}专享价购入` : "";
-        card = `<div class="service-card"><div><h3>${u.pkg}</h3><p>剩余 ${u.daysLeft} 天 · 已换电 ${u.swapUsed} 次 · 服务中${modelHint}${batHint}${chHint}</p></div><button type="button" class="btn-gold" data-action="buy">续费</button></div>`;
-      }
-
-      el.innerHTML = `
-        <div class="profile-head">
-          <div class="avatar">👤</div>
-          <div><span class="phone">${u.phone}</span><span class="tag-sm ${u.kyc ? "ok" : ""}">${u.kyc ? "已认证" : "未认证"}</span></div>
-          <button type="button" class="settings-btn" id="btnSettings">⚙</button>
+    function buildPersonalBranch() {
+      return `<div class="flow-branch-area">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+          <div><div class="branch-v-connector"><div class="arrow-v"></div><span class="connector-label">申请免押</span></div>
+            ${flowCell("P04b", "信用免押", SCREENS.depositWaiver(), "支付分/芝麻")}</div>
+          <div><div class="branch-v-connector"><div class="arrow-v"></div><span class="connector-label">实缴押金</span></div>
+            ${flowCell("P04c", "实缴购套餐", SCREENS.purchasePaidDeposit(), "实付·在押")}</div>
         </div>
-        ${renderServiceScopeBanner()}
-        ${card}
-        ${depositStatusHtml(u)}
-        <div class="section-card">
-          <div class="section-title">常用功能</div>
-          <div class="grid-4">
-            <button type="button" class="grid-item" data-action="scan"><span class="gi">⊞</span>扫码换电</button>
-            ${u.entitlement === "渠道人天" ? "" : `<button type="button" class="grid-item" data-action="buy"><span class="gi">🛒</span>购买套餐</button>`}
-            <button type="button" class="grid-item" data-action="coupon"><span class="gi orange">🎫</span>我的优惠券</button>
-            <button type="button" class="grid-item" data-action="service"><span class="gi">📞</span>客服电话</button>
-            <button type="button" class="grid-item" data-action="return"><span class="gi">🔋</span>电池退还</button>
-            ${u.entitlement === "个人套餐" ? `<button type="button" class="grid-item" data-action="freeze"><span class="gi">❄</span>申请冻结</button>` : ""}
-            ${u.coolingPeriod && !u.refundApplied ? `<button type="button" class="grid-item" data-action="cooling_refund"><span class="gi">↩</span>冷静期退款</button>` : ""}
-            <button type="button" class="grid-item" data-action="kyc"><span class="gi">✓</span>实名认证</button>
-          </div>
+        <div class="flow-note"><h4>押金相关 · 业务规则</h4>
+          <ul><li>信用免押：支付分/芝麻达标 → 方式「信用免押」、状态 ——</li>
+            <li>实缴押金：同笔支付 → 方式「实付」、状态「在押」；还电后可退</li>
+            <li>续费不重复收押；换 OP 购新套餐须按新 OP 规则重办</li></ul></div></div>`;
+    }
+
+    function buildChannelTrack() {
+      return [
+        flowCell("C01", "登录授权", SCREENS.login(), "● 不引导购套餐"),
+        connector(""), flowCell("C02", "权益到账", SCREENS.mineChannel({ depositPending: true, today: "今日已预占" }), "◆ channel U2110"),
+        connector(""), flowCell("C03", "今日预占", SCREENS.mineChannel({ depositPending: true, today: "今日已预占" }), "◆ 已预占可换"),
+        connector(""), flowCell("C04a", "办理押金", SCREENS.channelDeposit(), "● 首领前"),
+        connector(""), flowCell("C04b", "扫码领取", SCREENS.scanPickup(), "● 出电"),
+        connector(""), flowCell("C04c", "领取成功", SCREENS.resultPickup(), "● 押金已办结"),
+        connector(""), flowCell("C05", "换电确认消耗", SCREENS.resultSwap(true), "◆ 今日已确认"),
+        connector(""), flowCell("C06", "额度异常", SCREENS.mineChannelFail(), "! channel_fail"),
+        connector(""), flowCell("C06b", "仅可还电", SCREENS.scanReturnOnly(), "! 禁止换电"),
+        connector(""), flowCell("C07", "离职终止", SCREENS.mineResigned(), "■ channel_resign"),
+        connector(""), flowCell("C08", "还电回池", SCREENS.resultReturn(), "◆ 不回款骑手")
+      ].join("");
+    }
+
+    const SUPPLEMENT_PERSONAL = [
+      { id: "SP-01", title: "定位两 OP 接近", key: "geo_ambiguous", fn: () => SCREENS.mineGeoAmbiguous() },
+      { id: "SP-02", title: "定位拒绝", key: "geo_denied", fn: () => SCREENS.geoDenied() },
+      { id: "SP-03", title: "附近无站", key: "geo_no_nearby", fn: () => SCREENS.geoNoNearby() },
+      { id: "SP-04", title: "个人跨网·案例3", key: "personal_cross3", fn: () => SCREENS.failCrossNet() },
+      { id: "SP-05", title: "支付失败", key: "payment_fail", fn: () => SCREENS.wirePaymentFail() },
+      { id: "SP-06", title: "柜机超时/无空电", key: "cabinet_timeout", fn: () => SCREENS.wireCabinetTimeout() },
+      { id: "SP-07", title: "解冻待领电池", key: "pending_pickup", fn: () => SCREENS.minePendingPickup() },
+      { id: "SP-08", title: "冷静期退款", key: "cooling_refund", fn: () => SCREENS.mineCooling() },
+      { id: "SP-09", title: "订单空态", key: "orders_empty", fn: () => SCREENS.ordersEmptySwap() }
+    ];
+    const SUPPLEMENT_CHANNEL = [
+      { id: "SC-01", title: "押金已办·持电池", key: "channel_deposit_done", fn: () => SCREENS.mineChannel({ confirmed: true, today: "今日已确认消耗" }) },
+      { id: "SC-02", title: "预占失败·待还电", key: "channel_fail", fn: () => SCREENS.mineChannelFail() },
+      { id: "SC-03", title: "个人无额度·待还电", key: "channel_no_quota", fn: () => SCREENS.mineChannelNoQuota() },
+      { id: "SC-04", title: "渠道跨网·案例3", key: "channel_cross3", fn: () => SCREENS.failCrossNet() },
+      { id: "SC-05", title: "离职还电回池", key: "channel_resign", fn: () => SCREENS.mineResigned() }
+    ];
+    const SUPPLEMENT_PHASE2 = [
+      { id: "S2-01", title: "设备租赁·付费已购", key: "lease_whitelist", fn: () => SCREENS.mineLeasePaid() },
+      { id: "S2-02", title: "设备租赁·付费未购", key: "lease_whitelist_new", fn: () => SCREENS.mineLeaseNew() },
+      { id: "S2-03", title: "设备租赁·白名单免费", key: "lease_whitelist_free", fn: () => SCREENS.mineLeaseFree() },
+      { id: "S2-04", title: "渠道停服·持电池", key: "lease_suspended", fn: () => SCREENS.mineLeaseSuspended() },
+      { id: "S2-05", title: "渠道停服·未持电池", key: "lease_suspended_nobat", fn: () => SCREENS.failSuspended() },
+      { id: "S2-06", title: "非白名单拦截", key: "lease_blocked", fn: () => SCREENS.mineLeaseBlocked() },
+      { id: "S2-07", title: "专属站地图", key: "lease_map", fn: () => SCREENS.homeDedicated() },
+      { id: "S2-08", title: "白名单未购扫码", key: "lease_pkg_required", fn: () => SCREENS.failLeasePkg() },
+      { id: "S2-09", title: "扫专属站拦截", key: "lease_whitelist_block", fn: () => SCREENS.failWhitelist() },
+      { id: "S2-10", title: "骑士卡·未登录", key: "card_link_guest", fn: () => SCREENS.loginCardLink() },
+      { id: "S2-11", title: "骑士卡·未实名", key: "card_link_kyc", fn: () => SCREENS.kyc() },
+      { id: "S2-12", title: "骑士卡·专享价", key: "card_link_attr", fn: () => SCREENS.purchaseCardAttr() },
+      { id: "S2-13", title: "骑士卡·再次购卡", key: "card_link_rebuy", fn: () => SCREENS.purchaseCardRebuy() }
+    ];
+
+    function buildSupplementGrid(items, phase2) {
+      return items.map(s => flowCell(s.id, (phase2 ? "⋯ " : "") + s.title, s.fn(), s.key + (phase2 ? " · 二期" : ""))).join("");
+    }
+
+    function renderFlowBoard() {
+      document.getElementById("flowBoard").innerHTML = `
+        <div class="legend-bar">
+          <span>用户操作</span><span class="sys">系统自动</span><span class="warn">警告/阻断</span><span class="phase2">二期</span>
         </div>
-        <div class="section-card">
-          <div class="section-title">我的订单</div>
-          <div class="grid-2">
-            <button type="button" class="grid-item" data-goto-orders="return"><span class="gi">📋</span>退租订单</button>
-            <button type="button" class="grid-item" data-goto-orders="purchase"><span class="gi">📋</span>服务购买订单</button>
-          </div>
-        </div>`;
-
-      el.querySelector("#btnSettings").onclick = () => {
-        document.getElementById("settingsRole").value = state.role;
-        openOverlay("overlaySettings");
-      };
-      el.querySelectorAll("[data-action]").forEach(btn => {
-        btn.onclick = () => handleAction(btn.dataset.action);
-      });
-      el.querySelectorAll("[data-goto-orders]").forEach(btn => {
-        btn.onclick = () => { state.orderTab = btn.dataset.gotoOrders; switchTab("orders"); };
-      });
+        <section class="flow-section"><h2>信息架构 · 三 Tab 基础页 <span class="badge">IA</span></h2>
+          <p class="section-desc">首页地图 + 订单三 Tab（换电/服务购买/退租）+ 我的服务态 + 设置。个人与人天共用 Tab 结构；渠道人天通常无自购套餐单。</p>
+          <div class="flow-track">${buildIATrack()}</div></section>
+        <section class="flow-section"><h2>主线一 · 个人套餐 <span class="badge">P01–P09</span></h2>
+          <p class="section-desc">登录 → 实名 → 定 OP → 购套餐 → 待领电 → 扫码领取 → 换电 → 续费 → 冻结/解冻 → 冷静期退款。</p>
+          <div class="flow-track">${buildPersonalTrack()}</div>${buildPersonalBranch()}</section>
+        <section class="flow-section"><h2>主线二 · 渠道人天 <span class="badge">C01–C08</span></h2>
+          <p class="section-desc">权益到账 → 预占 → 首领押金 → 领电 → 换电确认消耗 → 额度异常仅还电 → 离职 → 还电回池。无主套餐入口，无自费兜底。</p>
+          <div class="flow-track">${buildChannelTrack()}</div>
+          <div class="flow-note" style="margin-top:16px"><h4>渠道 vs 个人 · 互斥</h4>
+            <p>不可同时持有个人套餐与渠道人天；零额度持电池<strong>仅可还电</strong>，须联系渠道续配。</p></div></section>
+        <section class="flow-section"><h2>补充场景 · 个人 / 定位 <span class="badge">一期</span></h2>
+          <div class="supplement-grid">${buildSupplementGrid(SUPPLEMENT_PERSONAL, false)}</div></section>
+        <section class="flow-section"><h2>补充场景 · 渠道人天 <span class="badge">一期</span></h2>
+          <div class="supplement-grid">${buildSupplementGrid(SUPPLEMENT_CHANNEL, false)}</div></section>
+        <section class="flow-section"><h2>补充场景 · 二期 <span class="badge">非必测</span></h2>
+          <p class="section-desc">设备租赁白名单、骑士卡链接、专属站等。演示身份 key 与验收标准一致。</p>
+          <div class="supplement-grid">${buildSupplementGrid(SUPPLEMENT_PHASE2, true)}</div></section>`;
     }
 
-    function handleAction(action) {
-      const u = user();
-      if (action === "deposit") {
-        if (u.entitlement !== "渠道人天") { toast("请在购套餐时办理押金"); return; }
-        if (isDepositSettled(u)) { toast("押金已办结"); return; }
-        state.scanSite = u.homeSite || state.scanSite;
-        document.getElementById("demoSite").value = state.scanSite;
-        openOverlay("overlayScan");
-        renderChannelDepositSheet(SITES[state.scanSite] || SITES["ST-SH-01"]);
-        return;
-      }
-      if (action === "refund_deposit") {
-        if (!canApplyDepositRefund(u)) { toast("当前无可退实付押金"); return; }
-        if (u.holdsBattery) { toast("请先归还电池后再申请退押"); return; }
-        u.depositStatus = "退押中";
-        state.returnOrders.unshift({
-          id: "RF" + Date.now().toString().slice(-8),
-          type: "押金退还",
-          amount: u.depositAmount || 99,
-          time: new Date().toLocaleString("zh-CN"),
-          status: "待审核",
-          userId: u.userId
-        });
-        toast("已提交退押申请 ¥" + (u.depositAmount || 99) + "，进入运营商退款管理");
-        renderMine();
-        return;
-      }
-      if (action === "scan") { startScan(); return; }
-      if (action === "buy") {
-        if (u.loggedIn && !u.kyc && u.channelAttr) { openOverlay("overlayKyc"); return; }
-        openPurchaseFlow();
-        return;
-      }
-      if (action === "coupon") { toast("暂无可用优惠券"); return; }
-      if (action === "service") { toast("客服 400-607-2666"); return; }
-      if (action === "return") {
-        if (!u.loggedIn || u.status === "未开通") { toast("请先开通服务"); return; }
-        if (!u.holdsBattery) { toast("当前未持有电池"); return; }
-        toast("电池已归还，可继续申请退押或冻结");
-        if (u.holdsBattery) u.holdsBattery = false;
-        renderMine();
-        return;
-      }
-      if (action === "cooling_refund") {
-        if (!u.loggedIn || u.entitlement !== "个人套餐") { toast("仅个人套餐用户可申请"); return; }
-        if (!u.coolingPeriod) { toast("已超过 3 天冷静期，不可申请"); return; }
-        if (u.holdsBattery) { toast("请先归还电池后再申请退款"); return; }
-        if (u.refundApplied) { toast("已提交申请，等待运营商审核"); return; }
-        u.refundApplied = true;
-        toast("已提交冷静期退款（建议退套餐 ¥279 + 押金 ¥99），等待运营商审核");
-        renderMine();
-        return;
-      }
-      if (action === "freeze") {
-        if (!u.loggedIn || u.status === "未开通") { toast("请先开通服务"); return; }
-        if (u.entitlement !== "个人套餐") { toast("仅个人套餐用户可申请冻结"); return; }
-        if (u.status === "已冻结") { toast("服务已冻结"); return; }
-        if (u.status !== "服务中") { toast("仅服务中且套餐有效期内可申请"); return; }
-        if (u.daysLeft != null && u.daysLeft <= 0) { toast("套餐已过期，无法冻结"); return; }
-        if (u.holdsBattery) { toast("请先归还电池后再申请冻结"); return; }
-        u.status = "已冻结";
-        toast("服务已冻结，解冻后可继续换电");
-        renderMine();
-        return;
-      }
-      if (action === "kyc") { openOverlay("overlayKyc"); return; }
-      if (action === "unfreeze") {
-        if (u.entitlement !== "个人套餐") { toast("仅个人套餐用户可解除冻结"); return; }
-        if (u.status !== "已冻结") { toast("当前未处于冻结状态"); return; }
-        if (u.holdsBattery) { toast("请先归还电池后再解除冻结"); return; }
-        const frozenDays = u.frozenDays || 1;
-        u.status = "服务中";
-        u.pendingPickup = true;
-        if (u.daysLeft != null) u.daysLeft += frozenDays;
-        toast("已解除冻结，有效期已顺延；请先扫码领取电池");
-        renderMine();
-        return;
-      }
-    }
-
-    function renderOrders() {
-      document.querySelectorAll(".sub-tab").forEach(t => t.classList.toggle("active", t.dataset.otab === state.orderTab));
-      const u = user();
-      const list = document.getElementById("orderList");
-      let rows = [];
-      if (state.orderTab === "swap") {
-        rows = state.swapOrders.filter(o => !u.userId || o.userId === u.userId);
-        if (!rows.length) {
-          list.innerHTML = `<div class="empty"><div class="icon">🔋</div>暂无换电记录</div>`;
-          return;
-        }
-        list.innerHTML = rows.map(o => `
-          <div class="order-card">
-            <div class="top"><span class="id">${o.id}</span><span class="status ${o.status === "失败" ? "fail" : ""}">${o.status}</span></div>
-            <div class="meta">${o.site}<br>${o.time}<br>权益：${o.type}</div>
-          </div>`).join("");
-      } else if (state.orderTab === "purchase") {
-        rows = state.purchaseOrders.filter(o => !u.userId || o.userId === u.userId);
-        if (!rows.length) {
-          list.innerHTML = `<div class="empty"><div class="icon">🛒</div>暂无购买记录</div>`;
-          return;
-        }
-        list.innerHTML = rows.map(o => `<div class="order-card">
-            <div class="top"><span class="id">${o.id}</span><span class="status">${o.status}</span></div>
-            <div class="meta">${o.pkg} · ¥${o.amount}${o.pkgAmount != null ? `<br>套餐 ¥${o.pkgAmount} + 押金 ¥${o.depositAmount ?? 0}${o.depositMethod ? "（" + o.depositMethod + (o.depositMethod === "实付" ? " · " + (o.depositStatus || "在押") : " · ——") + "）" : (o.depositStatus ? "（" + o.depositStatus + "）" : "")}` : ""}${o.sellerOperatorName ? "<br>服务：" + o.sellerOperatorName : ""}${o.channel ? "<br>渠道：" + o.channel + " · " + (o.linkCode || "") : ""}<br>${o.time}</div>
-          </div>`).join("");
-      } else {
-        rows = state.returnOrders.filter(o => !u.userId || o.userId === u.userId);
-        if (!rows.length) {
-          list.innerHTML = `<div class="empty"><div class="icon">📋</div>暂无退租记录</div>`;
-          return;
-        }
-        list.innerHTML = rows.map(o => `<div class="order-card">
-            <div class="top"><span class="id">${o.id}</span><span class="status">${o.status}</span></div>
-            <div class="meta">${o.type || "退租"} · ¥${o.amount || 0}<br>${o.time}</div>
-          </div>`).join("");
-      }
-    }
-
-    const LEASE_SUSPEND_MSG = "当前站点已到期，请联系管理员续费";
-
-    function isLeaseChannelSuspended(u) {
-      return u.entitlement === "设备租赁白名单" && u.whitelist && u.channelSuspended === true;
-    }
-
-    function isChannelResigned(u) {
-      return !!(u.channelResigned || u.status === "已离职" || u.status === "已完结");
-    }
-
-    /** 渠道人天无可用额度：禁止换电；持电池仅可还电（无自费兜底） */
-    function isChannelQuotaBlocked(u) {
-      if (u.entitlement !== "渠道人天") return false;
-      if (u.preOccupyFail || u.status === "权益不可用" || u.status === "待还电") return true;
-      if (u.gateReason === "个人无额度" || u.gateReason === "预占失败") return true;
-      if (u.remainingDays != null && u.remainingDays <= 0
-        && u.todayEligibility !== "已预占" && u.todayEligibility !== "已确认消耗") return true;
-      return false;
-    }
-
-    function startScan() {
-      const u = user();
-      const site = SITES[state.scanSite];
-      if (site) {
-        state.session.scanCabinetOp = site.operator;
-        if (!activePackageOperator(u)) setSessionOperator(site.operator, "scan", site.id, null);
-      }
-      if (!u.loggedIn) { toast("请先登录"); switchTab("mine"); return; }
-      if (u.status === "未开通") {
-        toast("请先购买套餐开通服务");
-        if (!u.kyc) openOverlay("overlayKyc");
-        else openPurchaseFlow();
-        return;
-      }
-      if (u.status === "已冻结") { toast("服务已冻结，请先解除冻结"); return; }
-      if (isChannelResigned(u) && !u.holdsBattery) {
-        toast("服务已完结，剩余人天已回池");
-        return;
-      }
-      if (isChannelQuotaBlocked(u) && !u.holdsBattery) {
-        toast("今日无人天额度，不可换电；请联系渠道管理员续配");
-        return;
-      }
-      const channelFirstPickup = u.entitlement === "渠道人天" && !u.holdsBattery && !isChannelQuotaBlocked(u) && u.status === "服务中";
-      const pickupMode = (u.pendingPickup && !u.holdsBattery) || channelFirstPickup;
-      if (pickupMode && needsDepositBeforePickup(u)) {
-        openOverlay("overlayScan");
-        renderChannelDepositSheet(site);
-        return;
-      }
-      const returnOnly = (isLeaseChannelSuspended(u) || (isChannelResigned(u) && u.holdsBattery)
-        || (isChannelQuotaBlocked(u) && u.holdsBattery));
-      const body = document.getElementById("scanBody");
-      const returnHint = isChannelQuotaBlocked(u)
-        ? "无人天额度：仅可<strong>还电</strong>，不可<strong>换电/出电</strong>"
-        : (isChannelResigned(u) ? "离职回池：可" : "渠道已停用：可") + "取<strong>还电</strong>，不可<strong>出电</strong>";
-      body.innerHTML = `
-        <div class="scan-box">
-          <div class="scan-frame"><div class="scan-line"></div></div>
-          <p style="color:var(--muted);font-size:13px">${pickupMode ? "对准换电柜二维码 · 领取电池" : "对准换电柜二维码"}</p>
-          <p style="font-size:12px;margin-top:8px;color:var(--blue)">当前柜机：${site.name}</p>
-          ${pickupMode ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">${channelFirstPickup ? "渠道首次服务须" : "解冻后首次服务须"}<strong>领取电池</strong>（出电，非换电）</p>` : ""}
-          ${returnOnly && u.holdsBattery ? `<p style="font-size:12px;margin-top:10px;color:var(--warn)">${returnHint}</p>` : ""}
-          ${pickupMode
-            ? `<button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟领取电池</button>`
-            : returnOnly && u.holdsBattery
-            ? `<button type="button" class="btn-block" style="margin-top:16px;background:var(--blue)" id="btnSimReturn">模拟还电入柜</button>
-               <button type="button" class="btn-block" style="margin-top:8px;background:#fff;color:var(--danger);border:1px solid var(--danger)" id="btnSimScan">模拟扫码换电（不出电）</button>`
-            : `<button type="button" class="btn-block" style="margin-top:20px" id="btnSimScan">模拟扫描成功</button>`}
-        </div>`;
-      body.querySelector("#btnSimScan").onclick = () => pickupMode ? runPickupBattery(site) : runSwap(site);
-      if (returnOnly && u.holdsBattery) {
-        body.querySelector("#btnSimReturn").onclick = () => runReturnBattery(site);
-      }
-      openOverlay("overlayScan");
-    }
-
-    function leaseWhitelistNeedsPkg(u) {
-      return u.entitlement === "设备租赁白名单" && u.whitelist && u.whitelistAccess !== "free" && (u.status === "未开通" || !u.pkg);
-    }
-
-    function opPolicy(opId) {
-      return OPERATOR_POLICY[opId] || { crossNetworkEnabled: true };
-    }
-
-    function channelSwapPolicy(chId) {
-      return CHANNEL_SWAP_POLICY[chId] || { crossNetworkEnabled: false, crossNetworkDepositPaid: false };
-    }
-
-    function checkSwapGate(u, site) {
-      if (site.channelDedicated && !canSeeDedicatedSite(u, site)) {
-        return { ok: false, msg: "该站点为渠道专用站，仅白名单用户可见可用（E_WHITELIST）" };
-      }
-      const cabinetOp = site.operator;
-      const isLeaseWl = u.entitlement === "设备租赁白名单" && u.whitelist && u.channelId;
-      const hostOp = isLeaseWl ? (channelSwapPolicy(u.channelId).hostOperatorId || CHANNELS[u.channelId]?.operatorId || "OP-SX") : u.operator;
-      const userOp = hostOp;
-      const isCrossNetwork = userOp && cabinetOp && userOp !== cabinetOp;
-
-      if (isCrossNetwork) {
-        if (isLeaseWl) {
-          const chPol = channelSwapPolicy(u.channelId);
-          if (!chPol.crossNetworkEnabled) {
-            return { ok: false, msg: "您的渠道未开通跨网换电，仅可在本网站点换电" };
-          }
-          if (!chPol.crossNetworkDepositPaid) {
-            return { ok: false, msg: "渠道跨网保证金未缴纳，跨网换电不可用（E_CHANNEL_CROSSNET_DEPOSIT）" };
-          }
-          if (chPol.crossSwapEnabled === false) {
-            return { ok: false, msg: "渠道信用额度不足，跨网换电已关闭" };
-          }
-        } else {
-          const userCredit = OPERATOR_CREDIT[userOp];
-          if (userCredit && userCredit.crossSwapEnabled === false) {
-            return { ok: false, msg: "您的运营商信用额度不足，跨网换电已关闭" };
-          }
-          const userPol = opPolicy(userOp);
-          if (!userPol.crossNetworkEnabled) {
-            return { ok: false, msg: "您的运营商已关闭跨网换电，仅可在本运营商站点换电" };
-          }
-        }
-        const cabPol = opPolicy(cabinetOp);
-        if (!cabPol.crossNetworkEnabled) {
-          return { ok: false, msg: "该站点运营商已关闭跨网换电，外来用户不可换电" };
-        }
-      }
-
-      return { ok: true };
-    }
-
-    function runPickupBattery(site) {
-      const u = user();
-      if (needsDepositBeforePickup(u)) {
-        renderChannelDepositSheet(site);
-        return;
-      }
-      const gate = checkSwapGate(u, site);
-      if (!gate.ok) {
-        showScanResult(false, gate.msg, site);
-        return;
-      }
-      const batSn = "BAT-SH-" + Date.now().toString().slice(-4);
-      u.holdsBattery = true;
-      u.pendingPickup = false;
-      u.currentBatterySn = batSn;
-      const id = "SW" + Date.now().toString().slice(-8);
-      const typeLabel = u.entitlement === "渠道人天" ? "渠道人天 · 领取电池" : "个人套餐 · 领取电池";
-      state.swapOrders.unshift({
-        id, site: site.name, time: new Date().toLocaleString("zh-CN"), status: "成功",
-        type: typeLabel, userId: u.userId
-      });
-      document.getElementById("scanBody").innerHTML = `
-        <div class="result-ok">
-          <div class="big">✓</div>
-          <h3 style="margin-bottom:8px">领取电池成功</h3>
-          <p style="font-size:13px;color:var(--muted);line-height:1.7">
-            单号 ${id}<br>${site.name}<br>已领取 ${batSn} · 格口已关闭<br>
-            <small>押金：${u.depositMethod || "—"}${u.depositMethod === "实付" && u.depositAmount ? " ¥" + u.depositAmount : ""} · 状态 ${u.depositMethod === "实付" ? (u.depositStatus || "在押") : (u.depositMethod ? "——" : "—")} · 后续可正常换电</small>
-          </p>
-          <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
-        </div>`;
-      document.getElementById("scanBody").querySelector("[data-close-scan]").onclick = () => {
-        closeOverlay("overlayScan");
-        renderMine();
-        renderHome();
-      };
-    }
-
-    function runSwap(site) {
-      const u = user();
-      if (u.pendingPickup && !u.holdsBattery) {
-        runPickupBattery(site);
-        return;
-      }
-      if (isChannelResigned(u)) {
-        showScanResult(false, "服务已终止（离职），仅可还电入柜，不可出电", site);
-        return;
-      }
-      if (u.leaseBlocked) {
-        showScanResult(false, u.blockReason || "非授权用户，请联系渠道管理员", site);
-        return;
-      }
-      if (isLeaseChannelSuspended(u)) {
-        showScanResult(false, LEASE_SUSPEND_MSG + "（E_LEASE_CHANNEL_SUSPENDED）", site);
-        return;
-      }
-      if (leaseWhitelistNeedsPkg(u)) {
-        showScanResult(false, "白名单付费用户须购买白名单套餐后方可换电（E_LEASE_PKG_REQUIRED）", site);
-        return;
-      }
-      if (u.preOccupyFail || isChannelQuotaBlocked(u)) {
-        const reason = u.gateReason || u.failReason || "渠道人天今日不可用";
-        showScanResult(false, `${reason}，不可换电（仅可还电）`, site);
-        return;
-      }
-      const gate = checkSwapGate(u, site);
-      if (!gate.ok) {
-        showScanResult(false, gate.msg, site);
-        return;
-      }
-      const userOp = (u.entitlement === "设备租赁白名单" && u.channelId)
-        ? (channelSwapPolicy(u.channelId).hostOperatorId || CHANNELS[u.channelId]?.operatorId || "OP-SX")
-        : (u.operator || "OP-SX");
-      const cabOp = site.operator;
-      const batOp = site.batteryOperator || site.operator;
-      const cabFee = userOp !== cabOp ? 0.5 : 0;
-      const batFee = userOp !== batOp ? 0.1 : 0;
-      const id = "SW" + Date.now().toString().slice(-8);
-      state.swapOrders.unshift({
-        id, site: site.name, time: new Date().toLocaleString("zh-CN"), status: "成功",
-        type: u.entitlement || "个人套餐", userId: u.userId,
-        userOwner: u.channelId || userOp, cabinetOwner: cabOp, batteryOwner: batOp, l1Fee: cabFee + batFee
-      });
-      if (u.entitlement === "渠道人天") u.swapUsed = (u.swapUsed || 0) + 1;
-      else if (u.entitlement === "设备租赁白名单") u.swapUsed = (u.swapUsed || 0) + 1;
-      else u.swapUsed = (u.swapUsed || 0) + 1;
-      showScanResult(true, "换电成功", site, id, { userOp, cabOp, batOp, l1Fee: cabFee + batFee });
-    }
-
-    function runReturnBattery(site) {
-      const u = user();
-      const resign = isChannelResigned(u);
-      const quotaBlock = isChannelQuotaBlocked(u);
-      if ((!isLeaseChannelSuspended(u) && !resign && !quotaBlock) || !u.holdsBattery) {
-        showScanResult(false, "当前无法还电", site);
-        return;
-      }
-      const id = "RT" + Date.now().toString().slice(-8);
-      const batSn = u.currentBatterySn || (resign ? "BAT-SF-2110" : "BAT-SF-RET");
-      u.holdsBattery = false;
-      u.currentBatterySn = null;
-      if (resign) {
-        u.status = "已完结";
-        u.remainingDays = 0;
-      } else if (quotaBlock) {
-        u.status = "权益不可用";
-      }
-      state.returnOrders.unshift({
-        id, site: site.name, battery: batSn, time: new Date().toLocaleString("zh-CN"),
-        status: "已归还", userId: u.userId,
-        note: resign ? "离职还电 · 剩余人天已回池"
-          : (quotaBlock ? "零额度还电 · 不可换电" : "渠道停服期间还电入柜")
-      });
-      showReturnResult(site, id, batSn, resign, quotaBlock);
-    }
-
-    function showReturnResult(site, returnId, batSn, resign, quotaBlock) {
-      const tip = resign
-        ? "✓ 剩余人天已回池 · 不向骑手退款 · 服务完结"
-        : (quotaBlock
-          ? "✓ 电池已归还 · 仍无人天额度，不可换电；请联系渠道续配"
-          : "渠道停服期间仅支持还电，暂不可取新电池");
-      document.getElementById("scanBody").innerHTML = `
-        <div class="result-ok">
-          <div class="big">✓</div>
-          <h3 style="margin-bottom:8px">还电成功</h3>
-          <p style="font-size:13px;color:var(--muted);line-height:1.7">
-            单号 ${returnId}<br>${site.name}<br>已归还 ${batSn} · 格口已关闭<br>
-            <small>${tip}</small>
-          </p>
-          <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
-        </div>`;
-      document.getElementById("scanBody").querySelector("[data-close-scan]").onclick = () => {
-        closeOverlay("overlayScan");
-        renderMine();
-        renderHome();
-      };
-    }
-
-    function showScanResult(ok, msg, site, swapId, _triplet) {
-      const u = user();
-      let dayLine = "";
-      if (ok && u.entitlement === "渠道人天") {
-        u.todayEligibility = "已确认消耗";
-        dayLine = `<br><small>✓ 今日人天：已确认消耗（同日不重复扣）</small>`;
-      }
-      document.getElementById("scanBody").innerHTML = ok ? `
-        <div class="result-ok">
-          <div class="big">✓</div>
-          <h3 style="margin-bottom:8px">${msg}</h3>
-          <p style="font-size:13px;color:var(--muted);line-height:1.7">
-            单号 ${swapId}<br>${site.name}<br>换出电池 SOC 96% · 健康正常${dayLine}
-          </p>
-          <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>完成</button>
-        </div>` : `
-        <div class="result-ok">
-          <div class="big" style="color:var(--danger)">✕</div>
-          <h3 style="margin-bottom:8px">换电失败</h3>
-          <p style="font-size:13px;color:var(--muted)">${msg}</p>
-          <button type="button" class="btn-block" style="margin-top:20px" data-close-scan>知道了</button>
-        </div>`;
-      document.getElementById("scanBody").querySelector("[data-close-scan]").onclick = () => closeOverlay("overlayScan");
-    }
-
-    document.querySelectorAll(".tab-item").forEach(b => b.onclick = () => switchTab(b.dataset.tab));
-    document.getElementById("btnScan").onclick = startScan;
-    document.getElementById("btnHelp").onclick = () => toast("帮助中心建设中");
-    document.getElementById("btnLocate").onclick = () => {
-      const geo = geoResolve();
-      if (geo.blocked) {
-        toast(geo.reason === "denied" ? "演示：用户拒绝定位" : "演示：附近无在营站");
-        return;
-      }
-      if (geo.needPick) {
-        openOperatorPicker(geo.candidates, () => toast("请点「服务购买」继续"));
-        return;
-      }
-      if (geo.auto) {
-        setSessionOperator(geo.operatorId, "geo_auto", geo.nearestSiteId, geo.distanceM);
-        renderMine();
-        toast("已匹配 " + OPERATORS[geo.operatorId].name + " · 最近 " + SITES[geo.nearestSiteId].name);
-      }
-    };
-    document.querySelectorAll(".map-pin").forEach(p => {
-      p.onclick = () => {
-        state.scanSite = p.dataset.site;
-        document.getElementById("demoSite").value = state.scanSite;
-        const s = SITES[state.scanSite];
-        if (s) state.session.scanCabinetOp = s.operator;
-        toast("已选站点：" + s.name);
-      };
-    });
-
-    document.querySelectorAll(".sub-tab").forEach(t => {
-      t.onclick = () => { state.orderTab = t.dataset.otab; renderOrders(); };
-    });
-
-    document.querySelectorAll("[data-close]").forEach(b => {
-      b.onclick = () => closeOverlay(b.dataset.close);
-    });
-    document.querySelectorAll(".overlay").forEach(ov => {
-      ov.onclick = e => { if (e.target === ov) ov.classList.remove("open"); };
-    });
-
-    document.getElementById("btnKycSubmit").onclick = () => {
-      const name = document.getElementById("kycName").value.trim();
-      const id = document.getElementById("kycId").value.trim();
-      if (!name || id.length < 15) { toast("请填写正确的身份信息"); return; }
-      const u = user();
-      u.kyc = true;
-      if (state.role === "card_link_kyc") {
-        state.role = "card_link_attr";
-        document.getElementById("demoRole").value = "card_link_attr";
-      }
-      closeOverlay("overlayKyc");
-      toast("实名认证成功，可享渠道专享价购套餐");
-      renderMine();
-    };
-
-    document.getElementById("btnLogout").onclick = () => {
-      state.role = "guest";
-      document.getElementById("demoRole").value = "guest";
-      closeOverlay("overlaySettings");
-      renderMine();
-      toast("已退出登录");
-    };
-    document.getElementById("settingsRole").onchange = function() {
-      state.mainline.stepId = null;
-      state.role = this.value;
-      document.getElementById("demoRole").value = this.value;
-      closeOverlay("overlaySettings");
-      renderMainlineSteps();
-      renderMine();
-      renderOrders();
-      renderMapPins();
-    };
-
-    document.getElementById("applyDemo").onclick = () => {
-      state.mainline.stepId = null;
-      state.role = document.getElementById("demoRole").value;
-      state.scanSite = state.role === "personal_cross3" ? "ST-BJ-01" : document.getElementById("demoSite").value;
-      if (state.role === "personal_cross3") document.getElementById("demoSite").value = "ST-BJ-01";
-      state.geoScenario = document.getElementById("demoGeo").value;
-      if (state.role === "geo_ambiguous") state.geoScenario = "ambiguous";
-      resetSessionContext();
-      if (state.role === "card_link_guest" || state.role === "card_link_kyc" || state.role === "card_link_attr") {
-        setSessionOperator("OP-SX", "launch");
-      }
-      OPERATOR_POLICY["OP-SX"].crossNetworkEnabled = document.getElementById("policyCrossNet").checked;
-      renderMainlineSteps();
-      renderMine();
-      renderOrders();
-      renderMapPins();
-      toast("已切换补充场景 · " + document.getElementById("demoRole").selectedOptions[0].text);
-    };
-
-    document.getElementById("btnMainlineNext").onclick = () => goMainline(1);
-    document.getElementById("btnMainlinePrev").onclick = () => goMainline(-1);
-    document.querySelectorAll("[data-story]").forEach(btn => {
-      btn.onclick = () => {
-        state.mainline.story = btn.dataset.story;
-        const first = MAINLINE[state.mainline.story].steps[0].id;
-        applyMainlineStep(first, { openUi: false });
-        switchTab(state.mainline.story === "personal" ? "mine" : "mine");
-        toast("已切换故事线 · " + (state.mainline.story === "personal" ? "个人套餐" : "人天池"));
-      };
-    });
-
-    applyMainlineStep(state.mainline.stepId || "P06", { openUi: false });
-    switchTab("home");
-    renderMine();
-    renderMapPins();
-
+    renderFlowBoard();
     (function () {
-      var link = document.getElementById("navDocsLink");
-      if (link && !/\/prototype(\/|$)/.test(location.pathname)) {
-        link.href = "../documentation/index.html";
-      }
+      var href = "../documentation/index.html";
+      ["navDocsLink", "navDocsLink2"].forEach(function (id) { var el = document.getElementById(id); if (el) el.href = href; });
     })();
   </script>
 </body>

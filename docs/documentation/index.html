@@ -44,7 +44,7 @@
     .toolbar .file { font-weight: 600; color: var(--ink); }
     .article {
       background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-      box-shadow: var(--shadow); padding: 28px 32px 36px; max-width: 920px;
+      box-shadow: var(--shadow); padding: 28px 32px 36px; max-width: 1100px;
     }
     .article .loading, .article .error { color: var(--muted); font-size: 14px; }
     .md h1 { font-size: 26px; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
@@ -61,15 +61,55 @@
     .md blockquote { margin: 12px 0; padding: 10px 14px; border-left: 4px solid var(--brand); background: var(--brand-soft); color: var(--muted); }
     .md hr { border: none; border-top: 1px solid var(--line); margin: 24px 0; }
     .md .mermaid-wrap {
-      margin: 18px 0; padding: 20px 16px; background: #fafbfc;
-      border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto;
+      margin: 18px 0; padding: 0; background: #fafbfc;
+      border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
     }
-    .md .mermaid-wrap .mermaid { display: flex; justify-content: center; min-height: 40px; }
-    .md .mermaid-wrap svg { max-width: 100%; height: auto; }
+    .md .mermaid-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+      padding: 8px 12px; background: #f1f5f9; border-bottom: 1px solid var(--line);
+      font-size: 12px; color: var(--muted);
+    }
+    .md .mermaid-toolbar .mermaid-title { font-weight: 600; color: var(--ink); max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .md .mermaid-toolbar .mermaid-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .md .mermaid-toolbar button {
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
+      border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; line-height: 1.3;
+    }
+    .md .mermaid-toolbar button:hover { border-color: var(--brand); color: var(--brand-dark); background: var(--brand-soft); }
+    .md .mermaid-toolbar button:disabled { opacity: .55; cursor: wait; }
+    .md .mermaid-toolbar button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .md .mermaid-toolbar button.primary:hover { background: var(--brand-dark); border-color: var(--brand-dark); color: #fff; }
+    .md .mermaid-viewport {
+      padding: 20px 16px; overflow: auto; max-height: min(72vh, 820px);
+      background: #fafbfc; -webkit-overflow-scrolling: touch;
+    }
+    .md .mermaid-wrap .mermaid { display: inline-block; min-width: 100%; text-align: center; min-height: 40px; }
+    /* 不压扁大图：保留矢量原始宽度，横向滚动查看；下载走高清栅格 */
+    .md .mermaid-wrap svg { max-width: none; height: auto; display: block; margin: 0 auto; }
     .md .mermaid-error {
       font-size: 12px; color: #c84545; padding: 10px 12px; background: #fff5f5;
-      border-radius: 6px; margin-top: 8px;
+      border-radius: 6px; margin: 8px 12px 12px;
     }
+    .mermaid-lightbox {
+      position: fixed; inset: 0; z-index: 1000; background: rgba(15, 23, 42, .72);
+      display: none; flex-direction: column; padding: 16px;
+    }
+    .mermaid-lightbox.open { display: flex; }
+    .mermaid-lightbox .lb-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+      color: #fff; margin-bottom: 10px; font-size: 13px;
+    }
+    .mermaid-lightbox .lb-bar .lb-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .mermaid-lightbox .lb-bar button {
+      border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff;
+      border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+    }
+    .mermaid-lightbox .lb-bar button:hover { background: rgba(255,255,255,.22); }
+    .mermaid-lightbox .lb-stage {
+      flex: 1; min-height: 0; overflow: auto; background: #fff; border-radius: 10px;
+      padding: 24px; display: flex; justify-content: flex-start; align-items: flex-start;
+    }
+    .mermaid-lightbox .lb-stage svg { max-width: none; height: auto; display: block; }
     .md .anchor-flash { animation: anchorFlash 1.2s ease; border-radius: 4px; }
     @keyframes anchorFlash {
       0%, 100% { background: transparent; }
@@ -207,19 +247,261 @@
     }
 
     function prepareMermaidBlocks(root) {
-      root.querySelectorAll("pre code.language-mermaid").forEach(code => {
+      root.querySelectorAll("pre code.language-mermaid").forEach((code, idx) => {
         const pre = code.parentElement;
         const wrap = document.createElement("div");
         wrap.className = "mermaid-wrap";
+        wrap.dataset.diagramIndex = String(idx + 1);
         const diagram = document.createElement("div");
         diagram.className = "mermaid";
         diagram.textContent = code.textContent.trim();
-        wrap.appendChild(diagram);
+        const viewport = document.createElement("div");
+        viewport.className = "mermaid-viewport";
+        viewport.appendChild(diagram);
+        wrap.appendChild(viewport);
         pre.replaceWith(wrap);
       });
     }
 
     let mermaidReady = false;
+    const RASTER_SCALE = 3;
+    const MAX_CANVAS_PIXELS = 16 * 1024 * 1024;
+
+    function diagramBasename(wrap, index) {
+      const heading = wrap.previousElementSibling;
+      let title = "";
+      if (heading && /^H[1-6]$/i.test(heading.tagName)) title = heading.textContent.trim();
+      if (!title) title = "diagram-" + index;
+      return (title || "diagram")
+        .replace(/[\\/:*?"<>|]+/g, "-")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 80) || ("diagram-" + index);
+    }
+
+    function pickSafeScale(w, h) {
+      for (let s = RASTER_SCALE; s >= 1; s--) {
+        if (w * s * h * s <= MAX_CANVAS_PIXELS) return s;
+      }
+      return 1;
+    }
+
+    function getSvgMetrics(svg) {
+      const vb = svg.viewBox && svg.viewBox.baseVal;
+      let w = vb && vb.width ? vb.width : 0;
+      let h = vb && vb.height ? vb.height : 0;
+      if (!w || !h) {
+        try {
+          const box = svg.getBBox();
+          w = w || box.width;
+          h = h || box.height;
+        } catch (_) { /* ignore */ }
+      }
+      if (!w || !h) {
+        const rect = svg.getBoundingClientRect();
+        w = w || rect.width || parseFloat(svg.getAttribute("width")) || 800;
+        h = h || rect.height || parseFloat(svg.getAttribute("height")) || 600;
+      }
+      return { width: Math.ceil(w), height: Math.ceil(h) };
+    }
+
+    function serializeMermaidSvg(svg, scale) {
+      scale = scale || 1;
+      const clone = svg.cloneNode(true);
+      const { width, height } = getSvgMetrics(svg);
+      clone.setAttribute("width", String(width * scale));
+      clone.setAttribute("height", String(height * scale));
+      if (!clone.getAttribute("viewBox") && width && height) {
+        clone.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      }
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      if (!clone.getAttribute("xmlns:xlink")) {
+        clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+      }
+      // 去掉交互态缩放，导出按矢量真实尺寸
+      clone.style.maxWidth = "none";
+      clone.style.width = (width * scale) + "px";
+      clone.style.height = (height * scale) + "px";
+
+      const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+      style.textContent = `
+        svg { font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; background: #ffffff; }
+        .nodeLabel, .edgeLabel, .label, text { font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; }
+      `;
+      clone.insertBefore(style, clone.firstChild);
+
+      const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      bg.setAttribute("width", "100%");
+      bg.setAttribute("height", "100%");
+      bg.setAttribute("fill", "#ffffff");
+      clone.insertBefore(bg, style.nextSibling);
+
+      return {
+        svgString: new XMLSerializer().serializeToString(clone),
+        width: width * scale,
+        height: height * scale
+      };
+    }
+
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    function downloadSvg(svg, filename) {
+      const data = serializeMermaidSvg(svg, 1);
+      const blob = new Blob([data.svgString], { type: "image/svg+xml;charset=utf-8" });
+      triggerDownload(blob, filename.endsWith(".svg") ? filename : filename + ".svg");
+    }
+
+    function downloadPngHd(svg, filename) {
+      const { width, height } = getSvgMetrics(svg);
+      const scale = pickSafeScale(width, height);
+      const data = serializeMermaidSvg(svg, scale);
+      const svgBlob = new Blob([data.svgString], { type: "image/svg+xml;charset=utf-8" });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = data.width;
+            canvas.height = data.height;
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(svgUrl);
+            canvas.toBlob(blob => {
+              if (!blob) { reject(new Error("PNG 生成失败")); return; }
+              triggerDownload(blob, (filename.endsWith(".png") ? filename : filename + ".png"));
+              resolve({ scale, width: data.width, height: data.height });
+            }, "image/png");
+          } catch (err) {
+            URL.revokeObjectURL(svgUrl);
+            reject(err);
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(svgUrl);
+          reject(new Error("SVG 栅格化失败（若图含复杂 HTML 标签，请改下 SVG）"));
+        };
+        img.src = svgUrl;
+      });
+    }
+
+    function ensureLightbox() {
+      let lb = document.getElementById("mermaidLightbox");
+      if (lb) return lb;
+      lb = document.createElement("div");
+      lb.id = "mermaidLightbox";
+      lb.className = "mermaid-lightbox";
+      lb.innerHTML = `
+        <div class="lb-bar">
+          <span id="lbTitle">流程图预览</span>
+          <div class="lb-actions">
+            <button type="button" data-lb="png">下载 PNG 高清</button>
+            <button type="button" data-lb="svg">下载 SVG</button>
+            <button type="button" data-lb="close">关闭 · Esc</button>
+          </div>
+        </div>
+        <div class="lb-stage" id="lbStage"></div>`;
+      document.body.appendChild(lb);
+      lb.addEventListener("click", e => {
+        if (e.target === lb) closeLightbox();
+      });
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape" && lb.classList.contains("open")) closeLightbox();
+      });
+      return lb;
+    }
+
+    let lightboxSvg = null;
+    let lightboxName = "diagram";
+
+    function openLightbox(svg, title, basename) {
+      const lb = ensureLightbox();
+      const stage = document.getElementById("lbStage");
+      document.getElementById("lbTitle").textContent = title || "流程图预览";
+      stage.innerHTML = "";
+      const clone = svg.cloneNode(true);
+      clone.style.maxWidth = "none";
+      stage.appendChild(clone);
+      lightboxSvg = svg;
+      lightboxName = basename;
+      lb.classList.add("open");
+      lb.querySelector('[data-lb="png"]').onclick = async () => {
+        const btn = lb.querySelector('[data-lb="png"]');
+        btn.disabled = true;
+        try { await downloadPngHd(lightboxSvg, lightboxName + "-hd"); }
+        catch (err) { alert(err.message || String(err)); }
+        finally { btn.disabled = false; }
+      };
+      lb.querySelector('[data-lb="svg"]').onclick = () => downloadSvg(lightboxSvg, lightboxName);
+      lb.querySelector('[data-lb="close"]').onclick = closeLightbox;
+    }
+
+    function closeLightbox() {
+      const lb = document.getElementById("mermaidLightbox");
+      if (lb) lb.classList.remove("open");
+      lightboxSvg = null;
+    }
+
+    function attachMermaidToolbars(root) {
+      root.querySelectorAll(".mermaid-wrap").forEach((wrap, i) => {
+        if (wrap.querySelector(".mermaid-toolbar")) return;
+        const svg = wrap.querySelector("svg");
+        if (!svg) return;
+        const index = i + 1;
+        const basename = diagramBasename(wrap, index);
+        const metrics = getSvgMetrics(svg);
+        const toolbar = document.createElement("div");
+        toolbar.className = "mermaid-toolbar";
+        toolbar.innerHTML = `
+          <span class="mermaid-title">图 ${index} · ${basename}</span>
+          <div class="mermaid-actions">
+            <button type="button" data-act="zoom">放大查看</button>
+            <button type="button" data-act="svg">下载 SVG</button>
+            <button type="button" class="primary" data-act="png">下载 PNG 高清 ×${RASTER_SCALE}</button>
+          </div>`;
+        const hint = document.createElement("span");
+        hint.style.cssText = "display:block;width:100%;font-size:11px;color:#94a3b8;margin-top:2px";
+        hint.textContent = `矢量尺寸约 ${metrics.width}×${metrics.height}px · 可横向滚动；PNG 按 ${RASTER_SCALE}× 栅格化`;
+        toolbar.appendChild(hint);
+
+        const viewport = wrap.querySelector(".mermaid-viewport") || wrap;
+        wrap.insertBefore(toolbar, viewport);
+
+        toolbar.querySelector('[data-act="zoom"]').onclick = () =>
+          openLightbox(svg, `图 ${index} · ${basename}`, basename);
+        toolbar.querySelector('[data-act="svg"]').onclick = () =>
+          downloadSvg(svg, basename);
+        toolbar.querySelector('[data-act="png"]').onclick = async (ev) => {
+          const btn = ev.currentTarget;
+          const old = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = "生成中…";
+          try {
+            const r = await downloadPngHd(svg, basename + "-hd");
+            btn.textContent = `已下载 ${r.width}×${r.height}`;
+            setTimeout(() => { btn.textContent = old; }, 1600);
+          } catch (err) {
+            alert("高清 PNG 导出失败：" + (err.message || err) + "\n可改下「下载 SVG」后用本地工具转 PNG。");
+            btn.textContent = old;
+          } finally {
+            btn.disabled = false;
+          }
+        };
+      });
+    }
+
     async function renderMermaidDiagrams(root) {
       const nodes = root.querySelectorAll(".mermaid");
       if (!nodes.length || typeof mermaid === "undefined") return;
@@ -236,14 +518,19 @@
             tertiaryColor: "#f8fafc",
             fontFamily: '"Microsoft YaHei", "PingFang SC", Arial, sans-serif'
           },
-          flowchart: { useMaxWidth: true, htmlLabels: true, curve: "basis" },
-          sequence: { useMaxWidth: true, wrap: true },
+          /* useMaxWidth:false → 保留图原始宽度，避免压成一团看不清；htmlLabels:false → PNG 栅格化更稳 */
+          flowchart: { useMaxWidth: false, htmlLabels: false, curve: "basis" },
+          sequence: { useMaxWidth: false, wrap: true },
+          state: { useMaxWidth: false },
+          er: { useMaxWidth: false },
+          gantt: { useMaxWidth: false },
           securityLevel: "loose"
         });
         mermaidReady = true;
       }
       try {
         await mermaid.run({ nodes: Array.from(nodes), suppressErrors: true });
+        attachMermaidToolbars(root);
       } catch (err) {
         nodes.forEach(node => {
           if (node.querySelector("svg")) return;
@@ -252,6 +539,7 @@
           errDiv.textContent = "流程图渲染失败，请检查 Mermaid 语法。";
           node.closest(".mermaid-wrap")?.appendChild(errDiv);
         });
+        attachMermaidToolbars(root);
         console.error("mermaid", err);
       }
     }

@@ -23,15 +23,17 @@ class RiderUserMainlineTests(unittest.TestCase):
             self.assertIn(step, MOBILE)
             self.assertIn(step, PRD)
 
-    def test_demo_panel_has_mainline_guide(self):
-        self.assertIn("主线导览", MOBILE)
-        self.assertIn('id="mainlineSteps"', MOBILE)
-        self.assertIn('id="btnMainlineNext"', MOBILE)
+    def test_flow_board_layout(self):
+        self.assertIn("flow-board", MOBILE)
+        self.assertIn("flow-track", MOBILE)
+        self.assertIn("flow-connector", MOBILE)
+        self.assertIn("主线一 · 个人套餐", MOBILE)
+        self.assertIn("主线二 · 渠道人天", MOBILE)
         self.assertIn("补充场景", MOBILE)
 
-    def test_default_role_is_mainline_personal(self):
-        self.assertRegex(MOBILE, r'role:\s*"personal"')
-        self.assertIn('option value="personal" selected', MOBILE)
+    def test_personal_story_in_mainline(self):
+        self.assertIn('story: "personal"', MOBILE)
+        self.assertIn("P04b", MOBILE)
 
     def test_phase2_roles_marked_supplement(self):
         self.assertIn("二期", MOBILE)
