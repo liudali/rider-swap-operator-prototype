@@ -2164,6 +2164,99 @@
       };
     }
 
+    function userKycStatus(u) {
+      return u.kycStatus || "未实名";
+    }
+
+    function maskIdNo(idNo) {
+      if (!idNo || idNo.length < 8) return idNo || "—";
+      return idNo.slice(0, 3) + "*".repeat(Math.max(0, idNo.length - 7)) + idNo.slice(-4);
+    }
+
+    function kycStatusTag(status) {
+      const s = status || "未实名";
+      const cls = s === "已实名" ? "" : s === "未通过" ? "risk" : "warn";
+      return `<span class="tag ${cls}">${s}</span>`;
+    }
+
+    function userKycActionCellHtml(u) {
+      const st = userKycStatus(u);
+      if (st === "已实名") {
+        return `<button type="button" class="link-btn" data-view-kyc="${u.id}">查看实名信息</button>`;
+      }
+      if (st === "未通过") {
+        return `<button type="button" class="link-btn" data-view-kyc="${u.id}">查看</button>
+          <button type="button" class="link-btn" data-kyc-manual-pass="${u.id}">手动通过</button>`;
+      }
+      return "—";
+    }
+
+    function idCardPhotoPlaceholder(label) {
+      return `<div style="width:160px;height:100px;border:1px dashed var(--border);border-radius:6px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted)">${label}</div>`;
+    }
+
+    function userKycDetailHtml(u) {
+      const st = userKycStatus(u);
+      if (st === "未实名") {
+        return `<p style="margin:0;font-size:13px;color:var(--muted)">该用户尚未提交实名认证。</p>`;
+      }
+      return `
+        <div class="detail-grid">
+          <div class="detail-item"><span>认证状态</span><strong>${kycStatusTag(st)}</strong></div>
+          <div class="detail-item"><span>姓名</span><strong>${u.realName || "—"}</strong></div>
+          <div class="detail-item"><span>身份证号</span><strong>${maskIdNo(u.idNo)}</strong></div>
+          <div class="detail-item"><span>提交时间</span><strong>${u.kycSubmittedAt || "—"}</strong></div>
+          ${st === "已实名" ? `<div class="detail-item"><span>通过时间</span><strong>${u.kycPassedAt || "—"}</strong></div>
+          ${u.kycManualPassedBy ? `<div class="detail-item"><span>人工通过</span><strong>${u.kycManualPassedBy}</strong></div>` : ""}` : ""}
+          ${st === "未通过" && u.kycRejectReason ? `<div class="detail-item" style="grid-column:1/-1"><span>驳回原因</span><strong style="color:var(--red)">${u.kycRejectReason}</strong></div>` : ""}
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:16px 0 8px">身份证照片（演示占位）</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          ${idCardPhotoPlaceholder("身份证正面")}
+          ${idCardPhotoPlaceholder("身份证反面")}
+        </div>`;
+    }
+
+    function openUserKycDrawer(userId) {
+      const u = users.find(x => x.id === userId);
+      if (!u) return;
+      document.querySelector("#drawerTitle").textContent = "实名认证 · " + u.id;
+      document.querySelector("#drawerSub").textContent = u.phone + " · " + userKycStatus(u);
+      const manualBtn = userKycStatus(u) === "未通过"
+        ? `<button type="button" class="btn primary" data-kyc-manual-pass="${u.id}">手动通过</button>` : "";
+      document.querySelector("#drawerBody").innerHTML = `
+        <section class="panel" style="margin:0">
+          ${panelHead("实名信息", "三要素：姓名 + 身份证号 + 身份证正反面", "user_kyc")}
+          <div class="panel-body" style="padding-top:0">${userKycDetailHtml(u)}</div>
+        </section>
+        ${manualBtn ? `<div style="margin-top:16px">${manualBtn}</div>` : ""}`;
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindDrawerActions();
+    }
+
+    function confirmUserKycManualPass(userId) {
+      const u = users.find(x => x.id === userId);
+      if (!u || userKycStatus(u) !== "未通过") return;
+      const actor = currentEmployee()?.name || (isPlatformRole() ? "平台管理员" : "运营商管理员");
+      openProtoConfirm({
+        title: "手动通过实名",
+        html: `<p style="margin:0 0 8px">确认将 <strong>${u.id}</strong>（${u.realName || "—"}）标记为<strong>已实名</strong>？</p>
+          <p style="margin:0;font-size:12px;color:var(--muted)">须已人工核对三要素；操作留痕。</p>`,
+        confirmLabel: "确认通过",
+        onConfirm: () => {
+          u.kycStatus = "已实名";
+          u.kycPassedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+          u.kycManualPassedBy = actor;
+          u.kycRejectReason = null;
+          closeDrawer();
+          showProtoToast("已手动通过实名认证");
+          render();
+        }
+      });
+    }
+
     function isChannelRole() { return state.role === "channel"; }
     function isOperatorRole() { return state.role === "operator"; }
     function isPlatformRole() { return state.role === "platform"; }
@@ -3845,6 +3938,9 @@
         ] },
         { key: "depositStatus", label: "押金状态", type: "select", options: [
           { v: "全部", t: "全部" }, { v: "在押", t: "在押" }, { v: "退押中", t: "退押中" }, { v: "无", t: "——" }
+        ] },
+        { key: "kycStatus", label: "实名认证", type: "select", options: [
+          { v: "全部", t: "全部" }, { v: "已实名", t: "已实名" }, { v: "未实名", t: "未实名" }, { v: "未通过", t: "未通过" }
         ] }
       ],
       refundManage: [
@@ -3956,6 +4052,9 @@
         ] },
         { key: "depositStatus", label: "押金状态", type: "select", options: [
           { v: "全部", t: "全部" }, { v: "在押", t: "在押" }, { v: "退押中", t: "退押中" }, { v: "无", t: "——" }
+        ] },
+        { key: "kycStatus", label: "实名认证", type: "select", options: [
+          { v: "全部", t: "全部" }, { v: "已实名", t: "已实名" }, { v: "未实名", t: "未实名" }, { v: "未通过", t: "未通过" }
         ] }
       ],
       platformUsers_depositStats: [
@@ -9721,6 +9820,7 @@
           const want = f.depositStatus === "无" ? "无" : f.depositStatus;
           if (st !== want) return false;
         }
+        if (f.kycStatus && f.kycStatus !== "全部" && userKycStatus(u) !== f.kycStatus) return false;
         return true;
       });
       const pg = paginateList(rows, state.platformUsersPage, state.platformUsersPageSize);
@@ -9729,13 +9829,15 @@
         <section class="panel">
           ${panelHead("用户信息", `共 ${pg.total} 人`, "platform_users")}
           <div class="panel-body orders-table-wrap">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("user_kyc")} 三要素：姓名 + 身份证号 + 身份证正反面照片。</p>
             <table>
               <thead><tr>
-                <th>用户</th><th>用户状态</th><th>服务运营商</th><th>用户类型</th>
-                <th>电池押金</th><th>押金状态</th><th>套餐/权益</th><th>服务状态</th><th>生效周期</th><th>渠道商</th><th>持有电池</th>
+                <th>用户</th><th>实名认证</th><th>用户状态</th><th>服务运营商</th><th>用户类型</th>
+                <th>电池押金</th><th>押金状态</th><th>套餐/权益</th><th>服务状态</th><th>生效周期</th><th>渠道商</th><th>持有电池</th><th>操作</th>
               </tr></thead>
               <tbody>${pg.slice.map(u => `<tr>
                 <td>${u.id}<br><small style="color:var(--muted)">${u.phone}</small></td>
+                <td>${kycStatusTag(userKycStatus(u))}</td>
                 <td>${tag(u.userStatus)}</td>
                 <td><strong>${u.serviceOperatorName}</strong><br><small style="color:var(--muted)">${u.serviceOperatorId}</small></td>
                 <td>${u.userType}</td>
@@ -9746,7 +9848,8 @@
                 <td><small style="color:var(--muted)">${u.pkgPeriod || "—"}</small></td>
                 <td>${u.channelName}</td>
                 <td>${u.heldBattery || "未持有"}</td>
-              </tr>`).join("") || "<tr><td colspan='11'>暂无</td></tr>"}</tbody>
+                <td>${userKycActionCellHtml(u)}</td>
+              </tr>`).join("") || "<tr><td colspan='13'>暂无</td></tr>"}</tbody>
             </table>
             ${renderTablePager(pg, "pu-page")}
           </div>
@@ -16994,6 +17097,7 @@
           const wantSt = f.depositStatus === "无" ? "无" : f.depositStatus;
           if (stDep !== wantSt) return false;
         }
+        if (f.kycStatus && f.kycStatus !== "全部" && userKycStatus(u) !== f.kycStatus) return false;
         return true;
       });
       return `
@@ -17013,17 +17117,18 @@
         <section class="panel">
           ${panelHead("用户列表", `共 ${us.length} 人`, "users_panel")}
           <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("users_panel")}${noteBtn("rider_battery_deposit")} 套餐与服务状态分列；电池押金为方式，押金状态<strong>仅实付</strong>有值。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("users_panel")}${noteBtn("user_kyc")}${noteBtn("rider_battery_deposit")} 套餐与服务状态分列；电池押金为方式，押金状态<strong>仅实付</strong>有值。</p>
             <table>
               <thead><tr>
-                <th>用户</th><th>套餐/服务</th><th>服务状态</th><th>人天池权益</th>
-                <th>电池押金</th><th>押金状态</th><th>期内换电</th><th>最近换电</th>
+                <th>用户</th><th>实名认证</th><th>套餐/服务</th><th>服务状态</th><th>人天池权益</th>
+                <th>电池押金</th><th>押金状态</th><th>期内换电</th><th>最近换电</th><th>操作</th>
               </tr></thead>
               <tbody>${us.map(u => {
                 const dep = riderBatteryDepositInfo(u);
                 const svcState = u.serviceState || "——";
                 return `<tr>
                 <td>${u.id}<br><small style="color:var(--muted)">${u.phone}</small></td>
+                <td>${kycStatusTag(userKycStatus(u))}</td>
                 <td>${u.pkg || "—"}</td>
                 <td>${svcState === "——" || !u.serviceState ? "——" : tag(svcState)}</td>
                 <td>${u.poolEligibility ? eligibilityTag(u.poolEligibility) + (u.poolTeam ? `<br><small>${u.poolTeam}</small>` : "") + (u.poolFailReason ? `<br><small style="color:var(--red)">${poolNoQuotaHint(u)}</small>` : "") : "—"}</td>
@@ -17031,8 +17136,9 @@
                 <td>${riderDepositStatusCellHtml(dep)}</td>
                 <td>${scale(u.swaps)}</td>
                 <td>${u.last}</td>
+                <td>${userKycActionCellHtml(u)}</td>
               </tr>`;
-              }).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='10'>暂无</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -17847,6 +17953,12 @@
       });
       root.querySelectorAll("[data-open-operator]").forEach(btn => {
         btn.onclick = () => openOperatorDetail(btn.dataset.openOperator);
+      });
+      root.querySelectorAll("[data-view-kyc]").forEach(btn => {
+        btn.onclick = () => openUserKycDrawer(btn.dataset.viewKyc);
+      });
+      root.querySelectorAll("[data-kyc-manual-pass]").forEach(btn => {
+        btn.onclick = () => confirmUserKycManualPass(btn.dataset.kycManualPass);
       });
       root.querySelectorAll("[data-edit-operator]").forEach(btn => {
         btn.onclick = () => { closeDrawer(); openOperatorForm(btn.dataset.editOperator); };
