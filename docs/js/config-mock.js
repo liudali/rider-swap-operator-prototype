@@ -2584,11 +2584,17 @@
       { id: "DL-011", operatorId: "OP-BJ", time: "2026-06-10 23:59", type: "平台费代扣", delta: -5.38, balanceAfter: -5.38, ref: "PFB-202606-BJ", by: "系统" }
     ];
 
+    function mockOperatorLogoUrl(name, color) {
+      const initial = String(name || "运").trim().slice(0, 1);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" rx="32" fill="${color}"/><text x="100" y="128" text-anchor="middle" fill="#fff" font-size="96" font-family="system-ui,sans-serif" font-weight="600">${initial}</text></svg>`;
+      return "data:image/svg+xml," + encodeURIComponent(svg);
+    }
+
     const platformOperators = [
-      { id: "OP-SX", name: "绿色出行", logo: "⚡", brandColor: "#1677ff", city: "上海", status: "在营", contactName: "张经理", contactPhone: "138****8001", loginAccount: "13800001000", email: "zhang@example.com", address: "上海市浦东新区银城中路", onboardDate: "2025-03-01", mchWx: "1900000123***", mchAli: "2088123456***", remark: "首版示范运营商" },
-      { id: "OP-LJZ", name: "陆家嘴联营", city: "上海", status: "在营", contactName: "李站长", contactPhone: "139****6601", loginAccount: "13800006601", email: "li@example.com", address: "上海市浦东新区陆家嘴环路", onboardDate: "2025-06-15", mchWx: "1900000456***", mchAli: "2088765432***", remark: "" },
-      { id: "OP-BJ", name: "滨江联营", city: "上海", status: "在营", contactName: "王运维", contactPhone: "137****7702", loginAccount: "13800007702", email: "wang@example.com", address: "上海市浦东新区滨江大道", onboardDate: "2025-11-01", mchWx: "1900000789***", mchAli: "2088987654***", remark: "信用额度已用尽，跨网已停" },
-      { id: "OP-HZ", name: "西湖换电", city: "杭州", status: "在营", contactName: "陈经理", contactPhone: "135****8800", loginAccount: "13800008800", email: "chen@example.com", address: "杭州市西湖区文三路", onboardDate: "2026-06-01", mchWx: "1900000999***", mchAli: "2088999888***", remark: "新入网 · 待定档" }
+      { id: "OP-SX", name: "绿色出行", logoUrl: mockOperatorLogoUrl("绿", "#1677ff"), brandColor: "#1677ff", city: "上海", status: "在营", contactName: "张经理", contactPhone: "138****8001", loginAccount: "13800001000", email: "zhang@example.com", address: "上海市浦东新区银城中路", onboardDate: "2025-03-01", mchWx: "1900000123***", mchAli: "2088123456***", remark: "首版示范运营商" },
+      { id: "OP-LJZ", name: "陆家嘴联营", logoUrl: mockOperatorLogoUrl("陆", "#722ed1"), city: "上海", status: "在营", contactName: "李站长", contactPhone: "139****6601", loginAccount: "13800006601", email: "li@example.com", address: "上海市浦东新区陆家嘴环路", onboardDate: "2025-06-15", mchWx: "1900000456***", mchAli: "2088765432***", remark: "" },
+      { id: "OP-BJ", name: "滨江联营", logoUrl: mockOperatorLogoUrl("滨", "#fa8c16"), city: "上海", status: "在营", contactName: "王运维", contactPhone: "137****7702", loginAccount: "13800007702", email: "wang@example.com", address: "上海市浦东新区滨江大道", onboardDate: "2025-11-01", mchWx: "1900000789***", mchAli: "2088987654***", remark: "信用额度已用尽，跨网已停" },
+      { id: "OP-HZ", name: "西湖换电", logoUrl: mockOperatorLogoUrl("西", "#52c41a"), city: "杭州", status: "在营", contactName: "陈经理", contactPhone: "135****8800", loginAccount: "13800008800", email: "chen@example.com", address: "杭州市西湖区文三路", onboardDate: "2026-06-01", mchWx: "1900000999***", mchAli: "2088999888***", remark: "新入网 · 待定档" }
     ];
 
     /** 平台管理员维护：各运营商平台技术服务费抽成比例（C 端支付分账 / B 端确认消耗可分别配置） */

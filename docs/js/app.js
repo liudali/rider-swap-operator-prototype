@@ -1347,6 +1347,61 @@
       return op ? op.name : id || "—";
     }
 
+    function operatorLogoUrl(op) {
+      return op?.logoUrl || "";
+    }
+
+    function operatorLogoHtml(op, size) {
+      const px = size || 36;
+      const name = op?.name || "运";
+      const url = operatorLogoUrl(op);
+      if (url) {
+        return `<img src="${escProtoAttr(url)}" alt="${escProtoAttr(name)}" class="operator-logo-fallback" style="width:${px}px;height:${px}px;border-radius:8px;object-fit:cover" />`;
+      }
+      return `<span class="operator-logo-fallback" style="width:${px}px;height:${px}px">${name.slice(0, 1)}</span>`;
+    }
+
+    function bindOperatorLogoUpload(form) {
+      const root = form?.querySelector("[data-logo-upload]");
+      if (!root) return;
+      const hidden = root.querySelector('[name="logoUrl"]');
+      const preview = root.querySelector("[data-logo-preview]");
+      const fileInput = root.querySelector("[data-logo-file]");
+      const showPreview = (url) => {
+        if (preview) {
+          preview.innerHTML = url
+            ? `<img src="${url}" alt="Logo 预览" />`
+            : `<span class="logo-upload-placeholder">点击上传 Logo</span>`;
+        }
+        if (hidden) hidden.value = url || "";
+      };
+      const openPicker = () => fileInput?.click();
+      preview?.addEventListener("click", openPicker);
+      root.querySelector("[data-logo-pick]")?.addEventListener("click", openPicker);
+      root.querySelector("[data-logo-clear]")?.addEventListener("click", () => {
+        if (fileInput) fileInput.value = "";
+        showPreview("");
+      });
+      fileInput?.addEventListener("change", () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+        if (!/^image\/(png|jpe?g|webp|svg\+xml)$/.test(file.type)) {
+          window.alert("请上传 PNG、JPG、WebP 或 SVG 图片");
+          fileInput.value = "";
+          return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+          window.alert("图片大小不能超过 2MB");
+          fileInput.value = "";
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => showPreview(String(reader.result || ""));
+        reader.onerror = () => window.alert("图片读取失败，请重试");
+        reader.readAsDataURL(file);
+      });
+    }
+
     function platformOperatorOptions() {
       return [{ v: "全部", t: "全部运营商" }].concat(platformOperators.map(o => ({ v: o.id, t: o.name })));
     }
@@ -7798,6 +7853,7 @@
           ${panelHead("基础信息", "平台维护的运营商主体", "platform_operators")}
           <div class="panel-body" style="padding-top:0">
             <div class="detail-grid">
+              <div class="detail-item"><span>Logo</span><strong>${operatorLogoHtml(op, 48)}</strong></div>
               <div class="detail-item"><span>联系人</span><strong>${op.contactName}<br><small>${op.contactPhone}</small></strong></div>
               <div class="detail-item"><span>邮箱</span><strong>${op.email || "—"}</strong></div>
               <div class="detail-item"><span>地址</span><strong style="white-space:normal">${op.address || "—"}</strong></div>
@@ -7887,6 +7943,22 @@
       state.operatorFormId = opId || "new";
       document.querySelector("#operatorFormTitle").textContent = op ? "编辑运营商 · " + op.name : "新增运营商";
       document.querySelector("#operatorForm").innerHTML = `
+        <label class="form-span-2">Logo 图片 <span style="color:var(--red)">*</span>
+          <div class="logo-upload" data-logo-upload>
+            <input type="hidden" name="logoUrl" value="${escProtoAttr(op?.logoUrl || "")}" required />
+            <div class="logo-upload-preview" data-logo-preview>
+              ${op?.logoUrl
+                ? `<img src="${escProtoAttr(op.logoUrl)}" alt="Logo 预览" />`
+                : `<span class="logo-upload-placeholder">点击上传 Logo</span>`}
+            </div>
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg" data-logo-file />
+            <div class="logo-upload-actions">
+              <button type="button" class="link-btn" data-logo-pick>选择图片</button>
+              <button type="button" class="link-btn" data-logo-clear>清除</button>
+            </div>
+            <small style="font-size:12px;color:var(--muted);font-weight:400">PNG / JPG / WebP / SVG，建议 200×200px，≤ 2MB；用于列表、详情及 C 端品牌展示</small>
+          </div>
+        </label>
         <label>运营商名称<input name="name" value="${op?.name || ""}" required placeholder="如：绿色出行" /></label>
         <label class="form-span-2">账号（手机号）
           <input name="loginAccount" type="tel" inputmode="numeric" pattern="1\\d{10}" maxlength="11"
@@ -7901,6 +7973,7 @@
         <label>地址<input name="address" value="${op?.address || ""}" /></label>
         <label>备注<textarea name="remark" rows="2">${op?.remark || ""}</textarea></label>
         <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">微信/支付宝子商户号不在此配置；运营商登录后于「收款账户」自行提交主体信息完成开户。</p>`;
+      bindOperatorLogoUpload(document.querySelector("#operatorForm"));
       document.querySelector("#operatorModal").classList.add("open");
       document.querySelector("#operatorMask").classList.add("open");
     }
@@ -8083,6 +8156,10 @@
         window.alert("请填写运营商名称");
         return;
       }
+      if (!data.logoUrl?.trim()) {
+        window.alert("请上传运营商 Logo 图片");
+        return;
+      }
       if (!data.loginAccount?.trim()) {
         window.alert("请填写登录账号（手机号）");
         return;
@@ -8106,7 +8183,7 @@
       if (state.operatorFormId === "new") {
         const id = "OP-" + Date.now().toString().slice(-4);
         platformOperators.push({
-          id, name: data.name, city: data.city, status: data.status,
+          id, name: data.name, logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
           contactName: data.contactName, contactPhone: data.contactPhone,
           loginAccount: loginPhone,
           email: data.email,
@@ -8126,7 +8203,7 @@
         const op = platformOperators.find(o => o.id === state.operatorFormId);
         if (op) {
           Object.assign(op, {
-            name: data.name, city: data.city, status: data.status,
+            name: data.name, logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
             contactName: data.contactName, contactPhone: data.contactPhone,
             loginAccount: loginPhone,
             email: data.email,
@@ -9531,7 +9608,7 @@
               <tbody>${rows.map(op => {
                 const cfg = operatorPlatformFeeConfig(op.id);
                 return `<tr>
-                  <td><strong>${op.name}</strong><br><small style="color:var(--muted)">${op.id}</small></td>
+                  <td><div class="operator-logo-cell">${operatorLogoHtml(op, 36)}<div><strong>${op.name}</strong><br><small style="color:var(--muted)">${op.id}</small></div></div></td>
                   <td><strong class="fee-platform">${formatFeeRatePct(cfg.cEndRate)}</strong></td>
                   <td><strong class="fee-platform">${formatFeeRatePct(cfg.bEndRate)}</strong></td>
                   <td>${cfg.effectiveFrom}</td><td>${tag(cfg.status)}</td>
@@ -9597,7 +9674,7 @@
                 const prof = operatorCreditProfile(op.id);
                 const tierTxt = prof?.tierCode ? tierLabel(prof.tierCode) : tag("待定档");
                 return `<tr>
-                  <td><strong>${op.name}</strong><br><small style="color:var(--muted)">${op.id}</small></td>
+                  <td><div class="operator-logo-cell">${operatorLogoHtml(op, 36)}<div><strong>${op.name}</strong><br><small style="color:var(--muted)">${op.id}</small></div></div></td>
                   <td>${op.contactName}<br><small>${op.contactPhone}</small></td>
                   <td>${op.city}</td><td>${tag(op.status)}</td><td>${op.onboardDate}</td>
                   <td>${prof?.tierCode ? tag(tierTxt) : tierTxt}</td>
