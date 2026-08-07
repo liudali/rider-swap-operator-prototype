@@ -10197,7 +10197,7 @@
               </tr></thead>
               <tbody>${rows.map(r => `<tr>
                 <td>${r.sn}</td><td>${r.specs || "—"}</td>
-                <td>${r.operatorName}</td><td>${r.city || "—"}</td><td>${r.site || "—"}</td>
+                <td>${r.operatorName}</td><td>${r.city || "—"}</td><td>${batterySiteCell(r.raw)}</td>
                 <td>${r.soc != null ? r.soc + "%" : "—"}</td>
                 <td>${r.soh != null ? r.soh + "%" : "—"}</td>
                 <td>${platformBatteryBelongCell(r.raw)}</td>
@@ -11988,6 +11988,22 @@
         : kind;
     }
 
+    /** 电池仅在电柜格口内展示站点；用户持有或柜外时不展示 */
+    function batteryShowsSite(b) {
+      const kind = batteryLocationKind(b);
+      return kind === "自有电柜" || kind === "其他运营商电柜";
+    }
+
+    function batterySiteCell(b) {
+      if (!batteryShowsSite(b)) return "—";
+      const loc = String(b.inCab || "").trim();
+      if (/^CAB-/.test(loc)) {
+        const cab = cabinetBySn(loc);
+        if (cab?.site && cab.site !== "—") return cab.site;
+      }
+      return b.site && b.site !== "—" ? b.site : "—";
+    }
+
     function cabinetBatteryStats(c) {
       const knownBats = batteries.filter(b => b.inCab === c.sn);
       const known = knownBats.length;
@@ -12448,8 +12464,8 @@
       } else if (tab === "battery") {
         const f = getPf();
         const rows = batteries.filter(filterOwnRow).filter(b => {
-          if (!matchKw(b.sn, f.sn) && !matchKw(b.site, f.sn)) return false;
-          if (f.site !== "全部" && b.site !== f.site) return false;
+          if (!matchKw(b.sn, f.sn) && !matchKw(batterySiteCell(b), f.sn)) return false;
+          if (f.site !== "全部" && batterySiteCell(b) !== f.site) return false;
           if (f.location && f.location !== "全部" && batteryLocationKind(b) !== f.location) return false;
           return true;
         });
@@ -12458,7 +12474,7 @@
         body = `<table><thead><tr><th>电池 SN</th><th>站点</th><th>运营主体</th><th>权属</th><th>电量</th><th>健康度 ${noteBtn("devices_bat_soh")}</th><th>位置</th></tr></thead>
           <tbody>${pg.slice.map(b => {
             const soh = batterySohPercent(b);
-            return `<tr><td>${b.sn}</td><td>${b.site}</td><td>${b.deviceOwnerName}</td><td>${ownershipCell(b)}</td><td>${b.soc != null ? b.soc + "%" : "—"}</td><td>${soh != null ? soh + "%" : "—"}</td><td>${batteryLocationCell(b)}</td></tr>`;
+            return `<tr><td>${b.sn}</td><td>${batterySiteCell(b)}</td><td>${b.deviceOwnerName}</td><td>${ownershipCell(b)}</td><td>${b.soc != null ? b.soc + "%" : "—"}</td><td>${soh != null ? soh + "%" : "—"}</td><td>${batteryLocationCell(b)}</td></tr>`;
           }).join("") || "<tr><td colspan='7'>暂无自有设备</td></tr>"}</tbody></table>
           ${renderTablePager(pg, "bat-page")}`;
       } else if (tab === "alerts") {
