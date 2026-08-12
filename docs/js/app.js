@@ -9462,14 +9462,8 @@
           </div>
         </section>`;
       }
-      const std = platformDepositStandard;
-      const stdBanner = `<section class="panel"><div class="panel-body">
-        <div class="platform-price-banner">渠道押金统一标准：电池 <strong>¥${std.battery.toLocaleString()}</strong>/块 · 换电柜 <strong>¥${std.cabinet.toLocaleString()}</strong>/台
-        <button type="button" class="link-btn" data-edit-deposit-standard style="margin-left:12px">编辑标准（演示）</button></div>
-      </div></section>`;
-      return `${ownScopeBanner()}
-        ${stdBanner}
-        ${pageWithTabs(sidebar, body)}`;
+      /* 渠道押金统一标准属「渠道信用」口径，不在运营商平台保证金页展示 */
+      return `${ownScopeBanner()}${pageWithTabs(sidebar, body)}`;
     }
 
     function renderPlatformLeasing() {
