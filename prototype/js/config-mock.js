@@ -57,10 +57,10 @@
     const l1UnifiedPricing = { cabinetFee: 0.5, batteryFee: 0.1, effectiveFrom: "2026-01-01", status: "生效", updatedAt: "2026-01-01", updatedBy: "平台管理员" };
     /** 平台统一人天标准日值：B 端 1% 计提基数；亦为运营商面向渠道商的默认批发价（运营商可改） */
     const platformStandardDayPrice = { price: 8.5, effectiveFrom: "2026-01-01", status: "生效", updatedAt: "2026-01-01", updatedBy: "平台管理员" };
-    /** 跨网统价 · 城市覆盖（默认全网价可被城市行覆盖；改价不追溯） */
+    /** 跨网统价 · 城市覆盖（状态仅 生效/停用；停用回退全网默认；可删除，decision-102） */
     const l1CityOverrides = [
-      { id: "L1C-SH", city: "上海", cabinetFee: 0.5, batteryFee: 0.1, status: "沿用全网", updatedAt: "2026-07-01" },
-      { id: "L1C-HZ", city: "杭州", cabinetFee: 0.6, batteryFee: 0.12, status: "覆盖生效", updatedAt: "2026-07-10" }
+      { id: "L1C-SH", city: "上海", cabinetFee: 0.5, batteryFee: 0.1, status: "停用", updatedAt: "2026-07-01" },
+      { id: "L1C-HZ", city: "杭州", cabinetFee: 0.6, batteryFee: 0.12, status: "生效", updatedAt: "2026-07-10" }
     ];
     /** 人天标准日值 · 城市覆盖（状态仅 生效/停用；停用时回退全网默认；可删除，decision-101） */
     const stdDayCityOverrides = [
@@ -511,7 +511,7 @@
       platform_lease_binding: { title: "租赁关系绑定", content: "平台管理员建立「租赁公司 ↔ 运营商」绑定后，该租赁公司方可向该运营商发起租赁协议签约。<strong>运营商</strong>承租信息来源于平台运营商档案；一运营商可同时与多家租赁公司建立绑定并分别签约。" },
       platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。<br>设备管理分 <strong>电柜 / 电池 / 电池型号管理</strong>；电池列表规格取自平台型号字典。" },
       platform_battery_models: { title: "电池型号管理", content: "由<strong>平台管理员</strong>统一维护电池型号字典（规格串如 48V30Ah）。运营商定价、套餐 SKU、设备台账规格均引用本字典启用项；停用后不可再新建定价，已有数据仍可展示历史型号。" },
-      platform_l1_pricing: { title: "跨网服务费", content: "柜机/电池服务费<strong>全网默认价</strong> + <strong>城市覆盖价</strong>由平台发布；跨运营商换电清分按此单价；城市价优先；改价不追溯。" },
+      platform_l1_pricing: { title: "跨网服务费", content: "柜机/电池服务费<strong>全网默认价始终生效</strong>（不可停用）+ <strong>城市覆盖价</strong>（状态：生效/停用，可删除；停用回退全网默认）；跨运营商换电清分按此单价；城市价优先；改价不追溯。" },
       platform_day_standard: { title: "人天标准日值", content: "全网默认日值<strong>始终生效</strong>（不可停用）+ <strong>城市覆盖</strong>（生效/停用，可删除）；B 端 1% 计提基数；亦为运营商默认批发价（可改）。" },
       platform_stats: { title: "业务汇总", content: "全平台 Mock 汇总：<br>· <strong>业务快照（不受统计范围）</strong>：运营商、渠道商、在营站点、设备<br>· <strong>经营指标（随统计范围缩放）</strong>：用户、套餐订单、换电成功、业务流水、平台营收（演示：今日×1 / 近7日×5.2 / 近30日×18）<br>· 业务流水=套餐实付+渠道 B2B 批发 · 平台营收=Σ(C 端实付×1%) + Σ(B 端确认消耗×标准人天价×1%)" },
       platform_operator_device_gate: { title: "设备绑定前置", content: "运营商「我的设备」仅展示平台已绑定的柜机/电池；未绑定设备不会出现在运营商后台。" },

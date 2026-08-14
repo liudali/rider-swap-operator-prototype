@@ -8983,7 +8983,8 @@
       l1UnifiedPricing.cabinetFee = parseFloat(document.querySelector("#l1CabinetFee")?.value || l1UnifiedPricing.cabinetFee);
       l1UnifiedPricing.batteryFee = parseFloat(document.querySelector("#l1BatteryFee")?.value || l1UnifiedPricing.batteryFee);
       l1UnifiedPricing.effectiveFrom = document.querySelector("#l1EffectiveFrom")?.value || l1UnifiedPricing.effectiveFrom;
-      l1UnifiedPricing.status = document.querySelector("#l1Status")?.value || l1UnifiedPricing.status;
+      /* 全网默认跨网价始终生效，不存在停用（decision-102） */
+      l1UnifiedPricing.status = "生效";
       l1UnifiedPricing.updatedAt = new Date().toISOString().slice(0, 10);
       l1UnifiedPricing.updatedBy = "平台管理员";
       showProtoToast("演示：跨网设备服务费统价已更新，新清分将按新单价计算");
@@ -9011,6 +9012,28 @@
       return "停用"; /* 沿用全网等历史态 → 停用（回退全网） */
     }
 
+    function normalizeL1CityStatus(status) {
+      if (status === "生效" || status === "停用") return status;
+      if (status === "覆盖生效") return "生效";
+      return "停用"; /* 沿用全网等历史态 → 停用（回退全网） */
+    }
+
+    function deleteL1CityOverride(id) {
+      const row = l1CityOverrides.find(r => r.id === id);
+      if (!row) return;
+      openProtoConfirm({
+        title: "删除城市覆盖价",
+        message: `确认删除「${row.city}」的跨网服务费覆盖？删除后该城市回退全网默认价。`,
+        confirmLabel: "删除",
+        onConfirm: () => {
+          const idx = l1CityOverrides.findIndex(r => r.id === id);
+          if (idx >= 0) l1CityOverrides.splice(idx, 1);
+          showProtoToast("演示：已删除城市覆盖价");
+          render();
+        }
+      });
+    }
+
     function deleteStdDayCityOverride(id) {
       const row = stdDayCityOverrides.find(r => r.id === id);
       if (!row) return;
@@ -9029,13 +9052,14 @@
 
     function openL1CityOverrideForm(editId) {
       const row = editId ? l1CityOverrides.find(r => r.id === editId) : null;
+      const statusVal = row ? normalizeL1CityStatus(row.status) : "生效";
       openProtoForm({
         title: row ? "编辑城市覆盖价" : "添加城市覆盖价",
         fields: [
           { name: "city", label: "城市", value: row?.city || "", required: true },
           { name: "cabinetFee", label: "柜机服务费（元/次）", type: "number", value: String(row?.cabinetFee ?? l1UnifiedPricing.cabinetFee) },
           { name: "batteryFee", label: "电池服务费（元/次）", type: "number", value: String(row?.batteryFee ?? l1UnifiedPricing.batteryFee) },
-          { name: "status", label: "状态", type: "select", value: row?.status || "覆盖生效", options: ["覆盖生效", "沿用全网", "停用"], optionLabels: { "覆盖生效": "覆盖生效", "沿用全网": "沿用全网", "停用": "停用" } }
+          { name: "status", label: "状态", type: "select", value: statusVal, options: ["生效", "停用"], optionLabels: { "生效": "生效", "停用": "停用" } }
         ],
         submitLabel: "保存",
         onSubmit: (data) => {
@@ -9045,19 +9069,20 @@
           const batteryFee = parseFloat(data.batteryFee);
           if (Number.isNaN(cabinetFee) || cabinetFee < 0) return "请填写有效柜机费";
           if (Number.isNaN(batteryFee) || batteryFee < 0) return "请填写有效电池费";
+          const status = data.status === "停用" ? "停用" : "生效";
           const today = new Date().toISOString().slice(0, 10);
           if (row) {
             row.city = city;
             row.cabinetFee = cabinetFee;
             row.batteryFee = batteryFee;
-            row.status = data.status || "覆盖生效";
+            row.status = status;
             row.updatedAt = today;
           } else {
             if (l1CityOverrides.some(r => r.city === city)) return "该城市已有覆盖价，请直接编辑";
             l1CityOverrides.push({
               id: "L1C-" + Date.now(),
               city, cabinetFee, batteryFee,
-              status: data.status || "覆盖生效",
+              status,
               updatedAt: today
             });
           }
@@ -9916,16 +9941,17 @@
           </div>
         </section>`;
       }
+      l1UnifiedPricing.status = "生效";
       return `
         ${ownScopeBanner()}
         <section class="panel">
-          ${panelHead("跨网服务费 · 全网默认价", "跨运营商换电柜机/电池服务费；运营商往来账只读", "platform_l1_pricing")}
+          ${panelHead("跨网服务费 · 全网默认价", "全网默认始终生效 · 跨运营商换电柜机/电池服务费；运营商往来账只读", "platform_l1_pricing")}
           <div class="panel-body">
             <form id="l1PricingForm" class="form-grid" style="max-width:480px">
               <label>柜机服务费（元/次）<input id="l1CabinetFee" type="number" min="0" step="0.01" value="${l1UnifiedPricing.cabinetFee}" required /></label>
               <label>电池服务费（元/次）<input id="l1BatteryFee" type="number" min="0" step="0.01" value="${l1UnifiedPricing.batteryFee}" required /></label>
               <label>生效日期<input type="date" id="l1EffectiveFrom" value="${l1UnifiedPricing.effectiveFrom}" /></label>
-              <label>状态<select id="l1Status"><option ${l1UnifiedPricing.status === "生效" ? "selected" : ""}>生效</option><option ${l1UnifiedPricing.status === "停用" ? "selected" : ""}>停用</option></select></label>
+              <label>状态<span class="readonly-field" style="display:inline-flex;align-items:center;min-height:32px">${tag("生效")}<span style="margin-left:8px;font-size:12px;color:var(--muted)">全网默认始终生效</span></span></label>
             </form>
             <p style="font-size:12px;color:var(--muted);margin:12px 0">最近更新：${l1UnifiedPricing.updatedAt} · ${l1UnifiedPricing.updatedBy}。变更后 enrichSwapTriplet / 运营商往来账演示按新单价计算。</p>
             <button type="button" class="btn primary" id="saveL1Pricing" data-save-l1-pricing>发布全网默认价（演示）</button>
@@ -9933,16 +9959,22 @@
           </div>
         </section>
         <section class="panel">
-          ${panelHead("城市覆盖价", "默认全网价；可按城市单独覆盖柜机/电池单价", "platform_l1_pricing")}
+          ${panelHead("城市覆盖价", "状态：生效 / 停用；停用回退全网默认；可删除", "platform_l1_pricing")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>城市</th><th>柜机费</th><th>电池费</th><th>状态</th><th>更新</th><th>操作</th></tr></thead>
-              <tbody>${(typeof l1CityOverrides !== "undefined" ? l1CityOverrides : []).map(r => `<tr>
+              <tbody>${(typeof l1CityOverrides !== "undefined" ? l1CityOverrides : []).map(r => {
+                const st = normalizeL1CityStatus(r.status);
+                return `<tr>
                 <td><strong>${r.city}</strong></td>
                 <td>¥${r.cabinetFee}</td><td>¥${r.batteryFee}</td>
-                <td>${tag(r.status)}</td><td>${r.updatedAt}</td>
-                <td><button type="button" class="link-btn" data-l1-city-edit="${r.id}">编辑（演示）</button></td>
-              </tr>`).join("") || "<tr><td colspan='6'>暂无城市覆盖</td></tr>"}</tbody>
+                <td>${tag(st)}</td><td>${r.updatedAt}</td>
+                <td>
+                  <button type="button" class="link-btn" data-l1-city-edit="${r.id}">编辑</button>
+                  <button type="button" class="link-btn" data-l1-city-del="${r.id}" style="margin-left:8px;color:var(--danger,#c0392b)">删除</button>
+                </td>
+              </tr>`;
+              }).join("") || "<tr><td colspan='6'>暂无城市覆盖</td></tr>"}</tbody>
             </table>
             <button type="button" class="btn" style="margin-top:10px" id="addL1CityOverride" data-add-l1-city>+ 添加城市覆盖（演示）</button>
           </div>
@@ -9955,7 +9987,7 @@
               <li>渠道成员<strong>允许跨网换电</strong>，与个人用户相同清分规则；userOwner=额度售卖方 U</li>
               <li>运营商后台「平台服务 → 运营商往来」展示平台统价，不可自行改价</li>
               <li>日清 ${INTER_OP_CLEAR_TIME}：优先划扣保证金，保证金为 0 才启用信用额度</li>
-              <li>城市覆盖价优先于全网默认价；改价不追溯</li>
+              <li>城市覆盖价（生效）优先于全网默认价；停用/删除回退全网；改价不追溯</li>
             </ul>
           </div>
         </section>`;
@@ -19218,6 +19250,9 @@
       });
       document.querySelectorAll("[data-l1-city-edit]").forEach(btn => {
         btn.onclick = (e) => { e.preventDefault(); openL1CityOverrideForm(btn.dataset.l1CityEdit); };
+      });
+      document.querySelectorAll("[data-l1-city-del]").forEach(btn => {
+        btn.onclick = (e) => { e.preventDefault(); deleteL1CityOverride(btn.dataset.l1CityDel); };
       });
       document.querySelectorAll("[data-add-std-city], #addStdDayCityOverride").forEach(btn => {
         btn.onclick = (e) => { e.preventDefault(); openStdDayCityOverrideForm(null); };
