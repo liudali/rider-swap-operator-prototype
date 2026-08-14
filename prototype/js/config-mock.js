@@ -62,10 +62,11 @@
       { id: "L1C-SH", city: "上海", cabinetFee: 0.5, batteryFee: 0.1, status: "沿用全网", updatedAt: "2026-07-01" },
       { id: "L1C-HZ", city: "杭州", cabinetFee: 0.6, batteryFee: 0.12, status: "覆盖生效", updatedAt: "2026-07-10" }
     ];
-    /** 人天标准日值 · 城市覆盖 */
+    /** 人天标准日值 · 城市覆盖（状态仅 生效/停用；停用时回退全网默认；可删除，decision-101） */
     const stdDayCityOverrides = [
-      { id: "STD-SH", city: "上海", price: 8.5, status: "沿用全网", updatedAt: "2026-07-01" },
-      { id: "STD-HZ", city: "杭州", price: 9.0, status: "覆盖生效", updatedAt: "2026-07-12" }
+      { id: "STD-SH", city: "上海", price: 8.5, status: "停用", updatedAt: "2026-07-01" },
+      { id: "STD-HZ", city: "杭州", price: 9.0, status: "生效", updatedAt: "2026-07-12" },
+      { id: "STD-BJ", city: "北京", price: 9.5, status: "生效", updatedAt: "2026-08-14" }
     ];
     const leasePenaltyConfig = {
       types: ["逾期未缴", "擅自转租", "设备损毁", "提前退租"],
@@ -267,7 +268,7 @@
       depositAccount: ["服务保证金账户", "页内 Tab：账户概况 / 充值申请 / 变动明细。"],
       platformService: ["平台服务", "二级：服务保证金账户 / 平台服务费 / 运营商往来（页内：概况/明细/日清/周月）。"],
       channelSettlement: ["渠道结算模式", "人天池 / 渠道分销（骑士卡） / 设备租赁 / 激活码四种结算模式演示。"],
-      channelCredit: ["渠道信用额度", "平台评估信用抵扣押金；运营商可调整额度；渠道提交打款凭证由运营商审核。"],
+      channelCredit: ["渠道信用额度", "默认初始 ¥100,000；运营商可调整；渠道提交打款凭证由运营商审核。一期不展示信用分（decision-098）。"],
       commissionStatement: ["佣金对账", "页内「月度汇总 / 明细」；统计范围默认<strong>近6个月</strong>，可选近12个月或任意自然月。开启<strong>佣金及时到付</strong>时展示已即时分账；未开启则为线下结算。"],
       channelLinks: ["套餐与链接", "管理运营商授权的可售套餐；同一套餐可生成<strong>多条推广链接</strong>与<strong>二维码</strong>；扫码直达运营商小程序；24h 归因期内享渠道专享价。"],
       channelOrders: ["购卡记录", "经本渠道推广链接成交的套餐购买记录；支持<strong>支付时间</strong>筛选。结算仅<strong>即时分账 / 线下结算</strong>；线下结算时「状态」为 ——。"],
@@ -278,7 +279,7 @@
       leasePkgOrders: ["白名单订单", "白名单用户购套餐流水；订单快照含<strong>电池型号</strong>；收款方为本渠道子商户。"],
       channelInterOp: ["渠道跨网往来账", "设备租赁渠道开通跨网后，骑手在他网换电的跨网设备服务费经平台代收代付。"],
       platformFee: ["平台服务费", "页内 Tab：费用总览 / C 端支付分账 / B 端消耗计提。"],
-      operators: ["运营商管理", "二级：运营商列表 / 提现审核 / 平台服务费 / 渠道商管理。主体维护、账户汇总、准入档位；渠道商全平台只读监管。"],
+      operators: ["运营商管理", "二级：运营商列表 / 提现审核 / 平台服务费 / 渠道商管理。主体维护、账户汇总；列表「准入档位」为二期展示。渠道商全平台只读监管。"],
       platformLeasing: ["租赁公司", "平台维护设备租赁公司与运营商绑定关系；绑定后租赁公司方可向该运营商发起签约。"],
       operatorCreditEval: ["运营商信用评估", "准入档位制（A/B/C/D）：档位配置、入网定档、升降档与变更记录；约束信用额度封顶。"],
       depositManage: ["保证金管理", "平台清分专户、运营商对公充值确认、保证金/信用额度调整（≤档位封顶）与变动账本。"],
@@ -349,7 +350,7 @@
       platform_fee: { title: "平台服务费", content: "平台按<strong>运营商维度</strong>配置抽成比例（默认 1%）。<strong>C 端</strong>：支付成功分账至平台商户（已确认）。<strong>B 端渠道人天</strong>：确认消耗时按平台标准人天价 × 该运营商 B 端费率向额度售卖方 U 计提（与批发价无关）。运营商后台只读查看本主体适用比例；优先划扣保证金，保证金为 0 才占用信用额度。" },
       platform_operator_fee_rate: { title: "运营商平台服务费", content: "在<strong>运营商管理 → 运营商平台服务费</strong>维护各运营商 C 端 / B 端抽成比例（可不同）。新订单、新消耗按生效配置计算；历史已清分不回溯。运营商在「平台服务费」页只读查看。" },
       platform_fee_trigger: { title: "计费触发", content: "C 端：支付成功分账（费率=该运营商 C 端比例）。B 端人天池：<strong>确认消耗</strong>分两场景——<strong>确认消耗-换电</strong>（关联换电单）与<strong>确认消耗-持有电池</strong>（当日无换电但持电池，无关联单）；费率=该运营商 B 端比例，计提基数=平台标准人天价。B 端激活码：<strong>码核销成功</strong>（同 B 端费率）。计提主体均为额度售卖方 U。" },
-      platform_standard_day_price: { title: "人天标准日值", content: "平台统一设置（默认 ¥8.5/人天），可按<strong>城市覆盖</strong>；向运营商展示；B 端 1% 平台费按此计提。亦为运营商面向渠道商的<strong>默认批发价</strong>，运营商可在定价管理中修改实际批发价。" },
+      platform_standard_day_price: { title: "人天标准日值", content: "平台统一设置（默认 ¥8.5/人天）；<strong>全网默认始终生效</strong>（无停用）。可按<strong>城市覆盖</strong>（状态：生效/停用，支持删除；停用则回退全网默认）；向运营商展示；B 端 1% 平台费按此计提。亦为运营商面向渠道商的<strong>默认批发价</strong>，运营商可在定价管理中修改实际批发价。" },
       pricing_quota: { title: "人天批发定价", content: "运营商向签约渠道商设定人天批发单价与最低起购量；<strong>默认批发价</strong>（无渠道）供新建签约继承，可单独设置；各渠道可覆盖。新建默认价=平台标准人天价，运营商可改。平台 B 端 1% 仍按平台标准价计提。" },
       flows_accrual: { title: "清分明细", content: "C 端支付成功后的分账明细：平台 1%、运营商净额；含退款冲正记录。" },
       overview_users: { title: "活跃用户", content: "计数：users 中 deviceOwnerId=当前主体，且 serviceState∉{已冻结,中途完结}，pkg 文案不含「退款/完结」的去重骑手。<br>受经营概览内「统计范围」演示缩放（今日×1 / 近7日×5.2 / 近30日×18）。" },
@@ -407,14 +408,14 @@
       refund_mode_manual: { title: "套餐退款 · 手动", content: "关闭自动退款时，所有<strong>套餐类</strong>退款申请进入待审核；运营商<strong>确认退款</strong>后系统自动执行原路退/垫付记账。" },
       deposit_refund_mode: { title: "押金退还模式", content: "骑手申请<strong>仅退电池押金</strong>统一进入「退款管理」。<br>· 前提：<strong>电池已还回且服务/订单已完结</strong>（decision-070）<br>· <strong>自动退款</strong>：已还电且无争议 → 系统自动原路退运营商子商户实收押金<br>· <strong>手动确认</strong>：进入待审核，确认后系统执行<br>· 与套餐退款模式<strong>独立配置</strong>；中途完结<strong>不含</strong>押金子项；冷静期押金是否同单另计" },
       orders_freeze: { title: "服务冻结", content: "<strong>个人套餐</strong>用户在<strong>套餐有效期内</strong>且<strong>未持有电池</strong>时可申请冻结/解除冻结，<strong>满足条件即系统自动生效</strong>，无需运营商审核。冻结期间不可换电；解冻后 <code>valid_to</code> 按冻结天数顺延，骑手端首次服务为领取电池。<strong>服务中</strong>套餐详情<strong>不展示</strong>解冻/首服信息块（decision-070）。渠道人天用户不适用。" },
-      orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>押金方式（全站统一）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）；不单列「无需押金」<br>· <strong>套餐购买订单</strong>：押金方式与<strong>收款状态</strong>（已收 / 待付 / ——）分列；仅实付有收款状态（decision-067）<br>· <strong>实付</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用/微信支付分达标免实付（仍须还电规则）" },
+      orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>押金方式（全站统一）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）；不单列「无需押金」<br>· <strong>套餐购买订单</strong>：押金方式与<strong>收款状态</strong>（已收 / 待付 / ——）分列；仅实付有收款状态（decision-067）<br>· <strong>实付</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用达标免实付（仍须还电规则；已移除微信支付分，decision-100）" },
       orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：<strong>仅实付押金</strong>流水（decision-086）。<br>· 与套餐无关联；列含支付时间/退款时间<br>· 操作列「<strong>退款日志</strong>」：抽屉展示各节点动作与时间（入账、申请、还电校验、审核、原路退等）<br>· 信用免押、渠道担保不在本页" },
-      orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>微信支付分免押（≥500）</strong>或<strong>芝麻信用免押（≥500）</strong>任一达标（运营商押金设置页只读展示，不可改；decision-073）。详情页与实付押金分开展示。" },
+      orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>芝麻信用免押（≥500）</strong>（运营商押金设置页只读展示，不可改；decision-100）。详情页与实付押金分开展示。" },
       rider_battery_deposit: { title: "骑手电池押金", content: "与「平台保证金」不同。<br>· 个人：购套餐<strong>同笔</strong>免押或实缴 → 运营商子商户<br>· 渠道人天：<strong>首次领电前</strong>免押或实缴（非静默渠道担保）<br>· <strong>押金方式（全站）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）<br>· 运营商「订单与服务 → 用户押金」明细；「用户」台账；平台「用户管理 → 用户押金统计」只读汇总<br>· 数额见「定价管理 → 押金设置」；<strong>仅退押</strong>进「退款管理」" },
-      platform_users_info: { title: "用户信息", content: "全平台用户列表。<br>· <strong>实名认证</strong>（三要素：姓名 + 身份证号 + 身份证正反面照片）：<strong>已实名</strong>（查看实名信息）/ <strong>未实名</strong> / <strong>未通过</strong>（查看 + 手动通过）<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（支付分或芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>服务状态</strong>与<strong>生效周期</strong>分列（decision-080）<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
+      platform_users_info: { title: "用户信息", content: "全平台用户列表。<br>· <strong>实名认证</strong>（三要素：姓名 + 身份证号 + 身份证正反面照片）：<strong>已实名</strong>（查看实名信息）/ <strong>未实名</strong> / <strong>未通过</strong>（查看 + 手动通过）<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>服务状态</strong>与<strong>生效周期</strong>分列（decision-080）<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
       user_kyc: { title: "实名认证", content: "骑手须提交<strong>三要素</strong>：姓名、身份证号、身份证正反面照片。<br>· <strong>已实名</strong>：机审或人工通过，可查看脱敏信息<br>· <strong>未实名</strong>：尚未提交或未通过<br>· <strong>未通过</strong>：机审驳回，平台管理员/运营商可查看材料并<strong>手动通过</strong>（须留痕）<br>购套餐前须完成实名（decision-097）" },
       platform_users_deposit_stats: { title: "用户押金统计", content: "按运营商汇总实付在押、免押人数、渠道担保、退押中金额；只读，不参与平台/合伙人清分。" },
-      pricing_deposit: { title: "押金设置", content: "面向<strong>个人购套餐</strong>与<strong>渠道人天首次领电</strong>。<br>· 运营商可配置：押金数额、启停<br>· <strong>免押门槛由平台统一</strong>，只读展示：微信支付分免押（≥500）、芝麻信用免押（≥500）；任一路达标即可免押（decision-073）<br>· 均未达标则须实缴<br>· 个人：购套餐同笔；渠道人天：首次领取电池前办结（decision-050）" },
+      pricing_deposit: { title: "押金设置", content: "面向<strong>个人购套餐</strong>与<strong>渠道人天首次领电</strong>。<br>· 运营商可配置：押金数额、启停<br>· <strong>免押门槛由平台统一</strong>，只读展示：芝麻信用免押（≥500）；已移除微信支付分（decision-100）<br>· 未达标则须实缴<br>· 个人：购套餐同笔；渠道人天：首次领取电池前办结（decision-050）" },
       orders_swap: { title: "换电订单", content: "列出换电单；权益来源：<strong>个人套餐</strong>（支付时已清分，本表不展示应分）、<strong>渠道人天</strong>、<strong>激活码（二期）</strong>（按天/次确认消耗，类人天）。每笔记录三元组 U/C/B 与跨网设备服务费。" },
       orders_swap_triplet: { title: "运营商三元组与 跨网设备服务费", content: "换电成功时 IoT 上报 userOwner/cabinetOwner/batteryOwner。应付方恒为 userOwner：C≠U 时代付柜机费 ¥0.5/次；B≠U 时代付电池费 ¥0.1/次；经平台保证金/信用额度日清。运营商往来账只见平台代收/代付。" },
       orders_swap_entitlement: { title: "权益来源与消耗", content: "<strong>个人套餐</strong>：骑手在线购套餐，款在<strong>支付成功</strong>时已清分；换电仅履约，不记应分/消耗。点套餐单号在<strong>换电订单页内</strong>抽屉查看套餐明细，不跳转「套餐购买订单」列表。<br><strong>渠道人天</strong>：换电消耗额度池人天（预占→确认）。<br><strong>激活码（二期）</strong>：渠道线下批发码，骑手输码开通；换电按<strong>天/次</strong>确认消耗并向运营商结算（类人天），不产生 C 端应分金额。" },
@@ -511,7 +512,7 @@
       platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。<br>设备管理分 <strong>电柜 / 电池 / 电池型号管理</strong>；电池列表规格取自平台型号字典。" },
       platform_battery_models: { title: "电池型号管理", content: "由<strong>平台管理员</strong>统一维护电池型号字典（规格串如 48V30Ah）。运营商定价、套餐 SKU、设备台账规格均引用本字典启用项；停用后不可再新建定价，已有数据仍可展示历史型号。" },
       platform_l1_pricing: { title: "跨网服务费", content: "柜机/电池服务费<strong>全网默认价</strong> + <strong>城市覆盖价</strong>由平台发布；跨运营商换电清分按此单价；城市价优先；改价不追溯。" },
-      platform_day_standard: { title: "人天标准日值", content: "全网默认日值 + <strong>城市覆盖</strong>；B 端 1% 计提基数；亦为运营商默认批发价（可改）。" },
+      platform_day_standard: { title: "人天标准日值", content: "全网默认日值<strong>始终生效</strong>（不可停用）+ <strong>城市覆盖</strong>（生效/停用，可删除）；B 端 1% 计提基数；亦为运营商默认批发价（可改）。" },
       platform_stats: { title: "业务汇总", content: "全平台 Mock 汇总：<br>· <strong>业务快照（不受统计范围）</strong>：运营商、渠道商、在营站点、设备<br>· <strong>经营指标（随统计范围缩放）</strong>：用户、套餐订单、换电成功、业务流水、平台营收（演示：今日×1 / 近7日×5.2 / 近30日×18）<br>· 业务流水=套餐实付+渠道 B2B 批发 · 平台营收=Σ(C 端实付×1%) + Σ(B 端确认消耗×标准人天价×1%)" },
       platform_operator_device_gate: { title: "设备绑定前置", content: "运营商「我的设备」仅展示平台已绑定的柜机/电池；未绑定设备不会出现在运营商后台。" },
       platform_orders: { title: "全平台订单", content: "套餐购买订单按售卖运营商过滤；换电订单展示全平台三元组与 跨网设备服务费；渠道商订单为人天批发采购单（PO-）。" },
@@ -531,7 +532,7 @@
       platform_flows: { title: "平台流水视角", content: "用户支付：C 端套餐/自费流水及 1% 平台分账。运营商之间：跨网柜机/电池费经平台代收代付的日清流水。平台提成：B 端确认消耗（换电 / 持有电池）计提 + C 端支付分账汇总；持电池确认无关联换电单。" },
       platform_account: { title: "平台收款账户", content: "智格平台 1% 技术服务费统一进入平台商户（微信/支付宝分账 + B 端代扣）。<strong>账户余额、冻结</strong>为商户当前实时状态，不受统计月份影响；月提成与营收构成随月份切换。非运营商经营账户。" },
       module_order_audit: { title: "变更记录", content: "统一<strong>变更记录</strong>（C-02/D-A1）：跨模块时间线，记录订单/服务生命周期事件（冻结、消耗、换电、退款等）。用于客诉、对账与监管；<strong>非新订单列表</strong>。渠道仅见本渠道成员事件；运营商见本主体订单；平台全平台只读。" },
-      module_channel_credit: { title: "渠道信用额度", content: "平台按在册骑手与设备标准评估<strong>信用额度</strong>，用于抵扣渠道应押总额；运营商可调整额度上限。渠道线下打款后提交凭证，由<strong>运营商审核</strong>。分级抵扣规则按信用评分映射抵扣比例。与运营商准入档位（A/B/C/D）独立。" },
+      module_channel_credit: { title: "渠道信用额度", content: "需信用结算模式（人天池 / 设备租赁 / 激活码）默认初始信用额度 <strong>¥100,000</strong>。<strong>应押</strong> = 签约运营商「定价管理 → 押金设置」电池押金数额 × 该渠道<strong>当前持有电池的骑手数</strong>（decision-099）。运营商可调额度；缺口由渠道交凭证、运营商审核。<strong>一期不展示信用分</strong>（decision-098）。与运营商准入档位独立。" },
       module_channel_links: { title: "套餐与链接", content: "渠道可售套餐由运营商签约配置（正式价/专享价/佣金只读）。渠道可为同一套餐创建<strong>多条推广链接</strong>，填写<strong>链接用途</strong>；每条可<strong>生成二维码</strong>（内容与链接一致）。链接直达<strong>签约运营商小程序</strong>；用户点击后 <strong>24h</strong> 内购买授权 SKU 均享渠道专享价。" },
       module_channel_orders: { title: "购卡记录", content: "仅展示经本渠道推广链接成交的套餐购买记录。<br>· <strong>结算</strong>仅两种：即时分账 / 线下结算（废止「线下待结」粘连文案）<br>· 线下结算时「状态」统一 <strong>——</strong>（decision-071）<br>· 支持按支付时间筛选；记录关联链接用途与 link_code。" },
       module_rent_devices: { title: "租赁设备", content: "运营商维护柜机/电池 SN 与部署站点；<strong>月租为签约统一价</strong>，不在此按单台定价或展示。" }
@@ -1085,7 +1086,7 @@
         pay: 299, status: "已冻结", serviceState: "已冻结", payTime: "2026-05-10 14:20", validFrom: "2026-05-10", validTo: "2026-06-09",
         swapLimit: null, swapUsed: 28, accrued: 81, payout: "已清分", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", cabinet: "CAB-22018",
         batteryDeposit: 99, depositPaid: 0,
-        depositWaiver: { type: "微信支付分", score: 718, waivedAmount: 99 },
+        depositWaiver: { type: "芝麻信用", score: 718, waivedAmount: 99 },
         freezeInfo: { applyTime: "2026-05-20 14:00", reason: "短期离岗", frozenDays: 7, maxFreezeDays: 30, resumeNote: "解冻后有效期顺延；首次服务为领取电池" }
       },
       {
@@ -1124,7 +1125,7 @@
         id: "SUB260601099", user: "U9001", phone: "135****9001", site: "浦东骑手驿站", city: "上海", pkg: "包月30天", pkgType: "monthly",
         pay: 299, status: "已完结", serviceState: "中途完结", payTime: "2026-05-28 09:00", validFrom: "2026-05-28", validTo: "2026-06-27",
         swapLimit: null, swapUsed: 2, accrued: 20, payout: "已清分", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", cabinet: "CAB-22018",
-        batteryDeposit: 99, depositPaid: 0, depositWaiver: { type: "微信支付分", score: 705, waivedAmount: 99 }, endTime: "2026-06-01 10:00"
+        batteryDeposit: 99, depositPaid: 0, depositWaiver: { type: "芝麻信用", score: 705, waivedAmount: 99 }, endTime: "2026-06-01 10:00"
       },
       {
         id: "SUB260608015", user: "U2199", phone: "139****2199", site: "世博换电服务点", city: "上海", pkg: "单次换电", pkgType: "single",
@@ -1259,15 +1260,13 @@
       "OP-SX": {
         amount: 99, enabled: true,
         scope: "个人套餐",
-        wechatPayScoreMin: 500,
         zhimaScoreMin: 500,
-        note: "芝麻/支付分不足时实缴；达标免押则实收 ¥0",
+        note: "芝麻信用不足时实缴；达标免押则实收 ¥0",
         updatedAt: "2026-06-10", updatedBy: "绿色出行"
       },
       "OP-LJZ": {
         amount: 199, enabled: true,
         scope: "个人套餐",
-        wechatPayScoreMin: 500,
         zhimaScoreMin: 500,
         note: "联营区示范高押金",
         updatedAt: "2026-06-01", updatedBy: "陆家嘴联营"
@@ -2013,7 +2012,7 @@
     const users = [
       { id: "U1028", phone: "138****1028", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 剩18天", swaps: 42, last: "今日 12:05",
         kycStatus: "已实名", realName: "王磊", idNo: "310115199003051234", kycSubmittedAt: "2026-05-01 09:12", kycPassedAt: "2026-05-01 09:15" },
-      { id: "U1041", phone: "139****1041", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 已冻结", swaps: 28, last: "05-20 14:10", deposit: "免押·支付分", serviceState: "已冻结",
+      { id: "U1041", phone: "139****1041", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 已冻结", swaps: 28, last: "05-20 14:10", deposit: "免押·芝麻", serviceState: "已冻结",
         kycStatus: "未实名" },
       { id: "U1055", phone: "136****1055", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 剩26天 · 待领取电池", swaps: 12, last: "06-11 10:00", serviceState: "服务中", resumePendingPickup: true,
         kycStatus: "未通过", realName: "李强", idNo: "310115199108081122", kycSubmittedAt: "2026-06-10 14:20", kycRejectReason: "身份证照片模糊，无法识别" },
@@ -2367,18 +2366,18 @@
     ];
 
     const channelCreditProfiles = [
-      { channelId: "CH-SF", creditScore: 82, creditLevel: "良", creditLimit: 108000, platformCreditLimit: 108000, operatorOverride: null,
-        requiredDeposit: 18000, paidDeposit: 18000, creditedAmount: 108000, gap: 0,
+      { channelId: "CH-SF", creditScore: null, creditLevel: null, creditLimit: 100000, platformCreditLimit: 100000, operatorOverride: null,
+        requiredDeposit: 18000, paidDeposit: 18000, creditedAmount: 18000, gap: 0,
         perDeviceDeposit: { cabinet: 15000, battery: 3000 }, ridersOnBook: 6,
-        channelUserDepositPolicy: "渠道用户默认免押，押金算在渠道", alert: null, updatedAt: "2026-06-10", evalBy: "平台管理员" },
-      { channelId: "CH-RENT", creditScore: 88, creditLevel: "优", creditLimit: 150000, platformCreditLimit: 150000, operatorOverride: null,
-        requiredDeposit: 150000, paidDeposit: 0, creditedAmount: 150000, gap: 0,
+        channelUserDepositPolicy: "渠道用户默认免押，押金算在渠道", alert: null, updatedAt: "2026-06-10", evalBy: "系统默认" },
+      { channelId: "CH-RENT", creditScore: null, creditLevel: null, creditLimit: 100000, platformCreditLimit: 100000, operatorOverride: null,
+        requiredDeposit: 150000, paidDeposit: 0, creditedAmount: 100000, gap: 50000,
         perDeviceDeposit: { cabinet: 15000, battery: 3000 }, ridersOnBook: 50, devicesOnBook: { cabinets: 5, batteries: 3 },
-        channelUserDepositPolicy: "白名单用户免押，押金算在渠道", alert: null, updatedAt: "2026-06-10", evalBy: "平台管理员" },
-      { channelId: "CH-ACT", creditScore: 80, creditLevel: "良", creditLimit: 80000, platformCreditLimit: 80000, operatorOverride: null,
-        requiredDeposit: 12000, paidDeposit: 12000, creditedAmount: 80000, gap: 0,
+        channelUserDepositPolicy: "白名单用户免押，押金算在渠道", alert: "押金缺口 ¥50,000，请提交打款凭证", updatedAt: "2026-06-10", evalBy: "系统默认" },
+      { channelId: "CH-ACT", creditScore: null, creditLevel: null, creditLimit: 100000, platformCreditLimit: 100000, operatorOverride: null,
+        requiredDeposit: 12000, paidDeposit: 12000, creditedAmount: 12000, gap: 0,
         perDeviceDeposit: { cabinet: 15000, battery: 3000 }, ridersOnBook: 86,
-        channelUserDepositPolicy: "激活码用户按个人用户押金/免押规则", alert: null, updatedAt: "2026-06-10", evalBy: "平台管理员" }
+        channelUserDepositPolicy: "激活码用户按个人用户押金/免押规则", alert: null, updatedAt: "2026-06-10", evalBy: "系统默认" }
     ];
 
     const multiPartyCollectionExplore = {

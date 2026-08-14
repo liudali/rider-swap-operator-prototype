@@ -285,7 +285,7 @@
           <p style="font-size:9px;margin-bottom:6px">电池型号：<strong>48V30Ah</strong> · 60V30Ah</p>
           <div class="pkg-card"><h5>30天畅换</h5><div class="price">¥299</div><div class="desc">30天不限次 · 48V30Ah</div></div>
           <div class="deposit-block"><h5>电池押金</h5>
-            <div class="deposit-opt selected"><div class="opt-title">☑ 微信支付分免押</div></div>
+            <div class="deposit-opt selected"><div class="opt-title">☑ 芝麻信用免押</div></div>
             <div class="deposit-opt"><div class="opt-title">支付押金 ¥99</div></div>
             <div class="pay-summary">套餐 ¥299 + 押金 ¥0<br><span class="total">应付 ¥299</span></div></div>
           <button class="btn-block" style="margin-top:8px">确认支付</button>
@@ -311,7 +311,7 @@
           <button class="btn-block" style="margin-top:8px">确认支付 ¥299</button></div>`, { hideTab: true }),
       depositWaiver: () => phoneShell("缴纳押金", "mine", `
         <div class="sheet-page"><p style="font-weight:600;margin-bottom:8px">骑手电池押金 · ¥99</p>
-          <div class="deposit-opt selected"><div class="opt-title">☑ 微信支付分 | 信用免押 · 分 720</div></div>
+          <div class="deposit-opt selected"><div class="opt-title">☑ 芝麻信用 | 信用免押 · 分 720</div></div>
           <button class="btn-block" style="margin-top:12px">立即免押</button></div>`, { hideTab: true }),
       scanPickup: () => phoneShell("扫码换电", "home", `
         <div class="scan-box"><div class="scan-frame"><div class="scan-line"></div></div>
@@ -334,7 +334,7 @@
           <p style="color:#d97706">无人天额度：仅可还电</p><button class="btn-block" style="margin-top:10px">模拟还电入柜</button></div>`, { hideTab: true }),
       channelDeposit: () => phoneShell("扫码换电", "home", `
         <div class="sheet-page"><p style="margin-bottom:8px">渠道人天 · 首次领电前须办押金</p>
-          <div class="deposit-opt selected"><div class="opt-title">☑ 微信支付分免押</div></div>
+          <div class="deposit-opt selected"><div class="opt-title">☑ 芝麻信用免押</div></div>
           <button class="btn-block" style="margin-top:10px">确认办理并领取</button></div>`, { hideTab: true }),
       failCrossNet: () => phoneShell("扫码换电", "home", `
         <div class="result-ok"><div class="big fail">✕</div><h4>换电失败</h4>
@@ -399,12 +399,12 @@
       return `<div class="flow-branch-area">
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
           <div><div class="branch-v-connector"><div class="arrow-v"></div><span class="connector-label">申请免押</span></div>
-            ${flowCell("P04b", "信用免押", SCREENS.depositWaiver(), "支付分/芝麻")}</div>
+            ${flowCell("P04b", "信用免押", SCREENS.depositWaiver(), "芝麻信用")}</div>
           <div><div class="branch-v-connector"><div class="arrow-v"></div><span class="connector-label">实缴押金</span></div>
             ${flowCell("P04c", "实缴购套餐", SCREENS.purchasePaidDeposit(), "实付·在押")}</div>
         </div>
         <div class="flow-note"><h4>押金相关 · 业务规则</h4>
-          <ul><li>信用免押：支付分/芝麻达标 → 方式「信用免押」、状态 ——</li>
+          <ul><li>信用免押：芝麻信用达标 → 方式「信用免押」、状态 ——</li>
             <li>实缴押金：同笔支付 → 方式「实付」、状态「在押」；还电后可退</li>
             <li>续费不重复收押；换 OP 购新套餐须按新 OP 规则重办</li></ul></div></div>`;
     }

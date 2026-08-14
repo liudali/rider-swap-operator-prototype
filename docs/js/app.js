@@ -433,9 +433,119 @@
         });
     }
 
+    /** 人天池 / 设备租赁 / 激活码：默认初始信用额度（decision-098） */
+    const CHANNEL_DEFAULT_CREDIT_LIMIT = 100000;
+
     function channelUsesCreditEval(channelId) {
       const contract = channelContracts.find(c => c.channelId === channelId);
       return contract ? contractSettlementMode(contract) !== "链接类" : true;
+    }
+
+    function channelOperatorId(channelId) {
+      const c = channelContracts.find(x => x.channelId === channelId);
+      return c?.operatorId || null;
+    }
+
+    /**
+     * 渠道商「持有电池的骑手数」（decision-099）
+     * 人天池：在职且 batteryHeld>0；设备租赁：白名单使用中且有 SN；其它：用户台账当前持电。
+     */
+    function channelBatteryHoldingRiderCount(channelId) {
+      if (!channelId) return 0;
+      const counted = new Set();
+      let n = 0;
+      const mark = (id) => {
+        if (!id || counted.has(id)) return false;
+        counted.add(id);
+        n += 1;
+        return true;
+      };
+      const poolIds = new Set(
+        (dayPools || []).filter(p => p.ownerId === channelId).map(p => p.id)
+      );
+      (dayPoolRiders || []).forEach(r => {
+        if (!poolIds.has(r.poolId)) return;
+        if (r.status !== "在职") return;
+        if ((r.batteryHeld || 0) <= 0) return;
+        mark(r.id);
+      });
+      (channelBatteryHolders || []).forEach(r => {
+        if (r.channelId !== channelId) return;
+        if (!r.batterySn || r.status !== "使用中") return;
+        mark(r.userId || `${r.channelId}:${r.phone || r.batterySn}`);
+      });
+      (typeof users !== "undefined" ? users : []).forEach(u => {
+        const uCh = u.channelId || u.channel;
+        if (uCh !== channelId) return;
+        if (counted.has(u.id)) return;
+        const poolRider = (dayPoolRiders || []).find(r => r.id === u.id);
+        const held = userLiveHeldBattery(u, poolRider);
+        if (held && held.text !== "未持有") mark(u.id);
+      });
+      return n;
+    }
+
+    /** 应押 = 运营商电池押金数额 × 持电骑手数（decision-099） */
+    function refreshChannelCreditDeposit(channelId) {
+      const prof = ensureChannelCreditProfile(channelId, { skipRefresh: true });
+      if (!prof) return null;
+      const opId = channelOperatorId(channelId);
+      const unit = opId ? personalDepositAmountForOperator(opId) : 0;
+      const holders = channelBatteryHoldingRiderCount(channelId);
+      const required = Math.round(unit * holders * 100) / 100;
+      const limit = Number(prof.creditLimit);
+      const effectiveLimit = Number.isFinite(limit) ? limit : CHANNEL_DEFAULT_CREDIT_LIMIT;
+      prof.batteryDepositUnit = unit;
+      prof.holdersWithBattery = holders;
+      prof.ridersOnBook = holders;
+      prof.requiredDeposit = required;
+      prof.creditLimit = effectiveLimit;
+      if (prof.platformCreditLimit == null) prof.platformCreditLimit = CHANNEL_DEFAULT_CREDIT_LIMIT;
+      prof.creditedAmount = Math.min(required, effectiveLimit);
+      prof.gap = Math.max(0, required - prof.creditedAmount);
+      prof.perDeviceDeposit = {
+        battery: unit,
+        cabinet: (platformDepositStandard && platformDepositStandard.cabinet) || 0
+      };
+      prof.alert = prof.gap > 0
+        ? "押金缺口 ¥" + prof.gap.toLocaleString() + "，请提交打款凭证"
+        : null;
+      return prof;
+    }
+
+    /** 需信用的渠道保证有档案；新建默认额度 10 万。信用分一期不展示。 */
+    function ensureChannelCreditProfile(channelId, opts) {
+      if (!channelId || !channelUsesCreditEval(channelId)) return null;
+      let prof = channelCreditProfiles.find(p => p.channelId === channelId);
+      if (!prof) {
+        const limit = CHANNEL_DEFAULT_CREDIT_LIMIT;
+        prof = {
+          channelId,
+          creditScore: null,
+          creditLevel: null,
+          creditLimit: limit,
+          platformCreditLimit: limit,
+          operatorOverride: null,
+          requiredDeposit: 0,
+          paidDeposit: 0,
+          creditedAmount: 0,
+          gap: 0,
+          batteryDepositUnit: 0,
+          holdersWithBattery: 0,
+          perDeviceDeposit: { cabinet: 0, battery: 0 },
+          ridersOnBook: 0,
+          channelUserDepositPolicy: "渠道用户默认免押，押金算在渠道",
+          alert: null,
+          updatedAt: new Date().toISOString().slice(0, 10),
+          evalBy: "系统默认"
+        };
+        channelCreditProfiles.push(prof);
+      } else if (prof.creditLimit == null || !Number.isFinite(Number(prof.creditLimit))) {
+        prof.creditLimit = CHANNEL_DEFAULT_CREDIT_LIMIT;
+        if (prof.platformCreditLimit == null) prof.platformCreditLimit = CHANNEL_DEFAULT_CREDIT_LIMIT;
+      }
+      if (!opts || !opts.skipRefresh) return refreshChannelCreditDeposit(channelId);
+      return prof;
     }
 
     function payMonthKey(payTime) {
@@ -4364,7 +4474,7 @@
       return Math.round(pkg * 0.01 * 100) / 100;
     }
 
-    /** 平台统一定义的信用免押门槛（运营商押金设置页只读展示，decision-073） */
+    /** 平台统一定义的芝麻信用免押门槛（运营商押金设置页只读展示，decision-100） */
     const CREDIT_WAIVER_SCORE_MIN = 500;
 
     function myPersonalDepositSettings() {
@@ -4372,8 +4482,8 @@
       if (!operatorPersonalDepositSettings[eid]) {
         operatorPersonalDepositSettings[eid] = {
           amount: 99, enabled: true, scope: "个人套餐",
-          wechatPayScoreMin: CREDIT_WAIVER_SCORE_MIN, zhimaScoreMin: CREDIT_WAIVER_SCORE_MIN,
-          note: "信用不足时实缴；达标免押则实收 ¥0",
+          zhimaScoreMin: CREDIT_WAIVER_SCORE_MIN,
+          note: "芝麻信用不足时实缴；达标免押则实收 ¥0",
           updatedAt: new Date().toISOString().slice(0, 10),
           updatedBy: entityNameById(eid)
         };
@@ -4382,8 +4492,8 @@
       if (s.amount == null || Number.isNaN(Number(s.amount))) s.amount = 99;
       if (s.enabled == null) s.enabled = true;
       if (!s.scope) s.scope = "个人套餐";
-      /* 门槛由平台统一，不可被运营商改写 */
-      s.wechatPayScoreMin = CREDIT_WAIVER_SCORE_MIN;
+      /* 门槛由平台统一，不可被运营商改写；已移除微信支付分（decision-100） */
+      delete s.wechatPayScoreMin;
       s.zhimaScoreMin = CREDIT_WAIVER_SCORE_MIN;
       return s;
     }
@@ -5685,6 +5795,11 @@
 
     function phase2BadgeHtml(extraClass) {
       return `<span class="badge-p2${extraClass ? " " + extraClass : ""}" title="二期范围：可浏览，一期不交付">二期</span>`;
+    }
+
+    /** 一期页内嵌的二期字段/列（表头、区块标题等） */
+    function phase2FieldMark(label) {
+      return `${label} ${phase2BadgeHtml()}`;
     }
 
     function phase2FeatureHint(name) {
@@ -7855,14 +7970,13 @@
             <div class="detail-grid">
               <div class="detail-item"><span>Logo</span><strong>${operatorLogoHtml(op, 48)}</strong></div>
               <div class="detail-item"><span>联系人</span><strong>${op.contactName}<br><small>${op.contactPhone}</small></strong></div>
-              <div class="detail-item"><span>邮箱</span><strong>${op.email || "—"}</strong></div>
               <div class="detail-item"><span>地址</span><strong style="white-space:normal">${op.address || "—"}</strong></div>
               <div class="detail-item"><span>入驻日期</span><strong>${op.onboardDate}</strong></div>
             </div>
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
-          ${panelHead("准入档位", prof?.tierCode ? "平台定档政策包（只读）" : "尚未定档", "operator_credit_eval")}
+          ${panelHead(phase2FieldMark("准入档位"), prof?.tierCode ? "平台定档政策包（只读）· 一期可浏览" : "尚未定档 · 一期可浏览", "operator_credit_eval")}
           <div class="panel-body" style="padding-top:0">
             ${tier ? `<div class="detail-grid">
               <div class="detail-item"><span>当前档位</span><strong>${tierLabel(prof.tierCode)}</strong></div>
@@ -7871,7 +7985,7 @@
               <div class="detail-item"><span>跨网默认</span><strong>${tier.crossNetworkDefault ? "开" : "关"}</strong></div>
               <div class="detail-item"><span>档位用途</span><strong>融资参考 · 已签渠道 ${st.channels}（不限）</strong></div>
               <div class="detail-item"><span>下次复审</span><strong>${prof.nextReviewAt || "—"}</strong></div>
-            </div>` : `<p style="margin:0;font-size:13px;color:var(--warn)">该运营商尚未完成入网定档，请前往「运营商信用评估」。</p>`}
+            </div>` : `<p style="margin:0;font-size:13px;color:var(--warn)">该运营商尚未完成入网定档，请前往「运营商信用评估」${phase2BadgeHtml()}。</p>`}
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
@@ -7926,7 +8040,7 @@
           <button type="button" class="btn primary" data-edit-operator="${op.id}">编辑信息</button>
           <button type="button" class="btn" data-edit-platform-fee-rate="${op.id}">编辑平台费率</button>
           <button type="button" class="btn" data-view-jump="depositManage" data-depstab-jump="pending">保证金管理</button>
-          <button type="button" class="btn" data-view-jump="operatorCreditEval">信用评估</button>
+          <button type="button" class="btn" data-view-jump="operatorCreditEval" title="二期">信用评估 ${phase2BadgeHtml()}</button>
         </div>`;
       state.detailOperatorId = opId;
       state.detailSubId = null;
@@ -7959,19 +8073,18 @@
             <small style="font-size:12px;color:var(--muted);font-weight:400">PNG / JPG / WebP / SVG，建议 200×200px，≤ 2MB；用于列表、详情及 C 端品牌展示</small>
           </div>
         </label>
-        <label>运营商名称<input name="name" value="${op?.name || ""}" required placeholder="如：绿色出行" /></label>
-        <label class="form-span-2">账号（手机号）
+        <label>运营商名称 <span style="color:var(--red)">*</span><input name="name" value="${op?.name || ""}" required placeholder="如：绿色出行" /></label>
+        <label class="form-span-2">账号（手机号） <span style="color:var(--red)">*</span>
           <input name="loginAccount" type="tel" inputmode="numeric" pattern="1\\d{10}" maxlength="11"
             value="${op?.loginAccount || ""}" required placeholder="11 位手机号，用于运营商后台登录" />
           <small style="display:block;margin-top:6px;font-size:12px;color:var(--muted);font-weight:400">默认密码：123456</small>
         </label>
-        <label>城市<select name="city"><option ${(!op || op.city === "上海") ? "selected" : ""}>上海</option><option ${op?.city === "杭州" ? "selected" : ""}>杭州</option></select></label>
-        <label>状态<select name="status"><option ${(!op || op.status === "在营") ? "selected" : ""}>在营</option><option ${op?.status === "已停用" ? "selected" : ""}>已停用</option></select></label>
-        <label>联系人<input name="contactName" value="${op?.contactName || ""}" /></label>
-        <label>联系电话<input name="contactPhone" value="${op?.contactPhone || ""}" /></label>
-        <label>邮箱<input name="email" type="email" value="${op?.email || ""}" /></label>
-        <label>地址<input name="address" value="${op?.address || ""}" /></label>
-        <label>备注<textarea name="remark" rows="2">${op?.remark || ""}</textarea></label>
+        <label>城市 <span style="color:var(--red)">*</span><select name="city" required><option ${(!op || op.city === "上海") ? "selected" : ""}>上海</option><option ${op?.city === "杭州" ? "selected" : ""}>杭州</option></select></label>
+        <label>状态 <span style="color:var(--red)">*</span><select name="status" required><option ${(!op || op.status === "在营") ? "selected" : ""}>在营</option><option ${op?.status === "已停用" ? "selected" : ""}>已停用</option></select></label>
+        <label>联系人 <span style="color:var(--red)">*</span><input name="contactName" value="${op?.contactName || ""}" required placeholder="如：张经理" /></label>
+        <label>联系电话 <span style="color:var(--red)">*</span><input name="contactPhone" type="tel" value="${op?.contactPhone || ""}" required placeholder="11 位手机号" /></label>
+        <label class="form-span-2">地址 <span style="color:var(--red)">*</span><input name="address" value="${op?.address || ""}" required placeholder="省市区 + 门牌号" /></label>
+        <label class="form-span-2">备注<textarea name="remark" rows="2" placeholder="选填">${op?.remark || ""}</textarea></label>
         <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">微信/支付宝子商户号不在此配置；运营商登录后于「收款账户」自行提交主体信息完成开户。</p>`;
       bindOperatorLogoUpload(document.querySelector("#operatorForm"));
       document.querySelector("#operatorModal").classList.add("open");
@@ -8164,6 +8277,18 @@
         window.alert("请填写登录账号（手机号）");
         return;
       }
+      if (!data.contactName?.trim()) {
+        window.alert("请填写联系人");
+        return;
+      }
+      if (!data.contactPhone?.trim()) {
+        window.alert("请填写联系电话");
+        return;
+      }
+      if (!data.address?.trim()) {
+        window.alert("请填写地址");
+        return;
+      }
       const loginPhone = String(data.loginAccount).trim();
       if (!/^1\d{10}$/.test(loginPhone)) {
         window.alert("登录账号须为 11 位手机号");
@@ -8183,12 +8308,11 @@
       if (state.operatorFormId === "new") {
         const id = "OP-" + Date.now().toString().slice(-4);
         platformOperators.push({
-          id, name: data.name, logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
-          contactName: data.contactName, contactPhone: data.contactPhone,
+          id, name: data.name.trim(), logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
+          contactName: data.contactName.trim(), contactPhone: data.contactPhone.trim(),
           loginAccount: loginPhone,
-          email: data.email,
-          address: data.address, onboardDate: new Date().toISOString().slice(0, 10),
-          mchWx: "", mchAli: "", remark: data.remark
+          address: data.address.trim(), onboardDate: new Date().toISOString().slice(0, 10),
+          mchWx: "", mchAli: "", remark: data.remark?.trim() || ""
         });
         operatorCreditAccounts.push({ operatorId: id, depositBalance: 0, creditLimit: 0, used: 0, available: 0, crossSwapEnabled: false, owed: 0 });
         operatorCreditProfiles.push({ operatorId: id, tierCode: null, status: "待定档", assignedAt: null, assignedBy: null, nextReviewAt: null, assignReason: null });
@@ -8203,11 +8327,10 @@
         const op = platformOperators.find(o => o.id === state.operatorFormId);
         if (op) {
           Object.assign(op, {
-            name: data.name, logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
-            contactName: data.contactName, contactPhone: data.contactPhone,
+            name: data.name.trim(), logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
+            contactName: data.contactName.trim(), contactPhone: data.contactPhone.trim(),
             loginAccount: loginPhone,
-            email: data.email,
-            address: data.address, remark: data.remark
+            address: data.address.trim(), remark: data.remark?.trim() || ""
           });
           const loginKey = (op.id === (ENT.operator?.id || "OP-SX")) ? "entity:operator" : `entity:${op.id}`;
           upsertAuthAccount(loginPhone, "operator", loginKey, op.name);
@@ -8462,6 +8585,9 @@
           });
           CHANNEL_REGISTRY[channelId] = { id: channelId, name: data.name.trim(), settlementMode: "激活码", logo: "🎫", tree: "批发激活码 · 骑手核销获套餐" };
           CHANNEL_NAV[channelId] = ["overview", "channelSettlement", "activationCodes", "activationRecords", "orderAudit", "channelCredit", "employees"];
+        }
+        if (settlementMode !== "链接类") {
+          ensureChannelCreditProfile(channelId);
         }
         upsertAuthAccount(loginPhone, "channel", `entity:${channelId}`, data.name.trim());
       } else {
@@ -8867,7 +8993,8 @@
     function savePlatformStandardDayPriceForm() {
       platformStandardDayPrice.price = parseFloat(document.querySelector("#stdDayPrice")?.value || platformStandardDayPrice.price);
       platformStandardDayPrice.effectiveFrom = document.querySelector("#stdDayEffectiveFrom")?.value || platformStandardDayPrice.effectiveFrom;
-      platformStandardDayPrice.status = document.querySelector("#stdDayStatus")?.value || platformStandardDayPrice.status;
+      /* 全网默认日值始终生效，不存在停用（decision-101） */
+      platformStandardDayPrice.status = "生效";
       platformStandardDayPrice.updatedAt = new Date().toISOString().slice(0, 10);
       platformStandardDayPrice.updatedBy = "平台管理员";
       platformFeeAccruals.forEach(a => {
@@ -8876,6 +9003,28 @@
       refreshPlatformFeeAccruals();
       showProtoToast("演示：人天标准日值已更新。B 端计提基数与新签约默认批发价将按 ¥" + platformStandardDayPrice.price + "/人天 展示");
       render();
+    }
+
+    function normalizeStdDayCityStatus(status) {
+      if (status === "生效" || status === "停用") return status;
+      if (status === "覆盖生效") return "生效";
+      return "停用"; /* 沿用全网等历史态 → 停用（回退全网） */
+    }
+
+    function deleteStdDayCityOverride(id) {
+      const row = stdDayCityOverrides.find(r => r.id === id);
+      if (!row) return;
+      openProtoConfirm({
+        title: "删除城市覆盖价",
+        message: `确认删除「${row.city}」的人天日值覆盖？删除后该城市回退全网默认日值。`,
+        confirmLabel: "删除",
+        onConfirm: () => {
+          const idx = stdDayCityOverrides.findIndex(r => r.id === id);
+          if (idx >= 0) stdDayCityOverrides.splice(idx, 1);
+          showProtoToast("演示：已删除城市覆盖价");
+          render();
+        }
+      });
     }
 
     function openL1CityOverrideForm(editId) {
@@ -8922,12 +9071,13 @@
 
     function openStdDayCityOverrideForm(editId) {
       const row = editId ? stdDayCityOverrides.find(r => r.id === editId) : null;
+      const statusVal = row ? normalizeStdDayCityStatus(row.status) : "生效";
       openProtoForm({
         title: row ? "编辑日值城市覆盖" : "添加日值城市覆盖",
         fields: [
           { name: "city", label: "城市", value: row?.city || "", required: true },
           { name: "price", label: "标准日值（元/人天）", type: "number", value: String(row?.price ?? platformStandardDayPrice.price) },
-          { name: "status", label: "状态", type: "select", value: row?.status || "覆盖生效", options: ["覆盖生效", "沿用全网", "停用"], optionLabels: { "覆盖生效": "覆盖生效", "沿用全网": "沿用全网", "停用": "停用" } }
+          { name: "status", label: "状态", type: "select", value: statusVal, options: ["生效", "停用"], optionLabels: { "生效": "生效", "停用": "停用" } }
         ],
         submitLabel: "保存",
         onSubmit: (data) => {
@@ -8935,18 +9085,19 @@
           if (!city) return "请填写城市";
           const price = parseFloat(data.price);
           if (Number.isNaN(price) || price < 0) return "请填写有效日值";
+          const status = data.status === "停用" ? "停用" : "生效";
           const today = new Date().toISOString().slice(0, 10);
           if (row) {
             row.city = city;
             row.price = price;
-            row.status = data.status || "覆盖生效";
+            row.status = status;
             row.updatedAt = today;
           } else {
             if (stdDayCityOverrides.some(r => r.city === city)) return "该城市已有覆盖价，请直接编辑";
             stdDayCityOverrides.push({
               id: "STD-" + Date.now(),
               city, price,
-              status: data.status || "覆盖生效",
+              status,
               updatedAt: today
             });
           }
@@ -9224,7 +9375,7 @@
     function depositAccountTabDesc(tab) {
       if (tab === "recharge") return "对公收款专户、提交充值申请与申请进度。";
       if (tab === "ledger") return "充值入账、日清划扣、平台费代扣变动明细。";
-      return "准入档位、保证金/信用额度 KPI 与清分收款专户。";
+      return "保证金/信用额度 KPI 与清分收款专户；准入档位为二期展示（可浏览）。";
     }
 
     function renderDepositAccount() {
@@ -9303,7 +9454,7 @@
             </table>
           </div>`;
       } else {
-        content = `${tier ? `${panelHead("准入档位（只读）", "平台定档政策包；授信上限由平台维护", "operator_credit_eval")}
+        content = `${tier ? `${panelHead(phase2FieldMark("准入档位（只读）"), "平台定档政策包；授信上限由平台维护 · 一期可浏览", "operator_credit_eval")}
           <div class="panel-body">
             <div class="detail-grid">
               <div class="detail-item"><span>当前档位</span><strong>${tierLabel(prof.tierCode)}</strong></div>
@@ -9313,7 +9464,7 @@
               <div class="detail-item"><span>档位用途</span><strong>可融资水平参考（与渠道数无关）</strong></div>
               <div class="detail-item"><span>下次复审</span><strong>${prof.nextReviewAt || "—"}</strong></div>
             </div>
-          </div>` : `<div class="pool-warn-banner" style="margin-bottom:14px">尚未完成平台准入定档，请联系平台管理员。${noteBtn("operator_credit_eval")}</div>`}
+          </div>` : `<div class="pool-warn-banner" style="margin-bottom:14px">尚未完成平台准入定档，请联系平台管理员。${phase2BadgeHtml()} ${noteBtn("operator_credit_eval")}</div>`}
         <div class="kpi-grid">
           ${kpi("平台保证金", credit ? "¥" + credit.depositBalance.toLocaleString("zh-CN") : "—", credit && credit.depositBalance > 0 ? "当前扣款账户" : "已用尽", "保", "operator_deposit")}
           ${kpi("信用额度", credit ? "¥" + credit.creditLimit.toLocaleString("zh-CN") : "—", credit && credit.depositBalance <= 0 ? "已启用" : "未启用", "额", "operator_credit")}
@@ -9418,16 +9569,16 @@
           </div>
         </section>
         <section class="panel">
-          ${panelHead("运营商清分账户", "保证金余额与信用额度；调额不得高于档位封顶", "deposit_manage")}
+          ${panelHead("运营商清分账户", "保证金余额与信用额度；调额不得高于档位封顶（二期）", "deposit_manage")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>运营商</th><th>保证金</th><th>信用额度</th><th>档位封顶</th><th>已占用</th><th>跨网</th><th>操作</th></tr></thead>
+              <thead><tr><th>运营商</th><th>保证金</th><th>信用额度</th><th>${phase2FieldMark("档位封顶")}</th><th>已占用</th><th>跨网</th><th>操作</th></tr></thead>
               <tbody>${platformOperators.map(op => {
                 const c = creditForOperator(op.id);
                 const cap = operatorCreditCap(op.id);
                 const prof = operatorCreditProfile(op.id);
                 return `<tr>
-                  <td><strong>${op.name}</strong><br><small>${op.id}</small>${prof?.tierCode ? "<br><small>" + tierLabel(prof.tierCode) + "</small>" : ""}</td>
+                  <td><strong>${op.name}</strong><br><small>${op.id}</small>${prof?.tierCode ? "<br><small>" + tierLabel(prof.tierCode) + " " + phase2BadgeHtml() + "</small>" : ""}</td>
                   <td>¥${(c?.depositBalance || 0).toLocaleString("zh-CN")}</td>
                   <td>¥${(c?.creditLimit || 0).toLocaleString("zh-CN")}</td>
                   <td>¥${cap != null ? cap.toLocaleString("zh-CN") : "—"}</td>
@@ -9660,21 +9811,21 @@
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr>
-                <th>运营商</th><th>联系人</th><th>城市</th><th>状态</th><th>入驻</th><th>准入档位</th>
+                <th>运营商</th><th>联系人</th><th>城市</th><th>状态</th><th>入驻</th><th>${phase2FieldMark("准入档位")}</th>
                 <th>平台费率</th><th>保证金</th><th>信用额度（已用/上限）</th><th>跨网</th><th>操作</th>
               </tr></thead>
               <tbody>${rows.map(op => {
                 const credit = creditForOperator(op.id);
                 const prof = operatorCreditProfile(op.id);
-                const tierTxt = prof?.tierCode ? tierLabel(prof.tierCode) : tag("待定档");
+                const tierTxt = prof?.tierCode ? tierLabel(prof.tierCode) : "待定档";
                 return `<tr>
                   <td><div class="operator-logo-cell">${operatorLogoHtml(op, 36)}<div><strong>${op.name}</strong><br><small style="color:var(--muted)">${op.id}</small></div></div></td>
                   <td>${op.contactName}<br><small>${op.contactPhone}</small></td>
                   <td>${op.city}</td><td>${tag(op.status)}</td><td>${op.onboardDate}</td>
-                  <td>${prof?.tierCode ? tag(tierTxt) : tierTxt}</td>
+                  <td>${tag(tierTxt)} ${phase2BadgeHtml()}</td>
                   <td><strong class="fee-platform">${operatorFeeRateSummary(op.id)}</strong><br><small style="color:var(--muted)">C / B</small></td>
                   <td>¥${(credit?.depositBalance || 0).toLocaleString("zh-CN")}</td>
-                  <td>${credit ? "¥" + credit.used + " / ¥" + credit.creditLimit : "—"}<br><small>封顶 ¥${(operatorCreditCap(op.id) ?? "—")}</small></td>
+                  <td>${credit ? "¥" + credit.used + " / ¥" + credit.creditLimit : "—"}</td>
                   <td>${credit?.crossSwapEnabled ? tag("开启") : tag("已停")}</td>
                   <td>
                     <button type="button" class="link-btn" data-open-operator="${op.id}">详情</button>
@@ -9726,16 +9877,17 @@
       }
       if (tab === "dayPrice") {
         const cityRows = typeof stdDayCityOverrides !== "undefined" ? stdDayCityOverrides : [];
+        platformStandardDayPrice.status = "生效";
         return `
         ${ownScopeBanner()}
         <section class="panel">
-          ${panelHead("人天标准日值", "全网默认 · B 端 1% 计提基数；运营商默认批发价（可改）", "platform_day_standard")}
+          ${panelHead("人天标准日值", "全网默认始终生效 · B 端 1% 计提基数；运营商默认批发价（可改）", "platform_day_standard")}
           <div class="panel-body">
-            <p style="font-size:13px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_standard_day_price")} 平台按此价格向运营商展示并计提 B 端 1%；运营商新建签约渠道时默认批发价与此相同，可在「定价管理」修改。城市覆盖见下表。</p>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_standard_day_price")} 平台按此价格向运营商展示并计提 B 端 1%；运营商新建签约渠道时默认批发价与此相同，可在「定价管理」修改。全网默认<strong>不可停用</strong>；城市覆盖见下表。</p>
             <form id="stdDayPriceForm" class="form-grid" style="max-width:480px">
               <label>标准日值（元/人天）<input id="stdDayPrice" type="number" min="0" step="0.01" value="${platformStandardDayPrice.price}" required /></label>
               <label>生效日期<input type="date" id="stdDayEffectiveFrom" value="${platformStandardDayPrice.effectiveFrom}" /></label>
-              <label>状态<select id="stdDayStatus"><option ${platformStandardDayPrice.status === "生效" ? "selected" : ""}>生效</option><option ${platformStandardDayPrice.status === "停用" ? "selected" : ""}>停用</option></select></label>
+              <label>状态<span class="readonly-field" style="display:inline-flex;align-items:center;min-height:32px">${tag("生效")}<span style="margin-left:8px;font-size:12px;color:var(--muted)">全网默认始终生效</span></span></label>
             </form>
             <p style="font-size:12px;color:var(--muted);margin:12px 0">最近更新：${platformStandardDayPrice.updatedAt} · ${platformStandardDayPrice.updatedBy}</p>
             <button type="button" class="btn primary" id="saveStdDayPrice" data-save-std-day>发布全网默认日值（演示）</button>
@@ -9743,16 +9895,22 @@
           </div>
         </section>
         <section class="panel">
-          ${panelHead("城市覆盖价", "默认全网日值；可按城市单独覆盖（演示）", "platform_day_standard")}
+          ${panelHead("城市覆盖价", "状态：生效 / 停用；停用回退全网默认；可删除", "platform_day_standard")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>城市</th><th>标准日值</th><th>状态</th><th>更新</th><th>操作</th></tr></thead>
-              <tbody>${cityRows.map(r => `<tr>
+              <tbody>${cityRows.map(r => {
+                const st = normalizeStdDayCityStatus(r.status);
+                return `<tr>
                 <td><strong>${r.city}</strong></td>
                 <td>¥${r.price}/人天</td>
-                <td>${tag(r.status)}</td><td>${r.updatedAt}</td>
-                <td><button type="button" class="link-btn" data-std-city-edit="${r.id}">编辑（演示）</button></td>
-              </tr>`).join("") || "<tr><td colspan='5'>暂无城市覆盖</td></tr>"}</tbody>
+                <td>${tag(st)}</td><td>${r.updatedAt}</td>
+                <td>
+                  <button type="button" class="link-btn" data-std-city-edit="${r.id}">编辑</button>
+                  <button type="button" class="link-btn" data-std-city-del="${r.id}" style="margin-left:8px;color:var(--danger,#c0392b)">删除</button>
+                </td>
+              </tr>`;
+              }).join("") || "<tr><td colspan='5'>暂无城市覆盖</td></tr>"}</tbody>
             </table>
             <button type="button" class="btn" style="margin-top:10px" id="addStdDayCityOverride" data-add-std-city>+ 添加城市覆盖（演示）</button>
           </div>
@@ -15168,17 +15326,16 @@
         }
       } else if (tab === "deposit") {
         const cfg = myPersonalDepositSettings();
-        const wxMin = CREDIT_WAIVER_SCORE_MIN;
         const zhimaMin = CREDIT_WAIVER_SCORE_MIN;
         body = `<section class="panel">
-          ${panelHead("押金设置", "个人套餐 · 信用门槛（平台统一只读）+ 不足时须缴电池押金数额", "pricing_deposit")}
+          ${panelHead("押金设置", "个人套餐 · 芝麻信用门槛（平台统一只读）+ 不足时须缴电池押金数额", "pricing_deposit")}
           <div class="panel-body">
             <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("pricing_deposit")}${noteBtn("rider_battery_deposit")}${noteBtn("orders_deposit_waiver")}
-              适用对象：<strong>个人套餐用户</strong> · 微信支付分或芝麻信用<strong>任一路达标</strong>可免押 · 均未达标则实缴 · 购套餐<strong>同笔支付</strong>进运营商子商户 · 不参与清分</div>
+              适用对象：<strong>个人套餐用户</strong> · 芝麻信用达标可免押 · 未达标则实缴 · 购套餐<strong>同笔支付</strong>进运营商子商户 · 不参与清分</div>
             <div class="detail-grid" style="margin-bottom:16px">
               <div class="detail-item"><span>适用用户</span><strong>个人套餐</strong><br><small style="color:var(--muted)">渠道人天 / 设备租赁白名单不适用</small></div>
-              <div class="detail-item"><span>触发条件</span><strong>信用未达门槛</strong><br><small style="color:var(--muted)">支付分 &lt; ${wxMin} 且 芝麻 &lt; ${zhimaMin}</small></div>
-              <div class="detail-item"><span>免押达标</span><strong>实收 ¥0</strong><br><small style="color:var(--muted)">支付分 ≥ ${wxMin} 或 芝麻 ≥ ${zhimaMin}</small></div>
+              <div class="detail-item"><span>触发条件</span><strong>信用未达门槛</strong><br><small style="color:var(--muted)">芝麻信用 &lt; ${zhimaMin}</small></div>
+              <div class="detail-item"><span>免押达标</span><strong>实收 ¥0</strong><br><small style="color:var(--muted)">芝麻信用 ≥ ${zhimaMin}</small></div>
               <div class="detail-item"><span>最近更新</span><strong>${cfg.updatedAt || "—"}</strong><br><small style="color:var(--muted)">${cfg.updatedBy || "—"}</small></div>
             </div>
             <form id="personalDepositForm" class="detail-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:end">
@@ -15193,11 +15350,7 @@
                   <option value="0" ${cfg.enabled === false ? "selected" : ""}>关闭（本运营商暂不收个人押金）</option>
                 </select>
               </label>
-              <div class="detail-item" style="margin:0">
-                <span>平台统一 · 不可修改</span>
-                <strong>微信支付分免押（≥${wxMin}）</strong>
-              </div>
-              <div class="detail-item" style="margin:0">
+              <div class="detail-item" style="margin:0;grid-column:1/-1">
                 <span>平台统一 · 不可修改</span>
                 <strong>芝麻信用免押（≥${zhimaMin}）</strong>
               </div>
@@ -15207,14 +15360,14 @@
               </label>
               <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <button type="submit" class="btn primary" data-save-personal-deposit>保存押金设置</button>
-                <small style="color:var(--muted)">可改押金数额与启停；免押门槛由平台统一，运营商不可修改（decision-073）</small>
+                <small style="color:var(--muted)">可改押金数额与启停；芝麻免押门槛由平台统一，运营商不可修改（decision-100）</small>
               </div>
             </form>
             <table style="margin-top:20px">
               <thead><tr><th>场景</th><th>用户动作</th><th>押金应收</th></tr></thead>
               <tbody>
-                <tr><td>微信支付分 ≥ ${wxMin}（或芝麻 ≥ ${zhimaMin}）</td><td>购个人套餐</td><td><strong>¥0</strong>（信用免押）</td></tr>
-                <tr><td>支付分 &lt; ${wxMin} 且 芝麻 &lt; ${zhimaMin}</td><td>购个人套餐</td><td><strong>¥${cfg.enabled === false ? 0 : cfg.amount}</strong>（实付 · 同笔）</td></tr>
+                <tr><td>芝麻信用 ≥ ${zhimaMin}</td><td>购个人套餐</td><td><strong>¥0</strong>（信用免押）</td></tr>
+                <tr><td>芝麻信用 &lt; ${zhimaMin}</td><td>购个人套餐</td><td><strong>¥${cfg.enabled === false ? 0 : cfg.amount}</strong>（实付 · 同笔）</td></tr>
                 <tr><td>渠道人天 / 租赁白名单</td><td>开服务</td><td>不适用 · 渠道担保</td></tr>
               </tbody>
             </table>
@@ -15359,23 +15512,24 @@
             <table>
               <thead><tr>
                 <th>渠道商</th><th>结算模式</th><th>批发/定价</th><th>权益概要</th>
-                <th>信用分</th><th>信用额度</th><th>应押/缺口</th><th>待审订单</th>
+                <th>信用额度</th><th>应押/缺口</th><th>待审订单</th>
                 <th>有效期</th><th>状态</th><th>操作</th>
               </tr></thead>
               <tbody>${rows.map(c => {
                 const usesCredit = channelUsesCreditEval(c.channelId);
-                const prof = usesCredit ? channelCreditProfiles.find(p => p.channelId === c.channelId) : null;
+                const prof = usesCredit ? ensureChannelCreditProfile(c.channelId) : null;
                 const pending = usesCredit
                   ? channelDepositProofs.filter(p => p.channelId === c.channelId && p.status === "待审核").length
                   : 0;
-                const gap = prof ? (prof.gap || Math.max(0, prof.requiredDeposit - (prof.creditedAmount || 0))) : 0;
+                const gap = prof ? (prof.gap || 0) : 0;
                 const ch = platformChannels.find(p => p.id === c.channelId);
+                const holders = prof ? (prof.holdersWithBattery || 0) : 0;
+                const unit = prof ? (prof.batteryDepositUnit || 0) : 0;
                 const creditCells = usesCredit
-                  ? `<td>${prof ? prof.creditScore + " · " + prof.creditLevel : "—"}</td>
-                     <td>¥${(prof?.creditLimit || 0).toLocaleString()}</td>
-                     <td>${prof ? "应押 ¥" + prof.requiredDeposit.toLocaleString() + (gap > 0 ? `<br><small style="color:var(--warn)">缺口 ¥${gap.toLocaleString()}</small>` : "") : "—"}</td>
+                  ? `<td>¥${(prof?.creditLimit ?? CHANNEL_DEFAULT_CREDIT_LIMIT).toLocaleString()}</td>
+                     <td>${prof ? `应押 ¥${(prof.requiredDeposit || 0).toLocaleString()}<br><small style="color:var(--muted)">¥${unit.toLocaleString()}×${holders} 持电骑手</small>${gap > 0 ? `<br><small style="color:var(--warn)">缺口 ¥${gap.toLocaleString()}</small>` : ""}` : "—"}</td>
                      <td>${pending || "—"}</td>`
-                  : `<td colspan="4"><small style="color:var(--muted)">分销不适用渠道信用</small></td>`;
+                  : `<td colspan="3"><small style="color:var(--muted)">分销不适用渠道信用</small></td>`;
                 const ops = [
                   `<button type="button" class="link-btn" data-edit-channel-partner="${c.id}">编辑</button>`,
                   usesCredit ? `<button type="button" class="link-btn" data-adjust-channel-credit="${c.channelId}">调整额度</button>` : ""
@@ -15390,7 +15544,7 @@
                   <td>${tag(c.status)}${ch?.status === "已停用" ? `<br>${tag("渠道已停用")}` : ""}</td>
                   <td>${ops}</td>
                 </tr>`;
-              }).join("") || "<tr><td colspan='11'>暂无签约渠道，点击「+ 新增渠道商」创建</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='10'>暂无签约渠道，点击「+ 新增渠道商」创建</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -16675,15 +16829,15 @@
             </div>
           </section>`;
       }
-      const profile = channelCreditProfiles.find(p => p.channelId === channelEntityId());
+      const profile = ensureChannelCreditProfile(channelEntityId());
       if (!profile) return `${ownScopeBanner()}<p class="scope-hint">暂无渠道信用档案。</p>`;
-      const std = platformDepositStandard;
       const proofs = channelDepositProofs.filter(p => p.channelId === channelEntityId());
       const isOp = isOperatorRole();
       const isCh = isChannelRole();
-      const gap = profile.gap || Math.max(0, profile.requiredDeposit - (profile.creditedAmount || profile.creditLimit || 0));
+      const gap = profile.gap || 0;
       const depOk = gap <= 0;
-      const tierRows = creditTierConfig.map(t => `<tr><td>${t.tier}</td><td>${t.scoreMin}–${t.scoreMax}</td><td>${t.deductRatio}%</td></tr>`).join("");
+      const unit = profile.batteryDepositUnit || 0;
+      const holders = profile.holdersWithBattery || 0;
       const proofRows = proofs.map(p => `<tr>
         <td>${p.id}</td><td>¥${p.amount.toLocaleString()}</td><td>${p.transferRef}</td><td>${p.transferDate}</td>
         <td>${tag(p.status)}</td><td>${p.reviewTime || p.submitTime}</td>
@@ -16691,31 +16845,30 @@
       </tr>`).join("");
       const opAdjust = isOp ? `<button type="button" class="btn" data-adjust-channel-credit="${profile.channelId}">调整信用额度</button>` : "";
       const chSubmit = isCh && gap > 0 ? `<button type="button" class="btn primary" data-submit-deposit-proof>提交打款凭证</button>` : "";
+      const limitHint = profile.operatorOverride != null ? "运营商已调整" : "默认初始 ¥" + CHANNEL_DEFAULT_CREDIT_LIMIT.toLocaleString();
       return `
         ${ownScopeBanner()}
         <section class="panel">
-          ${panelHead("渠道信用额度", "平台评估 · 运营商可调整 · 渠道提交凭证审核", "day_pool_channel", opAdjust + chSubmit)}
+          ${panelHead("渠道信用额度", "默认初始额度 · 运营商可调整 · 渠道提交凭证审核", "day_pool_channel", opAdjust + chSubmit)}
           <div class="panel-body">
-            <div class="platform-price-banner" style="margin-bottom:14px">平台统一押金标准：电池 <strong>¥${std.battery.toLocaleString()}</strong>/块 · 换电柜 <strong>¥${std.cabinet.toLocaleString()}</strong>/台（${std.updatedAt} 更新）</div>
+            <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("module_channel_credit")}${noteBtn("pricing_deposit")}
+              <strong>应押</strong> = 签约运营商「定价管理 → 押金设置」电池押金 <strong>¥${unit.toLocaleString()}</strong>
+              × 本渠道<strong>持电骑手</strong> <strong>${holders}</strong> 人
+              = <strong>¥${(profile.requiredDeposit || 0).toLocaleString()}</strong>。
+              默认初始信用额度 <strong>¥${CHANNEL_DEFAULT_CREDIT_LIMIT.toLocaleString()}</strong>（一期不展示信用分）。
+            </div>
             <div class="kpi-grid">
-              ${kpi("信用评分", profile.creditScore, profile.creditLevel + " · " + (profile.evalBy || "平台"), "信", "day_pool_channel")}
-              ${kpi("信用额度", "¥" + profile.creditLimit.toLocaleString(), profile.operatorOverride ? "运营商已调整" : "平台评估", "额", "day_pool_channel")}
-              ${kpi("应押总额", "¥" + profile.requiredDeposit.toLocaleString(), profile.ridersOnBook + " 在册骑手", "押", "orders_deposit")}
+              ${kpi("信用额度", "¥" + profile.creditLimit.toLocaleString(), limitHint, "额", "day_pool_channel")}
+              ${kpi("应押总额", "¥" + (profile.requiredDeposit || 0).toLocaleString(), `¥${unit.toLocaleString()} × ${holders} 持电`, "押", "orders_deposit")}
               ${kpi("待补缴", depOk ? "¥0" : "¥" + gap.toLocaleString(), depOk ? "已覆盖" : "请提交凭证", depOk ? "✓" : "!", "orders_deposit")}
             </div>
             <div class="detail-grid" style="margin-top:16px">
-              <div class="detail-item"><span>信用抵扣额</span><strong>¥${(profile.creditedAmount || profile.creditLimit).toLocaleString()}</strong></div>
-              <div class="detail-item"><span>单骑手标准</span><strong>¥${profile.perDeviceDeposit.battery}/电池</strong></div>
+              <div class="detail-item"><span>信用抵扣额</span><strong>¥${(profile.creditedAmount || 0).toLocaleString()}</strong></div>
+              <div class="detail-item"><span>电池押金单价</span><strong>¥${unit.toLocaleString()}</strong></div>
+              <div class="detail-item"><span>持电骑手数</span><strong>${holders}</strong></div>
               <div class="detail-item"><span>渠道用户策略</span><strong>${profile.channelUserDepositPolicy}</strong></div>
-              <div class="detail-item"><span>最近评估</span><strong>${profile.updatedAt}</strong></div>
             </div>
             ${profile.alert ? `<div class="pool-warn-banner" style="margin-top:16px">${profile.alert}</div>` : ""}
-          </div>
-        </section>
-        <section class="panel">
-          ${panelHead("分级抵扣规则", "平台可配置 · 按信用评分映射", "day_pool_channel")}
-          <div class="panel-body orders-table-wrap">
-            <table><thead><tr><th>等级</th><th>得分区间</th><th>抵扣比例</th></tr></thead><tbody>${tierRows}</tbody></table>
           </div>
         </section>
         <section class="panel">
@@ -17195,7 +17348,7 @@
             <div class="kpi-grid in-panel kpi-grid-4">
               ${kpi("实付在押总额", "¥" + st.heldAmount.toLocaleString("zh-CN"), "含退押中", "押", "rider_battery_deposit")}
               ${kpi("实付在押人数", st.heldUsers, "当前在账", "人", "rider_battery_deposit")}
-              ${kpi("信用免押", st.creditUsers, "芝麻/支付分", "免", "orders_deposit_waiver")}
+              ${kpi("信用免押", st.creditUsers, "芝麻信用", "免", "orders_deposit_waiver")}
               ${kpi("渠道担保", st.channelUsers, "人天/白名单押金算渠道", "渠", "rider_battery_deposit")}
             </div>
             ${st.refundingAmount > 0 ? `<p style="margin:10px 0 0;font-size:12px;color:var(--muted)">其中退押处理中 <strong>¥${st.refundingAmount.toLocaleString("zh-CN")}</strong></p>` : ""}
@@ -17547,13 +17700,16 @@
           const cfg = myPersonalDepositSettings();
           cfg.amount = Math.round(amount * 100) / 100;
           cfg.enabled = String(fd.get("enabled")) !== "0";
-          cfg.wechatPayScoreMin = CREDIT_WAIVER_SCORE_MIN;
           cfg.zhimaScoreMin = CREDIT_WAIVER_SCORE_MIN;
+          delete cfg.wechatPayScoreMin;
           cfg.note = String(fd.get("note") || "").trim();
           cfg.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
           cfg.updatedBy = currentEmployee()?.name || currentEntity().name;
-          if (typeof showProtoToast === "function") showProtoToast("押金设置已保存（演示 · 本地 Mock）");
-          else window.alert("押金设置已保存（演示 · 本地 Mock）");
+          const opId = currentEmployee() ? currentEmployee().entityId : currentEntity().id;
+          channelContracts.filter(c => c.operatorId === opId && channelUsesCreditEval(c.channelId))
+            .forEach(c => refreshChannelCreditDeposit(c.channelId));
+          if (typeof showProtoToast === "function") showProtoToast("押金设置已保存；签约渠道应押已按新单价重算");
+          else window.alert("押金设置已保存；签约渠道应押已按新单价重算");
           render();
         };
       }
@@ -17915,7 +18071,7 @@
       });
       root.querySelectorAll("[data-adjust-channel-credit]").forEach(btn => {
         btn.onclick = () => {
-          const prof = channelCreditProfiles.find(p => p.channelId === btn.dataset.adjustChannelCredit);
+          const prof = ensureChannelCreditProfile(btn.dataset.adjustChannelCredit);
           if (!prof) return;
           openProtoForm({
             title: "调整渠道信用额度",
@@ -17925,9 +18081,7 @@
               if (!Number.isFinite(v) || v < 0) return "请输入有效金额";
               prof.operatorOverride = v;
               prof.creditLimit = v;
-              prof.creditedAmount = Math.min(prof.requiredDeposit, v);
-              prof.gap = Math.max(0, prof.requiredDeposit - prof.creditedAmount);
-              prof.alert = prof.gap > 0 ? "押金缺口 ¥" + prof.gap.toLocaleString() + "，请提交打款凭证" : null;
+              refreshChannelCreditDeposit(prof.channelId);
               return {
                 successMessage: "已调整 " + btn.dataset.adjustChannelCredit + " 信用额度为 ¥" + v.toLocaleString("zh-CN"),
                 afterClose: () => render()
@@ -18420,12 +18574,12 @@
           const cap = operatorCreditCap(opId);
           const prof = operatorCreditProfile(opId);
           if (!prof?.tierCode) {
-            showProtoToast("该运营商尚未定档，请先在「运营商信用评估」完成定档。");
+            showProtoToast("【二期】该运营商尚未定档，请先在「运营商信用评估」完成定档。");
             return;
           }
-          const hint = cap != null ? `档位封顶 ¥${cap.toLocaleString("zh-CN")}` : "";
+          const hint = cap != null ? `档位封顶 ¥${cap.toLocaleString("zh-CN")}（二期）` : "";
           openProtoForm({
-            title: "调整信用额度上限",
+            title: "调整信用额度上限（档位封顶·二期）",
             fields: [{ name: "limit", label: hint ? `信用额度上限（元，${hint}）` : "信用额度上限（元）", type: "number", value: String(credit.creditLimit) }],
             onSubmit: (data) => {
               const v = Number(data.limit);
@@ -19070,6 +19224,9 @@
       });
       document.querySelectorAll("[data-std-city-edit]").forEach(btn => {
         btn.onclick = (e) => { e.preventDefault(); openStdDayCityOverrideForm(btn.dataset.stdCityEdit); };
+      });
+      document.querySelectorAll("[data-std-city-del]").forEach(btn => {
+        btn.onclick = (e) => { e.preventDefault(); deleteStdDayCityOverride(btn.dataset.stdCityDel); };
       });
       renderPageFilters();
       document.querySelectorAll("[data-swap-policy]").forEach(inp => {
