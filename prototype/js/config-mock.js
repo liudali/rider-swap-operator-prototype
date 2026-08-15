@@ -331,7 +331,7 @@
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
       channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
-      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。<strong>分销商·链接类</strong>（结算模式=链接类）：授权套餐与专享价在「平台设置 → 渠道分销价」维护；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。<strong>分销商·激活码</strong>为二期。平台仅查询监管。" },
+      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。<strong>不采集合同有效期、不设签约状态</strong>（decision-103）；停服用渠道主体「状态」（在营/已停用）。<strong>分销商·链接类</strong>（结算模式=链接类）：授权套餐与专享价在「平台设置 → 渠道分销价」维护；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。<strong>分销商·激活码</strong>为二期。平台仅查询监管。" },
       login_portal: { title: "登录分流与改密", content: "登录页区分<strong>运营商登录</strong>与<strong>渠道商登录</strong>。账号均为手机号+密码。修改密码页：手机号 → 获取验证码 → 新密码（≥6 位）→ 返回登录；演示验证码固定 888888。" },
       day_pool_one_per_operator: { title: "一运营商一池", content: "渠道商 × 运营商 = <strong>唯一</strong> `DayPool`。向第二家运营商签约才新增池；增购、赠送、退款、分配、预占/确认等均写入<strong>额度变动记录</strong>，不新建第二池。" },
       day_pool_b2b_settlement: { title: "B2B 资金与平台计提", content: "渠道<strong>采购/到账时</strong>批发款已是运营商收入（在线 T+0/T+1 或线下确认）。骑手<strong>确认消耗</strong>仅扣池余额，<strong>不向运营商二次打款</strong>；平台按标准人天价 × 1% 向额度售卖方计提（见「平台服务费」）。" },
@@ -351,7 +351,7 @@
       platform_operator_fee_rate: { title: "运营商平台服务费", content: "在<strong>运营商管理 → 运营商平台服务费</strong>维护各运营商 C 端 / B 端抽成比例（可不同）。新订单、新消耗按生效配置计算；历史已清分不回溯。运营商在「平台服务费」页只读查看。" },
       platform_fee_trigger: { title: "计费触发", content: "C 端：支付成功分账（费率=该运营商 C 端比例）。B 端人天池：<strong>确认消耗</strong>分两场景——<strong>确认消耗-换电</strong>（关联换电单）与<strong>确认消耗-持有电池</strong>（当日无换电但持电池，无关联单）；费率=该运营商 B 端比例，计提基数=平台标准人天价。B 端激活码：<strong>码核销成功</strong>（同 B 端费率）。计提主体均为额度售卖方 U。" },
       platform_standard_day_price: { title: "人天标准日值", content: "平台统一设置（默认 ¥8.5/人天）；<strong>全网默认始终生效</strong>（无停用）。可按<strong>城市覆盖</strong>（状态：生效/停用，支持删除；停用则回退全网默认）；向运营商展示；B 端 1% 平台费按此计提。亦为运营商面向渠道商的<strong>默认批发价</strong>，运营商可在定价管理中修改实际批发价。" },
-      pricing_quota: { title: "人天批发定价", content: "运营商向签约渠道商设定人天批发单价与最低起购量；<strong>默认批发价</strong>（无渠道）供新建签约继承，可单独设置；各渠道可覆盖。新建默认价=平台标准人天价，运营商可改。平台 B 端 1% 仍按平台标准价计提。" },
+      pricing_quota: { title: "人天批发定价", content: "运营商向签约渠道商设定人天批发单价与最低起购量；<strong>默认批发价</strong>（无渠道）供新建签约继承，可单独设置；各渠道可覆盖。新建默认价=平台标准人天价，运营商可改。平台 B 端 1% 仍按平台标准价计提。批发价行可启用/停用，<strong>不含合同有效期</strong>（decision-103）。" },
       flows_accrual: { title: "清分明细", content: "C 端支付成功后的分账明细：平台 1%、运营商净额；含退款冲正记录。" },
       overview_users: { title: "活跃用户", content: "计数：users 中 deviceOwnerId=当前主体，且 serviceState∉{已冻结,中途完结}，pkg 文案不含「退款/完结」的去重骑手。<br>受经营概览内「统计范围」演示缩放（今日×1 / 近7日×5.2 / 近30日×18）。" },
       overview_site_stats: { title: "站点繁忙度", content: "每站点一张卡片：<strong>实时繁忙度</strong>（低/中/高）+ <strong>统计日换电高峰</strong>（按小时聚合，标出集中时段与 24h 分布条）。不用收入评估。" },
@@ -2128,12 +2128,12 @@
     ];
 
     const channelContracts = [
-      { id: "CC-SF-01", channelId: "CH-SF", channelName: "顺丰同城渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "人天池", wholesalePrice: 8.5, minDays: 1000, sites: ["浦东骑手驿站", "世博换电服务点"], status: "启用", validFrom: "2026-01-01", validTo: "2026-12-31" },
-      { id: "CC-TEMP-01", channelId: "CH-TEMP", channelName: "临时渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "人天池", wholesalePrice: 8.5, minDays: 500, sites: ["浦东骑手驿站"], status: "启用", validFrom: "2026-03-01", validTo: "2026-12-31" },
-      { id: "CC-CARD-01", channelId: "CH-CARD", channelName: "骑士卡渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "链接类", wholesalePrice: 249, minDays: null, cardSkus: ["SKU-30D", "SKU-7D"], sites: ["浦东骑手驿站", "世博换电服务点", "陆家嘴分站"], status: "启用", validFrom: "2026-03-01", validTo: "2027-02-28", instantCommissionPayout: true, commissionRate: 0.09, instantCommissionEnabledAt: "2026-05-01" },
-      { id: "CC-DELIV-01", channelId: "CH-DELIV", channelName: "闪送骑士卡", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "链接类", wholesalePrice: 235, minDays: null, cardSkus: ["SKU-DEL-30D", "SKU-DEL-7D"], sites: ["浦东骑手驿站", "世博换电服务点"], status: "启用", validFrom: "2026-04-01", validTo: "2027-03-31", instantCommissionPayout: false, commissionRate: null },
-      { id: "CC-RENT-01", channelId: "CH-RENT", channelName: "京东物流租赁渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "设备租赁", wholesalePrice: null, minDays: null, monthlyRent: 12000, dedicatedSiteId: "ST-SH-JD", dedicatedSiteName: "京东物流专属站", whitelistCount: 50, whitelistDefaultAccess: "paid", billingStatus: "6月已缴", crossNetworkEnabled: true, crossNetworkDepositPaid: true, crossNetworkDepositAmount: 20000, status: "启用", validFrom: "2026-04-01", validTo: "2027-03-31" },
-      { id: "CC-ACT-01", channelId: "CH-ACT", channelName: "蜂鸟激活码渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "激活码", wholesalePrice: 255, minDays: null, minCodes: 100, codeSkuName: "30天包月", codeValidityDays: 30, codeInventory: 420, codesRedeemed: 86, status: "启用", validFrom: "2026-05-01", validTo: "2027-04-30" }
+      { id: "CC-SF-01", channelId: "CH-SF", channelName: "顺丰同城渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "人天池", wholesalePrice: 8.5, minDays: 1000, sites: ["浦东骑手驿站", "世博换电服务点"] },
+      { id: "CC-TEMP-01", channelId: "CH-TEMP", channelName: "临时渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "人天池", wholesalePrice: 8.5, minDays: 500, sites: ["浦东骑手驿站"] },
+      { id: "CC-CARD-01", channelId: "CH-CARD", channelName: "骑士卡渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "链接类", wholesalePrice: 249, minDays: null, cardSkus: ["SKU-30D", "SKU-7D"], sites: ["浦东骑手驿站", "世博换电服务点", "陆家嘴分站"], instantCommissionPayout: true, commissionRate: 0.09, instantCommissionEnabledAt: "2026-05-01" },
+      { id: "CC-DELIV-01", channelId: "CH-DELIV", channelName: "闪送骑士卡", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "链接类", wholesalePrice: 235, minDays: null, cardSkus: ["SKU-DEL-30D", "SKU-DEL-7D"], sites: ["浦东骑手驿站", "世博换电服务点"], instantCommissionPayout: false, commissionRate: null },
+      { id: "CC-RENT-01", channelId: "CH-RENT", channelName: "京东物流租赁渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "设备租赁", wholesalePrice: null, minDays: null, monthlyRent: 12000, dedicatedSiteId: "ST-SH-JD", dedicatedSiteName: "京东物流专属站", whitelistCount: 50, whitelistDefaultAccess: "paid", billingStatus: "6月已缴", crossNetworkEnabled: true, crossNetworkDepositPaid: true, crossNetworkDepositAmount: 20000 },
+      { id: "CC-ACT-01", channelId: "CH-ACT", channelName: "蜂鸟激活码渠道", operatorId: "OP-SX", operatorName: PAYEE_OPERATOR, operatorLogo: "⚡", settlementMode: "激活码", wholesalePrice: 255, minDays: null, minCodes: 100, codeSkuName: "30天包月", codeValidityDays: 30, codeInventory: 420, codesRedeemed: 86 }
     ];
 
     const channelSettlementModes = [
@@ -2434,9 +2434,9 @@
     ];
 
     const operatorDayQuotaPrices = [
-      { id: "OP-Q-01", operatorId: "OP-SX", channelId: "CH-SF", channelName: ENT.channel.name, wholesalePrice: 8.5, minDays: 1000, status: "生效", validTo: "2026-12-31" },
-      { id: "OP-Q-02", operatorId: "OP-SX", channelId: "*", channelName: "默认批发价", wholesalePrice: 9.0, minDays: 500, status: "生效", validTo: "2026-12-31" },
-      { id: "OP-Q-03", operatorId: "OP-SX", channelId: "CH-TEMP", channelName: "临时渠道", wholesalePrice: 8.5, minDays: 500, status: "生效", validTo: "2026-12-31" }
+      { id: "OP-Q-01", operatorId: "OP-SX", channelId: "CH-SF", channelName: ENT.channel.name, wholesalePrice: 8.5, minDays: 1000, status: "生效" },
+      { id: "OP-Q-02", operatorId: "OP-SX", channelId: "*", channelName: "默认批发价", wholesalePrice: 9.0, minDays: 500, status: "生效" },
+      { id: "OP-Q-03", operatorId: "OP-SX", channelId: "CH-TEMP", channelName: "临时渠道", wholesalePrice: 8.5, minDays: 500, status: "生效" }
     ];
 
     const channelSalesOrders = [

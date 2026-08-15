@@ -637,7 +637,7 @@
     }
 
     function operatorIdForChannel(channelId) {
-      const c = channelContracts.find(cc => cc.channelId === channelId && cc.status === "启用");
+      const c = channelContracts.find(cc => cc.channelId === channelId);
       return c?.operatorId || "OP-SX";
     }
 
@@ -3330,8 +3330,7 @@
       pool = createPendingPoolForChannel({
         channelId: o.channelId, channelName: o.channelName,
         operatorId: o.operatorId, operatorName: o.operatorName,
-        wholesalePrice: o.unitPrice, validFrom: new Date().toISOString().slice(0, 10),
-        validTo: contract?.validTo || "2026-12-31", orderNo: o.id, status: "使用中"
+        wholesalePrice: o.unitPrice, orderNo: o.id, status: "使用中"
       });
       o.poolId = pool.id;
       return pool;
@@ -8416,10 +8415,7 @@
         </select></label>
         <label class="field-rent form-span-2">新建站点名称<input name="newSiteName" placeholder="选择「+ 新建专属站点」时填写" /></label>
         <p class="field-rent form-span-2" style="font-size:12px;color:var(--muted);margin:0">月租为签约<strong>统一价</strong>；专属站专用；白名单由渠道自行维护。</p>
-        <label>合同有效期起<input name="validFrom" type="date" value="${contract?.validFrom || "2026-01-01"}" required /></label>
-        <label>合同有效期止<input name="validTo" type="date" value="${contract?.validTo || "2026-12-31"}" required /></label>
-        <label>签约状态<select name="contractStatus"><option ${(!contract || contract.status === "启用") ? "selected" : ""}>启用</option><option ${contract?.status === "停用" ? "selected" : ""}>停用</option></select></label>
-        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">人天池：自动建池 · 链接类：授权 SKU 在「渠道分销价」维护 · <span class="badge-p2">二期</span>设备租赁：统一月租与专属站 · <span class="badge-p2">二期</span>激活码：批发码库存</p>`;
+        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">人天池：自动建池 · 链接类：授权 SKU 在「渠道分销价」维护 · <span class="badge-p2">二期</span>设备租赁：统一月租与专属站 · <span class="badge-p2">二期</span>激活码：批发码库存。停服用上方渠道「状态」。</p>`;
       const syncModeFields = () => {
         const m = contract ? mode : (document.querySelector("#channelPartnerMode")?.value || "人天池");
         document.querySelectorAll(".field-day, .field-card, .field-rent, .field-act").forEach(el => { el.style.display = "none"; });
@@ -8540,26 +8536,24 @@
           crossNetworkDepositAmount: settlementMode === "设备租赁" ? 20000 : undefined,
           instantCommissionPayout: settlementMode === "链接类" ? instantCommissionPayout : false,
           commissionRate: settlementMode === "链接类" && instantCommissionPayout ? commissionRate : null,
-          instantCommissionEnabledAt: settlementMode === "链接类" && instantCommissionPayout ? new Date().toISOString().slice(0, 10) : null,
-          status: data.contractStatus, validFrom: data.validFrom, validTo: data.validTo
+          instantCommissionEnabledAt: settlementMode === "链接类" && instantCommissionPayout ? new Date().toISOString().slice(0, 10) : null
         });
         if (settlementMode === "人天池") {
           operatorDayQuotaPrices.push({
             id: "OP-Q-" + Date.now().toString().slice(-4),
             operatorId: op.id, channelId, channelName: data.name.trim(),
-            wholesalePrice, minDays, status: data.contractStatus === "启用" ? "生效" : "停用",
-            validTo: data.validTo
+            wholesalePrice, minDays, status: "生效"
           });
           createPendingPoolForChannel({
             channelId, channelName: data.name.trim(),
             operatorId: op.id, operatorName: op.name,
-            wholesalePrice, validFrom: data.validFrom, validTo: data.validTo
+            wholesalePrice
           });
         }
         if (settlementMode === "设备租赁") {
           channelLeaseSummary.push({
             channelId, monthlyRent: monthlyRent || 12000, devicesCovered: 0, cabinets: 0, batteries: 0,
-            whitelistCount: 0, dedicatedSiteId, dedicatedSiteName, nextDue: data.validFrom, billingStatus: "待首缴",
+            whitelistCount: 0, dedicatedSiteId, dedicatedSiteName, nextDue: new Date().toISOString().slice(0, 10), billingStatus: "待首缴",
             monthSwaps: 0, operatorId: op.id, operatorName: op.name
           });
           channelSwapPolicy[channelId] = {
@@ -8612,9 +8606,6 @@
         contract.monthlyRent = monthlyRent;
         contract.dedicatedSiteId = dedicatedSiteId;
         contract.dedicatedSiteName = dedicatedSiteName || contract.dedicatedSiteName;
-        contract.status = data.contractStatus;
-        contract.validFrom = data.validFrom;
-        contract.validTo = data.validTo;
         if (contractSettlementMode(contract) === "链接类") {
           const prevInstant = !!contract.instantCommissionPayout;
           const settleChanged = prevInstant !== instantCommissionPayout;
@@ -8692,8 +8683,6 @@
             quota.channelName = data.name.trim();
             quota.wholesalePrice = wholesalePrice;
             quota.minDays = minDays;
-            quota.status = data.contractStatus === "启用" ? "生效" : "停用";
-            quota.validTo = data.validTo;
           }
         }
         if (contractSettlementMode(contract) === "设备租赁") {
@@ -10825,7 +10814,7 @@
       if (isChannelRole()) {
         const contract = myChannelContracts()[0];
         const contractPanel = contract ? `<section class="panel">
-            ${panelHead("签约运营商", "结算模式与合同（只读）", "day_pool_contract")}
+            ${panelHead("签约运营商", "结算模式与签约信息（只读）", "day_pool_contract")}
             <div class="panel-body">
               <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
                 <div style="width:56px;height:56px;border-radius:12px;background:var(--primary,#1677ff);display:flex;align-items:center;justify-content:center;font-size:28px">${contract.operatorLogo || channelProfile().logo || "运"}</div>
@@ -10846,7 +10835,6 @@
                       ? `<div class="detail-item"><span>批发单价</span><strong>¥${contract.wholesalePrice}/码</strong></div>
                          <div class="detail-item"><span>套餐码</span><strong>${contract.codeSkuName || "—"} · ${contract.codeValidityDays || 30} 天</strong></div>`
                     : `<div class="detail-item"><span>批发单价</span><strong>¥${contract.wholesalePrice}/人天</strong></div>`}
-                <div class="detail-item"><span>有效期</span><strong>${contract.validFrom} ~ ${contract.validTo}</strong></div>
                 <div class="detail-item"><span>可用站点</span><strong>${channelContractSitesLabel(contract.sites)}</strong></div>
               </div>
             </div>
@@ -10922,7 +10910,7 @@
             ${kpi(lowPool ? "额度池预警" : "额度池数", lowPool ? lowPool.id + " · " + lowPool.balancePct + "%" : pools.length + " 个", lowPool ? "低于 20% 或不足在职×10天" : "向运营商采购", lowPool ? "!" : "池", lowPool ? "day_pool_warn" : "day_pool_purchase")}
           </div>
           ${contract ? `<section class="panel">
-            ${panelHead("签约运营商", "批发价与合同（只读）；池级扣天/激活见额度池详情", "day_pool_contract")}
+            ${panelHead("签约运营商", "批发价与签约信息（只读）；池级扣天/激活见额度池详情", "day_pool_contract")}
             <div class="panel-body">
               <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
                 <div style="width:56px;height:56px;border-radius:12px;background:var(--primary,#1677ff);display:flex;align-items:center;justify-content:center;font-size:28px">${contract.operatorLogo || "🚚"}</div>
@@ -10934,7 +10922,6 @@
               <div class="detail-grid">
                 <div class="detail-item"><span>运营商</span><strong>${contract.operatorName}</strong></div>
                 <div class="detail-item"><span>批发单价</span><strong>¥${contract.wholesalePrice}/人天</strong></div>
-                <div class="detail-item"><span>有效期</span><strong>${contract.validFrom} ~ ${contract.validTo}</strong></div>
                 <div class="detail-item"><span>可用站点</span><strong>${channelContractSitesLabel(contract.sites)}</strong></div>
               </div>
             </div>
@@ -15061,7 +15048,7 @@
       if (!form) return;
       const sel = form.querySelector("[name=channelId]");
       const canSave = sel && sel.selectedOptions[0] && sel.selectedOptions[0].dataset.configured !== "1";
-      form.querySelectorAll("[name=wholesalePrice],[name=minDays],[name=validTo],[name=status]").forEach(el => {
+      form.querySelectorAll("[name=wholesalePrice],[name=minDays],[name=status]").forEach(el => {
         el.disabled = !canSave;
       });
       if (saveBtn) saveBtn.disabled = !canSave;
@@ -15073,15 +15060,12 @@
       if (!sel) return;
       sel.onchange = () => {
         const opt = sel.selectedOptions[0];
-        const to = form.querySelector("[name=validTo]");
         const wp = form.querySelector("[name=wholesalePrice]");
         const md = form.querySelector("[name=minDays]");
         if (opt?.dataset.configured === "1") {
           if (wp) wp.value = opt.dataset.price || platformAccrualDayPrice();
           if (md) md.value = opt.dataset.mindays || "500";
-          if (to && opt.dataset.to) to.value = opt.dataset.to;
         } else if (opt) {
-          if (to && opt.dataset.to) to.value = opt.dataset.to;
           if (wp) wp.value = platformAccrualDayPrice();
           if (md) md.value = opt.dataset.mindays || "500";
         }
@@ -15109,9 +15093,9 @@
           const options = contracts.map(c => {
             const q = quotaPriceForChannel(c.channelId);
             if (q) {
-              return `<option value="${c.channelId}" disabled data-configured="1" data-name="${c.channelName}" data-price="${q.wholesalePrice}" data-mindays="${q.minDays}" data-to="${q.validTo || c.validTo}">${c.channelName}（已配置 · ¥${q.wholesalePrice}/人天）</option>`;
+              return `<option value="${c.channelId}" disabled data-configured="1" data-name="${c.channelName}" data-price="${q.wholesalePrice}" data-mindays="${q.minDays}">${c.channelName}（已配置 · ¥${q.wholesalePrice}/人天）</option>`;
             }
-            return `<option value="${c.channelId}" data-configured="0" data-name="${c.channelName}" data-to="${c.validTo}" data-mindays="${c.minDays || 500}">${c.channelName}（待配置）</option>`;
+            return `<option value="${c.channelId}" data-configured="0" data-name="${c.channelName}" data-mindays="${c.minDays || 500}">${c.channelName}（待配置）</option>`;
           }).join("");
           const hint = pending.length
             ? `共 ${contracts.length} 家人天池签约渠道，<strong>${pending.length}</strong> 家待配置批发价。`
@@ -15123,7 +15107,6 @@
             <label>平台标准价（只读）<input value="¥${std}/人天" readonly /></label>
             <label>我的批发价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${firstPending ? std : (quotaPriceForChannel(contracts[0].channelId)?.wholesalePrice || std)}" required /></label>
             <label>最低起购（人天）<input name="minDays" type="number" min="1" step="1" value="${firstPending?.minDays || contracts[0]?.minDays || 500}" required /></label>
-            <label>有效期至<input name="validTo" type="date" value="${firstPending?.validTo || contracts[0]?.validTo || "2026-12-31"}" required /></label>
             <label>状态<select name="status"><option selected>生效</option><option>停用</option></select></label>`;
           const sel = document.querySelector("#quotaPricingForm [name=channelId]");
           if (firstPending) sel.value = firstPending.channelId;
@@ -15139,7 +15122,6 @@
           <label>平台标准价（只读）<input value="¥${std}/人天" readonly /></label>
           <label>我的批发价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${row.wholesalePrice}" required /></label>
           <label>最低起购（人天）<input name="minDays" type="number" min="1" step="1" value="${row.minDays}" required /></label>
-          <label>有效期至<input name="validTo" type="date" value="${row.validTo}" required /></label>
           <label>状态<select name="status"><option ${row.status === "生效" ? "selected" : ""}>生效</option><option ${row.status === "停用" ? "selected" : ""}>停用</option></select></label>`;
       } else {
         if (saveBtn) saveBtn.disabled = false;
@@ -15149,7 +15131,6 @@
           <label>平台标准价（只读）<input value="¥${std}/人天" readonly /></label>
           <label>我的批发价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${row.wholesalePrice}" required /></label>
           <label>最低起购（人天）<input name="minDays" type="number" min="1" step="1" value="${row.minDays}" required /></label>
-          <label>有效期至<input name="validTo" type="date" value="${row.validTo}" required /></label>
           <label>状态<select name="status"><option ${row.status === "生效" ? "selected" : ""}>生效</option><option ${row.status === "停用" ? "selected" : ""}>停用</option></select></label>`;
       }
       document.querySelector("#quotaPricingModal").classList.add("open");
@@ -15168,9 +15149,8 @@
       const form = document.querySelector("#quotaPricingForm");
       const wholesalePrice = parseFloat(form.querySelector("[name=wholesalePrice]")?.value);
       const minDays = parseInt(form.querySelector("[name=minDays]")?.value, 10);
-      const validTo = form.querySelector("[name=validTo]")?.value;
       const status = form.querySelector("[name=status]")?.value || "生效";
-      if (!Number.isFinite(wholesalePrice) || wholesalePrice <= 0 || !Number.isFinite(minDays) || minDays < 1 || !validTo) {
+      if (!Number.isFinite(wholesalePrice) || wholesalePrice <= 0 || !Number.isFinite(minDays) || minDays < 1) {
         window.alert("请填写完整有效参数");
         return;
       }
@@ -15192,13 +15172,12 @@
         operatorDayQuotaPrices.push({
           id: "OP-Q-" + String(Date.now()).slice(-6),
           operatorId: opId, channelId, channelName,
-          wholesalePrice, minDays, status, validTo
+          wholesalePrice, minDays, status
         });
         const contract = channelContracts.find(c => c.operatorId === opId && c.channelId === channelId);
         if (contract) {
           contract.wholesalePrice = wholesalePrice;
           contract.minDays = minDays;
-          contract.validTo = validTo;
         }
         closeQuotaPricingForm();
         state.view = "pricing";
@@ -15211,14 +15190,12 @@
       if (!row) return;
       row.wholesalePrice = wholesalePrice;
       row.minDays = minDays;
-      row.validTo = validTo;
       row.status = status;
       if (row.channelId !== "*") {
         const contract = channelContracts.find(c => c.operatorId === opId && c.channelId === row.channelId);
         if (contract) {
           contract.wholesalePrice = wholesalePrice;
           contract.minDays = minDays;
-          contract.validTo = validTo;
         }
       }
       closeQuotaPricingForm();
@@ -15417,29 +15394,29 @@
           <div class="panel-body orders-table-wrap">
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_quota")} 平台标准人天价（只读）：<strong class="fee-platform">¥${std}/人天</strong> — B 端 1% 平台费按此计提。</p>
             <table class="quota-price-table">
-              <thead><tr><th>渠道商</th><th>平台标准价</th><th>我的批发价</th><th>最低起购</th><th>有效期至</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>渠道商</th><th>平台标准价</th><th>我的批发价</th><th>最低起购</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${rows.map(r => {
                 const isDef = r.channelId === "*";
                 return `<tr class="${isDef ? "quota-row-default" : ""}">
                 <td>${isDef ? `<span class="quota-default-badge">默认</span> ` : ""}<strong>${r.channelName}</strong>${isDef ? `<br><small style="color:var(--muted)">无渠道 · 新建签约继承</small>` : ""}</td>
                 <td><span class="fee-platform">¥${std}/人天</span> <small style="color:var(--muted)">只读</small></td>
                 <td>¥${r.wholesalePrice}/人天${r.wholesalePrice !== std ? ` <small style="color:var(--warn)">已调整</small>` : ""}</td>
-                <td>${r.minDays} 人天</td><td>${r.validTo}</td><td>${tag(r.status)}</td>
+                <td>${r.minDays} 人天</td><td>${tag(r.status)}</td>
                 <td><button type="button" class="link-btn" data-edit-quota-pricing="${r.id}">${isDef ? "设置" : "编辑"}</button></td>
               </tr>`;
-              }).join("") || "<tr><td colspan='7'>暂无批发价，请先设置默认批发价</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='6'>暂无批发价，请先设置默认批发价</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
       } else if (tab === "card") {
         const contracts = myChannelContracts().filter(c => contractSettlementMode(c) === "链接类");
-        const rows = contracts.flatMap(c => channelLinkSkus.filter(s => s.channelId === c.channelId).map(s => ({ ...s, channelName: c.channelName, contractId: c.id, validTo: c.validTo, status: c.status })));
+        const rows = contracts.flatMap(c => channelLinkSkus.filter(s => s.channelId === c.channelId).map(s => ({ ...s, channelName: c.channelName, contractId: c.id })));
         body = `<section class="panel">
           ${panelHead("渠道分销价", "按签约渠道分别设定正式价、专享价与佣金", "pricing_card", `<button type="button" class="btn primary" data-new-card-pricing>+ 新增分销价</button>`)}
           <div class="panel-body orders-table-wrap">
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_card")} 多分销渠道（如骑士卡、闪送骑士卡）<strong>各签各价</strong>；本页仅维护价格与佣金。签约渠道档案请至「渠道管理 → 签约渠道」。</p>
             <table>
-              <thead><tr><th>渠道商</th><th>电池型号</th><th>SKU</th><th>正式零售价</th><th>渠道专享价</th><th>佣金/单</th><th>有效期至</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>渠道商</th><th>电池型号</th><th>SKU</th><th>正式零售价</th><th>渠道专享价</th><th>佣金/单</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${rows.map(r => `<tr>
                 <td>${r.channelName}</td>
                 <td>${normalizeBatteryModel(r.batteryModel)}</td>
@@ -15447,12 +15424,11 @@
                 <td>¥${r.officialPrice}</td>
                 <td>¥${r.channelPrice}</td>
                 <td>¥${r.commissionPerOrder}</td>
-                <td>${r.validTo}</td>
                 <td>${tag(r.status)}</td>
                 <td>
                   <button type="button" class="link-btn" data-edit-card-pricing="${r.id}">编辑</button>
                 </td>
-              </tr>`).join("") || "<tr><td colspan='9'>暂无渠道分销签约</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='8'>暂无渠道分销签约</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -15545,7 +15521,7 @@
               <thead><tr>
                 <th>渠道商</th><th>结算模式</th><th>批发/定价</th><th>权益概要</th>
                 <th>信用额度</th><th>应押/缺口</th><th>待审订单</th>
-                <th>有效期</th><th>状态</th><th>操作</th>
+                <th>渠道状态</th><th>操作</th>
               </tr></thead>
               <tbody>${rows.map(c => {
                 const usesCredit = channelUsesCreditEval(c.channelId);
@@ -15572,11 +15548,10 @@
                   <td>${contractPricingCell(c)}</td>
                   <td>${contractTermsCell(c)}</td>
                   ${creditCells}
-                  <td>${c.validFrom} ~ ${c.validTo}</td>
-                  <td>${tag(c.status)}${ch?.status === "已停用" ? `<br>${tag("渠道已停用")}` : ""}</td>
+                  <td>${tag(ch?.status || "在营")}</td>
                   <td>${ops}</td>
                 </tr>`;
-              }).join("") || "<tr><td colspan='10'>暂无签约渠道，点击「+ 新增渠道商」创建</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='9'>暂无签约渠道，点击「+ 新增渠道商」创建</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -18011,7 +17986,7 @@
             operatorDayQuotaPrices.push({
               id: "OP-Q-DEF-" + String(Date.now()).slice(-4),
               operatorId: opId, channelId: "*", channelName: "默认批发价",
-              wholesalePrice: std, minDays: 500, status: "生效", validTo: "2026-12-31"
+              wholesalePrice: std, minDays: 500, status: "生效"
             });
           }
           openQuotaPricingForm(defaultQuotaRow().id);
