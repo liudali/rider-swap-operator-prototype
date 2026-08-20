@@ -260,7 +260,7 @@
       financeDrawdown: ["放款申请", "资方视角：录入主体授信、尽调审查、登记放款、还款工单确认。"],
       activationCodes: ["激活码", "渠道申请批发 → 确认到账按单造码；标记发放；一码一用；作废需运营商确认（无退款）。"],
       activationRecords: ["核销记录", "激活码核销成功记录；触发平台向运营商 B 端 1% 计提（与人天池确认消耗同类费率）。"],
-      accounts: ["收款账户管理", "进件子商户须绑定对公结算账户：提现/分账打款至此对公户；含开户名、开户行、账号。"],
+      accounts: ["收款账户管理", "运营商：本人绑定唯一对公银行卡（开户名称/卡号/开户银行/开户支行）；未绑定不可提现。渠道/资方仍为进件子商户+对公。"],
       dayPool: ["人天额度池", "渠道商向签约运营商购买人天额度，登记骑手并分配/收回；换电时按日预占与确认消耗。"],
       pricing: ["平台设置", ""],
       channelSales: ["渠道管理", "签约渠道商、渠道订单与渠道权益；维护各渠道权益与定价。"],
@@ -331,7 +331,7 @@
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
       channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
-      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。<strong>不采集合同有效期、不设签约状态</strong>（decision-103）；停服用渠道主体「状态」（在营/已停用）。<strong>分销商·链接类</strong>（结算模式=链接类）：授权套餐与专享价在「平台设置 → 渠道分销价」维护；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。人天池：批发单价与起购；设备租赁：统一月租与专属站。<strong>分销商·激活码</strong>为二期。平台仅查询监管。" },
+      channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。<strong>不采集合同有效期、不设签约状态</strong>（decision-103）；停服用渠道主体「状态」（在营/已停用）。<strong>人天池批发单价/最低起购</strong>不在签约档案填写，统一在「平台设置 → 人天批发价」维护；新建签约继承默认批发价（decision-104）。<strong>分销商·链接类</strong>（结算模式=链接类）：授权套餐与专享价在「平台设置 → 渠道分销价」维护；可开启<strong>佣金及时到付</strong>（须渠道进件收款账户）。设备租赁：统一月租与专属站。<strong>分销商·激活码</strong>为二期。平台仅查询监管。" },
       login_portal: { title: "登录分流与改密", content: "登录页区分<strong>运营商登录</strong>与<strong>渠道商登录</strong>。账号均为手机号+密码。修改密码页：手机号 → 获取验证码 → 新密码（≥6 位）→ 返回登录；演示验证码固定 888888。" },
       day_pool_one_per_operator: { title: "一运营商一池", content: "渠道商 × 运营商 = <strong>唯一</strong> `DayPool`。向第二家运营商签约才新增池；增购、赠送、退款、分配、预占/确认等均写入<strong>额度变动记录</strong>，不新建第二池。" },
       day_pool_b2b_settlement: { title: "B2B 资金与平台计提", content: "渠道<strong>采购/到账时</strong>批发款已是运营商收入（在线 T+0/T+1 或线下确认）。骑手<strong>确认消耗</strong>仅扣池余额，<strong>不向运营商二次打款</strong>；平台按标准人天价 × 1% 向额度售卖方计提（见「平台服务费」）。" },
@@ -426,9 +426,9 @@
       arch_b: { title: "架构 B · 运营商收款", content: "骑手 C 端支付进入<strong>运营商</strong>微信/支付宝子商户；支付成功时 1% 分账至平台商户。人天池/激活码渠道无 C 端收款账户；<strong>渠道分销</strong>在运营商开启「佣金及时到付」且渠道进件后，佣金随支付<strong>即时分账</strong>至渠道子商户。" },
       flows_receipt: { title: "资金实收", content: "骑手套餐/自费支付进入<strong>运营商</strong>进件商户的实收流水；<strong>退款亦由运营商子商户原路出款</strong>。" },
       flows_accrual: { title: "清分明细", content: "C 端支付成功后的分账明细：平台 1%、运营商净额；开启<strong>佣金及时到付</strong>的骑士卡链接订单另含渠道佣金分账；含退款冲正记录。" },
-      flows_payout: { title: "提现申请", content: "运营商从可提现余额发起申请 → 平台审核 → 通过后打款至<strong>收款账户</strong>默认子商户绑定的<strong>对公结算账户</strong>。<br><strong>一期</strong>可提现 = 已清分 − 已提现 − 待审（不扣融资待还）。「本月融资待还」预留属<strong>二期</strong>（与融资管理同期）。<strong>未绑定对公不可提现</strong>。<strong>渠道商-设备租赁</strong>不适用本流程（白名单套餐款进渠道子商户）。" },
+      flows_payout: { title: "提现申请", content: "运营商从可提现余额发起申请 → 平台审核 → 通过后打款至「收款账户」绑定的<strong>唯一对公银行卡</strong>。<br><strong>一期</strong>可提现 = 已清分 − 已提现 − 待审（不扣融资待还）。「本月融资待还」预留属<strong>二期</strong>（与融资管理同期）。<strong>未绑定对公银行卡不可提现</strong>。<strong>渠道商-设备租赁</strong>不适用本流程（白名单套餐款进渠道子商户）。" },
       flows_withdraw_apply: { title: "发起提现", content: "申请金额不得超过当前可提现余额；提交后状态为「待审核」，平台在流水管理审核。" },
-      platform_withdraw_review: { title: "运营商提现审核", content: "平台审核运营商提现申请：通过后代付/提现至运营商绑定账户；驳回须填写原因。<br>仅适用于<strong>运营商</strong>经营收入子商户，不含渠道商-设备租赁。" },
+      platform_withdraw_review: { title: "运营商提现审核", content: "平台审核运营商提现申请：通过后代付/提现至运营商绑定的<strong>唯一对公银行卡</strong>；驳回须填写原因。<br>仅适用于<strong>运营商</strong>经营收入，不含渠道商-设备租赁。" },
       orders_pkg_pay: { title: "收款主体", content: "架构 B 下 C 端套餐支付进入<strong>运营商</strong>进件商户（演示：绿色出行）。渠道商无收款账户；B 端采购款付至运营商。" },
       users_panel: { title: "用户", content: "本运营商旗下骑手；<strong>不设绑定站点</strong>。<br>· <strong>实名认证</strong>：已实名 / 未实名 / 未通过（操作同平台用户管理）<br>· <strong>套餐/服务</strong>与<strong>服务状态</strong>分列<br>· <strong>电池押金</strong>（方式）与<strong>押金状态</strong>分列；仅实付有在押/退押中<br>· 人天池权益、换电与最近活跃" },
       lease_agreements: { title: "协议与设备", content: "资方维护<strong>租赁协议</strong>（承租运营商 + 关联设备清单 + 租金条款）；<strong>设备清单单独维护</strong>，一清单可对应一协议；同一运营商可有<strong>多份协议/多份清单</strong>。不含站点。变更须运营商确认，次月 1 日生效。" },
@@ -466,9 +466,9 @@
       lease_contracts: { title: "租赁协议", content: "资方维护：承租方、设备清单、月租金、押金、租期类型（固定/滚动）、还款日。变更后须运营商重新确认，次月 1 日生效。" },
       lease_repay: { title: "还款计划", content: "按期应还/已还金额与状态；逾期标红。" },
       lease_panel: { title: "资金方后台", content: "设备租赁公司（融资租赁方）登录后审核<strong>平台已绑定</strong>运营商提交的放款申请、确认预还款计划与放款金额；合作运营商名单来源于<strong>平台管理员</strong>维护的绑定关系。" },
-      accounts_panel: { title: "收款账户管理", content: "架构 B：C 端套餐款进<strong>运营商子商户</strong>（微信/支付宝进件）；每个进件账户须绑定<strong>对公结算账户</strong>（户名/开户行/账号）。平台审核提现后打款至默认子商户绑定的对公户。B2B/对公通道账户本身即对公户。" },
-      accounts_corp_bind: { title: "绑定对公账户", content: "字段：对公户名、开户行、对公账号、联行号（选填）。未绑定对公不可发起提现。变更后新提现按新账户打款，历史申请不变。" },
-      accounts: { title: "进件账户摘要", content: "运营商/资金方在微信、支付宝的进件子商户号摘要；完整进件与对公绑定在「收款账户」菜单维护。" },
+      accounts_panel: { title: "收款账户管理", content: "<strong>运营商</strong>：本人在本页添加<strong>唯一一张对公银行卡</strong>。必填：开户名称、银行卡号、开户银行、开户支行；联行号选填。默认未绑定，可自行添加；同一时间仅 1 个，变更即覆盖。平台审核提现后打款至此卡。<strong>平台管理员</strong>可在运营商详情查看并代为添加/变更。<br><strong>渠道/资方</strong>：进件子商户仍须绑定对公结算账户。" },
+      accounts_corp_bind: { title: "绑定对公账户", content: "<strong>运营商</strong>字段：开户名称、银行卡号、开户银行、开户支行（必填），联行号（选填）。未绑定不可发起提现。变更后新提现按新卡打款，历史申请不变。<br>渠道/资方：对公户名、开户行、对公账号、联行号（选填）。" },
+      accounts: { title: "收款账户", content: "<strong>运营商</strong>：本人绑定唯一对公银行卡（开户名称/卡号/开户银行/开户支行）。<strong>平台管理员</strong>在运营商详情可查看，必要时代为添加或变更（不写入主体编辑表单）。默认未绑定。<br><strong>渠道/资方</strong>：进件子商户 + 对公绑定仍在「收款账户」菜单维护。" },
       device_ownership: { title: "设备权属", content: "<strong>自有</strong>：产权归本运营主体。<br><strong>融资</strong>（原「设备租赁」权属，<span class='badge-p2'>二期</span>）：设备融资/还款并入「融资管理」；运营商<strong>我的设备</strong>不再打开「租赁协议」抽屉，仅展示融资标签与资方摘要。<br>渠道商「设备租赁」结算模式（白名单）仍为独立二期渠道模式，与运营商设备融资不是同一需求。" },
 
       channel_settlement_card: { title: "渠道分销（骑士卡）", content: "渠道为<strong>推广销售渠道</strong>：用户经推广链接/二维码进入<strong>运营商小程序</strong>，24h 内购套餐享<strong>渠道专享价</strong>。<br><strong>本月成交</strong>=筛选月 channelLinkOrders 笔数；<strong>本月应结佣</strong>=Σ commission；<strong>推广链接</strong>点击/成交=各 link 累计 clicks/conversions。" },
@@ -506,7 +506,7 @@
       day_pool_hold_no_quota: { title: "零额度 / 待还电", content: "渠道商顶栏「骑手零额度」（在职剩余人天=0）。原因：①个人无额度 ②预占失败。持电池→「待还电」：<strong>仅可还电、禁止换电</strong>；不透支；<strong>无自费兜底</strong>。见 decision-049 / 054。" },
       day_pool_refund: { title: "续费与退款", content: "<strong>续费</strong>：渠道商在原池上增购人天（在线/线下采购）。<strong>退款</strong>：不支持在线操作，须与运营商线下协商，由运营商后台扣减额度（类型：退款）。详见「额度池退款说明」。" },
       platform_scope: { title: "平台管理范围", content: "平台管理员可查看全业务汇总，治理运营商主体、设备绑定与跨网统价；不替代运营商日常运营与定价。" },
-      platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、进件账户摘要、平台保证金与信用额度。运营商在登录页选「运营商登录」凭手机号进入；登录后仅见本人经营数据。" },
+      platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、<strong>收款账户（可查看并代改）</strong>、平台保证金与信用额度。运营商在登录页选「运营商登录」凭手机号进入；登录后仅见本人经营数据。" },
       platform_leasing_companies: { title: "设备租赁公司", content: "平台管理员维护出租方主体档案（可<strong>多家并存</strong>）。前期演示环境以「华东设备租赁公司」为主；架构支持后续接入更多租赁公司。" },
       platform_lease_binding: { title: "租赁关系绑定", content: "平台管理员建立「租赁公司 ↔ 运营商」绑定后，该租赁公司方可向该运营商发起租赁协议签约。<strong>运营商</strong>承租信息来源于平台运营商档案；一运营商可同时与多家租赁公司建立绑定并分别签约。" },
       platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。<br>设备管理分 <strong>电柜 / 电池 / 电池型号管理</strong>；电池列表规格取自平台型号字典。" },
@@ -524,7 +524,7 @@
       platform_devices_battery_belong: { title: "当前位置", content: "平台电池三档：<strong>电柜</strong>（在任意柜机格口，含跨运营商柜）、<strong>用户</strong>（骑手持有）、<strong>柜外</strong>（柜外充电/待入柜/资方库存等）。与运营商「我的设备·电池」四档位置（自有电柜/其他运营商电柜/柜外/柜外-用户）不同粒度。<strong>站点列仅在「电柜」时展示</strong>；用户持有或柜外时为「—」。" },
       platform_device_bound_at: { title: "归属日", content: "设备<strong>归属当前运营商</strong>的日期（平台批量导入并指定运营商时写入）。<br>· 首次导入且同时指定运营商：与「导入日期」相同<br>· 若日后发生换绑运营商：更新归属日，<strong>不改</strong>导入日期<br>· 无归属运营商（如资方库存）：显示 —" },
       platform_device_imported_at: { title: "导入日期", content: "该 SN <strong>首次进入平台设备台账</strong>的日期（批量导入成功日）。只记一次，不因站点调拨、换电流转或运营商换绑而变更。" },
-      platform_channels: { title: "渠道商监管查询", content: "渠道商主体由签约运营商在「渠道管理 → 签约渠道」维护；平台本页只读监管。" },
+      platform_channels: { title: "渠道商监管查询", content: "渠道商主体由签约运营商在「渠道管理 → 签约渠道」维护；平台本页只读监管。列表不展示「创建/维护方」（与签约运营商同一主体）和「采购支付」（无下游动作）。" },
       channel_no_receipt: { title: "渠道收款账户", content: "人天池/激活码等模式：渠道仅 B 端向运营商付款，<strong>无</strong> C 端收款账户。<br><strong>设备租赁</strong>例外：白名单用户购套餐款进<strong>渠道子商户</strong>，须在「收款账户」进件。" },
       platform_marketing: { title: "平台营销（二期）", content: "【二期】立减优惠券：原价 − 券 = 实付；链接须带 <code>op=</code>；支付成功即锁定 userOwner；款进运营商。<strong>不代收、不拨付用户款</strong>。券面价差<strong>默认运营商承担</strong>；营销服务费按协议月结。一期不交付，原型仅演示。" },
       platform_marketing_collect: { title: "运营商收款", content: "用户经 ch=PLATFORM 链接购套餐，须已锁定运营商；实付款进<strong>该运营商</strong>子商户；支付分账 1%。立减额由运营商让利（无平台补贴）。" },
@@ -1642,9 +1642,9 @@
 
 
     const operatorWithdrawalRequests = [
-      { id: "WD-260501", operatorId: "OP-SX", amount: 186, applyTime: "2026-05-02 09:00", reviewTime: "2026-05-02 09:10", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-05-02 10:00", accountId: "PA-OP-WX", accountLabel: "微信 · 2088123456***", monthDueReserved: 0, rejectReason: null },
-      { id: "WD-260601", operatorId: "OP-SX", amount: 245, applyTime: "2026-06-02 09:00", reviewTime: "2026-06-02 09:15", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-06-02 09:30", accountId: "PA-OP-WX", accountLabel: "微信 · 2088123456***", monthDueReserved: 0, rejectReason: null },
-      { id: "WD-260605", operatorId: "OP-SX", amount: 81, applyTime: "2026-06-05 14:20", reviewTime: "2026-06-05 16:00", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-06-05 16:30", accountId: "PA-OP-WX", accountLabel: "微信 · 2088123456***", monthDueReserved: 0, rejectReason: null }
+      { id: "WD-260501", operatorId: "OP-SX", amount: 186, applyTime: "2026-05-02 09:00", reviewTime: "2026-05-02 09:10", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-05-02 10:00", accountId: "PA-OP-SX-CORP", accountLabel: "上海绿色出行科技有限公司 · 1219 **** **** 8820 · 招商银行", monthDueReserved: 0, rejectReason: null },
+      { id: "WD-260601", operatorId: "OP-SX", amount: 245, applyTime: "2026-06-02 09:00", reviewTime: "2026-06-02 09:15", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-06-02 09:30", accountId: "PA-OP-SX-CORP", accountLabel: "上海绿色出行科技有限公司 · 1219 **** **** 8820 · 招商银行", monthDueReserved: 0, rejectReason: null },
+      { id: "WD-260605", operatorId: "OP-SX", amount: 81, applyTime: "2026-06-05 14:20", reviewTime: "2026-06-05 16:00", reviewedBy: "平台财务", status: "已提现", withdrawTime: "2026-06-05 16:30", accountId: "PA-OP-SX-CORP", accountLabel: "上海绿色出行科技有限公司 · 1219 **** **** 8820 · 招商银行", monthDueReserved: 0, rejectReason: null }
     ];
 
     const payoutBatches = operatorWithdrawalRequests;
@@ -1983,18 +1983,6 @@
     ];
 
     const paymentAccounts = [
-      { id: "PA-OP-WX", entityId: "OP-SX", operatorId: "OP-SX", channel: "微信支付", mchName: PAYEE_OPERATOR, mchNo: PAYEE_MCH.wx, purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: true,
-        bankAccountName: "上海绿色出行科技有限公司", bankName: "招商银行上海分行营业部", bankAccount: "1219 **** **** 8820", bankCode: "308290003113", corpBoundAt: "2026-01-08" },
-      { id: "PA-OP-ALI", entityId: "OP-SX", operatorId: "OP-SX", channel: "支付宝", mchName: PAYEE_OPERATOR, mchNo: PAYEE_MCH.ali, purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: false,
-        bankAccountName: "", bankName: "", bankAccount: "", bankCode: "", corpBoundAt: null },
-      { id: "PA-OP-RENT", entityId: "OP-SX", operatorId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8821", purpose: "对公转账（租金等）", accountScope: "b2b", status: "已绑定", default: false,
-        bankAccountName: "上海绿色出行科技有限公司", bankName: "建设银行浦东分行", bankAccount: "3100 **** **** 8821", bankCode: "105290037017", corpBoundAt: "2026-01-10" },
-      { id: "PA-OP-FEE", entityId: "OP-SX", operatorId: "OP-SX", channel: "预存户", mchName: PAYEE_OPERATOR, mchNo: "FEE-PREPAY-001", purpose: "平台服务费预存", accountScope: "internal", status: "已开通", default: false,
-        bankAccountName: "", bankName: "", bankAccount: "", bankCode: "", corpBoundAt: null },
-      { id: "PA-OP-B2B", entityId: "OP-SX", operatorId: "OP-SX", channel: "对公转账", mchName: PAYEE_OPERATOR, mchNo: "3100****8822", purpose: "渠道批发收款", accountScope: "b2b", status: "已开通", default: false,
-        bankAccountName: "上海绿色出行科技有限公司", bankName: "建设银行浦东分行", bankAccount: "3100 **** **** 8822", bankCode: "105290037017", corpBoundAt: "2026-02-01" },
-      { id: "PA-LJZ-WX", entityId: "OP-LJZ", operatorId: "OP-LJZ", channel: "微信支付", mchName: "陆家嘴联营", mchNo: "2088999***", purpose: "骑手套餐收款", accountScope: "c_end", status: "已开通", default: true,
-        bankAccountName: "上海陆家嘴联营能源有限公司", bankName: "工商银行陆家嘴支行", bankAccount: "1001 **** **** 3344", bankCode: "102290026399", corpBoundAt: "2026-03-01" },
       { id: "PA-LEASE-WX", entityId: "LEASE-HD", channel: "微信支付", mchName: ENT.leasing.name, mchNo: "1900000999***", purpose: "租金收款", status: "已开通", default: true,
         bankAccountName: ENT.leasing.name, bankName: "交通银行上海分行", bankAccount: "3100 **** **** 7788", bankCode: "301290000007", corpBoundAt: "2025-11-01" },
       { id: "PA-LEASE-CORP", entityId: "LEASE-HD", channel: "对公账户", mchName: ENT.leasing.name, mchNo: "1219****3366", purpose: "租金收款（对公入账）", status: "已开通", default: true,
