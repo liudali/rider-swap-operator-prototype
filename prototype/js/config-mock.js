@@ -345,8 +345,8 @@
       operator_credit_eval: { title: "准入档位", content: "平台对运营商主体的招商准入政策包（方案 B）。A/B/C/D 四档绑定最低保证金、信用封顶、跨网默认、可签渠道数。入网定档 + 年度复审；运营商只读，不能自改授信上限。与「渠道信用评估」独立。" },
       deposit_recharge: { title: "对公充值流程", content: "① 运营商在「保证金账户」提交充值申请（金额、转账日期、银行流水号）；② 对公转账至平台清分专户（附言含运营商 ID）；③ 平台在「保证金管理 → 充值确认」核对到账后确认入账；④ 保证金余额增加，恢复保证金优先扣款。" },
       deposit_manage: { title: "平台保证金管理", content: "平台维护清分收款专户；审核运营商对公充值；可手工调整保证金余额、设置信用额度上限。所有变动写入保证金账本。" },
-      swap_policy: { title: "换电范围设置", content: "运营商可开启/关闭<strong>跨网换电</strong>（双向封闭）。<strong>同运营商内任意站点</strong>均可购套餐、换电；<strong>不设用户绑定站点</strong>。" },
-      swap_policy_cross_net: { title: "跨网换电", content: "关闭后：① 本运营商用户不可在其他运营商柜机换电；② 其他运营商用户不可在本运营商站点换电。与信用额度停跨网叠加。" },
+      swap_policy: { title: "换电范围设置", content: "跨网须<strong>平台开关</strong>与<strong>运营商开关同时开启</strong>才生效（双向封闭）。变更须确认，避免误触。同运营商内任意站点可购可换；不设用户绑定站点。" },
+      swap_policy_cross_net: { title: "跨网换电双开关", content: "平台按运营商配置「是否允许跨网」；运营商在换电范围自行开关。仅两者都开，且信用额度未停跨网，才可跨网。关闭任一侧即双向封闭。" },
       platform_fee: { title: "平台服务费", content: "平台按<strong>运营商维度</strong>配置抽成比例（默认 1%）。<strong>C 端</strong>：支付成功分账至平台商户（已确认）。<strong>B 端渠道人天</strong>：确认消耗时按平台标准人天价 × 该运营商 B 端费率向额度售卖方 U 计提（与批发价无关）。运营商后台只读查看本主体适用比例；优先划扣保证金，保证金为 0 才占用信用额度。" },
       platform_operator_fee_rate: { title: "运营商平台服务费", content: "在<strong>运营商管理 → 运营商平台服务费</strong>维护各运营商 C 端 / B 端抽成比例（可不同）。新订单、新消耗按生效配置计算；历史已清分不回溯。运营商在「平台服务费」页只读查看。" },
       platform_fee_trigger: { title: "计费触发", content: "C 端：支付成功分账（费率=该运营商 C 端比例）。B 端人天池：<strong>确认消耗</strong>分两场景——<strong>确认消耗-换电</strong>（关联换电单）与<strong>确认消耗-持有电池</strong>（当日无换电但持电池，无关联单）；费率=该运营商 B 端比例，计提基数=平台标准人天价。B 端激活码：<strong>码核销成功</strong>（同 B 端费率）。计提主体均为额度售卖方 U。" },
@@ -2686,15 +2686,37 @@
       { month: "2026-04", cEndSplit: 36.20, bEndAccrual: 9.85, l1Clearing: 0, payCount: 105, consumeFeeCount: 35, interOpCount: 5 }
     ];
 
-    /** 运营商自主换电范围（可与平台信用额度停跨网叠加） */
+    /** 运营商换电范围：平台开关 ∧ 运营商开关 才允许跨网；再叠加信用停跨网 */
     const operatorSwapPolicy = {
-      "OP-SX": { crossNetworkEnabled: false },
-      "OP-LJZ": { crossNetworkEnabled: false },
-      "OP-BJ": { crossNetworkEnabled: false }
+      "OP-SX": { platformEnabled: true, crossNetworkEnabled: false },
+      "OP-LJZ": { platformEnabled: true, crossNetworkEnabled: true },
+      "OP-BJ": { platformEnabled: true, crossNetworkEnabled: false },
+      "OP-HZ": { platformEnabled: false, crossNetworkEnabled: false }
     };
 
     function swapPolicyForOperator(operatorId) {
-      return operatorSwapPolicy[operatorId] || { crossNetworkEnabled: false };
+      return operatorSwapPolicy[operatorId] || { platformEnabled: false, crossNetworkEnabled: false };
+    }
+
+    function ensureOperatorSwapPolicy(operatorId) {
+      if (!operatorSwapPolicy[operatorId]) {
+        operatorSwapPolicy[operatorId] = { platformEnabled: false, crossNetworkEnabled: false };
+      }
+      return operatorSwapPolicy[operatorId];
+    }
+
+    function operatorCreditAllowsCross(operatorId) {
+      const credit = operatorCreditAccounts.find(a => a.operatorId === operatorId);
+      return !credit || credit.crossSwapEnabled !== false;
+    }
+
+    function operatorPolicyAllowsCrossNetwork(operatorId) {
+      const p = swapPolicyForOperator(operatorId);
+      return !!(p.platformEnabled && p.crossNetworkEnabled);
+    }
+
+    function operatorEffectiveOutboundCross(operatorId) {
+      return operatorPolicyAllowsCrossNetwork(operatorId) && operatorCreditAllowsCross(operatorId);
     }
 
     function siteRecordById(id) {

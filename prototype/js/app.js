@@ -8123,7 +8123,11 @@
             <div class="detail-item"><span>绑定时间</span><strong>${corpAcct.corpBoundAt || "—"}</strong></div>
             <div class="detail-item"><span>最近维护</span><strong>${corpAcct.updatedByRole ? `${corpAcct.updatedByRole} · ${corpAcct.updatedBy || "—"}` : "运营商"}</strong></div>
           </div>`;
-      document.querySelector("#drawerTitle").textContent = op.name;
+      const swapPol = swapPolicyForOperator(op.id);
+      const platOn = !!swapPol.platformEnabled;
+      const opOn = !!swapPol.crossNetworkEnabled;
+      const actualCross = operatorEffectiveOutboundCross(op.id);
+      const platCrossBtn = `<button type="button" class="${platOn ? "btn" : "btn primary"}" data-toggle-platform-cross="${op.id}" data-next="${platOn ? "0" : "1"}">${platOn ? "关闭平台跨网" : "开启平台跨网"}</button>`;
       document.querySelector("#drawerSub").textContent = op.id + " · " + op.city + " · " + op.status;
       document.querySelector("#drawerBody").innerHTML = `
         <section class="panel" style="margin:0">
@@ -8157,9 +8161,21 @@
             <div class="detail-grid">
               <div class="detail-item"><span>平台保证金</span><strong>¥${(credit?.depositBalance || 0).toLocaleString("zh-CN")}</strong></div>
               <div class="detail-item"><span>信用额度</span><strong>¥${(credit?.creditLimit || 0).toLocaleString("zh-CN")}</strong><br><small>已用 ¥${(credit?.used || 0).toLocaleString("zh-CN")} · 可用 ¥${(credit?.available || 0).toLocaleString("zh-CN")}</small></div>
-              <div class="detail-item"><span>跨网换电</span><strong>${credit?.crossSwapEnabled ? tag("已开启") : tag("已关闭")}</strong></div>
+              <div class="detail-item"><span>信用停跨网</span><strong>${credit?.crossSwapEnabled === false ? tag("已停") : "未停"}</strong></div>
               <div class="detail-item"><span>欠费</span><strong>${credit?.owed ? "¥" + credit.owed.toLocaleString("zh-CN") : "—"}</strong></div>
             </div>
+          </div>
+        </section>
+        <section class="panel" style="margin:16px 0 0">
+          ${panelHead("跨网管控", "须平台与运营商双开才可跨网 · 变更须确认", "swap_policy", platCrossBtn)}
+          <div class="panel-body" style="padding-top:0">
+            <div class="detail-grid">
+              <div class="detail-item"><span>实际跨网</span><strong>${actualCross ? tag("可跨网") : tag("不可跨网")}</strong></div>
+              <div class="detail-item"><span>平台开关</span><strong>${platOn ? tag("已开启") : tag("已关闭")}</strong></div>
+              <div class="detail-item"><span>运营商开关</span><strong>${opOn ? tag("已开启") : tag("已关闭")}</strong><br><small style="color:var(--muted)">由运营商在「换电范围」自行设定</small></div>
+              <div class="detail-item"><span>信用停跨网</span><strong>${credit?.crossSwapEnabled === false ? tag("已停") : "未停"}</strong></div>
+            </div>
+            <p style="margin:12px 0 0;font-size:12px;color:var(--muted)">关闭平台开关后立即双向封闭，即使运营商侧仍为开启。</p>
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
@@ -8498,7 +8514,7 @@
         });
         operatorCreditAccounts.push({ operatorId: id, depositBalance: 0, creditLimit: 0, used: 0, available: 0, crossSwapEnabled: false, owed: 0 });
         operatorCreditProfiles.push({ operatorId: id, tierCode: null, status: "待定档", assignedAt: null, assignedBy: null, nextReviewAt: null, assignReason: null });
-        operatorSwapPolicy[id] = { crossNetworkEnabled: false };
+        operatorSwapPolicy[id] = { platformEnabled: false, crossNetworkEnabled: false };
         operatorPlatformFeeRates[id] = {
           cEndRate: DEFAULT_PLATFORM_FEE_RATE, bEndRate: DEFAULT_PLATFORM_FEE_RATE,
           effectiveFrom: new Date().toISOString().slice(0, 10), status: "生效",
@@ -9691,7 +9707,7 @@
           ${kpi("平台保证金", credit ? "¥" + credit.depositBalance.toLocaleString("zh-CN") : "—", credit && credit.depositBalance > 0 ? "当前扣款账户" : "已用尽", "保", "operator_deposit")}
           ${kpi("信用额度", credit ? "¥" + credit.creditLimit.toLocaleString("zh-CN") : "—", credit && credit.depositBalance <= 0 ? "已启用" : "未启用", "额", "operator_credit")}
           ${kpi("待确认充值", pending, "笔申请等待平台核对", "待", "deposit_recharge")}
-          ${kpi("跨网状态", credit?.crossSwapEnabled ? "正常" : "已停", credit?.crossSwapEnabled ? "可跨网换电" : "信用额度用尽", "网", "operator_credit")}
+          ${kpi("信用跨网", credit?.crossSwapEnabled ? "未停" : "已停", credit?.crossSwapEnabled ? "额度未阻断跨网" : "信用额度用尽", "网", "operator_credit")}
         </div>
         ${panelHead("平台清分收款专户", "对公转账至此账户；附言须含运营商 ID", "deposit_recharge")}
         <div class="panel-body">
@@ -9805,7 +9821,7 @@
                   <td>¥${(c?.creditLimit || 0).toLocaleString("zh-CN")}</td>
                   <td>¥${cap != null ? cap.toLocaleString("zh-CN") : "—"}</td>
                   <td>¥${(c?.used || 0).toLocaleString("zh-CN")}</td>
-                  <td>${c?.crossSwapEnabled ? tag("开启") : tag("已停")}</td>
+                  <td>${c?.crossSwapEnabled ? tag("信用未停") : tag("信用已停")}</td>
                   <td>
                     <button type="button" class="link-btn" data-manual-deposit="${op.id}">手工入账</button>
                     <button type="button" class="link-btn" data-adjust-credit-limit="${op.id}">调信用额度</button>
@@ -10050,7 +10066,7 @@
                   <td>${operatorCorpListCell(op)}</td>
                   <td>¥${(credit?.depositBalance || 0).toLocaleString("zh-CN")}</td>
                   <td>${credit ? "¥" + credit.used + " / ¥" + credit.creditLimit : "—"}</td>
-                  <td>${credit?.crossSwapEnabled ? tag("开启") : tag("已停")}</td>
+                  <td>${operatorCrossNetworkListCell(op.id)}</td>
                   <td>
                     <button type="button" class="link-btn" data-open-operator="${op.id}">详情</button>
                     <button type="button" class="link-btn" data-edit-operator="${op.id}">编辑</button>
@@ -11799,24 +11815,68 @@
         || (state.view === "sites" && (tab === "fees" || tab === "bills"));
     }
 
+    function operatorCrossNetworkListCell(opId) {
+      const p = swapPolicyForOperator(opId);
+      const creditOk = operatorCreditAllowsCross(opId);
+      const actual = operatorEffectiveOutboundCross(opId);
+      const bits = [
+        p.platformEnabled ? "平台开" : "平台关",
+        p.crossNetworkEnabled ? "运营商开" : "运营商关"
+      ];
+      if (!creditOk) bits.push("信用已停");
+      return `<div style="font-size:12px;line-height:1.45">${actual ? tag("可跨网") : tag("不可跨网")}<br><span style="color:var(--muted)">${bits.join(" · ")}</span></div>`;
+    }
+
+    function confirmToggleCrossNetwork({ opId, field, nextOn, byPlatform }) {
+      const op = platformOperators.find(o => o.id === opId);
+      const name = op?.name || opId;
+      const who = field === "platformEnabled" ? "平台开关" : "运营商开关";
+      openProtoConfirm({
+        title: nextOn ? `开启${who}？` : `关闭${who}？`,
+        html: nextOn
+          ? `<p>开启后：<strong>${name}</strong> 的用户可去其他运营商换电，其他运营商用户也可进入其站点（双向）。</p>
+             <p style="color:var(--muted);font-size:13px">实际能否跨网，须<strong>平台开关与运营商开关同时开启</strong>，且信用额度未停跨网。</p>`
+          : `<p>关闭后立即双向封闭：<strong>${name}</strong> 的用户不能去他网，他网用户也不能进入其站点。</p>
+             <p style="color:var(--muted);font-size:13px">即使另一侧开关仍开着，跨网也不再生效。</p>`,
+        confirmLabel: nextOn ? "确认开启" : "确认关闭",
+        onConfirm: () => {
+          const pol = ensureOperatorSwapPolicy(opId);
+          pol[field] = nextOn;
+          if (byPlatform && state.detailOperatorId === opId) openOperatorDetail(opId);
+          else render();
+        }
+      });
+    }
+
     function renderSwapRangeSettings() {
       const canEdit = isEntityLogin() || employeeHasPerm("sites.edit") || employeeHasPerm("pricing.edit");
-      const policy = swapPolicyForOperator(currentEntity().id);
-      const credit = operatorCreditAccounts.find(a => a.operatorId === currentEntity().id);
+      const opId = currentEntity().id;
+      const policy = swapPolicyForOperator(opId);
+      const creditOk = operatorCreditAllowsCross(opId);
+      const dual = operatorPolicyAllowsCrossNetwork(opId);
+      const actual = operatorEffectiveOutboundCross(opId);
+      const opOn = !!policy.crossNetworkEnabled;
+      const platOn = !!policy.platformEnabled;
       const switchHtml = canEdit
-        ? `<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
-                <input type="checkbox" data-swap-policy="crossNetworkEnabled" ${policy.crossNetworkEnabled ? "checked" : ""} style="margin-top:3px" />
-                <span><strong>允许跨网换电</strong><br><small style="color:var(--muted)">关闭后：向本运营商付费的用户不可在其他运营商换电；其他运营商用户也不可在本运营商站点换电</small></span>
-              </label>`
-        : `<p style="margin:0;font-size:13px">允许跨网换电：<strong>${policy.crossNetworkEnabled ? "已开启" : "已关闭"}</strong>（当前账号只读）</p>`;
+        ? `<div>
+            <p style="margin:0 0 10px;font-size:13px">本网开关：<strong>${opOn ? "已开启" : "已关闭"}</strong></p>
+            <button type="button" class="${opOn ? "btn" : "btn primary"}" data-toggle-op-cross="${opId}" data-next="${opOn ? "0" : "1"}">${opOn ? "关闭本网跨网" : "开启本网跨网"}</button>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">须点按钮并确认后生效，避免误触。</p>
+          </div>`
+        : `<p style="margin:0;font-size:13px">本网开关：<strong>${opOn ? "已开启" : "已关闭"}</strong>（当前账号只读）</p>`;
       return `<section class="panel">
-          ${panelHead("换电范围设置", "控制所属用户可换电的地理/主体范围", "swap_policy")}
+          ${panelHead("换电范围设置", "跨网须平台与运营商双开 · 变更须确认", "swap_policy")}
           <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 14px">同运营商内<strong>任意站点</strong>均可购套餐、换电；仅跨网受下方开关与信用额度约束。${noteBtn("swap_policy_cross_net")}</p>
-            <div style="display:grid;gap:12px;max-width:520px">
-              ${switchHtml}
+            <p style="font-size:12px;color:var(--muted);margin:0 0 14px">同运营商内<strong>任意站点</strong>均可购套餐、换电。跨网须<strong>平台开关</strong>与<strong>本网开关同时开启</strong>。${noteBtn("swap_policy_cross_net")}</p>
+            <div class="detail-grid" style="margin-bottom:16px">
+              <div class="detail-item"><span>实际跨网</span><strong>${actual ? tag("可跨网") : tag("不可跨网")}</strong></div>
+              <div class="detail-item"><span>平台开关</span><strong>${platOn ? tag("已开启") : tag("已关闭")}</strong><br><small style="color:var(--muted)">${platOn ? "平台已允许本网跨网" : "请联系平台开启"}</small></div>
+              <div class="detail-item"><span>本网开关</span><strong>${opOn ? tag("已开启") : tag("已关闭")}</strong></div>
+              <div class="detail-item"><span>信用停跨网</span><strong>${creditOk ? "未停" : tag("已停")}</strong></div>
             </div>
-            ${credit && !credit.crossSwapEnabled ? `<p class="perm-banner" style="margin-top:14px">⚠ 平台已因信用额度用尽关闭本运营商用户的<strong>跨网换电</strong>（与上方开关无关，恢复额度后自动解除）。</p>` : ""}
+            <div style="max-width:520px">${switchHtml}</div>
+            ${!platOn ? `<p class="perm-banner" style="margin-top:14px">平台尚未开启本运营商跨网。即使打开本网开关，实际仍不可跨网。</p>` : ""}
+            ${dual && !creditOk ? `<p class="perm-banner" style="margin-top:14px">⚠ 信用额度用尽，平台已停本网用户<strong>出站跨网</strong>（双开关仍开着，恢复额度后自动解除）。</p>` : ""}
           </div>
         </section>`;
     }
@@ -18416,6 +18476,22 @@
       root.querySelectorAll("[data-kyc-manual-pass]").forEach(btn => {
         btn.onclick = () => confirmUserKycManualPass(btn.dataset.kycManualPass);
       });
+      root.querySelectorAll("[data-toggle-platform-cross]").forEach(btn => {
+        btn.onclick = () => confirmToggleCrossNetwork({
+          opId: btn.dataset.togglePlatformCross,
+          field: "platformEnabled",
+          nextOn: btn.dataset.next === "1",
+          byPlatform: true
+        });
+      });
+      root.querySelectorAll("[data-toggle-op-cross]").forEach(btn => {
+        btn.onclick = () => confirmToggleCrossNetwork({
+          opId: btn.dataset.toggleOpCross,
+          field: "crossNetworkEnabled",
+          nextOn: btn.dataset.next === "1",
+          byPlatform: false
+        });
+      });
       root.querySelectorAll("[data-edit-operator]").forEach(btn => {
         btn.onclick = () => { closeDrawer(); openOperatorForm(btn.dataset.editOperator); };
       });
@@ -19450,14 +19526,6 @@
         btn.onclick = (e) => { e.preventDefault(); deleteStdDayCityOverride(btn.dataset.stdCityDel); };
       });
       renderPageFilters();
-      document.querySelectorAll("[data-swap-policy]").forEach(inp => {
-        inp.onchange = () => {
-          const opId = currentEntity().id;
-          if (!operatorSwapPolicy[opId]) operatorSwapPolicy[opId] = { crossNetworkEnabled: false };
-          operatorSwapPolicy[opId][inp.dataset.swapPolicy] = inp.checked;
-          render();
-        };
-      });
     }
 
     function bindDrawerActions() {
