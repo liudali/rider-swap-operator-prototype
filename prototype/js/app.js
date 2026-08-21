@@ -4913,6 +4913,50 @@
       return { bankAccountName, bankName, bankBranch, bankAccount, bankCode };
     }
 
+    function upsertOperatorCorpAccount(opId, fields, actor) {
+      const existing = operatorCorpAccount(opId);
+      const payload = {
+        ...fields,
+        mchName: fields.bankAccountName,
+        mchNo: maskBankAccount(fields.bankAccount),
+        channel: "对公银行卡",
+        purpose: "提现打款",
+        accountScope: "withdraw",
+        status: "已绑定",
+        default: true,
+        ...actor
+      };
+      if (existing) {
+        Object.assign(existing, payload);
+        return existing;
+      }
+      const row = {
+        id: "PA-" + opId + "-CORP",
+        entityId: opId,
+        operatorId: opId,
+        accountKind: "operator_corp",
+        ...payload
+      };
+      paymentAccounts.push(row);
+      return row;
+    }
+
+    function operatorCorpFieldsTouched(data) {
+      return !!(
+        String(data.bankAccountName || "").trim() ||
+        String(data.bankAccount || "").replace(/\s/g, "") ||
+        String(data.bankName || "").trim() ||
+        String(data.bankBranch || "").trim() ||
+        String(data.bankCode || "").trim()
+      );
+    }
+
+    function operatorCorpListCell(op) {
+      const a = operatorCorpAccount(op.id);
+      if (!paymentAccountCorpBound(a)) return tag("未绑定");
+      return `<div style="font-size:12px;line-height:1.45"><strong>${a.bankAccountName}</strong><br><span style="color:var(--muted)">${maskBankAccount(a.bankAccount)}</span></div>`;
+    }
+
     function corpAccountActorLabel() {
       if (isPlatformRole()) return currentEmployee()?.name || "平台管理员";
       return currentEntity()?.name || "运营商";
@@ -4946,36 +4990,10 @@
             updatedByRole: byPlatform ? "平台" : "运营商",
             corpBoundAt: today
           };
-          if (existing) {
-            Object.assign(existing, {
-              ...v,
-              mchName: v.bankAccountName,
-              mchNo: maskBankAccount(v.bankAccount),
-              channel: "对公银行卡",
-              purpose: "提现打款",
-              status: "已绑定",
-              default: true,
-              ...actor
-            });
-            return { successMessage: byPlatform ? "已代为更新收款账户" : "收款账户已更新", afterClose: () => render() };
-          }
-          if (operatorCorpAccount(op.id)) return "同一时间仅可绑定一个收款账户，请变更现有账户";
-          paymentAccounts.push({
-            id: "PA-" + op.id + "-CORP",
-            entityId: op.id,
-            operatorId: op.id,
-            accountKind: "operator_corp",
-            channel: "对公银行卡",
-            mchName: v.bankAccountName,
-            mchNo: maskBankAccount(v.bankAccount),
-            purpose: "提现打款",
-            accountScope: "withdraw",
-            status: "已绑定",
-            default: true,
-            ...v,
-            ...actor
-          });
-          return { successMessage: byPlatform ? "已代为添加收款账户" : "收款账户已添加", afterClose: () => render() };
+          upsertOperatorCorpAccount(op.id, v, actor);
+          return { successMessage: bound
+            ? (byPlatform ? "已代为更新收款账户" : "收款账户已更新")
+            : (byPlatform ? "已代为添加收款账户" : "收款账户已添加"), afterClose: () => render() };
         }
       });
     }
@@ -8123,6 +8141,7 @@
               <div class="detail-item"><span>联系人</span><strong>${op.contactName}<br><small>${op.contactPhone}</small></strong></div>
               <div class="detail-item"><span>地址</span><strong style="white-space:normal">${op.address || "—"}</strong></div>
               <div class="detail-item"><span>入驻日期</span><strong>${op.onboardDate}</strong></div>
+              <div class="detail-item"><span>商户号</span><strong>${op.mchNo || "—"}</strong></div>
             </div>
           </div>
         </section>
@@ -8201,6 +8220,7 @@
 
     function openOperatorForm(opId) {
       const op = opId ? platformOperators.find(o => o.id === opId) : null;
+      const corp = op ? operatorCorpAccount(op.id) : null;
       state.operatorFormId = opId || "new";
       document.querySelector("#operatorFormTitle").textContent = op ? "编辑运营商 · " + op.name : "新增运营商";
       document.querySelector("#operatorForm").innerHTML = `
@@ -8231,8 +8251,14 @@
         <label>联系人 <span style="color:var(--red)">*</span><input name="contactName" value="${op?.contactName || ""}" required placeholder="如：张经理" /></label>
         <label>联系电话 <span style="color:var(--red)">*</span><input name="contactPhone" type="tel" value="${op?.contactPhone || ""}" required placeholder="11 位手机号" /></label>
         <label class="form-span-2">地址 <span style="color:var(--red)">*</span><input name="address" value="${op?.address || ""}" required placeholder="省市区 + 门牌号" /></label>
-        <label class="form-span-2">备注<textarea name="remark" rows="2" placeholder="选填">${op?.remark || ""}</textarea></label>
-        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">收款账户不在此配置。运营商可在「收款账户」自行绑定；平台也可在详情抽屉代为添加或变更。</p>`;
+        <label>商户号<input name="mchNo" value="${escProtoAttr(op?.mchNo || "")}" placeholder="支付通道商户号，由平台填写" /></label>
+        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">收款账户（对公银行卡）由平台维护，运营商也可自行绑定。同一时间仅 1 户；未填则保持未绑定。</p>
+        <label>开户名称<input name="bankAccountName" value="${escProtoAttr(corp?.bankAccountName || "")}" placeholder="与对公银行卡户名一致" /></label>
+        <label>银行卡号<input name="bankAccount" value="${escProtoAttr(corp?.bankAccount || "")}" inputmode="numeric" maxlength="32" placeholder="对公账号，仅数字" /></label>
+        <label>开户银行<input name="bankName" value="${escProtoAttr(corp?.bankName || "")}" placeholder="如：招商银行" /></label>
+        <label>开户支行<input name="bankBranch" value="${escProtoAttr(corp?.bankBranch || "")}" placeholder="如：招商银行上海分行营业部" /></label>
+        <label>联行号<input name="bankCode" value="${escProtoAttr(corp?.bankCode || "")}" inputmode="numeric" maxlength="12" placeholder="选填，12 位" /></label>
+        <label class="form-span-2">备注<textarea name="remark" rows="2" placeholder="选填">${op?.remark || ""}</textarea></label>`;
       bindOperatorLogoUpload(document.querySelector("#operatorForm"));
       document.querySelector("#operatorModal").classList.add("open");
       document.querySelector("#operatorMask").classList.add("open");
@@ -8452,12 +8478,28 @@
         return;
       }
       data.loginAccount = loginPhone;
+      const mchNo = String(data.mchNo || "").trim();
+      if (mchNo && !/^[A-Za-z0-9*]{6,32}$/.test(mchNo)) {
+        window.alert("商户号须为 6～32 位字母或数字");
+        return;
+      }
+      let corpPayload = null;
+      if (operatorCorpFieldsTouched(data)) {
+        const v = validateOperatorCorpFields(data);
+        if (typeof v === "string") {
+          window.alert(v);
+          return;
+        }
+        corpPayload = v;
+      }
+      let savedOpId = state.operatorFormId;
       if (state.operatorFormId === "new") {
         const id = "OP-" + Date.now().toString().slice(-4);
+        savedOpId = id;
         platformOperators.push({
           id, name: data.name.trim(), logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
           contactName: data.contactName.trim(), contactPhone: data.contactPhone.trim(),
-          loginAccount: loginPhone,
+          loginAccount: loginPhone, mchNo,
           address: data.address.trim(), onboardDate: new Date().toISOString().slice(0, 10),
           mchWx: "", mchAli: "", remark: data.remark?.trim() || ""
         });
@@ -8476,12 +8518,19 @@
           Object.assign(op, {
             name: data.name.trim(), logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
             contactName: data.contactName.trim(), contactPhone: data.contactPhone.trim(),
-            loginAccount: loginPhone,
+            loginAccount: loginPhone, mchNo,
             address: data.address.trim(), remark: data.remark?.trim() || ""
           });
           const loginKey = (op.id === (ENT.operator?.id || "OP-SX")) ? "entity:operator" : `entity:${op.id}`;
           upsertAuthAccount(loginPhone, "operator", loginKey, op.name);
         }
+      }
+      if (corpPayload) {
+        upsertOperatorCorpAccount(savedOpId, corpPayload, {
+          updatedBy: corpAccountActorLabel(),
+          updatedByRole: "平台",
+          corpBoundAt: new Date().toISOString().slice(0, 10)
+        });
       }
       closeOperatorForm();
       state.view = "operators";
@@ -9991,21 +10040,21 @@
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr>
-                <th>运营商</th><th>联系人</th><th>城市</th><th>状态</th><th>入驻</th><th>${phase2FieldMark("准入档位")}</th>
+                <th>运营商</th><th>联系人</th><th>城市</th><th>状态</th><th>入驻</th><th>商户号</th><th>${phase2FieldMark("准入档位")}</th>
                 <th>平台费率</th><th>收款账户</th><th>保证金</th><th>信用额度（已用/上限）</th><th>跨网</th><th>操作</th>
               </tr></thead>
               <tbody>${rows.map(op => {
                 const credit = creditForOperator(op.id);
                 const prof = operatorCreditProfile(op.id);
                 const tierTxt = prof?.tierCode ? tierLabel(prof.tierCode) : "待定档";
-                const corpBound = paymentAccountCorpBound(operatorCorpAccount(op.id));
                 return `<tr>
                   <td><div class="operator-logo-cell">${operatorLogoHtml(op, 36)}<div><strong>${op.name}</strong><br><small style="color:var(--muted)">${op.id}</small></div></div></td>
                   <td>${op.contactName}<br><small>${op.contactPhone}</small></td>
                   <td>${op.city}</td><td>${tag(op.status)}</td><td>${op.onboardDate}</td>
+                  <td>${op.mchNo || "—"}</td>
                   <td>${tag(tierTxt)} ${phase2BadgeHtml()}</td>
                   <td><strong class="fee-platform">${operatorFeeRateSummary(op.id)}</strong><br><small style="color:var(--muted)">C / B</small></td>
-                  <td>${corpBound ? tag("已绑定") : tag("未绑定")}</td>
+                  <td>${operatorCorpListCell(op)}</td>
                   <td>¥${(credit?.depositBalance || 0).toLocaleString("zh-CN")}</td>
                   <td>${credit ? "¥" + credit.used + " / ¥" + credit.creditLimit : "—"}</td>
                   <td>${credit?.crossSwapEnabled ? tag("开启") : tag("已停")}</td>
@@ -10014,7 +10063,7 @@
                     <button type="button" class="link-btn" data-edit-operator="${op.id}">编辑</button>
                   </td>
                 </tr>`;
-              }).join("") || "<tr><td colspan='12'>暂无</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='13'>暂无</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;

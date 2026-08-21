@@ -506,7 +506,7 @@
       day_pool_hold_no_quota: { title: "零额度 / 待还电", content: "渠道商顶栏「骑手零额度」（在职剩余人天=0）。原因：①个人无额度 ②预占失败。持电池→「待还电」：<strong>仅可还电、禁止换电</strong>；不透支；<strong>无自费兜底</strong>。见 decision-049 / 054。" },
       day_pool_refund: { title: "续费与退款", content: "<strong>续费</strong>：渠道商在原池上增购人天（在线/线下采购）。<strong>退款</strong>：不支持在线操作，须与运营商线下协商，由运营商后台扣减额度（类型：退款）。详见「额度池退款说明」。" },
       platform_scope: { title: "平台管理范围", content: "平台管理员可查看全业务汇总，治理运营商主体、设备绑定与跨网统价；不替代运营商日常运营与定价。" },
-      platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、<strong>收款账户（可查看并代改）</strong>、平台保证金与信用额度。运营商在登录页选「运营商登录」凭手机号进入；登录后仅见本人经营数据。" },
+      platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、<strong>商户号</strong>（平台填写）、<strong>收款账户</strong>（平台可在新增/编辑维护，运营商也可自助绑定）。运营商登录后仅见本人经营数据。" },
       platform_leasing_companies: { title: "设备租赁公司", content: "平台管理员维护出租方主体档案（可<strong>多家并存</strong>）。前期演示环境以「华东设备租赁公司」为主；架构支持后续接入更多租赁公司。" },
       platform_lease_binding: { title: "租赁关系绑定", content: "平台管理员建立「租赁公司 ↔ 运营商」绑定后，该租赁公司方可向该运营商发起租赁协议签约。<strong>运营商</strong>承租信息来源于平台运营商档案；一运营商可同时与多家租赁公司建立绑定并分别签约。" },
       platform_device_bind: { title: "设备归属", content: "平台通过「批量导入」弹窗指定运营商完成归属；类型与参数来自 IoT，无需人工填写。导入后初始站点为「未分配站点」。<br>设备管理分 <strong>电柜 / 电池 / 电池型号管理</strong>；电池列表规格取自平台型号字典。" },
@@ -1983,6 +1983,12 @@
     ];
 
     const paymentAccounts = [
+      { id: "PA-OP-SX-CORP", entityId: "OP-SX", operatorId: "OP-SX", accountKind: "operator_corp",
+        channel: "对公银行卡", mchName: "上海绿色出行科技有限公司", mchNo: "1219 **** **** 8820",
+        purpose: "提现打款", accountScope: "withdraw", status: "已绑定", default: true,
+        bankAccountName: "上海绿色出行科技有限公司", bankName: "招商银行", bankBranch: "招商银行上海分行营业部",
+        bankAccount: "1219000012348820", bankCode: "308290003113",
+        corpBoundAt: "2026-01-08", updatedBy: "张经理", updatedByRole: "运营商" },
       { id: "PA-LEASE-WX", entityId: "LEASE-HD", channel: "微信支付", mchName: ENT.leasing.name, mchNo: "1900000999***", purpose: "租金收款", status: "已开通", default: true,
         bankAccountName: ENT.leasing.name, bankName: "交通银行上海分行", bankAccount: "3100 **** **** 7788", bankCode: "301290000007", corpBoundAt: "2025-11-01" },
       { id: "PA-LEASE-CORP", entityId: "LEASE-HD", channel: "对公账户", mchName: ENT.leasing.name, mchNo: "1219****3366", purpose: "租金收款（对公入账）", status: "已开通", default: true,
@@ -2578,10 +2584,10 @@
     }
 
     const platformOperators = [
-      { id: "OP-SX", name: "绿色出行", logoUrl: mockOperatorLogoUrl("绿", "#1677ff"), brandColor: "#1677ff", city: "上海", status: "在营", contactName: "张经理", contactPhone: "138****8001", loginAccount: "13800001000", email: "zhang@example.com", address: "上海市浦东新区银城中路", onboardDate: "2025-03-01", mchWx: "1900000123***", mchAli: "2088123456***", remark: "首版示范运营商" },
-      { id: "OP-LJZ", name: "陆家嘴联营", logoUrl: mockOperatorLogoUrl("陆", "#722ed1"), city: "上海", status: "在营", contactName: "李站长", contactPhone: "139****6601", loginAccount: "13800006601", email: "li@example.com", address: "上海市浦东新区陆家嘴环路", onboardDate: "2025-06-15", mchWx: "1900000456***", mchAli: "2088765432***", remark: "" },
-      { id: "OP-BJ", name: "滨江联营", logoUrl: mockOperatorLogoUrl("滨", "#fa8c16"), city: "上海", status: "在营", contactName: "王运维", contactPhone: "137****7702", loginAccount: "13800007702", email: "wang@example.com", address: "上海市浦东新区滨江大道", onboardDate: "2025-11-01", mchWx: "1900000789***", mchAli: "2088987654***", remark: "信用额度已用尽，跨网已停" },
-      { id: "OP-HZ", name: "西湖换电", logoUrl: mockOperatorLogoUrl("西", "#52c41a"), city: "杭州", status: "在营", contactName: "陈经理", contactPhone: "135****8800", loginAccount: "13800008800", email: "chen@example.com", address: "杭州市西湖区文三路", onboardDate: "2026-06-01", mchWx: "1900000999***", mchAli: "2088999888***", remark: "新入网 · 待定档" }
+      { id: "OP-SX", name: "绿色出行", logoUrl: mockOperatorLogoUrl("绿", "#1677ff"), brandColor: "#1677ff", city: "上海", status: "在营", contactName: "张经理", contactPhone: "138****8001", loginAccount: "13800001000", email: "zhang@example.com", address: "上海市浦东新区银城中路", onboardDate: "2025-03-01", mchNo: "1900000123", mchWx: "1900000123***", mchAli: "2088123456***", remark: "首版示范运营商" },
+      { id: "OP-LJZ", name: "陆家嘴联营", logoUrl: mockOperatorLogoUrl("陆", "#722ed1"), city: "上海", status: "在营", contactName: "李站长", contactPhone: "139****6601", loginAccount: "13800006601", email: "li@example.com", address: "上海市浦东新区陆家嘴环路", onboardDate: "2025-06-15", mchNo: "1900000456", mchWx: "1900000456***", mchAli: "2088765432***", remark: "" },
+      { id: "OP-BJ", name: "滨江联营", logoUrl: mockOperatorLogoUrl("滨", "#fa8c16"), city: "上海", status: "在营", contactName: "王运维", contactPhone: "137****7702", loginAccount: "13800007702", email: "wang@example.com", address: "上海市浦东新区滨江大道", onboardDate: "2025-11-01", mchNo: "1900000789", mchWx: "1900000789***", mchAli: "2088987654***", remark: "信用额度已用尽，跨网已停" },
+      { id: "OP-HZ", name: "西湖换电", logoUrl: mockOperatorLogoUrl("西", "#52c41a"), city: "杭州", status: "在营", contactName: "陈经理", contactPhone: "135****8800", loginAccount: "13800008800", email: "chen@example.com", address: "杭州市西湖区文三路", onboardDate: "2026-06-01", mchNo: "", mchWx: "1900000999***", mchAli: "2088999888***", remark: "新入网 · 待定档" }
     ];
 
     /** 平台管理员维护：各运营商平台技术服务费抽成比例（C 端支付分账 / B 端确认消耗可分别配置） */
