@@ -618,7 +618,7 @@
       return rows.filter(o => {
         if (f.phone && !matchKw(o.phone, f.phone) && !matchKw(o.riderName, f.phone)) return false;
         if (f.skuId && f.skuId !== "全部" && o.skuId !== f.skuId) return false;
-        if (f.linkPurpose && !matchKw(o.linkPurpose || o.linkCode, f.linkPurpose)) return false;
+        if (f.linkPurpose && !matchKw(o.linkPurpose || o.linkId, f.linkPurpose)) return false;
         if (!matchDateStr(o.payTime, f.payFrom, f.payTo)) return false;
         return true;
       });
@@ -645,9 +645,9 @@
       return c?.operatorId || "OP-SX";
     }
 
-    function buildPromoLinkUrl(channelId, skuId, linkCode) {
+    function buildPromoLinkUrl(channelId, skuId, linkId) {
       const op = operatorIdForChannel(channelId);
-      return `wxmp://${op}/pages/landing/index?op=${op}&ch=${channelId}&sku=${skuId}&lnk=${linkCode}`;
+      return `wxmp://${op}/pages/landing/index?op=${op}&ch=${channelId}&sku=${skuId}&lnk=${linkId}`;
     }
 
     function renderFakeQrCells(seed) {
@@ -670,7 +670,7 @@
       document.querySelector("#noteTitle").textContent = "推广二维码 · " + link.purpose;
       document.querySelector("#noteBody").innerHTML = `
         <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
-          <div class="qr-preview" aria-hidden="true">${renderFakeQrCells(link.linkCode)}</div>
+          <div class="qr-preview" aria-hidden="true">${renderFakeQrCells(link.id)}</div>
           <div style="flex:1;min-width:220px">
             <p style="margin:0 0 8px;font-size:13px;color:var(--muted)">扫码打开<strong>运营商小程序</strong>（${operatorIdForChannel(link.channelId)}）<br>用户点击链接后 <strong>24h</strong> 内<strong>首笔</strong>购套餐享渠道专享价；续费/再次购卡走正式零售价</p>
             <p style="word-break:break-all;font-size:12px;background:var(--surface-soft);padding:8px;border-radius:6px;margin:0">${link.linkUrl}</p>
@@ -682,7 +682,7 @@
         </div>`;
       document.querySelector("#noteModal").classList.add("open");
       document.querySelector("#noteMask").classList.add("open");
-      document.querySelector("#qrDownloadBtn").onclick = () => window.alert("演示：已生成 PNG 二维码（" + link.linkCode + ".png）");
+      document.querySelector("#qrDownloadBtn").onclick = () => window.alert("演示：已生成 PNG 二维码（" + link.id + ".png）");
       document.querySelector("#qrCopyBtn").onclick = () => {
         if (navigator.clipboard?.writeText) {
           navigator.clipboard.writeText(link.linkUrl).then(() => showProtoToast("已复制小程序链接"));
@@ -692,21 +692,14 @@
       };
     }
 
-    function slugLinkCode(text, pkg, channelId) {
-      const base = (text || "link").trim().slice(0, 16).replace(/\s+/g, "-").toLowerCase().replace(/[^a-z0-9-]/g, "") || "link";
-      const n = channelPromoLinks.filter(l => l.channelId === channelId && l.packageId === pkg.id).length + 1;
-      return `${base}-${n}`;
-    }
-
     function createPromoLink(channelId, packageId, purpose) {
       const pkg = channelSalePackages.find(p => p.id === packageId && p.channelId === channelId);
       const label = (purpose || "").trim();
       if (!pkg || !label) return false;
-      const linkCode = slugLinkCode(label, pkg, channelId);
+      const id = "LNK-" + Date.now().toString(36).slice(-6).toUpperCase();
       channelPromoLinks.push({
-        id: "LNK-" + Date.now().toString(36).slice(-6).toUpperCase(),
-        channelId, packageId, skuId: pkg.skuId, purpose: label, linkCode,
-        linkUrl: buildPromoLinkUrl(channelId, pkg.skuId, linkCode),
+        id, channelId, packageId, skuId: pkg.skuId, purpose: label,
+        linkUrl: buildPromoLinkUrl(channelId, pkg.skuId, id),
         clicks: 0, conversions: 0, status: "启用", createdAt: new Date().toISOString().slice(0, 10)
       });
       return true;
@@ -10740,11 +10733,11 @@
           <div class="panel-body orders-table-wrap">
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px">每条链接绑定<strong>已签约运营商</strong>；购买时锁定该 OP，用户款进其自商户。</p>
             <table>
-              <thead><tr><th>用途</th><th>锁定运营商</th><th>链接码</th><th>URL</th><th>点击</th><th>成交</th><th>状态</th></tr></thead>
+              <thead><tr><th>用途</th><th>锁定运营商</th><th>ID</th><th>URL</th><th>点击</th><th>成交</th><th>状态</th></tr></thead>
               <tbody>${rows.map(l => `<tr>
                 <td>${l.purpose}</td>
                 <td><strong>${l.operatorName || operatorLabel(l.operatorId)}</strong><br><small>${l.operatorId || "—"}</small></td>
-                <td>${l.linkCode}</td>
+                <td>${l.id}</td>
                 <td><small style="word-break:break-all">${l.linkUrl}</small></td>
                 <td>${l.clicks}</td>
                 <td>${l.conversions}</td>
@@ -10773,7 +10766,7 @@
               <tbody>${rows.map(o => {
                 const refund = o.refundStatus || "——";
                 return `<tr>
-                <td>${o.id}<br><small>${o.payTime}<br>${o.linkPurpose || o.linkCode}</small></td>
+                <td>${o.id}<br><small>${o.payTime}<br>${o.linkPurpose || o.linkId || ""}</small></td>
                 <td>${o.riderName}<br><small>${o.phone}</small></td>
                 <td><strong>${o.lockedOperatorName || o.activatedOperatorName || "—"}</strong><br><small>${o.lockedOperatorId || o.activatedOperatorId || ""}</small></td>
                 <td>¥${o.officialPrice} − ¥${o.couponAmount || 0}<br><strong>实付 ¥${o.paidPrice}</strong></td>
@@ -16626,14 +16619,14 @@
             ${newLinkForm}
             <div class="orders-table-wrap">
               <table>
-                <thead><tr><th>套餐</th><th>电池型号</th><th>链接用途</th><th>链接码</th><th>点击</th><th>成交</th><th>创建日</th><th>状态</th><th>小程序链接</th><th>操作</th></tr></thead>
+                <thead><tr><th>套餐</th><th>电池型号</th><th>链接用途</th><th>ID</th><th>点击</th><th>成交</th><th>创建日</th><th>状态</th><th>小程序链接</th><th>操作</th></tr></thead>
                 <tbody>${pg.slice.map(l => {
                   const pkg = packages.find(p => p.id === l.packageId);
                   return `<tr>
                     <td>${pkg ? pkg.name : l.skuId}<br><small>¥${pkg?.channelPrice || "—"}</small></td>
                     <td>${pkg ? normalizeBatteryModel(pkg.batteryModel) : resolveChannelSkuBatteryModel(cid, l.skuId, l.packageId)}</td>
                     <td><strong>${l.purpose}</strong></td>
-                    <td><small>${l.linkCode}</small></td>
+                    <td><small>${l.id}</small></td>
                     <td>${l.clicks}</td>
                     <td>${l.conversions}</td>
                     <td>${l.createdAt}</td>
@@ -16693,7 +16686,7 @@
           ${panelHead("购卡记录", "仅展示经本渠道推广链接成交的套餐购买 · 共 " + all.length + " 笔，筛选后 " + orders.length + " 笔", "module_channel_orders")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>订单</th><th>用户</th><th>电池型号</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算</th><th>链接用途</th><th>链接码</th><th>支付时间</th><th>状态</th></tr></thead>
+              <thead><tr><th>订单</th><th>用户</th><th>电池型号</th><th>套餐</th><th>实付</th><th>佣金</th><th>结算</th><th>链接用途</th><th>ID</th><th>支付时间</th><th>状态</th></tr></thead>
               <tbody>${orders.map(o => `<tr>
                 <td>${o.id}</td>
                 <td>${o.riderName}<br><small>${o.phone}</small></td>
@@ -16703,7 +16696,7 @@
                 <td>¥${o.commission}${o.commissionRate ? `<br><small>${formatCommissionRate(o.commissionRate)}</small>` : ""}</td>
                 <td>${linkOrderSettleCell(o, cid)}</td>
                 <td>${o.linkPurpose || "—"}</td>
-                <td><small>${o.linkCode}</small></td>
+                <td><small>${o.linkId || "—"}</small></td>
                 <td>${o.payTime}</td>
                 <td>${linkOrderStatusCell(o, cid)}</td>
               </tr>`).join("") || "<tr><td colspan='11'>暂无购卡记录</td></tr>"}</tbody>
