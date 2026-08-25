@@ -2142,6 +2142,7 @@
       pool.totalDays += o.days;
       pool.balancePct = pool.totalDays ? Math.round(pool.availableDays / pool.totalDays * 1000) / 10 : 0;
       if (pool.status === "待入账" || pool.status === "待配置") pool.status = "使用中";
+      syncDayPoolDerived(pool);
       appendPoolLedger(pool, "购买入账", o.days, o.id, "采购到账 · PO");
     }
 
@@ -2293,10 +2294,7 @@
         || packageOrders.find(p => p.user === u.id);
       const poolRider = dayPoolRiders.find(r => r.id === u.id);
       const held = userLiveHeldBattery(u, poolRider);
-      let userStatus = "正常";
-      if (u.serviceState === "已冻结") userStatus = "冻结";
-      else if (u.serviceState === "中途完结") userStatus = "注销中";
-      else if (poolRider?.status === "离职") userStatus = "已离职";
+      let userStatus = u.accountStatus === "注销中" ? "注销中" : "正常";
       const userType = u.poolId ? "渠道成员" : "个人用户";
       const deposit = riderBatteryDepositInfo(u);
       return {
@@ -3040,7 +3038,7 @@
     /** 人天池余额不足：运营商看已售池；渠道商看自有池 */
     function lowBalanceDayPoolsAlert() {
       const list = isChannelRole() ? myDayPools() : (isOperatorRole() ? mySoldDayPools() : []);
-      return list.filter(p => p.status === "余额不足");
+      return list.filter(p => dayPoolIsLowBalance(p));
     }
 
     /** 渠道商：在职且剩余人天=0（个人无额度或预占失败等导致今日无可用额度） */
@@ -3122,7 +3120,7 @@
       const showAlerts = canAccessView("devices");
       const lowPools = lowBalanceDayPoolsAlert();
       const showBalanceWarn = lowPools.length > 0;
-      const balanceTip = lowPools.map(p => `${p.ownerName || ""} · ${p.name}`).filter(Boolean).join("；");
+      const balanceTip = lowPools.map(p => `${p.name} 可用${p.availableDays}/需${dayPoolRunwayNeed(p)}`).filter(Boolean).join("；");
       const zeroRiders = zeroQuotaActiveRidersAlert();
       const showZeroQuotaWarn = zeroRiders.length > 0;
       const zeroTip = zeroRiders.slice(0, 5).map(r => `${r.name}（${r.gateReason || r.failReason || "剩余0人天"}）`).join("；")
@@ -3312,6 +3310,41 @@
     }
 
     function poolById(id) { return dayPools.find(p => p.id === id); }
+
+    /** 人天池「余额不足」唯一口径：可用 < 在职×10（decision-113） */
+    const DAY_POOL_RUNWAY_DAYS = 10;
+    function dayPoolTerminalStatus(pool) {
+      const s = pool && pool.status;
+      if (s === "待配置" || s === "待入账" || s === "已到期" || s === "已关闭" || s === "已过期") return s;
+      return null;
+    }
+    function dayPoolActiveRiderCount(poolId) {
+      return dayPoolRiders.filter(r => r.poolId === poolId && r.status === "在职").length;
+    }
+    function dayPoolRunwayNeed(pool) {
+      return dayPoolActiveRiderCount(pool && pool.id) * DAY_POOL_RUNWAY_DAYS;
+    }
+    function dayPoolIsLowBalance(pool) {
+      if (!pool || dayPoolTerminalStatus(pool)) return false;
+      return (pool.availableDays || 0) < dayPoolRunwayNeed(pool);
+    }
+    function dayPoolDisplayStatus(pool) {
+      if (!pool) return "—";
+      const term = dayPoolTerminalStatus(pool);
+      if (term) return term;
+      return dayPoolIsLowBalance(pool) ? "余额不足" : "使用中";
+    }
+    function syncDayPoolDerived(pool) {
+      if (!pool) return;
+      pool.balancePct = pool.totalDays ? Math.round(pool.availableDays / pool.totalDays * 1000) / 10 : 0;
+      if (!dayPoolTerminalStatus(pool)) {
+        pool.status = dayPoolDisplayStatus(pool);
+        pool.warnSms = dayPoolIsLowBalance(pool);
+      }
+    }
+    function syncAllDayPoolDerived() {
+      (typeof dayPools !== "undefined" ? dayPools : []).forEach(syncDayPoolDerived);
+    }
 
     function channelContractSitesLabel(sites) {
       return sites && sites.length ? sites.join("、") : "不限制（规则配置）";
@@ -3772,7 +3805,7 @@
           <div class="detail-item"><span>额度池</span><strong>${sel.name}</strong><br><small style="font-weight:400;color:var(--muted)">${sel.id}</small></div>
           <div class="detail-item"><span>售卖方</span><strong>${sel.sellerName || "—"}</strong></div>
           <div class="detail-item"><span>采购单</span><strong>${sel.orderNo || "—"}</strong></div>
-          <div class="detail-item"><span>状态</span><strong>${poolStatusTag(sel.status)}</strong></div>
+          <div class="detail-item"><span>状态</span><strong>${poolStatusTag(dayPoolDisplayStatus(sel))}</strong></div>
           <div class="detail-item"><span>扣天口径</span><strong>${sel.deductMode || "—"}</strong></div>
           <div class="detail-item"><span>激活时机</span><strong>${sel.activationMode || "—"}</strong></div>
           <div class="detail-item"><span>池过期退款</span><strong>${sel.poolExpiryRefund || "—"}</strong></div>
@@ -3782,14 +3815,15 @@
           <div class="detail-item"><span>预占/冻结</span><strong>${sel.frozenDays || 0} 人天</strong></div>
           <div class="detail-item"><span>已消耗</span><strong>${sel.consumedDays || 0} 人天</strong></div>
           <div class="detail-item"><span>可用余额</span><strong>${sel.availableDays || 0} 人天</strong></div>
+          <div class="detail-item"><span>在职 / 需支撑</span><strong>${dayPoolActiveRiderCount(sel.id)} 人 / ${dayPoolRunwayNeed(sel)} 人天</strong><br><small style="font-weight:400;color:var(--muted)">余额不足 = 可用 &lt; 在职×${DAY_POOL_RUNWAY_DAYS}</small></div>
           <div class="detail-item"><span>可退款购买额度</span><strong>${Math.max(0, (sel.availableDays || 0) - (sel.giftedDays || 0))} 人天</strong></div>
           <div class="detail-item"><span>有效期</span><strong>${sel.validFrom || "—"} ~ ${sel.validTo || "—"}</strong></div>
         </div>
-        <div class="usage-bar" style="margin-top:12px"><i style="width:${Math.min(100, sel.balancePct || 0)}%"></i></div>
+        <div class="usage-bar" style="margin-top:12px"><i style="width:${Math.min(100, (dayPoolRunwayNeed(sel) ? Math.round((sel.availableDays || 0) / dayPoolRunwayNeed(sel) * 100) : 100))}%"></i></div>
         <p style="font-size:12px;color:var(--muted);margin:8px 0 0">已消耗 ${sel.consumedDays || 0} · 预占 ${sel.frozenDays || 0} · 可用 ${sel.availableDays || 0} / 总量 ${sel.totalDays || 0}</p>
         <div class="stat-pills" style="margin-top:12px">
           <span class="stat-pill">底层 <strong>分钟账本</strong>（1人天=1440分钟）</span>
-          <span class="stat-pill">余额比例 <strong>${sel.balancePct != null ? sel.balancePct + "%" : "—"}</strong></span>
+          <span class="stat-pill">跑道 <strong>${sel.availableDays || 0} / ${dayPoolRunwayNeed(sel)}</strong>（在职×${DAY_POOL_RUNWAY_DAYS}）</span>
         </div>
         <p style="font-size:12px;color:var(--muted);margin:14px 0 0">${noteBtn("day_pool_ledger")} ${noteBtn("day_pool_panel")} 增购入账见「额度明细」；池不支持在线退款，须与运营商线下协商。</p>`;
     }
@@ -4206,7 +4240,7 @@
         { key: "keyword", label: "用户 ID/手机", placeholder: "U1028" },
         { key: "operatorId", label: "服务运营商", type: "select", options: () => platformOperatorOptions() },
         { key: "userType", label: "用户类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "个人用户", t: "个人用户" }, { v: "渠道成员", t: "渠道成员" }] },
-        { key: "userStatus", label: "用户状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "正常", t: "正常" }, { v: "冻结", t: "冻结" }, { v: "注销中", t: "注销中" }] },
+        { key: "userStatus", label: "用户状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "正常", t: "正常" }, { v: "注销中", t: "注销中" }] },
         { key: "depositKind", label: "电池押金", type: "select", options: [
           { v: "全部", t: "全部" }, { v: "实付", t: "实付" }, { v: "信用免押", t: "信用免押" },
           { v: "渠道担保", t: "渠道担保" }, { v: "无", t: "——" }
@@ -6115,7 +6149,7 @@
           k === "dayPool" ? "nav-day-pool" : "",
           viewP2 ? "nav-phase2" : ""
         ].filter(Boolean).join(" ");
-        const badge = k === "dayPool" && myDayPools().some(p => p.balancePct < 20) ? " !"
+        const badge = k === "dayPool" && myDayPools().some(p => dayPoolIsLowBalance(p)) ? " !"
           : k === "depositManage" && pendingDepositRechargeCount() > 0 ? " !"
           : k === "operators" && pendingOperatorWithdrawReviewCount() > 0 ? " !"
           : k === "financeDrawdown" && pendingFinanceDrawdownCount() > 0 ? " !"
@@ -6590,7 +6624,7 @@
 
     function tag(s) {
       const risk = ["退款", "故障", "离线", "建设", "预警", "冻结", "失败", "中途", "完结"];
-      const warn = ["待", "处理", "结转", "可打"];
+      const warn = ["待", "处理", "结转", "可打", "注销"];
       const cls = risk.some(k => s.includes(k)) ? "risk" : warn.some(k => s.includes(k)) ? "warn" : s.includes("已打") || s.includes("完结") ? "neutral" : "";
       return `<span class="tag ${cls}">${s}</span>`;
     }
@@ -11117,21 +11151,21 @@
             ${renderDataDrillPanel("channel")}`;
         }
         const pools = myDayPools();
-        const lowPool = pools.find(p => p.balancePct < 20);
+        const lowPool = pools.find(p => dayPoolIsLowBalance(p));
         const poolAvail = pools.reduce((s, p) => s + p.availableDays, 0);
         const poolFrozen = pools.reduce((s, p) => s + p.frozenDays, 0);
         const riderCount = dayPoolRiders.filter(r => pools.some(p => p.id === r.poolId) && r.status === "在职").length;
         return `
           ${ownScopeBanner()}
           ${lowPool ? `<div class="pool-warn-banner">${noteBtn("day_pool_warn")}
-            <div style="font-size:12px;margin-top:6px">已触发「不足在职骑手×10天」规则 → 短信已发渠道商+运营商（见短信记录）</div>
-            <strong>人天额度池余额预警</strong>：${lowPool.name}（${lowPool.id}）可用余额仅 <strong>${lowPool.balancePct}%</strong>（${lowPool.availableDays} 人天）。
+            <div style="font-size:12px;margin-top:6px">可用 &lt; 在职×${DAY_POOL_RUNWAY_DAYS} 天 → 短信已发渠道商+运营商（见短信记录）</div>
+            <strong>人天额度池余额不足</strong>：${lowPool.name}（${lowPool.id}）可用 <strong>${lowPool.availableDays}</strong> 人天，在职 ${dayPoolActiveRiderCount(lowPool.id)} 人需支撑 ${dayPoolRunwayNeed(lowPool)} 人天。
             <button type="button" class="link-btn" data-view-jump="dayPool">进入额度池</button></div>` : ""}
           <div class="kpi-grid">
             ${kpi("人天池可用", poolAvail + " 人天", "预占中 " + poolFrozen + " 人天", "池", "day_pool_panel")}
             ${kpi("在职骑手", riderCount, "已登记团队成员", "骑", "day_pool_channel")}
             ${kpi("签约运营商", contract ? contract.operatorName : "—", contract ? "批发 ¥" + contract.wholesalePrice + "/人天" : "", "运", "day_pool_contract")}
-            ${kpi(lowPool ? "额度池预警" : "额度池数", lowPool ? lowPool.id + " · " + lowPool.balancePct + "%" : pools.length + " 个", lowPool ? "低于 20% 或不足在职×10天" : "向运营商采购", lowPool ? "!" : "池", lowPool ? "day_pool_warn" : "day_pool_purchase")}
+            ${kpi(lowPool ? "额度池预警" : "额度池数", lowPool ? lowPool.id + " · 可用 " + lowPool.availableDays : pools.length + " 个", lowPool ? "可用不足在职×" + DAY_POOL_RUNWAY_DAYS + "天" : "向运营商采购", lowPool ? "!" : "池", lowPool ? "day_pool_warn" : "day_pool_purchase")}
           </div>
           ${contract ? `<section class="panel">
             ${panelHead("签约运营商", "批发价与签约信息（只读）；池级扣天/激活见额度池详情", "day_pool_contract")}
@@ -14470,8 +14504,7 @@
         pool.availableDays += add;
         pool.totalDays += add;
         pool.balancePct = Math.round(pool.availableDays / pool.totalDays * 1000) / 10;
-        if (pool.balancePct >= 20) pool.status = "使用中";
-        pool.warnSms = false;
+        syncDayPoolDerived(pool);
         appendPoolLedger(pool, "续费入账", add, pool.orderNo, document.querySelector("#poolForm [name=remark]")?.value || "续费");
         dayPoolExceptions.filter(e => e.poolId === pool.id && e.type === "预占失败" && e.status === "待重试").forEach(e => {
           e.status = "已自动重试";
@@ -14593,6 +14626,7 @@
         if (days > 0 && days <= pool.availableDays) {
           pool.availableDays -= days;
           pool.balancePct = Math.round(pool.availableDays / pool.totalDays * 1000) / 10;
+          syncDayPoolDerived(pool);
           rider.allocatedDays = (rider.allocatedDays || 0) + days;
           rider.remainingDays = (rider.remainingDays || 0) + days;
           rider.quotaStatus = "使用中";
@@ -14610,6 +14644,7 @@
         if (days > 0) {
           pool.availableDays += days;
           pool.balancePct = Math.round(pool.availableDays / pool.totalDays * 1000) / 10;
+          syncDayPoolDerived(pool);
           rider.remainingDays -= days;
           rider.allocatedDays = Math.max(0, (rider.allocatedDays || 0) - days);
           if (rider.remainingDays <= 0) rider.quotaStatus = "已收回";
@@ -14643,6 +14678,7 @@
             p.expiredDays -= rawDays;
             if (p.status === "已过期" && p.availableDays > 0) p.status = "使用中";
             p.balancePct = p.totalDays ? Math.round(p.availableDays / p.totalDays * 1000) / 10 : 0;
+            syncDayPoolDerived(p);
             appendPoolLedger(p, "过期恢复", rawDays, remark.slice(0, 20) || "过期恢复", remark);
           } else {
             const isDeduct = adjustType === "退款" || adjustType === "修正";
@@ -14654,6 +14690,7 @@
             p.availableDays += delta;
             if (!isDeduct) p.totalDays += rawDays;
             p.balancePct = p.totalDays ? Math.round(p.availableDays / p.totalDays * 1000) / 10 : 0;
+            syncDayPoolDerived(p);
             appendPoolLedger(p, adjustType, delta, remark.slice(0, 20) || "协商单", remark);
           }
         }
@@ -16052,7 +16089,7 @@
                   <td><strong>${p.name}</strong><br><small>${p.id}</small></td>
                   <td>${p.ownerName}</td><td>${p.totalDays} 人天</td>
                   <td>${p.availableDays}</td><td>${p.consumedDays}</td>
-                  <td>¥${p.wholesalePrice}/人天</td><td>${poolStatusTag(p.status)}</td>
+                  <td>¥${p.wholesalePrice}/人天</td><td>${poolStatusTag(dayPoolDisplayStatus(p))}</td>
                   <td>
                     <button type="button" class="link-btn" data-pool-adjust="${p.id}">额度调整</button>
                     · <button type="button" class="link-btn" data-csasset-ledger-ch="${p.ownerId}">查看变动</button>
@@ -17204,7 +17241,7 @@
         if (state.dayPoolTab === "pools" && state.dayPoolPoolsSubTab === "ledger") return true;
         const f = getPf();
         if (!matchKw(p.id, f.poolId) && !matchKw(p.name, f.poolId)) return false;
-        if (f.status !== "全部" && p.status !== f.status) return false;
+        if (f.status !== "全部" && dayPoolDisplayStatus(p) !== f.status) return false;
         return true;
       });
       if (!state.dayPoolSelectedId && pools[0]) state.dayPoolSelectedId = pools[0].id;
@@ -17244,9 +17281,9 @@
                 <td>${p.frozenDays}</td>
                 <td>${p.consumedDays}</td>
                 <td><strong>${p.availableDays}</strong></td>
-                <td>${p.balancePct < 20 ? tag("余额不足 " + p.balancePct + "%") : p.balancePct + "%"}</td>
+                <td>${p.balancePct != null ? p.balancePct + "%" : "—"}</td>
                 <td>${p.validFrom} ~ ${p.validTo}</td>
-                <td>${poolStatusTag(p.status)}${p.warnSms ? "<br><small>已短信预警</small>" : ""}</td>
+                <td>${poolStatusTag(dayPoolDisplayStatus(p))}${p.warnSms ? "<br><small>已短信预警</small>" : ""}</td>
                 <td class="row-actions">
                   <button type="button" class="link-btn" data-open-pool-detail="${p.id}">详情</button>
                   ${canEditDayPool() ? `<button type="button" class="link-btn" data-pool-form="renew" data-pool-id="${p.id}">续费</button>` : ""}
@@ -17565,7 +17602,7 @@
         </section>`;
       }
 
-      const warnPool = pools.find(p => p.balancePct < 20);
+      const warnPool = pools.find(p => dayPoolIsLowBalance(p));
       const zeroQuotaN = isChannelRole() ? zeroQuotaActiveRidersAlert().length : 0;
       return `
         ${ownScopeBanner()}
@@ -17575,7 +17612,7 @@
           <p>向运营商采购额度池 → 创建<strong>骑手团队</strong>并绑定消耗池 → 登记/分配骑手。00:00 预占；<strong>换电或持电池</strong>确认消耗；每次换电同步渠道商。</p>
         </div>`}
         ${!isTeamAdminLogin() && warnPool ? `<div class="pool-warn-banner">${noteBtn("day_pool_warn")}${noteBtn("day_pool_insufficient")}
-          <strong>${warnPool.name}</strong> 可用余额 <strong>${warnPool.balancePct}%</strong>（${warnPool.availableDays}/${warnPool.totalDays} 人天）。
+          <strong>${warnPool.name}</strong> 可用 <strong>${warnPool.availableDays}</strong> 人天，在职 ${dayPoolActiveRiderCount(warnPool.id)} 人需支撑 ${dayPoolRunwayNeed(warnPool)} 人天（×${DAY_POOL_RUNWAY_DAYS}）。
           ${canEditDayPool() ? `<button type="button" class="link-btn" data-pool-form="renew" data-pool-id="${warnPool.id}">立即续费</button>` : ""}
         </div>` : ""}
         ${!isTeamAdminLogin() && zeroQuotaN > 0 ? `<div class="pool-warn-banner">${noteBtn("day_pool_hold_no_quota")}
@@ -19605,6 +19642,11 @@
     }
 
     function render() {
+      try {
+        syncAllDayPoolDerived();
+      } catch (e) {
+        console.error(e);
+      }
       try {
         renderNav();
       } catch (e) {
