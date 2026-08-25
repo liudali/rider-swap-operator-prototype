@@ -3437,6 +3437,114 @@
       });
     }
 
+    function channelTeamActiveCount(team) {
+      if (!team) return 0;
+      return dayPoolRiders.filter(r => r.teamId === team.id && r.status === "在职").length;
+    }
+
+    function enabledChannelTeams() {
+      return myChannelTeams().filter(t => t.status === "启用");
+    }
+
+    function normalizeChannelTeamName(raw) {
+      return String(raw || "").trim();
+    }
+
+    function isChannelTeamNameTaken(name, excludeId) {
+      const n = normalizeChannelTeamName(name);
+      if (!n) return false;
+      return myChannelTeams().some(t => t.id !== excludeId && normalizeChannelTeamName(t.name) === n);
+    }
+
+    function channelTeamNameError(name, excludeId) {
+      const n = normalizeChannelTeamName(name);
+      if (!n) return "请填写团队名称";
+      if (n.length > 20) return "团队名称不超过 20 字";
+      const editing = excludeId ? dayPoolTeams.find(t => t.id === excludeId) : null;
+      if (n === "默认团队" && !(editing && editing.isDefault)) return "「默认团队」为系统保留名称，请换一个";
+      if (isChannelTeamNameTaken(n, excludeId)) return "团队名称已存在，请换一个";
+      return "";
+    }
+
+    function applyChannelTeamName(team, nextName) {
+      team.name = nextName;
+      dayPoolRiders.filter(r => r.teamId === team.id).forEach(r => { r.team = nextName; });
+    }
+
+    function setChannelTeamStatus(teamId, nextStatus) {
+      const t = dayPoolTeams.find(x => x.id === teamId);
+      if (!t) return;
+      if (t.isDefault) {
+        showProtoToast("默认团队不可停用或删除");
+        return;
+      }
+      syncTeamRiderCounts();
+      if (nextStatus === "停用" && channelTeamActiveCount(t) > 0) {
+        showProtoToast("请先将在职骑手变更或移除后再停用");
+        return;
+      }
+      if (nextStatus === "停用") {
+        openProtoConfirm({
+          title: "停用团队",
+          message: "停用「" + t.name + "」后，登记/加入/变更将不可再选该团队。确认停用？",
+          confirmLabel: "停用",
+          onConfirm: () => {
+            t.status = "停用";
+            render();
+            showProtoToast("已停用「" + t.name + "」");
+          }
+        });
+        return;
+      }
+      t.status = "启用";
+      render();
+      showProtoToast("已启用「" + t.name + "」");
+    }
+
+    function deleteChannelTeam(teamId) {
+      const t = dayPoolTeams.find(x => x.id === teamId);
+      if (!t) return;
+      if (t.isDefault) {
+        showProtoToast("默认团队不可删除");
+        return;
+      }
+      syncTeamRiderCounts();
+      if (channelTeamActiveCount(t) > 0) {
+        showProtoToast("请先将在职骑手变更或移除后再删除");
+        return;
+      }
+      openProtoConfirm({
+        title: "删除团队",
+        message: "确认删除「" + t.name + "」？删除后不可恢复。",
+        confirmLabel: "删除",
+        onConfirm: () => {
+          const idx = dayPoolTeams.findIndex(x => x.id === teamId);
+          if (idx >= 0) dayPoolTeams.splice(idx, 1);
+          const ch = platformChannels.find(c => c.id === currentEntity().id);
+          if (ch && (ch.teamCount || 0) > 0) ch.teamCount -= 1;
+          render();
+          showProtoToast("已删除「" + t.name + "」");
+        }
+      });
+    }
+
+    function channelTeamOpsHtml(t) {
+      if (!canEditDayPool()) return "—";
+      if (t.isDefault) return `<small style="color:var(--muted)">系统默认，不可改名/停用/删除</small>`;
+      const empty = channelTeamActiveCount(t) === 0;
+      const btns = [`<button type="button" class="link-btn" data-pool-form="editTeam" data-team-id="${t.id}">编辑</button>`];
+      if (t.status === "启用") {
+        btns.push(`<button type="button" class="link-btn" data-team-disable="${t.id}">停用</button>`);
+      } else {
+        btns.push(`<button type="button" class="link-btn" data-team-enable="${t.id}">启用</button>`);
+      }
+      btns.push(`<button type="button" class="link-btn" data-team-delete="${t.id}">删除</button>`);
+      if (!empty) {
+        btns.push(`<br><small style="color:var(--muted)">有在职成员，停用/删除前请先挪人</small>`);
+      }
+      return btns.join(" ");
+    }
+
     function mySoldDayPools() {
       if (!isOperatorRole()) return [];
       return dayPools.filter(p => p.sellerId === currentEntity().id);
@@ -4182,7 +4290,8 @@
       ],
       dayPool_teams: [
         { key: "keyword", label: "团队名称", placeholder: "" },
-        { key: "poolId", label: "消耗额度池", type: "select", options: () => [{ v: "全部", t: "全部" }].concat(myDayPools().map(p => ({ v: p.id, t: p.name }))) }
+        { key: "poolId", label: "消耗额度池", type: "select", options: () => [{ v: "全部", t: "全部" }].concat(myDayPools().map(p => ({ v: p.id, t: p.name }))) },
+        { key: "status", label: "状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "启用", t: "启用" }, { v: "停用", t: "停用" }] }
       ],
       dayPool_rules: [
         { key: "poolId", label: "额度池", type: "select", options: () => [{ v: "全部", t: "全部额度池" }].concat(myDayPools().map(p => ({ v: p.id, t: p.name }))) },
@@ -14348,14 +14457,19 @@
       return pay;
     }
 
-    function openPoolForm(mode, poolId, riderId) {
+    function openPoolForm(mode, poolId, riderId, teamId) {
       const pool = poolId ? dayPools.find(p => p.id === poolId) : (selectedDayPool() || myDayPools()[0]);
       const rider = riderId ? dayPoolRiders.find(r => r.id === riderId) : null;
-      state.poolForm = { mode, poolId: pool ? pool.id : null, riderId: rider ? rider.id : null };
+      const teamRow = teamId ? dayPoolTeams.find(t => t.id === teamId) : null;
+      if (mode === "editTeam") {
+        if (!teamRow) { showProtoToast("未找到该团队"); return; }
+        if (teamRow.isDefault) { showProtoToast("默认团队不可编辑"); return; }
+      }
+      state.poolForm = { mode, poolId: pool ? pool.id : null, riderId: rider ? rider.id : null, teamId: teamRow ? teamRow.id : null };
       const titles = {
         purchase: "购买人天额度", renew: "续费额度池",
         register: "登记骑手", batchRegister: "批量登记骑手", allocate: "分配人天额度", recover: "收回人天额度", adjust: "额度调整",
-        team: "新增骑手团队", teamPool: "设置团队消耗池", leaveTeam: "移除团队",
+        team: "新增骑手团队", editTeam: "编辑骑手团队", teamPool: "设置团队消耗池", leaveTeam: "移除团队",
         changeTeam: "变更团队", joinTeam: "加入团队"
       };
       document.querySelector("#poolFormTitle").textContent = titles[mode] || "额度池";
@@ -14398,19 +14512,19 @@
           <label>延长失效至<input type="date" name="validTo" value="${pool ? pool.validTo : ""}"></label>
           <label>续费原因<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">余额不足后续费</textarea></label>`;
       } else if (mode === "register") {
-        const teams = myChannelTeams();
+        const teams = enabledChannelTeams();
         html = `
           <label>归属渠道商<input value="${currentEntity().name}" readonly></label>
-          <label>所属团队<select name="teamId">${teams.map(t => `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}</option>`).join("")}</select></label>
+          <label>所属团队<select name="teamId">${teams.map(t => `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}</option>`).join("") || "<option value=\"\">暂无启用中的团队</option>"}</select></label>
           <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("day_pool_identity")} 若骑手有<strong>生效中个人套餐</strong>，须先退订或冻结后再登记；不可个人+渠道双身份。</p>
           <label>手机号<input name="phone" placeholder="13800001111"></label>
           <label>姓名<input name="riderName" placeholder="骑手姓名"></label>
           <p style="font-size:12px;color:var(--muted);margin:0">演示：输入 138****1028（张骑手·个人包月）将拦截登记。</p>`;
       } else if (mode === "batchRegister") {
-        const teams = myChannelTeams();
+        const teams = enabledChannelTeams();
         html = `
           <div class="rider-batch-import" data-import-mode="manual" style="grid-column:1/-1">
-            <label>所属团队<select name="teamId">${teams.map(t => `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}</option>`).join("")}</select></label>
+            <label>所属团队<select name="teamId">${teams.map(t => `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}</option>`).join("") || "<option value=\"\">暂无启用中的团队</option>"}</select></label>
             <div>
               <span style="font-size:12px;color:var(--muted)">导入方式</span>
               <div class="refund-process-presets" role="group" aria-label="导入方式" style="margin-top:6px">
@@ -14476,15 +14590,17 @@
           ${recoverWin ? `<p style="font-size:12px;color:var(--warn);margin:0;grid-column:1/-1">可恢复过期额度 <strong>${recoverWin.maxDays}</strong> 人天，须在 <strong>${recoverWin.deadline}</strong> 前操作（仅运营商）。</p>` : ""}
           <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">「退款」「修正」为扣减：填写正数，系统将记为负向变动；扣减后可用余额不得为负。协商退款选「退款」。</p>
           <label>原因/协商单号<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">线下协商退款，扣减未使用购买额度</textarea></label>`;
-      } else if (mode === "team") {
-        const defPool = defaultChannelPoolId() || (myDayPools()[0] && myDayPools()[0].id);
+      } else if (mode === "team" || mode === "editTeam") {
+        const editing = mode === "editTeam" ? teamRow : null;
+        const defPool = (editing && resolveTeamPoolId(editing)) || defaultChannelPoolId() || (myDayPools()[0] && myDayPools()[0].id);
         const defP = defPool ? poolById(defPool) : null;
         html = `
-          <label>团队名称<input name="teamName" placeholder="如：浦东早班队"></label>
+          <label>团队名称 *<input name="teamName" maxlength="20" value="${editing ? editing.name : ""}" placeholder="如：浦东早班队"></label>
           <label>消耗额度池<input readonly value="${defP ? defP.name + "（渠道唯一池）" : "—"}"></label>
           <input type="hidden" name="poolId" value="${defPool || ""}">
-          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">一个渠道商仅一个人天池；团队与骑手统一从该池扣减，无需按团队分配。</p>
-          <label>备注<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)"></textarea></label>`;
+          <label>状态<input value="${editing ? editing.status : "启用"}" readonly></label>
+          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("day_pool_team")} 名称在本渠道内<strong>唯一</strong>。停用/删除须无在职成员；默认团队不可改。</p>
+          <label>备注<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">${editing ? (editing.remark || "") : ""}</textarea></label>`;
       } else if (mode === "teamPool" && teamForEdit) {
         /* 一渠道一池：不再提供按团队切换消耗池 */
         showProtoToast("渠道仅一个人天池，无需按团队设置消耗池");
@@ -14566,6 +14682,10 @@
       } else if (mode === "register") {
         const teamId = document.querySelector("#poolForm [name=teamId]")?.value || "TEAM-DEFAULT";
         const team = dayPoolTeams.find(t => t.id === teamId);
+        if (team && team.status !== "启用") {
+          showProtoToast("不可登记到已停用的团队");
+          return;
+        }
         const phone = document.querySelector("#poolForm [name=phone]")?.value || "";
         if (userHasActivePersonalPackage(phone)) {
           window.alert("该手机号对应骑手仍有生效中个人套餐，请先退订或冻结套餐后再加入渠道团队。");
@@ -14583,6 +14703,11 @@
         if (team) team.riderCount = (team.riderCount || 0) + 1;
       } else if (mode === "batchRegister") {
         const teamId = document.querySelector("#poolForm [name=teamId]")?.value || "TEAM-DEFAULT";
+        const batchTeam = dayPoolTeams.find(t => t.id === teamId);
+        if (batchTeam && batchTeam.status !== "启用") {
+          showProtoToast("不可登记到已停用的团队");
+          return;
+        }
         const site = document.querySelector("#poolForm [name=site]")?.value || "浦东骑手驿站";
         const importRoot = document.querySelector("#poolForm .rider-batch-import");
         const importMode = importRoot?.dataset.importMode || "manual";
@@ -14609,17 +14734,30 @@
         window.alert("批量登记完成：成功 " + okN + " 条，失败 " + (results.length - okN) + " 条\n\n" +
           results.map(r => (r.ok ? "✓ " : "✗ ") + r.phone + " " + r.name + (r.ok ? "" : " — " + r.reason)).join("\n"));
         riderBatchImportParsedRows = [];
-      } else if (mode === "team") {
+      } else if (mode === "team" || mode === "editTeam") {
+        const editing = mode === "editTeam" ? dayPoolTeams.find(t => t.id === form.teamId) : null;
+        if (mode === "editTeam" && (!editing || editing.isDefault)) {
+          showProtoToast("默认团队不可编辑");
+          return;
+        }
+        const name = normalizeChannelTeamName(document.querySelector("#poolForm [name=teamName]")?.value);
+        const nameErr = channelTeamNameError(name, editing ? editing.id : null);
+        if (nameErr) { showProtoToast(nameErr); return; }
+        const remark = document.querySelector("#poolForm [name=remark]")?.value || "";
         const poolId = document.querySelector("#poolForm [name=poolId]")?.value || defaultChannelPoolId();
-        const name = document.querySelector("#poolForm [name=teamName]")?.value || "新团队";
-        dayPoolTeams.push({
-          id: "TEAM-" + Date.now().toString().slice(-4), channelId: currentEntity().id, name, poolId,
-          isDefault: false, riderCount: 0, status: "启用",
-          createdAt: new Date().toISOString().slice(0, 10),
-          remark: document.querySelector("#poolForm [name=remark]")?.value || ""
-        });
-        const ch = platformChannels.find(c => c.id === currentEntity().id);
-        if (ch) ch.teamCount = (ch.teamCount || 0) + 1;
+        if (editing) {
+          applyChannelTeamName(editing, name);
+          editing.remark = remark;
+        } else {
+          dayPoolTeams.push({
+            id: "TEAM-" + Date.now().toString().slice(-4), channelId: currentEntity().id, name, poolId,
+            isDefault: false, riderCount: 0, status: "启用",
+            createdAt: new Date().toISOString().slice(0, 10),
+            remark
+          });
+          const ch = platformChannels.find(c => c.id === currentEntity().id);
+          if (ch) ch.teamCount = (ch.teamCount || 0) + 1;
+        }
       } else if (mode === "teamPool") {
         const teamId = document.querySelector("#poolForm [name=teamId]")?.value;
         const team = dayPoolTeams.find(t => t.id === teamId);
@@ -14642,6 +14780,10 @@
         const team = dayPoolTeams.find(t => t.id === teamId);
         if (!team) {
           window.alert("请选择目标团队");
+          return;
+        }
+        if (team.status !== "启用") {
+          showProtoToast("不可加入已停用的团队，请先启用或换一个启用中的团队");
           return;
         }
         if (mode === "changeTeam" && team.id === rider.teamId) {
@@ -17349,18 +17491,19 @@
           const teams = myChannelTeams().filter(t => {
             if (!matchKw(t.name, f.keyword)) return false;
             if (f.poolId !== "全部" && resolveTeamPoolId(t) !== f.poolId) return false;
+            if (f.status && f.status !== "全部" && t.status !== f.status) return false;
             return true;
           });
           const teamsPg = paginateList(teams, state.dayPoolTeamsPage, state.dayPoolTeamsPageSize || 8);
           state.dayPoolTeamsPage = teamsPg.page;
-          const poolHint = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} 一个渠道商<strong>仅一个人天额度池</strong>；所有团队与骑手均从该池扣减，不按团队分配/切换消耗池。</div>`;
+          const poolHint = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} 一个渠道商<strong>仅一个人天额度池</strong>；所有团队与骑手均从该池扣减。默认团队不可改名/停用/删除；其它团队无在职成员时可停用或删除。</div>`;
           body = `${poolHint}<section class="panel panel-with-top-tabs">
           ${ridersTopTabs}
           ${inlinePfBarHtml("dayPool_teams")}
           ${panelHead("骑手团队", "创建与管理团队；扣减统一走渠道唯一额度池", "day_pool_team", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="team">新增团队</button>` : "")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>团队</th><th>消耗额度池</th><th>在职骑手</th><th>默认</th><th>创建时间</th><th>备注</th><th>状态</th></tr></thead>
+              <thead><tr><th>团队</th><th>消耗额度池</th><th>在职骑手</th><th>默认</th><th>创建时间</th><th>备注</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${teamsPg.slice.map(t => `<tr>
                 <td><strong>${t.name}</strong><br><small>${t.id}</small></td>
                 <td>${teamPoolCell(t)}</td>
@@ -17369,7 +17512,8 @@
                 <td>${t.createdAt || "—"}</td>
                 <td>${t.remark || "—"}</td>
                 <td>${tag(t.status)}</td>
-              </tr>`).join("") || "<tr><td colspan='7'>暂无团队</td></tr>"}</tbody>
+                <td class="row-actions">${channelTeamOpsHtml(t)}</td>
+              </tr>`).join("") || "<tr><td colspan='8'>暂无团队</td></tr>"}</tbody>
             </table>
             ${renderTablePager(teamsPg, "dpriders-team-page")}
           </div>
@@ -18341,8 +18485,17 @@
         btn.onclick = e => {
           e.stopPropagation();
           if (btn.dataset.poolId) state.dayPoolSelectedId = btn.dataset.poolId;
-          openPoolForm(btn.dataset.poolForm, btn.dataset.poolId, btn.dataset.riderId);
+          openPoolForm(btn.dataset.poolForm, btn.dataset.poolId, btn.dataset.riderId, btn.dataset.teamId);
         };
+      });
+      root.querySelectorAll("[data-team-disable]").forEach(btn => {
+        btn.onclick = e => { e.stopPropagation(); setChannelTeamStatus(btn.dataset.teamDisable, "停用"); };
+      });
+      root.querySelectorAll("[data-team-enable]").forEach(btn => {
+        btn.onclick = e => { e.stopPropagation(); setChannelTeamStatus(btn.dataset.teamEnable, "启用"); };
+      });
+      root.querySelectorAll("[data-team-delete]").forEach(btn => {
+        btn.onclick = e => { e.stopPropagation(); deleteChannelTeam(btn.dataset.teamDelete); };
       });
       root.querySelectorAll("[data-pool-adjust]").forEach(btn => {
         btn.onclick = () => openPoolForm("adjust", btn.dataset.poolAdjust);

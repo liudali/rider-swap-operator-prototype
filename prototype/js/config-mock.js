@@ -494,7 +494,7 @@
       day_pool_b2b_refund: { title: "额度池退款说明（渠道商）", content: "人天额度池<strong>不支持在线退款</strong>。若需退未使用额度，须与<strong>签约运营商线下协商</strong>；达成一致后由运营商在后台执行额度扣减（账本类型：<strong>退款</strong>），资金按对公约定另行结算。渠道商后台不可自行发起池退款。" },
       day_pool_operator_adjust: { title: "运营商额度调整", content: "运营商在「渠道管理 → 渠道权益 → 已售额度池」手工调账。类型：充值、赠送、退款、修正、过期恢复（30 天内）。" },
       entitlement_api: { title: "渠道骑手可换电校验", content: "换电前调用 <code>POST /api/v1/entitlement/check</code>：返回 allowed_swap / allowed_return、fail_reason、gate_reason。无人天额度时 <strong>allowed_swap=false</strong>，持电池仅可还电；<strong>无自费兜底 SKU</strong>。见 decision-054。" },
-      day_pool_team: { title: "骑手团队", content: "入口在<strong>骑手登记</strong>页内 Tab「骑手团队」。渠道商创建团队用于组织骑手。<br>· <strong>一个渠道商仅一个人天额度池</strong>；所有团队/骑手均从该池扣减，<strong>无</strong>「按团队分配/切换消耗池」「自动绑定」操作<br>· 列表无「操作」列（decision-072）<br>· 在职与离职骑手均可加入/变更/移除团队（在「登记骑手」列表操作）" },
+      day_pool_team: { title: "骑手团队", content: "入口在<strong>骑手登记</strong>页内 Tab「骑手团队」。<br>· <strong>默认团队</strong>开户自动创建，始终启用，不可改名/停用/删除<br>· 其它团队可新增、编辑（名称本渠道唯一）、启用/停用；<strong>无在职成员</strong>才可停用或删除（decision-116）<br>· 一个渠道商仅一个人天额度池，不按团队切池<br>· 登记/加入/变更只出现<strong>启用中</strong>的团队" },
       day_pool_org: { title: "团队与额度池", content: "编排单元为<strong>团队</strong>（非组织/站点）。团队 <code>pool_id</code> 决定从哪个额度池扣减；额度使用规则为团队配置周期额度上限。" },
       day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护个人套餐城市价；渠道商只读。<strong>已取消</strong>渠道零额度自费兜底：无预占/无额度时不可换电，仅可还电，须渠道续配。" },
       day_pool_allocate: { title: "分配与收回", content: "分配：从团队绑定池可用余额划出 N 人天给骑手（分配即开通，按池统一口径预占/确认）。收回/退出团队：剩余未用人天自动退回池余额。" },
@@ -2051,6 +2051,8 @@
     const dayPoolTeams = [
       { id: "TEAM-DEFAULT", channelId: "CH-SF", name: "默认团队", poolId: "QP-2601", isDefault: true, riderCount: 5, status: "启用", createdAt: "2026-01-01", remark: "渠道开户时自动创建并绑定额度池" },
       { id: "TEAM-WB", channelId: "CH-SF", name: "世博车队", poolId: "QP-2601", isDefault: false, riderCount: 1, status: "启用", createdAt: "2026-06-01", remark: "共享闪送主池 QP-2601" },
+      { id: "TEAM-NIGHT", channelId: "CH-SF", name: "浦东夜班", poolId: "QP-2601", isDefault: false, riderCount: 0, status: "启用", createdAt: "2026-07-01", remark: "空编，可停用或删除（演示）" },
+      { id: "TEAM-OFF", channelId: "CH-SF", name: "已撤点车队", poolId: "QP-2601", isDefault: false, riderCount: 0, status: "停用", createdAt: "2026-03-01", remark: "无在职成员，已停用（演示）" },
     ];
 
     /* decision-062：不再维护团队周期额度上限；保留空数组以免历史引用报错 */
@@ -2873,7 +2875,7 @@
       leaseCollect: { month: "", lessee: "", collectStatus: "全部" },
       leaseRent: { month: "2026-06", contractId: "" },
       dayPool_pools: { poolId: "", status: "全部" },
-      dayPool_teams: { keyword: "", poolId: "全部" },
+      dayPool_teams: { keyword: "", poolId: "全部", status: "全部" },
       dayPool_rules: { poolId: "全部", teamId: "全部", status: "全部" },
       dayPool_riders: { teamId: "全部", keyword: "", status: "全部", quotaStatus: "全部" },
       dayPool_allocations_riders: { keyword: "", teamId: "全部", poolId: "全部", quotaStatus: "全部" },
