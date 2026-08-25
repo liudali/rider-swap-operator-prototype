@@ -1649,6 +1649,16 @@
       return o.payMethod || (o.payChannel === "online" ? "—" : "对公转账");
     }
 
+    /** 线下对公认款摘要：流水号是回单证据，附言/单号才是对账键（decision-114） */
+    function channelOfflineReconHtml(o) {
+      if (!o || o.payChannel === "online") return "";
+      const bits = [];
+      if (o.transferRef) bits.push("流水 " + o.transferRef);
+      if (o.payerAccount && o.payerAccount !== "—") bits.push("付款 " + o.payerAccount);
+      if (!bits.length && o.offlineVoucher) bits.push(o.offlineVoucher);
+      return bits.length ? `<br><small style="color:var(--muted)">${bits.join(" · ")}</small>` : "";
+    }
+
     function channelPoActionCell(o, role) {
       return b2bOrderActionCell(o, role, "day");
     }
@@ -2156,7 +2166,7 @@
       o.confirmedAt = now;
       o.confirmedBy = currentEntity().name;
       creditPoolFromChannelOrder(o);
-      window.alert("演示：已确认线下到账，订单 " + poId + " 已完成");
+      window.alert("演示：已确认线下到账\n采购单 " + poId + "\n金额 ¥" + o.amount.toLocaleString("zh-CN") + "\n流水号 " + (o.transferRef || "—") + "\n附言应对应该采购单号");
       return true;
     }
 
@@ -10396,7 +10406,7 @@
                   <td>${o.operatorName || operatorLabel(o.operatorId)}</td>
                   <td>${o.days.toLocaleString("zh-CN")} 人天<br><strong>¥${o.amount.toLocaleString("zh-CN")}</strong></td>
                   <td>${channelPayChannelLabel(o)}</td>
-                  <td>${channelPayMethodLabel(o)}${o.offlineVoucher ? `<br><small>${o.offlineVoucher}</small>` : ""}</td>
+                  <td>${channelPayMethodLabel(o)}${channelOfflineReconHtml(o)}</td>
                   <td>${tag(o.orderStatus)}</td>
                   <td>${tag(o.payStatus)}</td>
                   <td>${o.createdAt || "—"}</td>
@@ -14296,15 +14306,19 @@
     }
 
     function readPoolPurchasePaymentFromForm() {
-      const payChannel = document.querySelector("#poolForm [name=payChannel]")?.value || "offline";
+      const payChannel = document.querySelector("#poolForm [name=payChannel]")?.value || "online";
       const payMethod = payChannel === "online"
         ? (document.querySelector("#poolForm [name=onlinePayMethod]")?.value || "微信扫码")
         : (document.querySelector("#poolForm [name=offlinePayMethod]")?.value || "对公转账");
+      const transferRef = (document.querySelector("#poolForm [name=transferRef]")?.value || "").trim();
+      const payerAccount = (document.querySelector("#poolForm [name=payerAccount]")?.value || "").trim();
       return {
         payChannel,
         payMethod,
         orderStatus: payChannel === "online" ? "待支付" : "待确认到账",
-        payStatus: payChannel === "online" ? "待支付" : "待付款"
+        payStatus: payChannel === "online" ? "待支付" : "待付款",
+        transferRef: payChannel === "offline" ? transferRef : "",
+        payerAccount: payChannel === "offline" ? (payerAccount || "—") : ""
       };
     }
 
@@ -14328,7 +14342,7 @@
         createdAt: new Date().toISOString().slice(0, 19).replace("T", " "),
         payTime: null,
         paymentNo: pay.payChannel === "online" ? "WX-PAY-PENDING-" + Date.now().toString().slice(-4) : null,
-        offlineVoucher: pay.payChannel === "offline" ? "已提交采购单" : null,
+        offlineVoucher: pay.payChannel === "offline" ? (pay.transferRef || "已提交采购单") : null,
         confirmedBy: null, confirmedAt: null
       });
       return pay;
@@ -14368,6 +14382,13 @@
           <label>支付渠道<select name="payChannel" id="poolPayChannel"><option value="online">在线支付</option><option value="offline">线下打款</option></select></label>
           <label id="poolOnlinePayWrap">在线方式<select name="onlinePayMethod"><option>微信扫码</option><option>支付宝扫码</option></select></label>
           <label id="poolOfflinePayWrap" style="display:none">线下方式<select name="offlinePayMethod"><option>对公转账</option></select></label>
+          <div id="poolOfflineReconWrap" style="display:none;grid-column:1/-1">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 8px">${noteBtn("day_pool_offline_recon")} 对公<strong>附言请填上方采购单号</strong>。流水号是付款回单证据，收款来账号往往不同，不能单独认款。不填转账日。</p>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              <label>银行流水号 *<input name="transferRef" placeholder="付款回单流水号"></label>
+              <label>付款账户（建议）<input name="payerAccount" placeholder="对公户名或账号后四位"></label>
+            </div>
+          </div>
           <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("day_pool_one_per_operator")} ${noteBtn("day_pool_b2b_settlement")} ${noteBtn("channel_no_receipt")} 多次采购只增加<strong>批发订单</strong>与<strong>额度变动记录</strong>，不新建第二池。</p>
           <label>备注<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">向签约运营商增购人天</textarea></label>`;
       } else if (mode === "renew") {
@@ -14477,8 +14498,10 @@
         const online = paySel && paySel.value === "online";
         const onWrap = document.querySelector("#poolOnlinePayWrap");
         const offWrap = document.querySelector("#poolOfflinePayWrap");
+        const reconWrap = document.querySelector("#poolOfflineReconWrap");
         if (onWrap) onWrap.style.display = online ? "" : "none";
         if (offWrap) offWrap.style.display = online ? "none" : "";
+        if (reconWrap) reconWrap.style.display = online ? "none" : "";
       };
       if (paySel) { paySel.onchange = syncPoolPayFields; syncPoolPayFields(); }
       document.querySelector("#poolModal").classList.add("open");
@@ -14519,10 +14542,27 @@
           ? poolForChannelSeller(currentEntity().id, sellerId)
           : (form.poolId ? poolById(form.poolId) : null);
         const price = parseFloat(document.querySelector("#poolForm [name=wholesalePrice]")?.value || String(platformAccrualDayPrice()));
+        const payPreview = readPoolPurchasePaymentFromForm();
+        if (payPreview.payChannel === "offline") {
+          if (!payPreview.transferRef) {
+            window.alert("线下打款请填写银行流水号（付款回单）");
+            return;
+          }
+          const dup = channelSalesOrders.find(x =>
+            x.operatorId === sellerId
+            && x.transferRef
+            && x.transferRef === payPreview.transferRef
+            && x.orderStatus !== "已驳回"
+          );
+          if (dup) {
+            window.alert("该银行流水号已用于采购单 " + dup.id + "，请核对回单或换一笔转账");
+            return;
+          }
+        }
         const pay = appendChannelPurchaseOrder(existingPool?.id || null, days, price, orderNo);
         window.alert(pay.payChannel === "online"
           ? "采购单 " + orderNo + " 已创建，支付成功后入账" + (existingPool ? "池 " + existingPool.id : "（首单将创建唯一额度池）")
-          : "采购单 " + orderNo + " 已创建，运营商确认到账后入账" + (existingPool ? "池 " + existingPool.id : "（首单将创建唯一额度池）"));
+          : "采购单 " + orderNo + " 已创建。请对公转账并将附言填写为 " + orderNo + "，运营商按金额+附言+流水号确认后入账");
       } else if (mode === "register") {
         const teamId = document.querySelector("#poolForm [name=teamId]")?.value || "TEAM-DEFAULT";
         const team = dayPoolTeams.find(t => t.id === teamId);
@@ -15918,7 +15958,7 @@
                   <td>${o.id}${o.poolId ? `<br><small>${o.poolId}</small>` : ""}</td>
                   <td>${o.channelName}</td>
                   <td>${o.days} 人天<br>¥${o.amount.toLocaleString("zh-CN")}</td>
-                  <td>${channelPayChannelLabel(o)} · ${channelPayMethodLabel(o)}</td>
+                  <td>${channelPayChannelLabel(o)} · ${channelPayMethodLabel(o)}${channelOfflineReconHtml(o)}</td>
                   <td>${tag(o.orderStatus)}</td><td>${tag(o.payStatus)}</td>
                   <td>${o.payTime || "—"}</td>
                   <td>${channelPoActionCell(o, "operator")}</td>

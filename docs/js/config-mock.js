@@ -343,7 +343,8 @@
       operator_deposit: { title: "平台保证金", content: "运营商在平台预存的清分账户。平时 跨网设备服务费平台代收/代付、B 端 1% 平台费均从保证金划扣；余额为 0 后才启用信用额度。充值通过对公转账至平台清分专户，平台财务确认后入账。" },
       operator_credit: { title: "信用额度", content: "仅当平台保证金余额为 0 时启用，允许欠费记账。信用额度也用光后，自动关闭该运营商所属全部用户（个人+渠道）的跨网换电；本站换电不受影响。" },
       operator_credit_eval: { title: "准入档位", content: "平台对运营商主体的招商准入政策包（方案 B）。A/B/C/D 四档绑定最低保证金、信用封顶、跨网默认、可签渠道数。入网定档 + 年度复审；运营商只读，不能自改授信上限。与「渠道信用评估」独立。" },
-      deposit_recharge: { title: "对公充值流程", content: "① 运营商在「保证金账户」提交充值申请（金额、转账日期、银行流水号）；② 对公转账至平台清分专户（附言含运营商 ID）；③ 平台在「保证金管理 → 充值确认」核对到账后确认入账；④ 保证金余额增加，恢复保证金优先扣款。" },
+      deposit_recharge: { title: "对公充值流程", content: "① 运营商在「保证金账户」提交充值申请（金额、转账日期、银行流水号）；② 对公转账至平台清分专户（<strong>附言含运营商 ID</strong>，这是来账对上主体的键）；③ 平台核对金额+附言+付款户，流水号作回单证据（付款回单号与来账号往往不同）；④ 确认后保证金入账。" },
+      day_pool_offline_recon: { title: "人天采购对公认款", content: "与保证金同一套「对公认款包」（decision-114）。<strong>附言填采购单号</strong>才是收款方对上哪一笔的键；银行流水号是付款回单证据，系统内防重复，不能单独认人认单。建议填付款账户。<strong>不填转账日</strong>（付款日≠到账日，不是对账键，decision-115）。" },
       deposit_manage: { title: "平台保证金管理", content: "平台维护清分收款专户；审核运营商对公充值；可手工调整保证金余额、设置信用额度上限。所有变动写入保证金账本。" },
       swap_policy: { title: "换电范围设置", content: "跨网须<strong>平台开关</strong>与<strong>运营商开关同时开启</strong>才生效（双向封闭）。变更须确认，避免误触。同运营商内任意站点可购可换；不设用户绑定站点。" },
       swap_policy_cross_net: { title: "跨网换电双开关", content: "平台按运营商配置「是否允许跨网」；运营商在换电范围自行开关。仅两者都开，且信用额度未停跨网，才可跨网。关闭任一侧即双向封闭。" },
@@ -500,7 +501,7 @@
       day_pool_contract: { title: "额度池规则", content: "平台统一（只读）：<strong>分配即开通</strong>；每日预占后<strong>换电或持电池</strong>确认消耗；池过期<strong>不退</strong>。B 端结算节奏由渠道商与运营商线下协商，不在此展示。" },
       day_pool_identity: { title: "个人与渠道互斥", content: "同一骑手<strong>不可同时</strong>拥有生效中个人套餐与渠道团队成员身份。加入团队前须<strong>退订或冻结</strong>个人套餐。退出团队（主动/被移除）时<strong>未用人天自动回池</strong>。" },
       day_pool_channel: { title: "渠道商额度管理", content: "骑手须登记在渠道商名下并归属某一<strong>团队</strong>；团队绑定消耗额度池。登记时校验无生效中个人套餐。在职/离职均可<strong>加入、变更、移除团队</strong>；移除时未用人天自动回池并记离职。<strong>批量导入</strong>支持手工粘贴或上传 CSV/TXT/XLSX（手机号、姓名）。" },
-      day_pool_purchase: { title: "购买人天额度", content: "渠道商向签约运营商按批发价采购人天；<strong>同一运营商续费在原池增购</strong>，不因团队再建第二池。向新运营商签约才产生新池实例。" },
+      day_pool_purchase: { title: "购买人天额度", content: "渠道商向签约运营商按批发价采购人天；<strong>同一运营商续费在原池增购</strong>，不因团队再建第二池。向新运营商签约才产生新池实例。线下对公须填流水号，附言填采购单号（decision-114）。" },
       day_pool_ledger: { title: "额度明细账本", content: "所有额度变动留痕。渠道商可见：购买、分配、收回、预占、确认消耗、释放、续费等。运营商调账类型：<strong>充值、赠送、退款、修正、过期恢复</strong>（协商退款走「退款」；过期恢复仅运营商、池过期后 30 天内）。" },
       day_pool_warn: { title: "余额不足（唯一口径）", content: "池状态、顶栏、短信同一条：<strong>可用余额 &lt; 在职骑手数 × 10 人天</strong>。在职含未分配/零额度/待还电，不含离职。刚好 10 天仍为「使用中」。已作废「占总量 20%」规则（decision-113）。触发后短信渠道商+运营商，并写入短信记录。" },
       day_pool_hold_no_quota: { title: "零额度 / 待还电", content: "渠道商顶栏「骑手零额度」（在职剩余人天=0）。原因：①个人无额度 ②预占失败。持电池→「待还电」：<strong>仅可还电、禁止换电</strong>；不透支；<strong>无自费兜底</strong>。见 decision-049 / 054。" },
@@ -541,7 +542,7 @@
     const VIEW_MODULE_NOTE = {
       overview: ["scope", "overview_sites", "overview_online", "overview_orders", "overview_net", "overview_site_expense", "overview_site_stats", "overview_power_stats"],
       pricing: ["pricing_pkg", "pricing_zone", "pricing_quota", "pricing_card", "pricing_deposit", "swap_policy", "swap_policy_cross_net", "platform_standard_day_price"],
-      channelSales: ["channel_sales", "channel_partner_manage", "channel_partner_rights", "day_pool_one_per_operator", "day_pool_b2b_settlement"],
+      channelSales: ["channel_sales", "channel_partner_manage", "channel_partner_rights", "day_pool_one_per_operator", "day_pool_b2b_settlement", "day_pool_offline_recon"],
       sites: ["sites_panel", "site_expenses_panel", "site_partner_binding", "site_partner_change_log"],
       sitePartners: ["site_partner_panel", "site_partner_open_account", "site_partner_binding", "site_partner_change_log", "site_partner_split"],
       partnerOverview: ["partner_portal", "site_partner_open_account"],
@@ -571,7 +572,7 @@
       employees: ["employees_panel", "employees_perms", "employee_login_scope"],
       users: ["users_panel", "user_kyc", "rider_battery_deposit", "orders_deposit_waiver"],
       accounts: ["accounts_panel", "accounts_corp_bind", "arch_b"],
-      dayPool: ["day_pool_panel", "day_pool_reserve", "day_pool_consume", "day_pool_team", "day_pool_identity", "day_pool_b2b_refund", "day_pool_hold_no_quota", "entitlement_api"],
+      dayPool: ["day_pool_panel", "day_pool_reserve", "day_pool_consume", "day_pool_team", "day_pool_identity", "day_pool_b2b_refund", "day_pool_hold_no_quota", "day_pool_offline_recon", "entitlement_api"],
       channelCredit: ["module_channel_credit"],
       channelLinks: ["module_channel_links", "channel_settlement_card", "pricing_card"],
       channelOrders: ["module_channel_orders", "channel_settlement_card"],
@@ -2441,6 +2442,7 @@
         payChannel: "offline", payMethod: "对公转账",
         orderStatus: "已完成", payStatus: "已付款",
         createdAt: "2026-01-05 09:30", payTime: "2026-01-05 10:00",
+        transferRef: "20260105100088", transferDate: "2026-01-05", payerAccount: "3100****6601",
         confirmedBy: "张经理", confirmedAt: "2026-01-05 10:00", paymentNo: null
       },
       {
@@ -2459,7 +2461,8 @@
         payChannel: "offline", payMethod: "对公转账",
         orderStatus: "待确认到账", payStatus: "待付款",
         createdAt: "2026-06-08 11:00", payTime: null,
-        offlineVoucher: "转账凭证已上传", paymentNo: null, confirmedBy: null, confirmedAt: null
+        transferRef: "20260608112233", transferDate: "2026-06-08", payerAccount: "3100****6601",
+        offlineVoucher: "20260608112233", paymentNo: null, confirmedBy: null, confirmedAt: null
       },
       {
         id: "PO-202606-088", channelId: "CH-SF", channelName: ENT.channel.name,
