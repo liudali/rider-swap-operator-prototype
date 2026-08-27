@@ -4175,8 +4175,8 @@
         { key: "phone", label: "用户手机", placeholder: "完整或后四位" },
         { key: "payFrom", label: "支付日起", type: "date" },
         { key: "payTo", label: "支付日止", type: "date" },
-        { key: "serviceState", label: "服务状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] },
-        { key: "status", label: "订单状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] },
+        { key: "serviceState", label: "服务状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待激活", t: "待激活" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] },
+        { key: "status", label: "订单状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待激活", t: "待激活" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] },
         { key: "depositMethod", label: "押金方式", type: "select", options: [
           { v: "全部", t: "全部" }, { v: "实付", t: "实付" }, { v: "信用免押", t: "信用免押" },
           { v: "渠道担保", t: "渠道担保" }, { v: "无", t: "——" }
@@ -4242,7 +4242,7 @@
           { v: "全部", t: "全部" }, { v: "个人套餐", t: "个人套餐" }, { v: "人天池", t: "人天池" }
         ] },
         { key: "serviceState", label: "服务状态", type: "select", options: [
-          { v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" },
+          { v: "全部", t: "全部" }, { v: "待激活", t: "待激活" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" },
           { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }, { v: "不可用", t: "不可用" }
         ] },
         { key: "depositKind", label: "电池押金", type: "select", options: [
@@ -4378,7 +4378,7 @@
         { key: "orderId", label: "套餐单号", placeholder: "SUB-" },
         { key: "phone", label: "用户手机", placeholder: "" },
         { key: "operatorId", label: "售卖运营商", type: "select", options: () => platformOperatorOptions() },
-        { key: "serviceState", label: "服务状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] }
+        { key: "serviceState", label: "服务状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待激活", t: "待激活" }, { v: "服务中", t: "服务中" }, { v: "已冻结", t: "已冻结" }, { v: "中途完结", t: "中途完结" }, { v: "已完结", t: "已完结" }] }
       ],
       platformOrders_swap: [
         { key: "swapId", label: "换电单号", placeholder: "SW-" },
@@ -6660,13 +6660,61 @@
       ).join("")}</div>`;
     }
 
-    /** 个人套餐城市底价可选 SKU（暂定 · decision-041 补充） */
+    /** 个人套餐城市底价可选 SKU（decision-117：开通方式 + 有效期自然日） */
     const PERSONAL_PKG_SKU_PRESETS = [
-      { pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 299 },
-      { pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 89 },
-      { pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29 },
-      { pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9 }
+      { pkg: "包月30天", pkgType: "monthly", benefitDays: 30, swapLimit: null, retailPrice: 299 },
+      { pkg: "7天套餐", pkgType: "weekly", benefitDays: 7, swapLimit: null, retailPrice: 89 },
+      { pkg: "1天套餐", pkgType: "daily", benefitDays: 1, swapLimit: null, retailPrice: 29 },
+      { pkg: "次卡10次", pkgType: "times", benefitDays: null, swapLimit: 10, retailPrice: 89 },
+      { pkg: "单次换电", pkgType: "single", benefitDays: null, swapLimit: 1, retailPrice: 9.9 }
     ];
+    function skuIsTimesCard(row) {
+      return !!(row && (row.pkgType === "times" || row.pkgType === "single" || row.swapLimit));
+    }
+    function skuDefaultValidityDays(row) {
+      if (!row) return 1;
+      if (row.swapLimit) return row.swapLimit;
+      if (row.benefitDays) return row.benefitDays;
+      const t = row.pkgType;
+      if (t === "weekly") return 7;
+      if (t === "daily" || t === "single") return 1;
+      if (t === "times") return 10;
+      if (t === "quarterly") return 90;
+      return 30;
+    }
+    function pkgValidityDays(row) {
+      const n = parseInt(row?.validityDays, 10);
+      if (Number.isFinite(n) && n > 0) return n;
+      if (row?.validityHours) return Math.max(1, Math.ceil(row.validityHours / 24));
+      const preset = PERSONAL_PKG_SKU_PRESETS.find(p => p.pkg === row?.pkg);
+      return skuDefaultValidityDays(preset || row);
+    }
+    function pkgStartMode(row) {
+      return row?.startMode === "first_pickup" ? "first_pickup" : "pay";
+    }
+    function pkgStartModeLabel(modeOrRow) {
+      const mode = typeof modeOrRow === "string" ? modeOrRow : pkgStartMode(modeOrRow);
+      return mode === "first_pickup" ? "首次领电生效" : "购买立即生效";
+    }
+    function resolveValidityDays(raw, rowOrPreset) {
+      const days = parseInt(raw, 10);
+      if (!Number.isFinite(days) || days < 1) return { error: "有效期至少 1 天" };
+      if (!skuIsTimesCard(rowOrPreset)) {
+        const minDays = skuDefaultValidityDays(rowOrPreset);
+        if (days < minDays) return { error: "按天套餐有效期不能短于权益天数（" + minDays + " 天）" };
+      }
+      return { days };
+    }
+    function skuPresetOptionHtml(p, selectedPkg) {
+      return `<option value="${p.pkg}" data-type="${p.pkgType}" data-days="${skuDefaultValidityDays(p)}" data-swap="${p.swapLimit ?? ""}" data-price="${p.retailPrice}"${selectedPkg === p.pkg ? " selected" : ""}>${p.pkg}</option>`;
+    }
+    function startModeSelectHtml(selected) {
+      const mode = selected === "first_pickup" ? "first_pickup" : "pay";
+      return `<select name="startMode">
+            <option value="pay"${mode === "pay" ? " selected" : ""}>购买立即生效</option>
+            <option value="first_pickup"${mode === "first_pickup" ? " selected" : ""}>首次领电生效</option>
+          </select>`;
+    }
     /** 个人套餐/台账电池型号：取自平台字典启用项（decision-085/088） */
     const BATTERY_MODEL_OPTIONS = [];
     function syncBatteryModelOptions() {
@@ -10571,7 +10619,7 @@
                   <td>${p.id}</td><td>${p.user}<br><small>${p.phone}</small></td>
                   <td>${p.deviceOwnerName}</td><td>${p.site}</td><td>${p.pkg}</td>
                   <td>${serviceStateCell(p)}</td>
-                  <td>${p.validFrom}<br><small>至 ${p.validTo}</small></td>
+                  <td>${pkgOrderPeriodCell(p)}</td>
                   <td>¥${p.pay}</td>
                   <td><button type="button" class="link-btn" data-open-sub="${p.id}">详情</button></td>
                 </tr>`).join("") || "<tr><td colspan='9'>暂无</td></tr>"}</tbody>
@@ -13600,12 +13648,14 @@
           <div class="detail-item"><span>收款主体</span><strong>${PAYEE_OPERATOR}</strong></div>
           <div class="detail-item"><span>进件商户</span><strong>${PAYEE_MCH.wx}</strong></div>
           <div class="detail-item"><span>支付时间</span><strong>${p.payTime}</strong></div>
+          <div class="detail-item"><span>开通方式</span><strong>${pkgStartModeLabel(p)}</strong></div>
           <div class="detail-item"><span>服务状态</span><strong>${serviceStateCell(p)}</strong></div>
           <div class="detail-item"><span>押金方式</span>${dep.methodDetail}</div>
           <div class="detail-item"><span>收款状态</span><strong>${packageDepositPayStatusCell(p)}</strong>${payStatusExtra}</div>
           <div class="detail-item"><span>购电站点</span><strong>${p.site || "—"}</strong></div>
-          <div class="detail-item"><span>有效期起</span><strong>${p.validFrom}</strong></div>
-          <div class="detail-item"><span>有效期止</span><strong>${p.validTo}</strong></div>
+          <div class="detail-item"><span>有效期起</span><strong>${p.validFrom || ((p.serviceState || p.status) === "待激活" ? "待首次领电" : "—")}</strong></div>
+          <div class="detail-item"><span>有效期止</span><strong>${p.validTo || ((p.serviceState || p.status) === "待激活" ? "待首次领电" : "—")}</strong></div>
+          ${(p.serviceState || p.status) === "待激活" && p.activateDeadline ? `<div class="detail-item"><span>领取截止</span><strong>${p.activateDeadline}</strong><br><small style="font-weight:400;color:var(--muted)">逾期未领电关闭订单并全额退套餐费</small></div>` : ""}
           ${p.endTime ? `<div class="detail-item"><span>完结时间</span><strong>${p.endTime}</strong></div>` : ""}
           <div class="detail-item"><span>清分状态</span><strong>${tag(p.payout || "—")}</strong></div>
         </div>
@@ -13620,8 +13670,9 @@
 
     /** 套餐购买订单页 · 服务状态详情对比（非正式产品说明，decision-069） */
     function packageServiceStateDetailCompareHtml(scopedRows) {
-      const states = ["服务中", "已冻结", "中途完结", "已完结"];
+      const states = ["待激活", "服务中", "已冻结", "中途完结", "已完结"];
       const preferIds = {
+        "待激活": ["SUB260825001"],
         "服务中": ["SUB260524001", "SUB260525001"],
         "已冻结": ["SUB260524002"],
         "中途完结": ["SUB260615033", "SUB260523088"],
@@ -13657,7 +13708,7 @@
         <div class="panel-body">
           <div class="proto-doc-banner">
             <span class="proto-doc-badge">非正式</span>
-            <div>本区<strong>不进入正式交付范围</strong>，仅供产品对照：服务状态枚举（服务中 / 已冻结 / 中途完结 / 已完结）各自详情字段与附加区块差异。正式入口仍以列表「详情」抽屉为准。</div>
+            <div>本区<strong>不进入正式交付范围</strong>，仅供产品对照：服务状态枚举（待激活 / 服务中 / 已冻结 / 中途完结 / 已完结）各自详情字段与附加区块差异。正式入口仍以列表「详情」抽屉为准。</div>
           </div>
           <div class="proto-doc-compare-grid">${cards}</div>
         </div>
@@ -13675,7 +13726,8 @@
             <div class="detail-item"><span>实付金额</span><strong>¥${p.pay}</strong></div>
             <div class="detail-item"><span>押金方式</span>${packageDepositDetailHtml(p)}</div>
             <div class="detail-item"><span>收款状态</span><strong>${packageDepositPayStatusCell(p)}</strong></div>
-            <div class="detail-item"><span>有效期</span><strong>${p.validFrom} ~ ${p.validTo}</strong></div>
+            <div class="detail-item"><span>开通方式</span><strong>${pkgStartModeLabel(p)}</strong></div>
+            <div class="detail-item"><span>有效期</span><strong>${(p.serviceState || p.status) === "待激活" ? "待首次领电" : ((p.validFrom || "—") + " ~ " + (p.validTo || "—"))}</strong></div>
             <div class="detail-item"><span>清分状态</span><strong>${tag(p.payout || "—")}</strong></div>
           </div>
           <p style="font-size:12px;color:var(--muted);margin:12px 0 0">套餐款在<strong>支付成功</strong>时已清分；本换电单仅履约，不记应分/消耗。
@@ -13875,7 +13927,7 @@
                   <td>${packageDepositMethodCell(p)}</td>
                   <td>${packageDepositPayStatusCell(p)}</td>
                   <td>${serviceStateCell(p)}</td>
-                  <td>${p.validFrom}<br><small style="color:var(--muted)">至 ${p.validTo}</small></td>
+                  <td>${pkgOrderPeriodCell(p)}</td>
                   <td>${tag(p.payout || "—")}</td>
                   <td><button type="button" class="link-btn" data-open-sub="${p.id}">详情</button></td>
                 </tr>`).join("") || "<tr><td colspan='10'>暂无自有设备订单</td></tr>"}</tbody>
@@ -14950,7 +15002,13 @@
       return state.pf.leasePkg;
     }
     function pkgValidityLabel(row) {
-      return row.validityHours ? row.validityHours + "h" : "按 SKU";
+      return pkgValidityDays(row) + " 天";
+    }
+    function pkgOrderPeriodCell(p) {
+      if ((p.serviceState || p.status) === "待激活") {
+        return `待首次领电<br><small style="color:var(--muted)">须于 ${p.activateDeadline || "—"} 前领取</small>`;
+      }
+      return `${p.validFrom || "—"}<br><small style="color:var(--muted)">至 ${p.validTo || "—"}</small>`;
     }
 
     function openLeasePkgForm(id) {
@@ -14974,17 +15032,22 @@
             return;
           }
           sel.innerHTML = presets.map(p =>
-            `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-price="${p.retailPrice}">${p.pkg}</option>`
+            skuPresetOptionHtml(p)
           ).join("");
+          const first = presets[0];
           const priceEl = formRoot.querySelector("[name=retailPrice]");
-          if (priceEl && presets[0]) priceEl.value = presets[0].retailPrice;
+          const daysEl = formRoot.querySelector("[name=validityDays]");
+          if (priceEl && first) priceEl.value = first.retailPrice;
+          if (daysEl && first) daysEl.value = skuDefaultValidityDays(first);
         };
         openProtoForm({
           title: "新增 SKU · 白名单套餐",
           fields: [
-            { name: "hint", label: "说明", value: "唯一键：渠道 × 电池型号 × 套餐。套餐名仅可从个人套餐固定列表选择；编辑时不可改型号与套餐名。", readonly: true, required: false },
+            { name: "hint", label: "说明", value: "唯一键：渠道 × 电池型号 × 套餐。开通方式与有效期随 SKU 配置；按次默认几次=几天，可改时长。改价不追溯已购。", readonly: true, required: false },
             { name: "batteryModel", label: "电池型号", type: "select", options: modelOpts, value: modelOpts.includes("48V30Ah") ? "48V30Ah" : modelOpts[0] },
             { name: "pkgPreset", label: "套餐 SKU", type: "select", options: PERSONAL_PKG_SKU_PRESETS.map(p => p.pkg), value: PERSONAL_PKG_SKU_PRESETS[0]?.pkg },
+            { name: "startMode", label: "开通方式", type: "select", options: ["pay", "first_pickup"], optionLabels: { pay: "购买立即生效", first_pickup: "首次领电生效" }, value: "pay" },
+            { name: "validityDays", label: "有效期（天）", type: "number", value: skuDefaultValidityDays(PERSONAL_PKG_SKU_PRESETS[0]) },
             { name: "retailPrice", label: "零售价（元）", type: "number", value: PERSONAL_PKG_SKU_PRESETS[0]?.retailPrice || 299 },
             { name: "status", label: "状态", type: "select", options: ["生效", "停用"], value: "生效" }
           ],
@@ -14995,7 +15058,10 @@
             formRoot.querySelector("[name=pkgPreset]")?.addEventListener("change", e => {
               const opt = e.target.selectedOptions[0];
               const preset = PERSONAL_PKG_SKU_PRESETS.find(p => p.pkg === opt?.value);
-              if (preset) formRoot.querySelector("[name=retailPrice]").value = preset.retailPrice;
+              if (!preset) return;
+              formRoot.querySelector("[name=retailPrice]").value = preset.retailPrice;
+              const daysEl = formRoot.querySelector("[name=validityDays]");
+              if (daysEl) daysEl.value = skuDefaultValidityDays(preset);
             });
           },
           onSubmit: (data) => {
@@ -15005,13 +15071,16 @@
             if (!preset) return "请选择套餐 SKU，或该型号下已无可用 SKU 模板";
             const retailPrice = parseFloat(data.retailPrice);
             if (!Number.isFinite(retailPrice) || retailPrice <= 0) return "请填写有效零售价";
+            const validity = resolveValidityDays(data.validityDays, preset);
+            if (validity.error) return validity.error;
             if (channelLeasePkgSkus.some(s =>
               s.channelId === cid && normalizeBatteryModel(s.batteryModel) === batteryModel && s.pkg === pkg
             )) return "该渠道 × 型号下已存在同名 SKU";
             const newId = "LP-P" + Date.now().toString(36).slice(-4).toUpperCase();
             channelLeasePkgSkus.push({
               channelId: cid, id: newId, pkg, batteryModel,
-              pkgType: preset.pkgType, validityHours: preset.validityHours,
+              pkgType: preset.pkgType, swapLimit: preset.swapLimit || null,
+              validityDays: validity.days, startMode: data.startMode === "first_pickup" ? "first_pickup" : "pay",
               retailPrice, status: data.status || "生效",
               updatedAt: new Date().toISOString().slice(0, 10)
             });
@@ -15021,11 +15090,13 @@
         return;
       }
       openProtoForm({
-        title: "编辑零售价 · " + row.pkg,
+        title: "编辑 SKU · " + row.pkg,
         fields: [
-          { name: "hint", label: "说明", value: "电池型号 / 套餐名不可改；仅改零售价与状态。", readonly: true, required: false },
+          { name: "hint", label: "说明", value: "电池型号 / 套餐名不可改；可改开通方式、有效期、零售价与状态。改价不追溯已购。", readonly: true, required: false },
           { name: "batteryModel", label: "电池型号", value: normalizeBatteryModel(row.batteryModel), readonly: true },
           { name: "pkg", label: "套餐", value: row.pkg, readonly: true },
+          { name: "startMode", label: "开通方式", type: "select", options: ["pay", "first_pickup"], optionLabels: { pay: "购买立即生效", first_pickup: "首次领电生效" }, value: pkgStartMode(row) },
+          { name: "validityDays", label: "有效期（天）", type: "number", value: pkgValidityDays(row) },
           { name: "retailPrice", label: "零售价（元）", type: "number", value: row.retailPrice },
           { name: "status", label: "状态", type: "select", options: ["生效", "停用"], value: row.status || "生效" }
         ],
@@ -15033,8 +15104,12 @@
         onSubmit: (data) => {
           const retailPrice = parseFloat(data.retailPrice);
           if (!Number.isFinite(retailPrice) || retailPrice <= 0) return "请填写有效零售价";
+          const validity = resolveValidityDays(data.validityDays, row);
+          if (validity.error) return validity.error;
           row.retailPrice = retailPrice;
           row.status = data.status || row.status;
+          row.startMode = data.startMode === "first_pickup" ? "first_pickup" : "pay";
+          row.validityDays = validity.days;
           row.updatedAt = new Date().toISOString().slice(0, 10);
           return { successMessage: "已更新 " + row.pkg + " · ¥" + retailPrice, afterClose: () => render() };
         }
@@ -15269,16 +15344,16 @@
       if (!isNew && !row) return;
       state.pricingEditId = isNew ? "new" : id;
       const cities = ["上海", "杭州"];
-      const skuOptionsHtml = (selected) => PERSONAL_PKG_SKU_PRESETS.map(p =>
-        `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-price="${p.retailPrice}"${selected === p.pkg ? " selected" : ""}>${p.pkg}</option>`
-      ).join("");
+      const skuOptionsHtml = (selected) => PERSONAL_PKG_SKU_PRESETS.map(p => skuPresetOptionHtml(p, selected)).join("");
       if (isNew) {
         document.querySelector("#pricingFormTitle").textContent = "新增 SKU · 个人套餐";
         document.querySelector("#pricingForm").innerHTML = `
-          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">唯一键：城市 × 电池型号 × 套餐。套餐名称仅可从固定列表选择；编辑时不可改型号与套餐名。无生效 SKU 的型号不对骑手展示。</p>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">唯一键：城市 × 电池型号 × 套餐。开通方式与有效期按 SKU 配置；按天默认等于权益天数，按次默认几次=几天（可改时长）。改价不追溯已购。</p>
           <label>城市<select name="city">${cities.map(c => `<option>${c}</option>`).join("")}</select></label>
           <label>电池型号<select name="batteryModel" id="pricingBatteryModel">${BATTERY_MODEL_OPTIONS.map(m => `<option value="${m}">${m}</option>`).join("")}</select></label>
           <label>套餐 SKU<select name="pkgPreset" id="pricingPkgPreset"></select></label>
+          <label>开通方式${startModeSelectHtml("pay")}</label>
+          <label>有效期（天）<input name="validityDays" type="number" min="1" step="1" value="${skuDefaultValidityDays(PERSONAL_PKG_SKU_PRESETS[0])}" required /></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="299" required /></label>
           <label>状态<select name="status"><option selected>生效</option><option>停用</option></select></label>`;
         const syncPreset = () => {
@@ -15296,30 +15371,32 @@
             sel.innerHTML = `<option value="">（该型号下可选 SKU 已配齐）</option>`;
             return;
           }
-          sel.innerHTML = presets.map(p =>
-            `<option value="${p.pkg}" data-type="${p.pkgType}" data-hours="${p.validityHours ?? ""}" data-price="${p.retailPrice}">${p.pkg}</option>`
-          ).join("");
+          sel.innerHTML = presets.map(p => skuPresetOptionHtml(p)).join("");
           const first = presets[0];
           document.querySelector("#pricingForm [name=retailPrice]").value = first.retailPrice;
+          document.querySelector("#pricingForm [name=validityDays]").value = skuDefaultValidityDays(first);
         };
         syncPreset();
         document.querySelector("#pricingForm [name=city]")?.addEventListener("change", syncPreset);
         document.querySelector("#pricingForm [name=batteryModel]")?.addEventListener("change", syncPreset);
         document.querySelector("#pricingPkgPreset")?.addEventListener("change", e => {
           const opt = e.target.selectedOptions[0];
-          if (!opt?.dataset.price) return;
-          document.querySelector("#pricingForm [name=retailPrice]").value = opt.dataset.price;
+          if (!opt) return;
+          if (opt.dataset.price) document.querySelector("#pricingForm [name=retailPrice]").value = opt.dataset.price;
+          if (opt.dataset.days) document.querySelector("#pricingForm [name=validityDays]").value = opt.dataset.days;
         });
       } else {
         const allowed = PERSONAL_PKG_SKU_PRESETS.some(p => p.pkg === row.pkg);
-        document.querySelector("#pricingFormTitle").textContent = "编辑零售价 · " + row.pkg;
+        document.querySelector("#pricingFormTitle").textContent = "编辑 SKU · " + row.pkg;
         document.querySelector("#pricingForm").innerHTML = `
-          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">城市 / 电池型号 / 套餐名不可改；仅改零售价与状态。</p>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">城市 / 电池型号 / 套餐名不可改；可改开通方式、有效期、零售价与状态。已购订单沿用下单快照。</p>
           <label>城市<input name="city" value="${row.city}" readonly /></label>
           <label>电池型号<input name="batteryModel" value="${normalizeBatteryModel(row.batteryModel)}" readonly /></label>
           <label>套餐<select name="pkg" id="pricingPkgEdit" disabled>${allowed
             ? skuOptionsHtml(row.pkg)
             : `<option selected>${row.pkg}</option>`}</select></label>
+          <label>开通方式${startModeSelectHtml(pkgStartMode(row))}</label>
+          <label>有效期（天）<input name="validityDays" type="number" min="1" step="1" value="${pkgValidityDays(row)}" required /></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="${row.retailPrice}" required /></label>
           <label>状态<select name="status"><option ${row.status === "生效" ? "selected" : ""}>生效</option><option ${row.status === "停用" ? "selected" : ""}>停用</option></select></label>`;
       }
@@ -15337,6 +15414,7 @@
       const form = document.querySelector("#pricingForm");
       const retailPrice = parseFloat(form.querySelector("[name=retailPrice]")?.value);
       const status = form.querySelector("[name=status]")?.value || "生效";
+      const startMode = form.querySelector("[name=startMode]")?.value === "first_pickup" ? "first_pickup" : "pay";
       if (!Number.isFinite(retailPrice) || retailPrice <= 0) {
         window.alert("请填写有效零售价");
         return;
@@ -15348,6 +15426,15 @@
         const pkg = opt?.value;
         if (!pkg) {
           window.alert("请选择套餐 SKU，或该型号下已无可用 SKU 模板");
+          return;
+        }
+        const preset = PERSONAL_PKG_SKU_PRESETS.find(p => p.pkg === pkg) || {
+          pkgType: opt.dataset.type || "monthly",
+          swapLimit: opt.dataset.swap ? parseInt(opt.dataset.swap, 10) : null
+        };
+        const validity = resolveValidityDays(form.querySelector("[name=validityDays]")?.value, preset);
+        if (validity.error) {
+          window.alert(validity.error);
           return;
         }
         if (operatorPkgPrices.some(r =>
@@ -15365,7 +15452,9 @@
           batteryModel,
           pkg,
           pkgType: opt.dataset.type || "monthly",
-          validityHours: opt.dataset.hours ? parseInt(opt.dataset.hours, 10) : null,
+          swapLimit: opt.dataset.swap ? parseInt(opt.dataset.swap, 10) : null,
+          validityDays: validity.days,
+          startMode,
           retailPrice,
           status,
           updatedAt: new Date().toISOString().slice(0, 10)
@@ -15379,13 +15468,20 @@
       }
       const row = operatorPkgPrices.find(r => r.id === state.pricingEditId);
       if (!row) return;
+      const validity = resolveValidityDays(form.querySelector("[name=validityDays]")?.value, row);
+      if (validity.error) {
+        window.alert(validity.error);
+        return;
+      }
       row.retailPrice = retailPrice;
       row.status = status;
+      row.startMode = startMode;
+      row.validityDays = validity.days;
       row.updatedAt = new Date().toISOString().slice(0, 10);
       closePricingForm();
       state.view = "pricing";
       render();
-      window.alert("演示：零售价已更新（仅本地 Mock）");
+      window.alert("演示：SKU 已更新（仅本地 Mock）");
     }
 
     function cardPricingContracts() {
@@ -15479,7 +15575,7 @@
           officialPrice,
           channelPrice,
           commissionPerOrder,
-          validityDays: base.pkgType === "weekly" ? 7 : base.pkgType === "daily" || base.pkgType === "single" ? 1 : 30,
+          validityDays: pkgValidityDays(base),
           status
         });
         closeCardPricingForm();
@@ -15807,15 +15903,16 @@
                 </select></label>
               </div>
               <table>
-                <thead><tr><th>城市</th><th>电池型号</th><th>套餐</th><th>有效期</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+                <thead><tr><th>城市</th><th>电池型号</th><th>套餐</th><th>有效期</th><th>开通方式</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
                 <tbody>${rows.length ? rows.map(r => `<tr>
                   <td>${r.city}</td>
                   <td><strong>${normalizeBatteryModel(r.batteryModel)}</strong></td>
                   <td>${r.pkg}</td>
-                  <td>${r.validityHours ? r.validityHours + "h" : "按 SKU"}</td>
+                  <td>${pkgValidityLabel(r)}</td>
+                  <td>${pkgStartModeLabel(r)}</td>
                   <td>¥${r.retailPrice}</td><td>${tag(r.status)}</td><td>${r.updatedAt}</td>
                   <td><button type="button" class="link-btn" data-edit-pricing="${r.id}">编辑</button></td>
-                </tr>`).join("") : `<tr><td colspan="8">暂无匹配 SKU</td></tr>`}</tbody>
+                </tr>`).join("") : `<tr><td colspan="9">暂无匹配 SKU</td></tr>`}</tbody>
               </table>
             </div>
           </section>`;
@@ -17207,16 +17304,17 @@
               </select></label>
             </div>
             <table>
-              <thead><tr><th>电池型号</th><th>套餐</th><th>有效期</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+              <thead><tr><th>电池型号</th><th>套餐</th><th>有效期</th><th>开通方式</th><th>零售价</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
               <tbody>${rows.length ? rows.map(s => `<tr>
                 <td><strong>${normalizeBatteryModel(s.batteryModel)}</strong></td>
                 <td>${s.pkg}</td>
                 <td>${pkgValidityLabel(s)}</td>
+                <td>${pkgStartModeLabel(s)}</td>
                 <td>¥${s.retailPrice}</td>
                 <td>${tag(s.status)}</td>
                 <td>${s.updatedAt || "—"}</td>
                 <td>${isChannelRole() ? `<button type="button" class="link-btn" data-edit-lease-pkg="${s.id}">编辑</button>` : "—"}</td>
-              </tr>`).join("") : `<tr><td colspan="7">暂无匹配 SKU</td></tr>`}</tbody>
+              </tr>`).join("") : `<tr><td colspan="8">暂无匹配 SKU</td></tr>`}</tbody>
             </table>
           </div>
         </section>`;
@@ -17753,13 +17851,14 @@
           ${panelHead("骑手零售价（只读）", "运营商城市级个人套餐统一定价（渠道商只读）", "day_pool_retail")}
           <div class="panel-body orders-table-wrap">
             <table>
-              <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>零售价</th><th>合同批发价</th><th>状态</th></tr></thead>
+              <thead><tr><th>城市</th><th>套餐</th><th>有效期</th><th>开通方式</th><th>零售价</th><th>合同批发价</th><th>状态</th></tr></thead>
               <tbody>${rows.map(r => `<tr>
                 <td>${r.city}</td><td>${r.pkg}</td>
-                <td>${r.validityHours ? r.validityHours + "h" : "—"}</td>
+                <td>${pkgValidityLabel(r)}</td>
+                <td>${pkgStartModeLabel(r)}</td>
                 <td>¥${r.retailPrice}</td><td>¥${wholesale}/人天</td>
                 <td>${tag(r.status)}</td>
-              </tr>`).join("") || "<tr><td colspan='6'>暂无</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='7'>暂无</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;

@@ -327,7 +327,7 @@
       data_drill_panel: { title: "换电订单数", content: "紧凑卡片：按日换电订单数（含当日）。<br>· <strong>平台总览</strong>：先筛运营商，再筛该运营商下站点（切换运营商时站点重置为全部）<br>· 时间范围默认近 7 天，可选近 30 天或自定义（最多 31 天）" },
       data_drill_spark: { title: "换电订单折线图", content: "按所选站点与日期区间生成每日 Mock 换电订单数；右侧合计为区间之和；最高/最低取自序列。正式环境对接按日聚合 API（含当日）。" },
       platform_no_share: { title: "平台运营分成", content: "骑手套餐/换电应分台账记录运营商本站经营应得。平台收取 1% 技术服务费（C 端支付分账 + B 端确认消耗计提），见「平台服务费」。" },
-      pricing_pkg: { title: "个人套餐定价", content: "唯一键=<strong>运营商×城市×电池型号×SKU</strong>（decision-085/088）。电池型号取自平台「设备管理 → 电池型号管理」启用字典；不同型号可独立有效期/零售价/状态。<strong>无一单通兑</strong>。一期可选套餐名（暂定）：包月30天、7天套餐、1天套餐、单次换电。渠道骑手<strong>不</strong>走个人套餐自费兜底。<strong>价格分区</strong>为<strong>二期</strong>。" },
+      pricing_pkg: { title: "个人套餐定价", content: "唯一键=<strong>运营商×城市×电池型号×SKU</strong>（decision-085/088/117）。电池型号取自平台「设备管理 → 电池型号管理」启用字典。<strong>无一单通兑</strong>。<strong>开通方式</strong>：购买立即生效 / 首次领电生效。<strong>有效期</strong>为自然日，默认等于套餐天数；按次默认几次=几天，可改时长。1 天/单次按 1 个自然日（不再滚动 24h）。改 SKU 不追溯已购。一期可选套餐名（暂定）：包月30天、7天套餐、1天套餐、次卡10次、单次换电。<strong>价格分区</strong>为<strong>二期</strong>。" },
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
       channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
@@ -474,7 +474,7 @@
 
       channel_settlement_card: { title: "渠道分销（骑士卡）", content: "渠道为<strong>推广销售渠道</strong>：用户经推广链接/二维码进入<strong>运营商小程序</strong>，24h 内购套餐享<strong>渠道专享价</strong>。<br><strong>本月成交</strong>=筛选月 channelLinkOrders 笔数；<strong>本月应结佣</strong>=Σ commission；<strong>推广链接</strong>点击/成交=各 link 累计 clicks/conversions。" },
       channel_settlement_rent: { title: "设备租赁", content: "运营商维护<strong>租赁设备清单</strong>与<strong>专属站点</strong>；签约<strong>统一月租</strong>（MO→运营商）。渠道视为<strong>小型运营商</strong>：设备为租赁资产，可配置<strong>跨网换电</strong>（须向平台缴纳保证金）。白名单分<strong>免费</strong>（B2B 覆盖）与<strong>付费</strong>（须购白名单套餐）。" },
-      lease_whitelist_pkg: { title: "白名单套餐", content: "仅<strong>白名单付费</strong>类型用户须购买。渠道在「白名单套餐」维护 SKU，口径与运营商<strong>个人套餐</strong>一致：固定套餐名（包月30天/7天套餐/1天套餐/单次换电）× 电池型号 × 零售价；「白名单订单」查流水。支付进<strong>渠道收款账户</strong>。无一单通兑。" },
+      lease_whitelist_pkg: { title: "白名单套餐", content: "仅<strong>白名单付费</strong>类型用户须购买。渠道在「白名单套餐」维护 SKU，口径与运营商<strong>个人套餐</strong>一致：固定套餐名 × 电池型号 × 开通方式 × 有效期（天） × 零售价；「白名单订单」查流水。支付进<strong>渠道收款账户</strong>。无一单通兑。" },
       lease_whitelist: { title: "白名单用户", content: "渠道自行维护扁平名单。<strong>白名单免费</strong>：入名单即可换电（月租 B2B 覆盖）。<strong>白名单付费</strong>：须购有效白名单套餐方可换电。添加时选择类型。" },
       lease_whitelist_access: { title: "白名单类型", content: "<strong>白名单免费</strong>：渠道 B2B 月租已覆盖，名单内骑手免 C 端购套餐即可换电。<br><strong>白名单付费</strong>：名单内骑手须购买「白名单套餐」（款进渠道子商户）后换电；未购套餐扫码引导购买。" },
       channel_lease_crossnet: { title: "设备租赁 · 跨网换电", content: "渠道商在设备租赁模式下可视为<strong>小型运营商</strong>：名下骑手 userOwner=渠道。开通跨网后，骑手在他网换电产生<strong>跨网设备服务费</strong>，由渠道向平台保证金/信用额度支付（规则同运营商）。<br><strong>开通条件</strong>：向平台缴纳跨网保证金（演示 ¥20,000）。" },
@@ -1117,8 +1117,8 @@
       },
       {
         id: "SUB260524015", user: "U3321", phone: "136****3321", site: "陆家嘴分站", city: "上海", pkg: "次卡10次", pkgType: "times",
-        pay: 89, status: "服务中", serviceState: "服务中", payTime: "2026-05-23 09:40", validFrom: "2026-05-23", validTo: "2026-08-23",
-        swapLimit: 10, swapUsed: 3, accrued: 27, payout: "已清分", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营", cabinet: "CAB-22044",
+        pay: 89, status: "服务中", serviceState: "服务中", payTime: "2026-05-23 09:40", validFrom: "2026-05-23", validTo: "2026-06-01",
+        startMode: "pay", swapLimit: 10, swapUsed: 3, accrued: 27, payout: "已清分", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营", cabinet: "CAB-22044",
         batteryDeposit: 99, depositPaid: 0,
         depositWaiver: { type: "芝麻信用", score: 652, waivedAmount: 99 }
       },
@@ -1130,7 +1130,7 @@
       },
       {
         id: "SUB260608015", user: "U2199", phone: "139****2199", site: "世博换电服务点", city: "上海", pkg: "单次换电", pkgType: "single",
-        pay: 9.9, status: "已完结", serviceState: "已完结", payTime: "2026-06-08 15:50", validFrom: "2026-06-08", validTo: "2026-06-09",
+        pay: 9.9, status: "已完结", serviceState: "已完结", payTime: "2026-06-08 15:50", validFrom: "2026-06-08", validTo: "2026-06-08",
         swapLimit: 1, swapUsed: 0, accrued: 9.9, payout: "已清分", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", cabinet: "CAB-22021",
         batteryDeposit: 0, depositPaid: 0, depositWaiver: null, endTime: "2026-06-08 16:05"
       },
@@ -1160,7 +1160,7 @@
       },
       {
         id: "SUB260606001", user: "U2107", phone: "137****2107", site: "浦东骑手驿站", city: "上海", pkg: "1天套餐", pkgType: "daily",
-        pay: 29, status: "已完结", serviceState: "已完结", payTime: "2026-06-06 06:30", validFrom: "2026-06-06", validTo: "2026-06-07",
+        pay: 29, status: "已完结", serviceState: "已完结", payTime: "2026-06-06 06:30", validFrom: "2026-06-06", validTo: "2026-06-06",
         swapLimit: null, swapUsed: 3, accrued: 29, payout: "已清分", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", cabinet: "CAB-22018",
         batteryDeposit: 0, depositPaid: 0, depositWaiver: null, endTime: "2026-06-07 06:30"
       },
@@ -1187,6 +1187,13 @@
         id: "SUB260606BJ", user: "U-LJZ-01", phone: "137****7702", site: "滨江换电站", city: "上海", pkg: "包月30天", pkgType: "monthly",
         pay: 299, status: "服务中", serviceState: "服务中", payTime: "2026-06-05 10:00", validFrom: "2026-06-05", validTo: "2026-07-05",
         swapLimit: null, swapUsed: 8, accrued: 32, payout: "已清分", deviceOwnerId: "OP-BJ", deviceOwnerName: "滨江联营", cabinet: "CAB-BJ-01",
+        batteryDeposit: 99, depositPaid: 99, depositWaiver: null
+      },
+      {
+        id: "SUB260825001", user: "U2410", phone: "137****2410", site: "浦东骑手驿站", city: "上海", pkg: "7天套餐", pkgType: "weekly",
+        pay: 109, status: "待激活", serviceState: "待激活", payTime: "2026-08-20 11:00", validFrom: null, validTo: null,
+        startMode: "first_pickup", activateDeadline: "2026-08-27",
+        swapLimit: null, swapUsed: 0, accrued: 0, payout: "已清分", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", cabinet: "CAB-22018",
         batteryDeposit: 99, depositPaid: 99, depositWaiver: null
       },
     ];
@@ -2021,6 +2028,8 @@
       { id: "U2111", phone: "135****2111", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "已离职", swaps: 12, last: "06-07 16:20", poolTeam: "世博车队", poolEligibility: "已回池", poolId: "QP-2601", serviceState: "已离职" },
       { id: "U9001", phone: "135****9001", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "已完结", swaps: 2, last: "06-01 10:00", serviceState: "中途完结" },
       { id: "U2199", phone: "139****2199", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "单次 · 已退", swaps: 0, last: "06-08 16:05", serviceState: "已完结" },
+      { id: "U2410", phone: "137****2410", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "7天 · 待激活", swaps: 0, last: "08-20 11:00", deposit: "押¥99", serviceState: "待激活",
+        kycStatus: "已实名", realName: "周宁", idNo: "310115199407071088", kycSubmittedAt: "2026-08-20 10:40", kycPassedAt: "2026-08-20 10:42" },
       { id: "U2201", phone: "138****2201", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "7天 · 待退", swaps: 0, last: "06-03 08:00", deposit: "押¥99", serviceState: "服务中" },
       { id: "U2188", phone: "136****2188", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 服务中", swaps: 15, last: "06-12 18:00", deposit: "押¥99", serviceState: "服务中",
         kycStatus: "已实名", realName: "陈明", idNo: "310115198812081088", kycSubmittedAt: "2026-04-20 11:30", kycPassedAt: "2026-04-20 11:32" },
@@ -2097,10 +2106,10 @@
     ];
 
     const dayPoolRetailPrices = [
-      { id: "RP-01", poolId: "QP-2601", city: "上海", pkg: "包月30天", retailPrice: 299, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-05-01" },
-      { id: "RP-03", poolId: "QP-2601", city: "上海", pkg: "次卡10次", retailPrice: 89, wholesalePrice: 8.5, status: "生效", updatedAt: "2026-04-15" },
-      { id: "RP-04", poolId: "QP-2601", city: "上海", pkg: "1天套餐", retailPrice: 29, wholesalePrice: 8.5, validityHours: 24, status: "生效", updatedAt: "2026-06-01" },
-      { id: "RP-05", poolId: "QP-2601", city: "上海", pkg: "单次换电", retailPrice: 9.9, wholesalePrice: 8.5, validityHours: 24, status: "生效", updatedAt: "2026-06-01" }
+      { id: "RP-01", poolId: "QP-2601", city: "上海", pkg: "包月30天", retailPrice: 299, wholesalePrice: 8.5, validityDays: 30, startMode: "pay", status: "生效", updatedAt: "2026-05-01" },
+      { id: "RP-03", poolId: "QP-2601", city: "上海", pkg: "次卡10次", retailPrice: 89, wholesalePrice: 8.5, validityDays: 10, startMode: "pay", swapLimit: 10, status: "生效", updatedAt: "2026-04-15" },
+      { id: "RP-04", poolId: "QP-2601", city: "上海", pkg: "1天套餐", retailPrice: 29, wholesalePrice: 8.5, validityDays: 1, startMode: "pay", status: "生效", updatedAt: "2026-06-01" },
+      { id: "RP-05", poolId: "QP-2601", city: "上海", pkg: "单次换电", retailPrice: 9.9, wholesalePrice: 8.5, validityDays: 1, startMode: "pay", swapLimit: 1, status: "生效", updatedAt: "2026-06-01" }
     ];
 
     const dayPoolExceptions = [
@@ -2329,11 +2338,11 @@
       { id: "U4004", channelId: "CH-RENT", name: "赵夜配", phone: "136****4004", whitelistAccess: "paid", pkgStatus: "已失效", swaps: 0, status: "已移除", addedAt: "2026-01-20", addedBy: "渠道管理员", lastSwap: "—" }
     ];
     const channelLeasePkgSkus = [
-      { channelId: "CH-RENT", id: "LP-P01", pkg: "包月30天", batteryModel: "48V30Ah", pkgType: "monthly", validityHours: null, retailPrice: 299, status: "生效", updatedAt: "2026-06-01" },
-      { channelId: "CH-RENT", id: "LP-P01B", pkg: "包月30天", batteryModel: "60V30Ah", pkgType: "monthly", validityHours: null, retailPrice: 349, status: "生效", updatedAt: "2026-07-28" },
-      { channelId: "CH-RENT", id: "LP-P03", pkg: "7天套餐", batteryModel: "48V30Ah", pkgType: "weekly", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-06-01" },
-      { channelId: "CH-RENT", id: "LP-P04", pkg: "1天套餐", batteryModel: "48V30Ah", pkgType: "daily", validityHours: 24, retailPrice: 29, status: "生效", updatedAt: "2026-06-15" },
-      { channelId: "CH-RENT", id: "LP-P05", pkg: "单次换电", batteryModel: "48V30Ah", pkgType: "single", validityHours: 24, retailPrice: 9.9, status: "停用", updatedAt: "2026-07-01" }
+      { channelId: "CH-RENT", id: "LP-P01", pkg: "包月30天", batteryModel: "48V30Ah", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 299, status: "生效", updatedAt: "2026-06-01" },
+      { channelId: "CH-RENT", id: "LP-P01B", pkg: "包月30天", batteryModel: "60V30Ah", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 349, status: "生效", updatedAt: "2026-07-28" },
+      { channelId: "CH-RENT", id: "LP-P03", pkg: "7天套餐", batteryModel: "48V30Ah", pkgType: "weekly", validityDays: 7, startMode: "pay", retailPrice: 89, status: "生效", updatedAt: "2026-06-01" },
+      { channelId: "CH-RENT", id: "LP-P04", pkg: "1天套餐", batteryModel: "48V30Ah", pkgType: "daily", validityDays: 1, startMode: "pay", retailPrice: 29, status: "生效", updatedAt: "2026-06-15" },
+      { channelId: "CH-RENT", id: "LP-P05", pkg: "单次换电", batteryModel: "48V30Ah", pkgType: "single", swapLimit: 1, validityDays: 1, startMode: "pay", retailPrice: 9.9, status: "停用", updatedAt: "2026-07-01" }
     ];
     const channelLeasePkgOrders = [
       { id: "LC-260610-01", channelId: "CH-RENT", userId: "U4001", userName: "张配送", phone: "139****4001", skuId: "LP-P01", skuName: "包月30天", batteryModel: "48V30Ah", amount: 299, payTime: "2026-06-10 09:12", status: "已支付", subMch: "1678901234***" },
@@ -2401,15 +2410,15 @@
     ];
 
     const operatorPkgPrices = [
-      { id: "OP-P-01", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
-      { id: "OP-P-01B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 349, status: "生效", updatedAt: "2026-07-27" },
-      { id: "OP-P-03", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
-      { id: "OP-P-03B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "7天套餐", pkgType: "weekly", validityHours: null, retailPrice: 109, status: "生效", updatedAt: "2026-07-27" },
-      { id: "OP-P-04", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "1天套餐", pkgType: "daily", validityHours: 24, retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-05", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "单次换电", pkgType: "single", validityHours: 24, retailPrice: 9.9, status: "生效", updatedAt: "2026-06-01" },
-      { id: "OP-P-06", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "次卡10次", pkgType: "times", validityHours: null, retailPrice: 89, status: "生效", updatedAt: "2026-04-15" },
-      { id: "OP-P-07", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "30天畅换", pkgType: "monthly", validityHours: null, retailPrice: 329, status: "生效", updatedAt: "2026-05-15" },
-      { id: "OP-P-08", operatorId: "OP-SX", city: "上海", batteryModel: "48V20Ah", pkg: "包月30天", pkgType: "monthly", validityHours: null, retailPrice: 269, status: "停用", updatedAt: "2026-07-01" }
+      { id: "OP-P-01", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "包月30天", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
+      { id: "OP-P-01B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "包月30天", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 349, status: "生效", updatedAt: "2026-07-27" },
+      { id: "OP-P-03", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "7天套餐", pkgType: "weekly", validityDays: 7, startMode: "pay", retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
+      { id: "OP-P-03B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "7天套餐", pkgType: "weekly", validityDays: 7, startMode: "first_pickup", retailPrice: 109, status: "生效", updatedAt: "2026-07-27" },
+      { id: "OP-P-04", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "1天套餐", pkgType: "daily", validityDays: 1, startMode: "pay", retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
+      { id: "OP-P-05", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "单次换电", pkgType: "single", swapLimit: 1, validityDays: 1, startMode: "pay", retailPrice: 9.9, status: "生效", updatedAt: "2026-06-01" },
+      { id: "OP-P-06", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "次卡10次", pkgType: "times", swapLimit: 10, validityDays: 10, startMode: "pay", retailPrice: 89, status: "生效", updatedAt: "2026-04-15" },
+      { id: "OP-P-07", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "30天畅换", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 329, status: "生效", updatedAt: "2026-05-15" },
+      { id: "OP-P-08", operatorId: "OP-SX", city: "上海", batteryModel: "48V20Ah", pkg: "包月30天", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 269, status: "停用", updatedAt: "2026-07-01" }
     ];
 
     /** 同城价格分区：站点挂区 → 区价覆盖城市底价（可高可低）；未配 SKU 继承底价 */
