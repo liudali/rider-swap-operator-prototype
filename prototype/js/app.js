@@ -12,6 +12,8 @@
       operatorsTab: "list",
       l1PricingTab: "crossNet",
       platformUsersTab: "info",
+      platformUsersInfoSub: "list",
+      usersTab: "list",
       platformUsersPage: 1,
       platformUsersPageSize: 10,
       platformLeasingTab: "companies", depositTab: "pending", depositRechargeSubTab: "waiting", depositRechargePendingPage: 1, depositRechargeProcessedPage: 1, operatorCreditTab: "assignments",
@@ -1419,7 +1421,12 @@
         }
         return "dayPool_" + state.dayPoolTab;
       }
-      if (state.view === "platformUsers") return "platformUsers_" + state.platformUsersTab;
+      if (state.view === "users") return (state.usersTab || "list") === "kyc" ? "users_kyc" : "users";
+      if (state.view === "platformUsers") {
+        const t = state.platformUsersTab || "info";
+        if (t === "info" && (state.platformUsersInfoSub || "list") === "kyc") return "platformUsers_kyc";
+        return "platformUsers_" + t;
+      }
       if (state.view === "platformOrders") return "platformOrders_" + state.platformOrderTab;
       if (state.view === "operators") {
         if ((state.operatorsTab || "list") === "channels") return "platformChannels_list";
@@ -2338,9 +2345,39 @@
       return u.kycStatus || "未实名";
     }
 
+    function isKycPendingReview(u) {
+      return userKycStatus(u) === "未通过";
+    }
+
+    function pendingKycReviewUsers(scope) {
+      const pool = scope === "platform" ? users : users.filter(filterOwnRow);
+      return pool.filter(isKycPendingReview);
+    }
+
+    function pendingKycReviewCount(scope) {
+      return pendingKycReviewUsers(scope).length;
+    }
+
+    function kycPendingTabLabel(scope) {
+      const n = pendingKycReviewCount(scope);
+      return "待审认证" + (n ? " (" + n + ")" : "");
+    }
+
+    function usersListKycTopTabs(scope, active, dataAttr) {
+      const listLabel = scope === "platform" ? "用户信息" : "用户列表";
+      return panelTopTabs([
+        ["list", listLabel],
+        ["kyc", kycPendingTabLabel(scope)]
+      ], active || "list", dataAttr);
+    }
+
     function maskIdNo(idNo) {
       if (!idNo || idNo.length < 8) return idNo || "—";
       return idNo.slice(0, 3) + "*".repeat(Math.max(0, idNo.length - 7)) + idNo.slice(-4);
+    }
+
+    function userKycListStatus(u) {
+      return userKycStatus(u) === "已实名" ? "已实名" : "未实名";
     }
 
     function kycStatusTag(status) {
@@ -2350,15 +2387,50 @@
     }
 
     function userKycActionCellHtml(u) {
-      const st = userKycStatus(u);
-      if (st === "已实名") {
+      if (userKycStatus(u) === "已实名") {
         return `<button type="button" class="link-btn" data-view-kyc="${u.id}">查看实名信息</button>`;
       }
-      if (st === "未通过") {
-        return `<button type="button" class="link-btn" data-view-kyc="${u.id}">查看</button>
-          <button type="button" class="link-btn" data-kyc-manual-pass="${u.id}">手动通过</button>`;
-      }
       return "—";
+    }
+
+    function userKycReviewActionHtml(u) {
+      return `<button type="button" class="link-btn" data-view-kyc="${u.id}">查看</button>
+          <button type="button" class="link-btn" data-kyc-manual-pass="${u.id}">手动通过</button>`;
+    }
+
+    function renderKycReviewTable(rows, opts) {
+      const showOp = !!(opts && opts.showOperator);
+      const f = getPf();
+      const filtered = rows.filter(u => {
+        const kw = f.keyword || "";
+        if (kw && !matchKw(u.id, kw) && !matchKw(u.phone, kw)) return false;
+        if (!matchKw(u.id, f.userId)) return false;
+        if (!matchKw(u.phone, f.phone)) return false;
+        if (showOp && f.operatorId && f.operatorId !== "全部" && u.deviceOwnerId !== f.operatorId) return false;
+        return true;
+      });
+      const colCount = showOp ? 8 : 7;
+      return `
+          ${panelHead("待审认证", `未通过 ${filtered.length} 人 · 须人工核对三要素后手动通过`, "user_kyc")}
+          <div class="panel-body orders-table-wrap">
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("user_kyc")}${noteBtn("kyc_review_queue")} 本队列只含<strong>未通过</strong>。未提交为「未实名」，在用户列表查看；通过后离开本队列。</p>
+            <table>
+              <thead><tr>
+                <th>用户</th>${showOp ? "<th>服务运营商</th>" : ""}<th>姓名</th><th>身份证号</th>
+                <th>提交时间</th><th>驳回原因</th><th>状态</th><th>操作</th>
+              </tr></thead>
+              <tbody>${filtered.length ? filtered.map(u => `<tr>
+                <td>${u.id}<br><small style="color:var(--muted)">${u.phone}</small></td>
+                ${showOp ? `<td>${operatorLabel(u.deviceOwnerId)}</td>` : ""}
+                <td><strong>${u.realName || "—"}</strong></td>
+                <td>${maskIdNo(u.idNo)}</td>
+                <td>${u.kycSubmittedAt || "—"}</td>
+                <td style="white-space:normal;max-width:220px">${u.kycRejectReason || "—"}</td>
+                <td>${kycStatusTag(userKycStatus(u))}</td>
+                <td>${userKycReviewActionHtml(u)}</td>
+              </tr>`).join("") : `<tr><td colspan="${colCount}">暂无待审实名</td></tr>`}</tbody>
+            </table>
+          </div>`;
     }
 
     function idCardPhotoPlaceholder(label) {
@@ -4253,8 +4325,12 @@
           { v: "全部", t: "全部" }, { v: "在押", t: "在押" }, { v: "退押中", t: "退押中" }, { v: "无", t: "——" }
         ] },
         { key: "kycStatus", label: "实名认证", type: "select", options: [
-          { v: "全部", t: "全部" }, { v: "已实名", t: "已实名" }, { v: "未实名", t: "未实名" }, { v: "未通过", t: "未通过" }
+          { v: "全部", t: "全部" }, { v: "已实名", t: "已实名" }, { v: "未实名", t: "未实名" }
         ] }
+      ],
+      users_kyc: [
+        { key: "userId", label: "用户 ID", placeholder: "如 U1055" },
+        { key: "phone", label: "手机号", placeholder: "" }
       ],
       refundManage: [
         { key: "refundId", label: "退款单号", placeholder: "RF-" },
@@ -4368,8 +4444,12 @@
           { v: "全部", t: "全部" }, { v: "在押", t: "在押" }, { v: "退押中", t: "退押中" }, { v: "无", t: "——" }
         ] },
         { key: "kycStatus", label: "实名认证", type: "select", options: [
-          { v: "全部", t: "全部" }, { v: "已实名", t: "已实名" }, { v: "未实名", t: "未实名" }, { v: "未通过", t: "未通过" }
+          { v: "全部", t: "全部" }, { v: "已实名", t: "已实名" }, { v: "未实名", t: "未实名" }
         ] }
+      ],
+      platformUsers_kyc: [
+        { key: "keyword", label: "用户 ID/手机", placeholder: "U1055" },
+        { key: "operatorId", label: "服务运营商", type: "select", options: () => platformOperatorOptions() }
       ],
       platformUsers_depositStats: [
         { key: "operatorId", label: "运营商", type: "select", options: () => platformOperatorOptions() }
@@ -4508,6 +4588,9 @@
       if (key === "overview" && (isOperatorRole() || isPlatformRole())) specs = [];
       /* 人天额度池·额度池 / 骑手登记 / 额度分配 / 消耗明细：筛选下沉到页内 Tab 下方 */
       if (state.view === "dayPool" && (state.dayPoolTab === "pools" || state.dayPoolTab === "consume" || state.dayPoolTab === "allocations" || state.dayPoolTab === "riders")) specs = [];
+      /* 运营商用户 / 平台用户信息：筛选下沉到页内 Tab 下方 */
+      if (state.view === "users") specs = [];
+      if (state.view === "platformUsers" && (state.platformUsersTab || "info") === "info") specs = [];
       /* 骑士卡·佣金对账：筛选下沉到页内 Tab 下方 */
       if (key === "commissionStatement") specs = [];
       /* 服务保证金账户·变动明细：筛选下沉到页内 Tab 下方 */
@@ -4536,7 +4619,11 @@
       const fKey = filterKey;
       if (!state.pf[fKey]) state.pf[fKey] = PF_DEFAULTS[fKey] ? { ...PF_DEFAULTS[fKey] } : {};
       const f = state.pf[fKey];
-      return `<div class="panel-inline-filters" data-inline-pf="${fKey}" aria-label="页面筛选">${specs.map(s => renderFilterField(s, f)).join("")}</div>`;
+      const confirmLabel = PF_CONFIRM_LABELS[fKey] || "确认筛选";
+      const confirmBtn = PF_CONFIRM_KEYS.has(fKey)
+        ? `<div class="field pf-actions"><label>&nbsp;</label><button type="button" class="btn primary" data-pf-confirm>${confirmLabel}</button></div>`
+        : "";
+      return `<div class="panel-inline-filters" data-inline-pf="${fKey}" aria-label="页面筛选">${specs.map(s => renderFilterField(s, f)).join("")}${confirmBtn}</div>`;
     }
 
     function applyPageFiltersFromDom() {
@@ -6171,7 +6258,14 @@
           stateKey: "l1PricingTab",
           tabs: [["crossNet", "跨网服务费"], ["dayPrice", "人天标准日值"], ["sms", "预警短信"]]
         },
-        platformUsers: { stateKey: "platformUsersTab", tabs: [["info", "用户信息"], ["depositStats", "用户押金统计"], ["serviceChange", "服务变更"]] },
+        platformUsers: {
+          stateKey: "platformUsersTab",
+          tabs: () => [
+            ["info", "用户信息"],
+            ["depositStats", "用户押金统计"],
+            ["serviceChange", "服务变更"]
+          ]
+        },
         platformDevices: { stateKey: "platformDeviceTab", tabs: [["cabinet", "电柜"], ["battery", "电池"], ["models", "电池型号管理"]] },
         platformLeasing: { stateKey: "platformLeasingTab", tabs: [["companies", "租赁公司"], ["bindings", "租赁关系绑定"]] },
         platformOrders: { stateKey: "platformOrderTab", tabs: [["package", "套餐购买订单"], ["swap", "换电订单"], ["channel", "渠道商订单"]] },
@@ -6238,6 +6332,10 @@
           state.orderTab = map[state.view];
         }
         state.view = "orderService";
+      }
+      if (state.view === "platformUsers" && state.platformUsersTab === "kyc") {
+        state.platformUsersTab = "info";
+        state.platformUsersInfoSub = "kyc";
       }
       const items = getAllowedNavItems();
       if (!items.includes(state.view)) state.view = items[0];
@@ -10483,6 +10581,15 @@
             </div>
           </section>`;
       }
+      const infoSub = state.platformUsersInfoSub || "list";
+      const infoTabs = usersListKycTopTabs("platform", infoSub, "pu-info-sub");
+      if (infoSub === "kyc") {
+        return `<section class="panel panel-with-top-tabs">
+          ${infoTabs}
+          ${inlinePfBarHtml("platformUsers_kyc")}
+          ${renderKycReviewTable(pendingKycReviewUsers("platform"), { showOperator: true })}
+        </section>`;
+      }
       const rows = users.map(platformUserProfile).filter(u => {
         if (!matchKw(u.id, f.keyword) && !matchKw(u.phone, f.keyword)) return false;
         if (f.operatorId !== "全部" && u.serviceOperatorId !== f.operatorId) return false;
@@ -10497,16 +10604,18 @@
           const want = f.depositStatus === "无" ? "无" : f.depositStatus;
           if (st !== want) return false;
         }
-        if (f.kycStatus && f.kycStatus !== "全部" && userKycStatus(u) !== f.kycStatus) return false;
+        if (f.kycStatus && f.kycStatus !== "全部" && userKycListStatus(u) !== f.kycStatus) return false;
         return true;
       });
       const pg = paginateList(rows, state.platformUsersPage, state.platformUsersPageSize);
       state.platformUsersPage = pg.page;
       return `
-        <section class="panel">
+        <section class="panel panel-with-top-tabs">
+          ${infoTabs}
+          ${inlinePfBarHtml("platformUsers_info")}
           ${panelHead("用户信息", `共 ${pg.total} 人`, "platform_users")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("user_kyc")} 三要素：姓名 + 身份证号 + 身份证正反面照片。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("user_kyc")} 三要素：姓名 + 身份证号 + 身份证正反面照片。本表实名仅<strong>已实名 / 未实名</strong>；机审未通过在「待审认证」处理。</p>
             <table>
               <thead><tr>
                 <th>用户</th><th>实名认证</th><th>用户状态</th><th>服务运营商</th><th>用户类型</th>
@@ -10514,7 +10623,7 @@
               </tr></thead>
               <tbody>${pg.slice.map(u => `<tr>
                 <td>${u.id}<br><small style="color:var(--muted)">${u.phone}</small></td>
-                <td>${kycStatusTag(userKycStatus(u))}</td>
+                <td>${kycStatusTag(userKycListStatus(u))}</td>
                 <td>${tag(u.userStatus)}</td>
                 <td><strong>${u.serviceOperatorName}</strong><br><small style="color:var(--muted)">${u.serviceOperatorId}</small></td>
                 <td>${u.userType}</td>
@@ -17907,6 +18016,8 @@
     }
 
     function renderUsers() {
+      const tab = state.usersTab || "list";
+      const topTabs = usersListKycTopTabs("operator", tab, "users-sub");
       const f = getPf();
       const opId = currentEntity().id;
       const st = operatorRiderDepositStats(opId);
@@ -17917,6 +18028,28 @@
         const reason = u.poolFailReason || rider?.failReason || "无可用额度";
         return held ? `${reason} · 不可换电 · 仅可还电` : `${reason} · 不可换电 · 须渠道续配`;
       };
+      const kpiHtml = `
+        <div class="panel-body" style="border-bottom:1px solid var(--line)">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px">
+            <strong style="font-size:13px">骑手电池押金</strong>
+            <span style="font-size:12px;color:var(--muted)">购套餐同笔实收 · 不参与平台/合伙人清分 ${noteBtn("rider_battery_deposit")}</span>
+          </div>
+          <div class="kpi-grid in-panel kpi-grid-4">
+            ${kpi("实付在押总额", "¥" + st.heldAmount.toLocaleString("zh-CN"), "含退押中", "押", "rider_battery_deposit")}
+            ${kpi("实付在押人数", st.heldUsers, "当前在账", "人", "rider_battery_deposit")}
+            ${kpi("信用免押", st.creditUsers, "芝麻信用", "免", "orders_deposit_waiver")}
+            ${kpi("渠道担保", st.channelUsers, "人天/白名单押金算渠道", "渠", "rider_battery_deposit")}
+          </div>
+          ${st.refundingAmount > 0 ? `<p style="margin:10px 0 0;font-size:12px;color:var(--muted)">其中退押处理中 <strong>¥${st.refundingAmount.toLocaleString("zh-CN")}</strong></p>` : ""}
+        </div>`;
+      if (tab === "kyc") {
+        return `${ownScopeBanner()}
+        <section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${inlinePfBarHtml("users_kyc")}
+          ${renderKycReviewTable(pendingKycReviewUsers("operator"))}
+        </section>`;
+      }
       const us = users.filter(filterOwnRow).filter(u => {
         if (!matchKw(u.id, f.userId)) return false;
         if (!matchKw(u.phone, f.phone)) return false;
@@ -17932,27 +18065,18 @@
           const wantSt = f.depositStatus === "无" ? "无" : f.depositStatus;
           if (stDep !== wantSt) return false;
         }
-        if (f.kycStatus && f.kycStatus !== "全部" && userKycStatus(u) !== f.kycStatus) return false;
+        if (f.kycStatus && f.kycStatus !== "全部" && userKycListStatus(u) !== f.kycStatus) return false;
         return true;
       });
       return `
         ${ownScopeBanner()}
-        <section class="panel overview-kpi-panel">
-          ${panelHead("骑手电池押金", "购套餐同笔实收 · 不参与平台/合伙人清分", "rider_battery_deposit")}
-          <div class="panel-body">
-            <div class="kpi-grid in-panel kpi-grid-4">
-              ${kpi("实付在押总额", "¥" + st.heldAmount.toLocaleString("zh-CN"), "含退押中", "押", "rider_battery_deposit")}
-              ${kpi("实付在押人数", st.heldUsers, "当前在账", "人", "rider_battery_deposit")}
-              ${kpi("信用免押", st.creditUsers, "芝麻信用", "免", "orders_deposit_waiver")}
-              ${kpi("渠道担保", st.channelUsers, "人天/白名单押金算渠道", "渠", "rider_battery_deposit")}
-            </div>
-            ${st.refundingAmount > 0 ? `<p style="margin:10px 0 0;font-size:12px;color:var(--muted)">其中退押处理中 <strong>¥${st.refundingAmount.toLocaleString("zh-CN")}</strong></p>` : ""}
-          </div>
-        </section>
-        <section class="panel">
+        <section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${inlinePfBarHtml("users")}
+          ${kpiHtml}
           ${panelHead("用户列表", `共 ${us.length} 人`, "users_panel")}
           <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("users_panel")}${noteBtn("user_kyc")}${noteBtn("rider_battery_deposit")} 套餐与服务状态分列；电池押金为方式，押金状态<strong>仅实付</strong>有值。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("users_panel")}${noteBtn("user_kyc")}${noteBtn("rider_battery_deposit")} 套餐与服务状态分列；电池押金为方式，押金状态<strong>仅实付</strong>有值。本表实名仅<strong>已实名 / 未实名</strong>；机审未通过在「待审认证」处理。</p>
             <table>
               <thead><tr>
                 <th>用户</th><th>实名认证</th><th>套餐/服务</th><th>服务状态</th><th>人天池权益</th>
@@ -17963,7 +18087,7 @@
                 const svcState = u.serviceState || "——";
                 return `<tr>
                 <td>${u.id}<br><small style="color:var(--muted)">${u.phone}</small></td>
-                <td>${kycStatusTag(userKycStatus(u))}</td>
+                <td>${kycStatusTag(userKycListStatus(u))}</td>
                 <td>${u.pkg || "—"}</td>
                 <td>${svcState === "——" || !u.serviceState ? "——" : tag(svcState)}</td>
                 <td>${u.poolEligibility ? eligibilityTag(u.poolEligibility) + (u.poolTeam ? `<br><small>${u.poolTeam}</small>` : "") + (u.poolFailReason ? `<br><small style="color:var(--red)">${poolNoQuotaHint(u)}</small>` : "") : "—"}</td>
@@ -18243,6 +18367,23 @@
           if (btn.dataset.dpridersSub !== "list") state.dayPoolRiderFocus = null;
           state.dayPoolRidersPage = 1;
           state.dayPoolTeamsPage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-users-sub]").forEach(btn => {
+        btn.onclick = () => { state.usersTab = btn.dataset.usersSub; render(); };
+      });
+      root.querySelectorAll("[data-pu-info-sub]").forEach(btn => {
+        btn.onclick = () => {
+          state.platformUsersInfoSub = btn.dataset.puInfoSub;
+          if (btn.dataset.puInfoSub === "list") state.platformUsersPage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-goto-kyc-review]").forEach(btn => {
+        btn.onclick = () => {
+          if (isPlatformRole()) state.platformUsersInfoSub = "kyc";
+          else state.usersTab = "kyc";
           render();
         };
       });
