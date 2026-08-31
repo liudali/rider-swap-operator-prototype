@@ -413,9 +413,9 @@
       orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：<strong>仅实付押金</strong>流水（decision-086）。<br>· 与套餐无关联；列含支付时间/退款时间<br>· 操作列「<strong>退款日志</strong>」：抽屉展示各节点动作与时间（入账、申请、还电校验、审核、原路退等）<br>· 信用免押、渠道担保不在本页" },
       orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>芝麻信用免押（≥500）</strong>（运营商押金设置页只读展示，不可改；decision-100）。详情页与实付押金分开展示。" },
       rider_battery_deposit: { title: "骑手电池押金", content: "与「平台保证金」不同。<br>· 个人：购套餐<strong>同笔</strong>免押或实缴 → 运营商子商户<br>· 渠道人天：<strong>首次领电前</strong>免押或实缴（非静默渠道担保）<br>· <strong>押金方式（全站）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）<br>· 运营商「订单与服务 → 用户押金」明细；「用户」台账；平台「用户管理 → 用户押金统计」只读汇总<br>· 数额见「定价管理 → 押金设置」；<strong>仅退押</strong>进「退款管理」" },
-      platform_users_info: { title: "用户信息", content: "全平台用户列表。<br>· <strong>实名认证</strong>（本表仅两态）：<strong>已实名</strong>（查看实名信息）/ <strong>未实名</strong>；机审未通过不在本表展示，进入「待审认证」<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>服务状态</strong>与<strong>生效周期</strong>分列（decision-080）<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
-      user_kyc: { title: "实名认证", content: "骑手须提交<strong>三要素</strong>：姓名、身份证号、身份证正反面照片。<br>· <strong>用户列表 / 用户信息</strong>：仅 <strong>已实名</strong>（查看实名信息）/ <strong>未实名</strong>；操作无手动通过<br>· <strong>未通过</strong>：机审驳回，只出现在「待审认证」；核对后手动通过（须留痕）<br>购套餐前须完成实名（decision-097 / 118）" },
-      kyc_review_queue: { title: "待审认证", content: "用户列表 / 用户信息页内 Tab，只含<strong>未通过</strong>（机审驳回）。<br>· Tab 标注待审人数；0 人不显示数字<br>· 列：用户、姓名、证件号（脱敏）、提交时间、驳回原因、查看 / 手动通过<br>· 通过后变为已实名并离开本队列；留痕不变（decision-097）<br>· 运营商仅本主体；平台为全平台。不新增第四种实名状态（decision-118）" },
+      platform_users_info: { title: "用户信息", content: "全平台注册用户（含未购套餐）。<br>· <strong>实名认证</strong>（本表仅两态）：<strong>已实名</strong>（查看实名信息）/ <strong>未实名</strong>；机审未通过不在本表，进入「待审认证」<br>· 运营商用户列表只含已成交的已实名客户（decision-119）<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>服务状态</strong>与<strong>生效周期</strong>分列（decision-080）<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
+      user_kyc: { title: "实名认证", content: "骑手须提交<strong>三要素</strong>：姓名、身份证号、身份证正反面照片。<br>· 购套餐 / 人天入网<strong>之前</strong>须已实名（decision-097）<br>· <strong>运营商用户列表</strong>：只含已实名客户，操作「查看实名信息」（decision-119）<br>· <strong>平台用户信息</strong>：已实名 / 未实名（全量注册）<br>· <strong>未通过</strong>只在「待审认证」；核对后手动通过（须留痕）" },
+      kyc_review_queue: { title: "待审认证", content: "页内 Tab，只含<strong>未通过</strong>（机审驳回、尚未购套餐）。<br>· Tab 标注待审人数；0 人不显示数字<br>· 列：用户、姓名、证件号（脱敏）、提交时间、驳回原因、查看 / 手动通过<br>· 通过后离开本队列，可去购套餐；<strong>购后才进运营商用户列表</strong>（decision-119）<br>· 运营商仅本网提交；平台为全平台。不新增第四种实名状态" },
       platform_users_deposit_stats: { title: "用户押金统计", content: "按运营商汇总实付在押、免押人数、渠道担保、退押中金额；只读，不参与平台/合伙人清分。" },
       pricing_deposit: { title: "押金设置", content: "面向<strong>个人购套餐</strong>与<strong>渠道人天首次领电</strong>。<br>· 运营商可配置：押金数额、启停<br>· <strong>免押门槛由平台统一</strong>，只读展示：芝麻信用免押（≥500）；已移除微信支付分（decision-100）<br>· 未达标则须实缴<br>· 个人：购套餐同笔；渠道人天：首次领取电池前办结（decision-050）" },
       orders_swap: { title: "换电订单", content: "列出换电单；权益来源：<strong>个人套餐</strong>（支付时已清分，本表不展示应分）、<strong>渠道人天</strong>、<strong>激活码（二期）</strong>（按天/次确认消耗，类人天）。每笔记录三元组 U/C/B 与跨网设备服务费。" },
@@ -432,7 +432,7 @@
       flows_withdraw_apply: { title: "发起提现", content: "申请金额不得超过当前可提现余额；提交后状态为「待审核」，平台在流水管理审核。" },
       platform_withdraw_review: { title: "运营商提现审核", content: "平台审核运营商提现申请：通过后代付/提现至运营商绑定的<strong>唯一对公银行卡</strong>；驳回须填写原因。<br>仅适用于<strong>运营商</strong>经营收入，不含渠道商-设备租赁。" },
       orders_pkg_pay: { title: "收款主体", content: "架构 B 下 C 端套餐支付进入<strong>运营商</strong>进件商户（演示：绿色出行）。渠道商无收款账户；B 端采购款付至运营商。" },
-      users_panel: { title: "用户", content: "本运营商旗下骑手；<strong>不设绑定站点</strong>。<br>· <strong>实名认证</strong>（本表）：已实名 / 未实名；操作仅「查看实名信息」<br>· 机审<strong>未通过</strong>只在「待审认证」<br>· <strong>套餐/服务</strong>与<strong>服务状态</strong>分列<br>· <strong>电池押金</strong>（方式）与<strong>押金状态</strong>分列；仅实付有在押/退押中<br>· 人天池权益、换电与最近活跃" },
+      users_panel: { title: "用户", content: "本运营商<strong>已实名客户</strong>（购套餐或人天入网）；<strong>不设绑定站点</strong>。<br>· 未实名 / 未通过不是本网客户，不在本表（decision-119）<br>· 操作仅「查看实名信息」；机审未通过在「待审认证」<br>· <strong>套餐/服务</strong>与<strong>服务状态</strong>分列<br>· <strong>电池押金</strong>（方式）与<strong>押金状态</strong>分列；仅实付有在押/退押中<br>· 人天池权益、换电与最近活跃" },
       lease_agreements: { title: "协议与设备", content: "资方维护<strong>租赁协议</strong>（承租运营商 + 关联设备清单 + 租金条款）；<strong>设备清单单独维护</strong>，一清单可对应一协议；同一运营商可有<strong>多份协议/多份清单</strong>。不含站点。变更须运营商确认，次月 1 日生效。" },
       lease_device_lists: { title: "设备清单", content: "资方独立维护的设备组合（柜机/电池 SN）；可<strong>导入</strong>、清单内设备允许<strong>替换</strong>（如电池 A 无法维修换为电池 B），保留替换记录。新建协议时选择待绑定清单。" },
       lease_device_replace: { title: "设备替换", content: "在设备清单中将故障设备标记为「已替换」，登记新 SN 与原因；<strong>仅保修期内</strong>可替换（保修期跟随设备，平台管理员可编辑）。若清单已绑定履约中协议，替换后须运营商确认（次月 1 日生效）。" },
@@ -2016,9 +2016,9 @@
       { id: "U1028", phone: "138****1028", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 剩18天", swaps: 42, last: "今日 12:05",
         kycStatus: "已实名", realName: "王磊", idNo: "310115199003051234", kycSubmittedAt: "2026-05-01 09:12", kycPassedAt: "2026-05-01 09:15" },
       { id: "U1041", phone: "139****1041", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 已冻结", swaps: 28, last: "05-20 14:10", deposit: "免押·芝麻", serviceState: "已冻结",
-        kycStatus: "未实名" },
+        kycStatus: "已实名", realName: "孙敏", idNo: "310115199206061088", kycSubmittedAt: "2026-05-10 09:00", kycPassedAt: "2026-05-10 09:03" },
       { id: "U1055", phone: "136****1055", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 剩26天 · 待领取电池", swaps: 12, last: "06-11 10:00", serviceState: "服务中", resumePendingPickup: true,
-        kycStatus: "未通过", realName: "李强", idNo: "310115199108081122", kycSubmittedAt: "2026-06-10 14:20", kycRejectReason: "身份证照片模糊，无法识别" },
+        kycStatus: "已实名", realName: "李强", idNo: "310115199108081122", kycSubmittedAt: "2026-05-15 10:00", kycPassedAt: "2026-05-15 10:04" },
       { id: "U2088", phone: "137****2088", site: "陆家嘴分站", city: "上海", deviceOwnerId: "OP-LJZ", pkg: "中途完结退款中", swaps: 6, last: "05-20 14:10", deposit: "押¥99", serviceState: "中途完结", accountStatus: "注销中" },
       { id: "U3321", phone: "136****3321", site: "陆家嘴分站", city: "上海", deviceOwnerId: "OP-LJZ", pkg: "次卡 · 剩7次", swaps: 3, last: "05-23 09:50", deposit: "免押·芝麻", serviceState: "服务中" },
       { id: "U2101", phone: "138****2101", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "人天池 · 今日已用", swaps: 1, last: "今日 08:30", poolTeam: "默认团队", poolEligibility: "已确认消耗", poolId: "QP-2601",
@@ -2037,11 +2037,28 @@
       { id: "U1066", phone: "138****1066", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "中途完结退款中", swaps: 18, last: "06-12 09:00", deposit: "押¥99", serviceState: "中途完结" },
       { id: "U2107", phone: "137****2107", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "1天 · 已完结", swaps: 3, last: "06-06 22:00", serviceState: "已完结" },
       { id: "U3001", phone: "138****3001", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 渠道购卡", swaps: 5, last: "06-11 09:00", channelId: "CH-CARD", serviceState: "服务中",
-        kycStatus: "未实名" },
+        kycStatus: "已实名", realName: "刘骑士", idNo: "310115199309091234", kycSubmittedAt: "2026-06-10 16:00", kycPassedAt: "2026-06-10 16:03" },
       { id: "U-LJZ-01", phone: "137****7702", site: "滨江换电站", city: "上海", deviceOwnerId: "OP-BJ", pkg: "包月 · 剩23天", swaps: 8, last: "06-10 17:00", deposit: "押¥99", serviceState: "服务中" },
       { id: "U2301", phone: "138****2301", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "包月 · 服务中", swaps: 8, last: "06-12 08:00", deposit: "押¥99", serviceState: "服务中",
-        kycStatus: "未通过", realName: "赵刚", idNo: "310115199501011234", kycSubmittedAt: "2026-06-11 16:45", kycRejectReason: "姓名与身份证 OCR 不一致" }
+        kycStatus: "已实名", realName: "赵刚", idNo: "310115199501011234", kycSubmittedAt: "2026-06-07 11:00", kycPassedAt: "2026-06-07 11:04" },
+      { id: "U1090", phone: "135****1090", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "—", swaps: 0, last: "—",
+        kycStatus: "未通过", realName: "周斌", idNo: "310115199212121088", kycSubmittedAt: "2026-08-30 14:20", kycRejectReason: "身份证照片模糊，无法识别" },
+      { id: "U1091", phone: "136****1091", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "—", swaps: 0, last: "—",
+        kycStatus: "未通过", realName: "钱浩", idNo: "310115199408081234", kycSubmittedAt: "2026-08-30 16:45", kycRejectReason: "姓名与身份证 OCR 不一致" },
+      { id: "U0400", phone: "139****0400", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "—", swaps: 0, last: "—",
+        kycStatus: "未实名" }
     ];
+    users.forEach(u => {
+      if (u.kycStatus && u.kycStatus !== "已实名") return;
+      u.kycStatus = "已实名";
+      if (!u.realName) u.realName = "骑手" + String(u.id).replace(/\D/g, "").slice(-4);
+      if (!u.idNo) {
+        const n = String(u.id).replace(/\D/g, "").padStart(4, "0").slice(-4);
+        u.idNo = "31011519900101" + n;
+      }
+      u.kycSubmittedAt = u.kycSubmittedAt || "2026-03-01 10:00";
+      u.kycPassedAt = u.kycPassedAt || "2026-03-01 10:02";
+    });
 
     const dayPools = [
       {

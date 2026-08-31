@@ -2345,6 +2345,11 @@
       return u.kycStatus || "未实名";
     }
 
+    /** 运营商用户列表：本网已实名客户（购套餐/人天的前提是实名，decision-119） */
+    function isOperatorCustomerUser(u) {
+      return userKycStatus(u) === "已实名";
+    }
+
     function isKycPendingReview(u) {
       return userKycStatus(u) === "未通过";
     }
@@ -2413,7 +2418,7 @@
       return `
           ${panelHead("待审认证", `未通过 ${filtered.length} 人 · 须人工核对三要素后手动通过`, "user_kyc")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("user_kyc")}${noteBtn("kyc_review_queue")} 本队列只含<strong>未通过</strong>。未提交为「未实名」，在用户列表查看；通过后离开本队列。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("user_kyc")}${noteBtn("kyc_review_queue")} 本队列只含<strong>未通过</strong>（购套餐前机审驳回）。通过后可购套餐；<strong>购后才进运营商用户列表</strong>。</p>
             <table>
               <thead><tr>
                 <th>用户</th>${showOp ? "<th>服务运营商</th>" : ""}<th>姓名</th><th>身份证号</th>
@@ -2485,7 +2490,7 @@
       openProtoConfirm({
         title: "手动通过实名",
         html: `<p style="margin:0 0 8px">确认将 <strong>${u.id}</strong>（${u.realName || "—"}）标记为<strong>已实名</strong>？</p>
-          <p style="margin:0;font-size:12px;color:var(--muted)">须已人工核对三要素；操作留痕。</p>`,
+          <p style="margin:0;font-size:12px;color:var(--muted)">须已人工核对三要素；操作留痕。通过后可购套餐，购后才会出现在运营商用户列表。</p>`,
         confirmLabel: "确认通过",
         onConfirm: () => {
           u.kycStatus = "已实名";
@@ -4323,13 +4328,10 @@
         ] },
         { key: "depositStatus", label: "押金状态", type: "select", options: [
           { v: "全部", t: "全部" }, { v: "在押", t: "在押" }, { v: "退押中", t: "退押中" }, { v: "无", t: "——" }
-        ] },
-        { key: "kycStatus", label: "实名认证", type: "select", options: [
-          { v: "全部", t: "全部" }, { v: "已实名", t: "已实名" }, { v: "未实名", t: "未实名" }
         ] }
       ],
       users_kyc: [
-        { key: "userId", label: "用户 ID", placeholder: "如 U1055" },
+        { key: "userId", label: "用户 ID", placeholder: "如 U1090" },
         { key: "phone", label: "手机号", placeholder: "" }
       ],
       refundManage: [
@@ -4448,7 +4450,7 @@
         ] }
       ],
       platformUsers_kyc: [
-        { key: "keyword", label: "用户 ID/手机", placeholder: "U1055" },
+        { key: "keyword", label: "用户 ID/手机", placeholder: "U1090" },
         { key: "operatorId", label: "服务运营商", type: "select", options: () => platformOperatorOptions() }
       ],
       platformUsers_depositStats: [
@@ -10591,6 +10593,7 @@
         </section>`;
       }
       const rows = users.map(platformUserProfile).filter(u => {
+        if (isKycPendingReview(u)) return false;
         if (!matchKw(u.id, f.keyword) && !matchKw(u.phone, f.keyword)) return false;
         if (f.operatorId !== "全部" && u.serviceOperatorId !== f.operatorId) return false;
         if (f.userType !== "全部" && u.userType !== f.userType) return false;
@@ -18050,7 +18053,7 @@
           ${renderKycReviewTable(pendingKycReviewUsers("operator"))}
         </section>`;
       }
-      const us = users.filter(filterOwnRow).filter(u => {
+      const us = users.filter(filterOwnRow).filter(isOperatorCustomerUser).filter(u => {
         if (!matchKw(u.id, f.userId)) return false;
         if (!matchKw(u.phone, f.phone)) return false;
         if (f.pkgService !== "全部" && userPkgServiceType(u) !== f.pkgService) return false;
@@ -18065,7 +18068,6 @@
           const wantSt = f.depositStatus === "无" ? "无" : f.depositStatus;
           if (stDep !== wantSt) return false;
         }
-        if (f.kycStatus && f.kycStatus !== "全部" && userKycListStatus(u) !== f.kycStatus) return false;
         return true;
       });
       return `
@@ -18076,7 +18078,7 @@
           ${kpiHtml}
           ${panelHead("用户列表", `共 ${us.length} 人`, "users_panel")}
           <div class="panel-body">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("users_panel")}${noteBtn("user_kyc")}${noteBtn("rider_battery_deposit")} 套餐与服务状态分列；电池押金为方式，押金状态<strong>仅实付</strong>有值。本表实名仅<strong>已实名 / 未实名</strong>；机审未通过在「待审认证」处理。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("users_panel")}${noteBtn("user_kyc")}${noteBtn("rider_battery_deposit")} 本表仅<strong>已实名客户</strong>（购套餐/人天须先实名）。未实名与未通过不在本表；机审未通过在「待审认证」。</p>
             <table>
               <thead><tr>
                 <th>用户</th><th>实名认证</th><th>套餐/服务</th><th>服务状态</th><th>人天池权益</th>
