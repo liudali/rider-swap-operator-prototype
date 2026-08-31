@@ -390,13 +390,13 @@
       overview_power_site: { title: "站点用电", content: "Σ 该站点下所有柜机在筛选期内的日用电量；柜机数为去重 SN 数。" },
       overview_power_cabinet: { title: "单柜用电", content: "单台柜机在筛选期内的累计用电；可跳转「我的设备 → 换电柜」查看实时读数。" },
       sites_panel: { title: "站点信息", content: "运营商负责站点 CRUD 与设备分配；入口在「站点管理 → 站点信息」。可维护<strong>定位坐标</strong>（经度/纬度，非必填，成对填写）。换电范围见「平台设置 → 换电范围」。" },
-      devices_cab: { title: "换电柜管理", content: "列表字段对齐 IoT 台账。<strong>仅换电柜</strong>可绑定/变更站点；电池与站点无绑定关系。已绑定站点的柜机可执行<strong>移柜</strong>。<br>详情「换电模式切换」枚举：<strong>正常换电 / MQTT离线换电 / 蓝牙换电</strong>。<br><span class='badge-p2'>二期</span>：导出电池流转记录、运维操作记录、电柜组成、详情页<strong>远程运维按钮条</strong>（快照/通断电/风扇/重启等）、端口状态·操作 — 一期不交付，原型可浏览。" },
+      devices_cab: { title: "换电柜管理", content: "列表字段对齐 IoT 台账。<strong>仅换电柜</strong>可绑定/变更站点；电池与站点无绑定关系。站点允许空（展示「未分配站点」）：导入后未投放、或移柜卸站。所有自有柜机可<strong>移柜</strong>（首次投放 / 改站 / 卸站）。<br>详情「换电模式切换」枚举：<strong>正常换电 / MQTT离线换电 / 蓝牙换电</strong>。<br><span class='badge-p2'>二期</span>：导出电池流转记录、运维操作记录、电柜组成、详情页<strong>远程运维按钮条</strong>（快照/通断电/风扇/重启等）、端口状态·操作 — 一期不交付，原型可浏览。" },
       devices_cab_remote_ops: { title: "换电柜详情 · 远程运维（二期）", content: "【二期】详情页运维按钮条：查看快照/发送请求/运维记录、通断电、风扇、主板重启、更新版本、上传二维码、反向供电等。一期不交付；原型可浏览并提示二期。" },
       devices_cab_compose: { title: "电柜组成（二期）", content: "【二期】模块清单与格口快照；含隔口开关、上下电演示。一期不交付。" },
       devices_cab_port_ops: { title: "端口状态 · 操作（二期）", content: "【二期】详情页端口状态可只读浏览；开门/刷新/补电/通断电等<strong>操作</strong>属二期。一期不交付，原型仅演示入口。" },
       devices_cab_bat_flow: { title: "导出电池流转记录（二期）", content: "【二期】按时间范围导出电池入柜/出柜/流转 CSV。一期不交付。" },
       devices_cab_ops_log: { title: "运维操作记录（二期）", content: "【二期】远程运维指令与结果流水。一期不交付，原型可浏览演示表。" },
-      devices_move_cab: { title: "移柜", content: "前提：柜机已绑定站点（<code>cabinets.site</code> 对应运营商在营站点）。将柜机从 A 站迁至 B 站，同步更新投放地址与城市；<strong>不迁移电池</strong>（电池位置仍随柜内格口/流转记录，与站点无绑定）。移柜留痕 Mock。" },
+      devices_move_cab: { title: "移柜", content: "所有自有换电柜可移柜，站点可空。<strong>未分配</strong>→ 选在营站点即首次投放；<strong>已上站</strong>→ 可改到其他在营站，或选「未分配站点（暂不投放）」卸站。同步投放地址与城市；卸站清空投放地址。<strong>不迁移电池</strong>。移柜留痕 Mock。卸站后平台「改归属」不再拦截（decision-120）。" },
       devices_bat: { title: "电池", content: "归属本运营商的电池 SN、电量（SOC%）与<strong>健康度（SOH%）</strong>。位置四档：自有电柜 / 其他运营商电柜 / 柜外 / 柜外-用户；支持按位置筛选与分页。<strong>站点列仅在电柜格口内展示</strong>；用户持有或柜外时显示「—」。补电与调拨在运维流程处理（原型仅占位）。" },
       devices_bat_soh: { title: "健康度", content: "电池健康度 <strong>SOH</strong>，以百分比展示（0–100%），与平台设备台账「SOH」口径一致。不再使用「正常/预警」文案标签。" },
       orders_pkg: { title: "套餐购买订单", content: "骑手支付购买的包月/次卡订单，定义服务有效期与额度。支持中途完结退款、冻结/解冻。一笔套餐在有效期内可产生多笔换电订单。" },
@@ -523,6 +523,7 @@
       platform_users_battery: { title: "持有电池", content: "仅<strong>服务中且已换电</strong>的用户展示：<code>电池编码-SOC xx%-SOH yy%（归属 xxx运营商）</code>；SOH 为健康度百分比；<strong>必须有归属运营商</strong>。<strong>已冻结 / 中途完结 / 待首换开通</strong>及无持电记录 → <strong>未持有</strong>。" },
       platform_users_freeze: { title: "申请冻结校验", content: "仅<strong>个人套餐</strong>用户可申请。须同时满足：套餐<strong>服务中且在有效期内</strong>、<strong>未持有电池</strong>（仍持有则拒绝并提示先还电）。校验通过后<strong>即时冻结</strong>，无需人工审核。" },
       platform_devices_import: { title: "批量导入", content: "入口在<strong>设备管理</strong>（电柜或电池 Tab）页「批量导入」弹窗。<strong>先选归属运营商</strong>，再二选一：① 手工录入（少量，每行一个 SN）；② 表格导入（大量，上传 CSV/TXT，首列 SN）。类型/城市/规格由 IoT 按 SN 回填；导入即归属进对应台账。<strong>无「待绑定」队列</strong>。" },
+      platform_device_rebind: { title: "改归属", content: "平台纠错：把已导入设备改到另一家运营商（decision-120）。<br>· <strong>已分配站点一律拦截</strong>，弹窗展示该设备的<strong>站点</strong>与<strong>当前运营商</strong>；须运营商先卸站<br>· 用户持有、租赁/融资同样不可改<br>· 改电柜<strong>不改</strong>格内电池<br>· 原因枚举：导错运营商 / 分货更正 / 其他<br>· 成功后更新归属日，导入日期不变。不是跨主体调拨审批" },
       platform_devices_battery_belong: { title: "当前位置", content: "平台电池三档：<strong>电柜</strong>（在任意柜机格口，含跨运营商柜）、<strong>用户</strong>（骑手持有）、<strong>柜外</strong>（柜外充电/待入柜/资方库存等）。与运营商「我的设备·电池」四档位置（自有电柜/其他运营商电柜/柜外/柜外-用户）不同粒度。<strong>站点列仅在「电柜」时展示</strong>；用户持有或柜外时为「—」。" },
       platform_device_bound_at: { title: "归属日", content: "设备<strong>归属当前运营商</strong>的日期（平台批量导入并指定运营商时写入）。<br>· 首次导入且同时指定运营商：与「导入日期」相同<br>· 若日后发生换绑运营商：更新归属日，<strong>不改</strong>导入日期<br>· 无归属运营商（如资方库存）：显示 —" },
       platform_device_imported_at: { title: "导入日期", content: "该 SN <strong>首次进入平台设备台账</strong>的日期（批量导入成功日）。只记一次，不因站点调拨、换电流转或运营商换绑而变更。" },
@@ -588,11 +589,11 @@
       operators: ["platform_operators", "operator_credit_eval", "accounts", "platform_withdraw_review", "platform_operator_fee_rate", "platform_channels", "channel_partner_manage", "channel_no_receipt"],
       operatorCreditEval: ["operator_credit_eval"],
       depositManage: ["deposit_manage", "deposit_recharge", "operator_deposit", "operator_credit"],
-      deviceBinding: ["platform_device_bind", "platform_operator_device_gate", "platform_devices_import"],
+      deviceBinding: ["platform_device_bind", "platform_operator_device_gate", "platform_devices_import", "platform_device_rebind"],
       l1Pricing: ["platform_l1_pricing", "platform_day_standard", "platform_standard_day_price", "day_pool_warn", "inter_op_pricing"],
       platformUsers: ["platform_users", "platform_users_info", "user_kyc", "kyc_review_queue", "platform_users_deposit_stats", "rider_battery_deposit", "platform_users_battery", "platform_users_freeze", "orders_service_change"],
       platformOrders: ["platform_orders", "platform_channel_po"],
-      platformDevices: ["platform_device_bind", "platform_devices_import", "platform_operator_device_gate", "platform_devices_battery_belong", "platform_device_bound_at", "platform_device_imported_at", "platform_battery_models"],
+      platformDevices: ["platform_device_bind", "platform_devices_import", "platform_device_rebind", "platform_operator_device_gate", "platform_devices_battery_belong", "platform_device_bound_at", "platform_device_imported_at", "platform_battery_models"],
       platformChannels: ["platform_channels", "channel_partner_manage", "channel_no_receipt"],
       platformMarketing: ["platform_marketing", "platform_marketing_collect", "platform_marketing_payout"],
       platformFlows: ["platform_flows", "platform_fee"],
@@ -811,7 +812,9 @@
       { sn: "CAB-22021", site: "世博换电服务点", city: "上海", slots: 12, online: true, lastSwap: "10:30", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", ownership: "自有" },
       { sn: "CAB-22044", site: "陆家嘴分站", city: "上海", slots: 8, online: true, lastSwap: "10:22", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
       { sn: "CAB-22045", site: "陆家嘴分站", city: "上海", slots: 8, online: false, lastSwap: "昨日 21:00", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
-      { sn: "CAB-BJ-01", site: "滨江换电站", city: "上海", slots: 10, online: true, lastSwap: "16:00", deviceOwnerId: "OP-BJ", deviceOwnerName: "滨江联营" }
+      { sn: "CAB-BJ-01", site: "滨江换电站", city: "上海", slots: 10, online: true, lastSwap: "16:00", deviceOwnerId: "OP-BJ", deviceOwnerName: "滨江联营" },
+      { sn: "CAB-IMP-01", site: "未分配站点", city: "上海", slots: 12, online: false, lastSwap: "—", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", ownership: "自有", boundAt: "2026-08-31", importedAt: "2026-08-31", specs: "12 仓" },
+      { sn: "CAB-IMP-02", site: "未分配站点", city: "上海", slots: 12, online: false, lastSwap: "—", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", ownership: "自有", boundAt: "2026-08-31", importedAt: "2026-08-31", specs: "12 仓" }
     ];
 
     const batteries = [
@@ -829,7 +832,9 @@
       { sn: "BAT-SH-1051", site: "—", city: "上海", soc: 100, soh: 100, health: "正常", inCab: "资方库存", deviceOwnerId: null, lessorId: "LEASE-HD", lessorName: "华东设备租赁公司", ownership: "出租库存" },
       { sn: "BAT-SH-1021", site: "世博换电服务点", city: "上海", soc: 88, soh: 98, health: "正常", inCab: "CAB-22021", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行" },
       { sn: "BAT-SH-0901", site: "浦东骑手驿站", city: "上海", soc: 96, soh: 99, health: "正常", inCab: "CAB-22018", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
-      { sn: "BAT-BJ-1001", site: "滨江换电站", city: "上海", soc: 94, soh: 99, health: "正常", inCab: "CAB-BJ-01", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" }
+      { sn: "BAT-BJ-1001", site: "滨江换电站", city: "上海", soc: 94, soh: 99, health: "正常", inCab: "CAB-BJ-01", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
+      { sn: "BAT-IMP-01", site: "未分配站点", city: "上海", soc: 100, soh: 100, health: "正常", inCab: "待入柜", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", boundAt: "2026-08-31", importedAt: "2026-08-31" },
+      { sn: "BAT-IMP-02", site: "未分配站点", city: "上海", soc: 100, soh: 100, health: "正常", inCab: "待入柜", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", boundAt: "2026-08-31", importedAt: "2026-08-31" }
     ];
 
     /** 平台统一电池型号字典（decision-088；定价/台账规格串同源） */

@@ -8,7 +8,9 @@
       },
       view: "overview",
       deviceTab: "cabinet", deviceBatteryPage: 1, deviceBatteryPageSize: 5, orderTab: "package", flowTab: "receipt",
-      platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "cabinet", platformDeviceOpenImportModal: false, platformChannelTab: "list", platformMarketingTab: "campaigns",
+      platformOrderTab: "package", platformFlowTab: "userPay", platformDeviceTab: "cabinet", platformDeviceOpenImportModal: false,
+      platformDeviceChecked: { cabinet: [], battery: [] },
+      platformChannelTab: "list", platformMarketingTab: "campaigns",
       operatorsTab: "list",
       l1PricingTab: "crossNet",
       platformUsersTab: "info",
@@ -3329,7 +3331,7 @@
     }
 
     function operatorAggregateStats(operatorId) {
-      const siteSet = new Set(cabinets.filter(c => c.deviceOwnerId === operatorId).map(c => c.site));
+      const siteSet = new Set(cabinets.filter(c => c.deviceOwnerId === operatorId).map(c => c.site).filter(n => !isUnassignedSiteName(n)));
       sites.filter(s => s.operatorId === operatorId).forEach(s => siteSet.add(s.name));
       const channels = channelContracts.filter(c => c.operatorId === operatorId).length;
       const turnover = packageOrders.filter(p => p.deviceOwnerId === operatorId).reduce((s, p) => s + p.pay, 0)
@@ -4089,7 +4091,9 @@
 
     function ownSiteOptions() {
       const eid = currentEntity().id;
-      return ["全部", ...new Set(cabinets.filter(c => c.deviceOwnerId === eid).map(c => c.site))];
+      const names = [...new Set(cabinets.filter(c => c.deviceOwnerId === eid).map(c => c.site))];
+      const assigned = names.filter(n => !isUnassignedSiteName(n));
+      return ["全部", CABINET_UNASSIGNED_SITE, ...assigned];
     }
 
     function ownSiteIdOptions() {
@@ -7262,7 +7266,7 @@
       const eid = currentEntity().id;
       const date = getSiteBusyPf().date || "2026-06-15";
       const ownCabs = cabinets.filter(c => c.deviceOwnerId === eid);
-      const siteNames = [...new Set(ownCabs.map(c => c.site))].sort();
+      const siteNames = [...new Set(ownCabs.map(c => c.site).filter(n => !isUnassignedSiteName(n)))].sort();
       return siteNames.map(siteName => {
         const siteMeta = sites.find(s => s.name === siteName) || { id: "—", city: "—", address: "—", status: "—", waitingCount: 0 };
         const cabinetsAtSite = ownCabs.filter(c => c.site === siteName);
@@ -8648,7 +8652,7 @@
     }
 
     function myOperatorSites() {
-      const ownSiteNames = [...new Set(cabinets.filter(c => c.deviceOwnerId === currentEntity().id).map(c => c.site))];
+      const ownSiteNames = [...new Set(cabinets.filter(c => c.deviceOwnerId === currentEntity().id).map(c => c.site).filter(n => !isUnassignedSiteName(n)))];
       return sites.filter(s => s.operatorId === currentEntity().id || ownSiteNames.includes(s.name));
     }
 
@@ -9487,6 +9491,161 @@
       const idx = platformDeviceInventory.findIndex(i => i.sn === sn);
       if (idx >= 0) platformDeviceInventory.splice(idx, 1);
       return { ok: true, type: iot.type, opName: op.name, specs: iot.specs };
+    }
+
+    const DEVICE_REBIND_REASONS = ["导错运营商", "分货更正", "其他"];
+    const CABINET_UNASSIGNED_SITE = "未分配站点";
+
+    function isUnassignedSiteName(name) {
+      const s = String(name || "").trim();
+      return !s || s === "—" || s === CABINET_UNASSIGNED_SITE || s === "待绑定";
+    }
+
+    function cabinetSiteUnassigned(c) {
+      return isUnassignedSiteName(c?.site);
+    }
+
+    function cabinetSiteLabel(c) {
+      return cabinetSiteUnassigned(c) ? CABINET_UNASSIGNED_SITE : c.site;
+    }
+
+    function platformCabinetSiteAssigned(c) {
+      return !cabinetSiteUnassigned(c);
+    }
+
+    function platformDeviceRebindBlock(kind, raw) {
+      if (!raw) return { code: "missing", label: "不在台账", site: "—", operator: "—" };
+      const opName = raw.deviceOwnerName || operatorLabel(raw.deviceOwnerId) || "—";
+      if (kind === "battery" && (raw.heldByUser || batteryLocationKind(raw) === "柜外-用户")) {
+        return { code: "held", label: "用户持有", site: "—", operator: opName, extra: raw.holderName || "" };
+      }
+      const own = raw.ownership || "";
+      if (own === "租赁" || own === "融资" || own === "出租库存" || raw.lessorId) {
+        return { code: "lease", label: own || "租赁/融资", site: kind === "cabinet" ? (raw.site || "—") : batterySiteCell(raw), operator: opName };
+      }
+      if (kind === "cabinet" && platformCabinetSiteAssigned(raw)) {
+        return { code: "site", label: "已分配站点", site: raw.site, operator: opName };
+      }
+      if (kind === "battery") {
+        const site = batterySiteCell(raw);
+        if (site && site !== "—") {
+          return { code: "site", label: "已分配站点", site, operator: opName };
+        }
+      }
+      return null;
+    }
+
+    function findPlatformDeviceRaw(kind, sn) {
+      return kind === "battery" ? batteries.find(b => b.sn === sn) : cabinets.find(c => c.sn === sn);
+    }
+
+    function classifyDeviceRebind(kind, sns) {
+      const blocked = [];
+      const eligible = [];
+      sns.forEach(sn => {
+        const raw = findPlatformDeviceRaw(kind, sn);
+        const block = platformDeviceRebindBlock(kind, raw);
+        if (block) blocked.push({ sn, ...block });
+        else eligible.push({ sn, raw, operator: raw.deviceOwnerName || operatorLabel(raw.deviceOwnerId) || "—" });
+      });
+      return { blocked, eligible };
+    }
+
+    function applyDeviceOwnerRebind(kind, sns, operatorId, reason) {
+      const op = platformOperators.find(o => o.id === operatorId);
+      if (!op) return 0;
+      const day = new Date().toISOString().slice(0, 10);
+      const { eligible } = classifyDeviceRebind(kind, sns);
+      let n = 0;
+      eligible.forEach(({ raw }) => {
+        if (raw.deviceOwnerId === op.id) return;
+        raw.deviceOwnerId = op.id;
+        raw.deviceOwnerName = op.name;
+        raw.boundAt = day;
+        raw.rebindReason = reason;
+        raw.rebindAt = day;
+        n += 1;
+      });
+      return n;
+    }
+
+    function deviceRebindBlockedTableHtml(blocked) {
+      return `<div class="orders-table-wrap"><table>
+        <thead><tr><th>SN</th><th>原因</th><th>站点</th><th>当前运营商</th></tr></thead>
+        <tbody>${blocked.map(r => `<tr>
+          <td>${r.sn}</td>
+          <td>${r.label}${r.extra ? `<br><small style="color:var(--muted)">${r.extra}</small>` : ""}</td>
+          <td>${r.site || "—"}</td>
+          <td>${r.operator || "—"}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+      <p style="margin:10px 0 0;font-size:12px;color:var(--muted)">已分配站点的设备须先在运营商「我的设备」卸站后再改归属。改电柜不会改格内电池。</p>`;
+    }
+
+    function openDeviceRebindModal(kind, sns) {
+      const uniq = [...new Set((sns || []).filter(Boolean))];
+      if (!uniq.length) {
+        showProtoToast("请先勾选设备，或使用行内「改归属」");
+        return;
+      }
+      const { blocked, eligible } = classifyDeviceRebind(kind, uniq);
+      if (!eligible.length) {
+        openProtoConfirm({
+          title: "无法改归属",
+          html: `<p style="margin:0 0 10px;font-size:13px">已拦截 ${blocked.length} 台。当前站点与运营商如下：</p>${deviceRebindBlockedTableHtml(blocked)}`,
+          confirmLabel: "知道了",
+          cancelLabel: "关闭",
+          modalWidth: "min(560px,calc(100vw - 32px))"
+        });
+        return;
+      }
+      const kindLabel = kind === "battery" ? "电池" : "电柜";
+      const opOpts = platformOperators
+        .filter(o => o.status === "在营")
+        .map(o => `<option value="${escProtoAttr(o.id)}">${escProtoAttr(o.name)}（${o.id}）</option>`)
+        .join("");
+      const reasonOpts = DEVICE_REBIND_REASONS.map(r => `<option value="${escProtoAttr(r)}">${escProtoAttr(r)}</option>`).join("");
+      const blockedHtml = blocked.length
+        ? `<p style="margin:0 0 8px;font-size:12px;color:var(--red)">已拦截 ${blocked.length} 台（不改）：</p>${deviceRebindBlockedTableHtml(blocked)}`
+        : "";
+      const html = `<div class="device-rebind">
+          <p class="refund-process-hint" style="margin:0">${noteBtn("platform_device_rebind")} 纠错改绑，不是调拨。将改 <strong>${eligible.length}</strong> 台${kindLabel}；电柜改归属<strong>不带动</strong>格内电池。</p>
+          <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">可改：${eligible.map(e => e.sn).join("、")}</p>
+          ${blockedHtml}
+          <label>目标运营商
+            <select name="operatorId" required>
+              <option value="">请选择运营商</option>
+              ${opOpts}
+            </select>
+          </label>
+          <label>原因
+            <select name="reason" required>
+              <option value="">请选择</option>
+              ${reasonOpts}
+            </select>
+          </label>
+        </div>`;
+      openProtoForm({
+        title: "改归属 · " + kindLabel,
+        html,
+        submitLabel: "确认改归属",
+        modalWidth: "min(560px,calc(100vw - 32px))",
+        onSubmit: (data) => {
+          const operatorId = (data.operatorId || "").trim();
+          const reason = (data.reason || "").trim();
+          if (!operatorId) return "请选择目标运营商";
+          if (!DEVICE_REBIND_REASONS.includes(reason)) return "请选择原因";
+          const same = eligible.filter(e => e.raw.deviceOwnerId === operatorId);
+          if (same.length === eligible.length) return "所选设备已归属该运营商";
+          const n = applyDeviceOwnerRebind(kind, eligible.map(e => e.sn), operatorId, reason);
+          const op = platformOperators.find(o => o.id === operatorId);
+          if (state.platformDeviceChecked) state.platformDeviceChecked[kind] = [];
+          return {
+            successMessage: `已将 ${n} 台${kindLabel}改归属至 ${op?.name || operatorId}（${reason}）`,
+            afterClose: () => render()
+          };
+        }
+      });
     }
 
     function saveBindForm() {
@@ -10850,7 +11009,9 @@
       state.platformDeviceTab = tab;
       const f = getPf();
       const importBtn = `<button type="button" class="btn primary" data-open-device-import>批量导入</button>`;
-      const hint = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_operator_device_gate")}${noteBtn("platform_devices_import")} 归属运营商后，方可在「我的设备」维护并分配至站点。新设备请点击「批量导入」：先选运营商，再手工填 SN 或上传 SN 表格。</p>`;
+      const rebindBtn = `<button type="button" class="btn" data-batch-rebind="${tab}">改归属</button>`;
+      const headBtns = `${importBtn} ${rebindBtn}`;
+      const hint = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_operator_device_gate")}${noteBtn("platform_devices_import")}${noteBtn("platform_device_rebind")} 归属运营商后，方可在「我的设备」分配至站点。已分配站点的不可改归属（弹窗展示站点与当前运营商）。改电柜<strong>不改</strong>格内电池。新设备用「批量导入」：先选运营商，再手工填 SN 或上传表格。</p>`;
 
       if (tab === "models") {
         const rows = platformBatteryModels.filter(m => {
@@ -10897,17 +11058,20 @@
           return true;
         });
         return `${ownScopeBanner()}<section class="panel">
-          ${panelHead("全平台电池台账", `共 ${rows.length} 块`, "platform_device_bind", importBtn)}
+          ${panelHead("全平台电池台账", `共 ${rows.length} 块`, "platform_device_bind", headBtns)}
           <div class="panel-body orders-table-wrap">
             ${hint}
             <table>
               <thead><tr>
+                <th style="width:36px"><input type="checkbox" data-check-all-devices="battery" ${rows.length && rows.every(r => (state.platformDeviceChecked?.battery || []).includes(r.sn)) ? "checked" : ""}></th>
                 <th>SN</th><th>型号 ${noteBtn("platform_battery_models")}</th><th>归属运营商</th><th>城市</th><th>站点</th>
                 <th>SOC</th><th>SOH</th><th>当前位置 ${noteBtn("platform_devices_battery_belong")}</th>
                 <th>归属日 ${noteBtn("platform_device_bound_at")}</th>
                 <th>导入日期 ${noteBtn("platform_device_imported_at")}</th>
+                <th>操作</th>
               </tr></thead>
               <tbody>${rows.map(r => `<tr>
+                <td><input type="checkbox" data-check-device="battery" value="${r.sn}" ${(state.platformDeviceChecked?.battery || []).includes(r.sn) ? "checked" : ""}></td>
                 <td>${r.sn}</td><td>${r.specs || "—"}</td>
                 <td>${r.operatorName}</td><td>${r.city || "—"}</td><td>${batterySiteCell(r.raw)}</td>
                 <td>${r.soc != null ? r.soc + "%" : "—"}</td>
@@ -10915,7 +11079,8 @@
                 <td>${platformBatteryBelongCell(r.raw)}</td>
                 <td>${platformDeviceDateCell(r.boundAt)}</td>
                 <td>${platformDeviceDateCell(r.importedAt)}</td>
-              </tr>`).join("") || "<tr><td colspan='10'>暂无电池</td></tr>"}</tbody>
+                <td><button type="button" class="link-btn" data-rebind-device="battery" data-sn="${r.sn}">改归属</button></td>
+              </tr>`).join("") || "<tr><td colspan='12'>暂无电池</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -10929,23 +11094,27 @@
         return true;
       });
       return `${ownScopeBanner()}<section class="panel">
-          ${panelHead("全平台电柜台账", `共 ${rows.length} 台`, "platform_device_bind", importBtn)}
+          ${panelHead("全平台电柜台账", `共 ${rows.length} 台`, "platform_device_bind", headBtns)}
           <div class="panel-body orders-table-wrap">
             ${hint}
             <table>
               <thead><tr>
+                <th style="width:36px"><input type="checkbox" data-check-all-devices="cabinet" ${rows.length && rows.every(r => (state.platformDeviceChecked?.cabinet || []).includes(r.sn)) ? "checked" : ""}></th>
                 <th>SN</th><th>规格</th><th>归属运营商</th><th>城市</th><th>站点</th>
                 <th>在线状态</th>
                 <th>归属日 ${noteBtn("platform_device_bound_at")}</th>
                 <th>导入日期 ${noteBtn("platform_device_imported_at")}</th>
+                <th>操作</th>
               </tr></thead>
               <tbody>${rows.map(r => `<tr>
+                <td><input type="checkbox" data-check-device="cabinet" value="${r.sn}" ${(state.platformDeviceChecked?.cabinet || []).includes(r.sn) ? "checked" : ""}></td>
                 <td>${r.sn}</td><td>${r.specs || "—"}</td>
                 <td>${r.operatorName}</td><td>${r.city || "—"}</td><td>${r.site || "—"}</td>
                 <td>${r.online ? tag("在线") : tag("离线")}</td>
                 <td>${platformDeviceDateCell(r.boundAt)}</td>
                 <td>${platformDeviceDateCell(r.importedAt)}</td>
-              </tr>`).join("") || "<tr><td colspan='8'>暂无电柜</td></tr>"}</tbody>
+                <td><button type="button" class="link-btn" data-rebind-device="cabinet" data-sn="${r.sn}">改归属</button></td>
+              </tr>`).join("") || "<tr><td colspan='10'>暂无电柜</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -12766,46 +12935,61 @@
     }
 
     function cabinetDeployAddress(c) {
+      if (cabinetSiteUnassigned(c)) return c.deployAddress || "";
       if (c.deployAddress) return c.deployAddress;
       const siteMeta = sites.find(s => s.name === c.site);
-      return siteMeta?.address || c.site || "—";
+      return siteMeta?.address || "";
     }
 
     function cabinetHasSiteBinding(c) {
-      if (!c?.site || c.site === "待绑定" || c.site === "—") return false;
+      if (cabinetSiteUnassigned(c)) return false;
       return myOperatorSites().some(s => s.name === c.site && s.status !== "已停用");
     }
 
     function moveCabinetTargetSites(currentSiteName) {
-      return myOperatorSites().filter(s => s.status === "在营" && s.name !== currentSiteName);
+      const current = isUnassignedSiteName(currentSiteName) ? "" : currentSiteName;
+      return myOperatorSites().filter(s => s.status === "在营" && s.name !== current);
+    }
+
+    function appendCabinetMoveLog(sn, fromSite, toSite, remark) {
+      if (!Array.isArray(cabinetMoveLogs)) return;
+      cabinetMoveLogs.unshift({
+        id: "CM-" + Date.now().toString().slice(-6),
+        sn,
+        fromSite,
+        toSite,
+        operatorId: currentEntity().id,
+        operatorName: currentEmployee()?.name || currentEntity().name,
+        remark: (remark || "").trim(),
+        movedAt: new Date().toISOString().slice(0, 16).replace("T", " ")
+      });
     }
 
     function moveCabinetToSite(sn, targetSiteName, remark) {
       const c = cabinetBySn(sn);
       if (!c || !filterOwnRow(c)) return "无权操作该柜机";
-      if (!cabinetHasSiteBinding(c)) return "该柜机尚未绑定站点，无法移柜";
+      const fromSite = cabinetSiteLabel(c);
+      const unassign = isUnassignedSiteName(targetSiteName);
+      if (unassign) {
+        if (cabinetSiteUnassigned(c)) return "当前已是未分配站点";
+        c.site = CABINET_UNASSIGNED_SITE;
+        c.deployAddress = "";
+        const fa = financeAssets.find(a => a.sn === c.sn && a.type === "换电柜");
+        if (fa) fa.site = CABINET_UNASSIGNED_SITE;
+        myDeviceAlerts().filter(a => a.deviceSn === c.sn).forEach(a => { a.siteName = CABINET_UNASSIGNED_SITE; });
+        appendCabinetMoveLog(c.sn, fromSite, CABINET_UNASSIGNED_SITE, remark);
+        return null;
+      }
       const site = sites.find(s => s.name === targetSiteName && s.operatorId === currentEntity().id);
       if (!site || site.status !== "在营") return "目标站点无效或不在营";
       if (site.name === c.site) return "目标站点不能与当前站点相同";
-      const fromSite = c.site;
       c.site = site.name;
       c.city = site.city;
-      c.deployAddress = site.address || c.deployAddress;
+      c.deployAddress = site.address || "";
       const fa = financeAssets.find(a => a.sn === c.sn && a.type === "换电柜");
       if (fa) fa.site = site.name;
       myDeviceAlerts().filter(a => a.deviceSn === c.sn).forEach(a => { a.siteName = site.name; });
-      if (Array.isArray(cabinetMoveLogs)) {
-        cabinetMoveLogs.unshift({
-          id: "CM-" + Date.now().toString().slice(-6),
-          sn: c.sn,
-          fromSite,
-          toSite: site.name,
-          operatorId: currentEntity().id,
-          operatorName: currentEmployee()?.name || currentEntity().name,
-          remark: (remark || "").trim(),
-          movedAt: new Date().toISOString().slice(0, 16).replace("T", " ")
-        });
-      }
+      appendCabinetMoveLog(c.sn, fromSite, site.name, remark);
       return null;
     }
 
@@ -12815,29 +12999,41 @@
         showProtoToast("未找到该换电柜");
         return;
       }
-      if (!cabinetHasSiteBinding(c)) {
-        showProtoToast("该柜机尚未绑定站点，无法移柜");
-        return;
-      }
+      const unassigned = cabinetSiteUnassigned(c);
       const targets = moveCabinetTargetSites(c.site);
-      if (!targets.length) {
-        showProtoToast("暂无其他在营站点可移入");
+      const options = targets.map(s => s.name);
+      if (!unassigned) options.unshift(CABINET_UNASSIGNED_SITE);
+      if (!options.length) {
+        showProtoToast("暂无在营站点可投放");
         return;
       }
       openProtoForm({
         title: "移柜 · " + c.sn,
         fields: [
-          { name: "fromSite", label: "当前站点", value: c.site, readonly: true },
-          { name: "toSite", label: "目标站点", type: "select", options: targets.map(s => s.name), value: targets[0].name },
-          { name: "remark", label: "移柜说明", required: false, value: "" }
+          { name: "fromSite", label: "当前站点", value: cabinetSiteLabel(c), readonly: true },
+          {
+            name: "toSite",
+            label: "目标站点",
+            type: "select",
+            options,
+            value: options[0],
+            optionLabels: { [CABINET_UNASSIGNED_SITE]: "未分配站点（暂不投放）" }
+          },
+          { name: "remark", label: "移柜原因", required: false, value: "" }
         ],
         submitLabel: "确认移柜",
         onSubmit: (data) => {
-          const fromSite = c.site;
+          const fromSite = cabinetSiteLabel(c);
           const err = moveCabinetToSite(sn, data.toSite, data.remark);
           if (err) return err;
+          const toUnassign = isUnassignedSiteName(data.toSite);
+          const successMessage = toUnassign
+            ? `已将 ${sn} 从「${fromSite}」卸站（暂不投放）（演示）`
+            : (fromSite === CABINET_UNASSIGNED_SITE
+              ? `已将 ${sn} 投放至「${data.toSite}」（演示）`
+              : `已将 ${sn} 从「${fromSite}」迁至「${data.toSite}」（演示）`);
           return {
-            successMessage: `已将 ${sn} 从「${fromSite}」迁至「${data.toSite}」（演示）`,
+            successMessage,
             afterClose: () => render()
           };
         }
@@ -12862,7 +13058,11 @@
       if (f.deviceId && !matchKw(c.deviceId || "", f.deviceId)) return false;
       if (f.sn && !matchKw(c.sn, f.sn)) return false;
       if (f.deviceName && !matchKw(c.deviceName || "", f.deviceName)) return false;
-      if (f.site !== "全部" && c.site !== f.site) return false;
+      if (f.site !== "全部") {
+        if (f.site === CABINET_UNASSIGNED_SITE) {
+          if (!cabinetSiteUnassigned(c)) return false;
+        } else if (c.site !== f.site) return false;
+      }
       if (f.online === "online" && !c.online) return false;
       if (f.online === "offline" && c.online) return false;
       if (f.powerStatus !== "全部" && (c.powerStatus || "已通电") !== f.powerStatus) return false;
@@ -12962,7 +13162,7 @@
               ${cell("已使用电量", c.usedPowerKwh != null ? c.usedPowerKwh : "—")}
               ${cell("投放地址", cabinetDeployAddress(c) || "—")}
               ${cell("电柜 SN", c.sn)}
-              ${cell("所属站点", `${c.site}${opsDemo && cabinetHasSiteBinding(c) ? `<br><button type="button" class="link-btn" data-move-cab="${c.sn}">移柜</button>` : ""}`)}
+              ${cell("所属站点", `${cabinetSiteLabel(c)}${opsDemo ? `<br><button type="button" class="link-btn" data-move-cab="${c.sn}">移柜</button>` : ""}`)}
               ${cell("权属", ownershipCell(c))}
               <div class="cab-detail-cell"><span>换电模式切换</span>
                 <div class="cab-inline-ctrl">
@@ -13141,8 +13341,8 @@
         document.querySelector("#drawerBody").innerHTML = `
           <form class="form-grid" id="cabEditForm">
             <div class="field"><label>设备名称</label><input name="deviceName" value="${c.deviceName || ""}" placeholder="如 浦东1号柜" /></div>
-            <div class="field"><label>投放地址</label><input name="deployAddress" value="${cabinetDeployAddress(c)}" /></div>
-            <div class="field"><label>所属站点</label><input value="${c.site}" readonly /></div>
+            <div class="field"><label>投放地址</label><input name="deployAddress" value="${cabinetDeployAddress(c)}" placeholder="${cabinetSiteUnassigned(c) ? "未投放，可空" : ""}" /></div>
+            <div class="field"><label>所属站点</label><input value="${cabinetSiteLabel(c)}" readonly /><small style="color:var(--muted)">站点请用「移柜」投放、改站或卸站</small></div>
             <div class="field"><label>设备状态</label>
               <select name="deviceStatus"><option ${(c.deviceStatus || "启用") === "启用" ? "selected" : ""}>启用</option><option ${c.deviceStatus === "停用" ? "selected" : ""}>停用</option></select>
             </div>
@@ -13186,7 +13386,7 @@
             <table class="cab-list-table">
               <thead><tr>
                 <th>设备编号/电柜 SN ${noteBtn("devices_cab")}</th>
-                <th>通讯板编号</th><th>物联网卡编号</th><th>设备名称</th>
+                <th>通讯板编号</th><th>物联网卡编号</th><th>设备名称</th><th>站点</th>
                 <th>投放地址</th><th>设备通电状态</th><th>已使用电量</th><th>可换电池数量</th>
                 <th>柜内电池资产</th><th>设备状态</th><th>操作</th>
               </tr></thead>
@@ -13197,7 +13397,8 @@
                   <td>${c.commBoardId || "—"}</td>
                   <td style="font-size:12px;max-width:120px;word-break:break-all">${cabinetIccid(c)}</td>
                   <td>${c.deviceName || "—"}</td>
-                  <td style="white-space:normal;max-width:160px;font-size:12px">${cabinetDeployAddress(c)}</td>
+                  <td>${cabinetSiteLabel(c)}</td>
+                  <td style="white-space:normal;max-width:160px;font-size:12px">${cabinetDeployAddress(c) || "—"}</td>
                   <td>${tag(c.powerStatus || "已通电")}<br><small style="color:var(--muted)">${c.online ? "在线" : "离线"}</small></td>
                   <td>${c.usedPowerKwh != null ? c.usedPowerKwh : "—"}</td>
                   <td><strong>${stats.swapAvailable}</strong></td>
@@ -13206,11 +13407,11 @@
                   <td class="row-actions" style="white-space:nowrap">
                     <button type="button" class="link-btn" data-open-cab-compose="${c.sn}">电柜组成 ${phase2BadgeHtml()}</button>
                     <button type="button" class="link-btn" data-edit-cab="${c.sn}">编辑</button>
-                    ${canMoveCab && cabinetHasSiteBinding(c) ? `<button type="button" class="link-btn" data-move-cab="${c.sn}">移柜</button>` : ""}
+                    ${canMoveCab ? `<button type="button" class="link-btn" data-move-cab="${c.sn}">移柜</button>` : ""}
                     <button type="button" class="link-btn" data-open-cab-detail="${c.sn}">查看详情</button>
                   </td>
                 </tr>`;
-              }).join("") || "<tr><td colspan='11'>暂无换电柜</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='12'>暂无换电柜</td></tr>"}</tbody>
             </table>
           </div>`;
       } else if (tab === "battery") {
@@ -18561,6 +18762,34 @@
       });
       root.querySelectorAll("[data-open-device-import]").forEach(btn => {
         btn.onclick = () => openDeviceImportModal();
+      });
+      root.querySelectorAll("[data-batch-rebind]").forEach(btn => {
+        btn.onclick = () => {
+          const kind = btn.dataset.batchRebind === "battery" ? "battery" : "cabinet";
+          openDeviceRebindModal(kind, state.platformDeviceChecked?.[kind] || []);
+        };
+      });
+      root.querySelectorAll("[data-rebind-device]").forEach(btn => {
+        btn.onclick = () => openDeviceRebindModal(btn.dataset.rebindDevice, [btn.dataset.sn]);
+      });
+      root.querySelectorAll("[data-check-all-devices]").forEach(box => {
+        box.onchange = () => {
+          const kind = box.dataset.checkAllDevices;
+          if (!state.platformDeviceChecked) state.platformDeviceChecked = { cabinet: [], battery: [] };
+          const sns = [...root.querySelectorAll(`[data-check-device="${kind}"]`)].map(el => el.value);
+          state.platformDeviceChecked[kind] = box.checked ? sns : [];
+          render();
+        };
+      });
+      root.querySelectorAll("[data-check-device]").forEach(box => {
+        box.onchange = () => {
+          const kind = box.dataset.checkDevice;
+          if (!state.platformDeviceChecked) state.platformDeviceChecked = { cabinet: [], battery: [] };
+          const cur = new Set(state.platformDeviceChecked[kind] || []);
+          if (box.checked) cur.add(box.value);
+          else cur.delete(box.value);
+          state.platformDeviceChecked[kind] = [...cur];
+        };
       });
       root.querySelectorAll("[data-new-battery-model]").forEach(btn => {
         btn.onclick = () => openBatteryModelForm(null);
