@@ -52,7 +52,7 @@
       sitePartnerId: null,
       detailSiteExpenseId: null,
       detailSitePartnersId: null,
-      detailSubId: null, detailSwapId: null, detailSubFromSwapId: null, detailLeaseId: null, detailOperatorId: null, detailRefundId: null,
+      detailSubId: null, detailSwapId: null, detailSubFromSwapId: null, detailLeaseId: null, detailOperatorId: null, detailChannelId: null, detailRefundId: null,
       cabinetDetailSn: null
     };
 
@@ -377,7 +377,16 @@
     }
 
     function channelHasPayoutAccount(channelId) {
-      return paymentAccounts.some(a => a.entityId === channelId && a.status === "已开通");
+      return paymentAccountCorpBound(entityCorpAccount(channelId));
+    }
+
+    function channelHasOnlineSettle(channelId) {
+      return channelContracts.some(c => c.channelId === channelId && contractSettlementMode(c) === "链接类" && !!c.instantCommissionPayout);
+    }
+
+    function isLinkChannelEntity(entityId) {
+      const ch = platformChannels.find(c => c.id === entityId);
+      return (ch?.settlementMode || "") === "链接类";
     }
 
     function formatCommissionRate(rate) {
@@ -5100,8 +5109,18 @@
       return Math.max(0, +(operatorWithdrawableBalance(operatorId) - operatorFinanceMonthDue(operatorId)).toFixed(2));
     }
 
+    function entityCorpKind(entityId) {
+      if (platformChannels.some(c => c.id === entityId)) return "channel_corp";
+      return "operator_corp";
+    }
+
+    function entityCorpAccount(entityId) {
+      const kind = entityCorpKind(entityId);
+      return paymentAccounts.find(a => a.entityId === entityId && a.accountKind === kind) || null;
+    }
+
     function operatorCorpAccount(operatorId) {
-      return paymentAccounts.find(a => a.entityId === operatorId && a.accountKind === "operator_corp") || null;
+      return entityCorpAccount(operatorId);
     }
 
     function operatorDefaultWithdrawAccount(operatorId) {
@@ -5116,7 +5135,7 @@
       const bank = String(a.bankName || "").trim();
       const no = String(a.bankAccount || "").replace(/\s/g, "");
       if (!(name && bank && no)) return false;
-      if (a.accountKind === "operator_corp") return !!(String(a.bankBranch || "").trim());
+      if (a.accountKind === "operator_corp" || a.accountKind === "channel_corp") return !!(String(a.bankBranch || "").trim());
       return true;
     }
 
@@ -5152,14 +5171,16 @@
       return { bankAccountName, bankName, bankBranch, bankAccount, bankCode };
     }
 
-    function upsertOperatorCorpAccount(opId, fields, actor) {
-      const existing = operatorCorpAccount(opId);
+    function upsertEntityCorpAccount(entityId, fields, actor) {
+      const kind = entityCorpKind(entityId);
+      const isChannel = kind === "channel_corp";
+      const existing = entityCorpAccount(entityId);
       const payload = {
         ...fields,
         mchName: fields.bankAccountName,
         mchNo: maskBankAccount(fields.bankAccount),
         channel: "对公银行卡",
-        purpose: "提现打款",
+        purpose: isChannel ? "佣金结算打款" : "提现打款",
         accountScope: "withdraw",
         status: "已绑定",
         default: true,
@@ -5170,14 +5191,18 @@
         return existing;
       }
       const row = {
-        id: "PA-" + opId + "-CORP",
-        entityId: opId,
-        operatorId: opId,
-        accountKind: "operator_corp",
+        id: "PA-" + entityId + "-CORP",
+        entityId,
+        accountKind: kind,
+        ...(isChannel ? { channelId: entityId } : { operatorId: entityId }),
         ...payload
       };
       paymentAccounts.push(row);
       return row;
+    }
+
+    function upsertOperatorCorpAccount(opId, fields, actor) {
+      return upsertEntityCorpAccount(opId, fields, actor);
     }
 
     function operatorCorpFieldsTouched(data) {
@@ -5190,28 +5215,55 @@
       );
     }
 
-    function operatorCorpListCell(op) {
-      const a = operatorCorpAccount(op.id);
+    function entityCorpListCell(entityId) {
+      const a = entityCorpAccount(entityId);
       if (!paymentAccountCorpBound(a)) return tag("未绑定");
       return `<div style="font-size:12px;line-height:1.45"><strong>${a.bankAccountName}</strong><br><span style="color:var(--muted)">${maskBankAccount(a.bankAccount)}</span></div>`;
     }
 
-    function corpAccountActorLabel() {
+    function operatorCorpListCell(op) {
+      return entityCorpListCell(op.id);
+    }
+
+    function corpAccountActorLabel(entityId) {
       if (isPlatformRole()) return currentEmployee()?.name || "平台管理员";
+      if (entityCorpKind(entityId) === "channel_corp") return currentEntity()?.name || "渠道商";
       return currentEntity()?.name || "运营商";
     }
 
-    function openOperatorCorpAccountForm(operatorId) {
-      const opId = operatorId || currentEntity()?.id;
-      const op = platformOperators.find(o => o.id === opId);
-      if (!op) return;
-      const existing = operatorCorpAccount(op.id);
+    function corpAccountSubjectName(entityId) {
+      const op = platformOperators.find(o => o.id === entityId);
+      if (op) return op.name;
+      const ch = platformChannels.find(c => c.id === entityId);
+      return ch?.name || entityId;
+    }
+
+    function uniqueCorpDetailGrid(a) {
+      if (!paymentAccountCorpBound(a)) return "";
+      return `<div class="detail-grid">
+        <div class="detail-item"><span>开户名称</span><strong>${a.bankAccountName}</strong></div>
+        <div class="detail-item"><span>银行卡号</span><strong>${maskBankAccount(a.bankAccount)}</strong></div>
+        <div class="detail-item"><span>开户银行</span><strong>${a.bankName}</strong></div>
+        <div class="detail-item"><span>开户支行</span><strong>${a.bankBranch || "—"}</strong></div>
+        <div class="detail-item"><span>联行号</span><strong>${a.bankCode || "—"}</strong></div>
+        <div class="detail-item"><span>绑定时间</span><strong>${a.corpBoundAt || "—"}</strong></div>
+        ${a.updatedByRole ? `<div class="detail-item"><span>最近维护</span><strong>${a.updatedByRole} · ${a.updatedBy || "—"}</strong></div>` : ""}
+      </div>`;
+    }
+
+    function openEntityCorpAccountForm(entityId) {
+      const id = entityId || currentEntity()?.id;
+      if (!id) return;
+      if (entityCorpKind(id) === "channel_corp" && !isLinkChannelEntity(id) && !isCardChannel()) return;
+      const existing = entityCorpAccount(id);
       const bound = paymentAccountCorpBound(existing);
       const byPlatform = isPlatformRole();
+      const name = corpAccountSubjectName(id);
+      const roleLabel = entityCorpKind(id) === "channel_corp" ? "渠道商" : "运营商";
       openProtoForm({
         title: bound
-          ? (byPlatform ? "代改收款账户 · " + op.name : "变更收款账户")
-          : (byPlatform ? "代为添加收款账户 · " + op.name : "添加收款账户"),
+          ? (byPlatform ? "代改收款账户 · " + name : "变更收款账户")
+          : (byPlatform ? "代为添加收款账户 · " + name : "添加收款账户"),
         fields: [
           { name: "bankAccountName", label: "开户名称", value: existing?.bankAccountName || "", placeholder: "与对公银行卡户名一致" },
           { name: "bankAccount", label: "银行卡号", value: existing?.bankAccount || "", placeholder: "对公账号，仅数字", inputmode: "numeric", maxlength: 32 },
@@ -5225,16 +5277,27 @@
           if (typeof v === "string") return v;
           const today = new Date().toISOString().slice(0, 10);
           const actor = {
-            updatedBy: corpAccountActorLabel(),
-            updatedByRole: byPlatform ? "平台" : "运营商",
+            updatedBy: corpAccountActorLabel(id),
+            updatedByRole: byPlatform ? "平台" : roleLabel,
             corpBoundAt: today
           };
-          upsertOperatorCorpAccount(op.id, v, actor);
-          return { successMessage: bound
-            ? (byPlatform ? "已代为更新收款账户" : "收款账户已更新")
-            : (byPlatform ? "已代为添加收款账户" : "收款账户已添加"), afterClose: () => render() };
+          upsertEntityCorpAccount(id, v, actor);
+          return {
+            successMessage: bound
+              ? (byPlatform ? "已代为更新收款账户" : "收款账户已更新")
+              : (byPlatform ? "已代为添加收款账户" : "收款账户已添加"),
+            afterClose: () => {
+              if (byPlatform && entityCorpKind(id) === "channel_corp") openChannelDetail(id);
+              else if (byPlatform && state.detailOperatorId === id) openOperatorDetail(id);
+              else render();
+            }
+          };
         }
       });
+    }
+
+    function openOperatorCorpAccountForm(operatorId) {
+      openEntityCorpAccountForm(operatorId);
     }
 
     function paymentAccountNeedsCorp(a) {
@@ -8313,7 +8376,6 @@
     function renderAccounts() {
       const opId = currentEntity().id;
       const isLeaseCh = isLeaseChannel();
-      const isCardInstant = isCardChannel() && channelInstantCommissionEnabled(opId);
       const canBind = isEntityLogin() || employeeHasPerm("accounts.view");
       let body = "";
       function accountRowHtml(a) {
@@ -8344,16 +8406,33 @@
             <tbody>${rows.map(a => accountRowHtml(a)).join("") || "<tr><td colspan='10'>暂无账户</td></tr>"}</tbody>
           </table>`;
       } else if (isCardChannel()) {
-        const rows = paymentAccounts.filter(a => a.entityId === opId);
-        const unbound = rows.filter(a => paymentAccountNeedsCorp(a) && !paymentAccountCorpBound(a)).length;
-        const settleHint = isCardInstant
-          ? `当前为<strong>佣金及时到付</strong>：支付成功分账至渠道子商户，再结算至绑定的<strong>对公账户</strong>。`
-          : `当前为<strong>线下结算</strong>：购卡款进运营商子商户；运营商按对账结果线下打佣至本渠道<strong>对公结算账户</strong>。开启即时到付后须完成微信/支付宝进件。`;
-        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_card_accounts")}${noteBtn("accounts_corp_bind")} ${settleHint}${unbound ? ` 当前 <strong>${unbound}</strong> 个账户待绑定对公。` : ""}</p>
-          <table>
-            ${tableHead}
-            <tbody>${rows.map(a => accountRowHtml(a)).join("") || "<tr><td colspan='10'>暂无账户，请完成进件或维护对公收款信息</td></tr>"}</tbody>
-          </table>`;
+        const acct = entityCorpAccount(opId);
+        const bound = paymentAccountCorpBound(acct);
+        const addBtn = canBind && !bound ? `<button type="button" class="btn primary" data-edit-corp-account="${opId}">添加收款账户</button>` : "";
+        const changeBtn = canBind && bound ? `<button type="button" class="btn" data-edit-corp-account="${opId}">变更</button>` : "";
+        const online = channelHasOnlineSettle(opId);
+        const settleHint = online
+          ? `当前为<strong>线上结算（佣金及时到付）</strong>：须绑定唯一对公银行卡，字段与运营商相同；平台结算/分账打款至此卡。`
+          : `当前为<strong>线下结算</strong>：购卡款进运营商；若改为线上结算，须先绑定与运营商相同的对公银行卡。线下打佣也使用本账户。`;
+        if (!bound) {
+          body = `<div class="pool-warn-banner" style="margin-bottom:12px">${online ? "尚未绑定收款账户，无法接收线上结算佣金。" : "尚未绑定收款账户。开启线上结算前必须绑定。"}${noteBtn("channel_card_accounts")}</div>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_panel")} ${settleHint} 必填：开户名称、银行卡号、开户银行、开户支行；联行号选填。同一时间仅 <strong>1</strong> 个账户。</p>
+            <div style="padding:36px 16px;text-align:center;border:1px dashed var(--line);border-radius:8px;background:var(--surface-soft)">
+              <p style="margin:0 0 12px;font-size:14px;color:var(--muted)">暂无收款账户</p>
+              ${canBind ? `<button type="button" class="btn primary" data-edit-corp-account="${opId}">添加收款账户</button>` : `<p style="margin:0;font-size:12px;color:var(--muted)">当前账号无权添加</p>`}
+            </div>`;
+        } else {
+          body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_card_accounts")}${noteBtn("accounts_corp_bind")} ${settleHint} 同一时间仅 1 个账户；变更即覆盖。</p>
+            ${uniqueCorpDetailGrid(acct)}`;
+        }
+        return `
+        ${ownScopeBanner()}
+        <section class="panel">
+          ${panelHead("收款账户", bound ? "对公银行卡 · 佣金结算打款" : "未绑定 · 可自行添加", "channel_card_accounts", bound ? changeBtn : addBtn)}
+          <div class="panel-body">
+            ${body}
+          </div>
+        </section>`;
       } else if (isOperatorRole()) {
         const acct = operatorCorpAccount(opId);
         const bound = paymentAccountCorpBound(acct);
@@ -8398,7 +8477,7 @@
       return `
         ${ownScopeBanner()}
         <section class="panel">
-          ${panelHead("收款账户管理", isLeaseCh ? "白名单套餐收款 · 须绑定对公" : isCardChannel() ? (isCardInstant ? "即时到付 · 子商户进件 + 对公" : "线下结算 · 对公收款账户") : "对公结算账户绑定", isCardChannel() ? "channel_card_accounts" : "accounts_panel")}
+          ${panelHead("收款账户管理", isLeaseCh ? "白名单套餐收款 · 须绑定对公" : "对公结算账户绑定", "accounts_panel")}
           <div class="panel-body orders-table-wrap">
             ${body}
           </div>
@@ -8433,6 +8512,7 @@
       const opOn = !!swapPol.crossNetworkEnabled;
       const actualCross = operatorEffectiveOutboundCross(op.id);
       const platCrossBtn = `<button type="button" class="${platOn ? "btn" : "btn primary"}" data-toggle-platform-cross="${op.id}" data-next="${platOn ? "0" : "1"}">${platOn ? "关闭平台跨网" : "开启平台跨网"}</button>`;
+      document.querySelector("#drawerTitle").textContent = op.name;
       document.querySelector("#drawerSub").textContent = op.id + " · " + op.city + " · " + op.status;
       document.querySelector("#drawerBody").innerHTML = `
         <section class="panel" style="margin:0">
@@ -8522,9 +8602,59 @@
           <button type="button" class="btn" data-view-jump="depositManage" data-depstab-jump="pending">保证金管理</button>
           <button type="button" class="btn" data-view-jump="operatorCreditEval" title="二期">信用评估 ${phase2BadgeHtml()}</button>
         </div>`;
+      state.detailChannelId = null;
       state.detailOperatorId = opId;
       state.detailSubId = null;
       state.detailSwapId = null;
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindNotes();
+      bindDrawerActions();
+    }
+
+    function openChannelDetail(chId) {
+      const ch = platformChannels.find(c => c.id === chId);
+      if (!ch) return;
+      state.detailChannelId = chId;
+      state.detailOperatorId = null;
+      const isLink = ch.settlementMode === "链接类";
+      const online = isLink && channelHasOnlineSettle(ch.id);
+      const corpAcct = entityCorpAccount(ch.id);
+      const boundCorp = paymentAccountCorpBound(corpAcct);
+      const corpBtn = !isLink
+        ? ""
+        : boundCorp
+          ? `<button type="button" class="btn" data-edit-corp-account="${ch.id}">变更</button>`
+          : `<button type="button" class="btn primary" data-edit-corp-account="${ch.id}">代为添加</button>`;
+      const corpBody = !isLink
+        ? `<p style="margin:0;font-size:13px;color:var(--muted)">人天池 / 非链接类模式无 C 端收款账户；B 端采购款付至运营商。</p>`
+        : !boundCorp
+          ? `<p style="margin:0;font-size:13px;color:var(--muted)">${online ? "线上结算须绑定对公银行卡，否则无法接收佣金。" : "尚未绑定。开启线上结算前必须绑定；线下打佣也使用本账户。"} 渠道可自行添加，平台也可代为填写。字段与运营商相同。</p>`
+          : uniqueCorpDetailGrid(corpAcct);
+      const contract = cardContractForChannel(ch.id);
+      document.querySelector("#drawerTitle").textContent = ch.name;
+      document.querySelector("#drawerSub").textContent = ch.id + " · " + (ch.city || "—") + " · " + ch.status;
+      document.querySelector("#drawerBody").innerHTML = `
+        <section class="panel" style="margin:0">
+          ${panelHead("基础信息", "渠道主体由签约运营商维护 · 平台不新增", "platform_channels")}
+          <div class="panel-body" style="padding-top:0">
+            <div class="detail-grid">
+              <div class="detail-item"><span>结算模式</span><strong>${settlementModeLabel(ch.settlementMode || "人天池")}</strong></div>
+              <div class="detail-item"><span>登录账号</span><strong>${ch.loginAccount || "—"}</strong></div>
+              <div class="detail-item"><span>联系人</span><strong>${ch.contactName}<br><small>${ch.contactPhone}</small></strong></div>
+              <div class="detail-item"><span>签约运营商</span><strong>${(ch.signedOperators || []).join("、") || "—"}</strong></div>
+              ${isLink ? `<div class="detail-item"><span>与运营商结算</span><strong>${online ? tag("线上结算") : tag("线下结算")}</strong>${contract?.commissionRate ? `<br><small style="color:var(--muted)">佣金 ${formatCommissionRate(contract.commissionRate)}</small>` : ""}</div>` : ""}
+              <div class="detail-item"><span>入驻日期</span><strong>${ch.onboardDate || "—"}</strong></div>
+            </div>
+          </div>
+        </section>
+        <section class="panel" style="margin:16px 0 0">
+          ${panelHead("收款账户", !isLink ? "本模式不适用" : (boundCorp ? "对公银行卡 · 可代改" : "未绑定 · 可代为添加"), isLink ? "channel_card_accounts" : "channel_no_receipt", corpBtn)}
+          <div class="panel-body" style="padding-top:0">
+            ${corpBody}
+          </div>
+        </section>`;
       document.querySelector("#drawerMask").classList.add("open");
       document.querySelector("#orderDrawer").classList.add("open");
       document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
@@ -8901,9 +9031,9 @@
             <option value="1" ${((contract?.settlementChangePending?.targetInstant) ?? contract?.instantCommissionPayout) ? "selected" : ""}>开启 · 支付成功即时分账至渠道</option>
           </select></label>
           <label class="field-card-instant-on">渠道佣金比例（%）<input name="commissionRatePct" type="number" min="0.1" max="50" step="0.1" value="${(contract?.settlementChangePending?.targetRate ?? contract?.commissionRate) != null ? ((contract?.settlementChangePending?.targetRate ?? contract.commissionRate) * 100) : 9}" /></label>
-          <p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--muted);margin:8px 0 0">平台服务费仍按默认 <strong>1%</strong> 即时清分。开启须渠道在「收款账户」完成进件。结算类型变更<strong>次日 00:00</strong>生效（decision-065）。</p>
+          <p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--muted);margin:8px 0 0">平台服务费仍按默认 <strong>1%</strong> 即时清分。开启须渠道在「收款账户」绑定对公银行卡（字段与运营商相同）。结算类型变更<strong>次日 00:00</strong>生效（decision-065）。</p>
           ${contract?.settlementChangePending ? `<p class="form-span-2" style="font-size:12px;color:var(--warn);margin:8px 0 0">⏳ 已预约于 <strong>${contract.settlementChangePending.effectiveFrom} 00:00</strong> 切换为「${contract.settlementChangePending.targetInstant ? "即时到付" : "线下结算"}」；此前新单仍按当前生效方式。</p>` : ""}
-          ${contract?.channelId && !channelHasPayoutAccount(contract.channelId) ? `<p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--warn);margin:8px 0 0">⚠ 当前渠道尚未开通收款账户，无法正式开启即时到付。</p>` : ""}
+          ${contract?.channelId && !channelHasPayoutAccount(contract.channelId) ? `<p class="field-card-instant-on form-span-2" style="font-size:12px;color:var(--warn);margin:8px 0 0">⚠ 当前渠道尚未绑定对公银行卡，无法开启线上结算。</p>` : ""}
         </div>
         <label class="field-rent">月租（元/月 · 签约统一价）<input name="monthlyRent" type="number" min="1000" step="100" value="${contract?.monthlyRent ?? 12000}" /></label>
         <label class="field-rent">白名单默认类型<select name="whitelistDefaultAccess">
@@ -9016,7 +9146,7 @@
         }
         const cidCheck = state.channelPartnerContractId === "new" ? null : channelContracts.find(c => c.id === state.channelPartnerContractId)?.channelId;
         if (cidCheck && !channelHasPayoutAccount(cidCheck)) {
-          window.alert("无法开启：请渠道商先在「收款账户」完成支付通道进件");
+          window.alert("无法开启：请渠道商先在「收款账户」绑定对公银行卡");
           return;
         }
       }
@@ -11130,11 +11260,11 @@
       return `${ownScopeBanner()}<section class="panel">
           ${panelHead("渠道商列表", `共 ${rows.length} 家`, "platform_channels")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_channels")}${noteBtn("channel_partner_manage")}${noteBtn("channel_no_receipt")}</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_channels")}${noteBtn("channel_partner_manage")}${noteBtn("channel_card_accounts")} 主体仍由运营商签约创建。链接类若与运营商<strong>线上结算</strong>，收款账户与运营商相同（唯一对公银行卡），平台可查看并代改。</p>
             <table>
               <thead><tr>
                 <th>渠道商</th><th>结算模式</th><th>账号</th><th>联系人</th><th>状态</th><th>签约运营商</th>
-                <th>经营摘要</th><th>人员</th>
+                <th>经营摘要</th><th>人员</th><th>收款账户</th><th>操作</th>
               </tr></thead>
               <tbody>${rows.map(c => {
                 const summary = c.settlementMode === "链接类"
@@ -11142,17 +11272,23 @@
                   : c.settlementMode === "设备租赁"
                     ? `月租 ¥${(c.monthlyRent || 0).toLocaleString()} · 设备 ${channelRentDevices.filter(d => d.channelId === c.id).length} 台 · 白名单 ${c.riderCount || 0}`
                     : `额度池 ${c.poolCount} 个 · ${c.availableDays} / ${c.purchasedDays} 人天 · 月消耗 ${c.monthConsume}`;
+                const settleExtra = c.settlementMode === "链接类"
+                  ? `<br><small style="color:var(--muted)">${channelHasOnlineSettle(c.id) ? "线上结算" : "线下结算"}</small>`
+                  : "";
+                const acctCell = c.settlementMode === "链接类" ? entityCorpListCell(c.id) : "—";
                 return `<tr>
                 <td><strong>${c.name}</strong><br><small style="color:var(--muted)">${c.id}</small></td>
-                <td>${settlementModeLabel(c.settlementMode || "人天池")}</td>
+                <td>${settlementModeLabel(c.settlementMode || "人天池")}${settleExtra}</td>
                 <td>${c.loginAccount}</td>
                 <td>${c.contactName}<br><small>${c.contactPhone}</small></td>
                 <td>${tag(c.status)}</td>
                 <td>${c.signedOperators.join("、")}</td>
                 <td><small>${summary}</small></td>
                 <td>员工 ${c.staffCount} · 骑手 ${c.riderCount}<br><small>团队 ${c.teamCount}</small></td>
+                <td>${acctCell}</td>
+                <td><button type="button" class="link-btn" data-open-channel="${c.id}">详情</button></td>
               </tr>`;
-              }).join("") || "<tr><td colspan='8'>暂无</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='10'>暂无</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -14086,6 +14222,7 @@
       state.detailSubFromSwapId = null;
       state.detailLeaseId = null;
       state.detailOperatorId = null;
+      state.detailChannelId = null;
       state.detailRefundId = null;
       document.querySelector("#drawerMask").classList.remove("open");
       document.querySelector("#orderDrawer").classList.remove("open");
@@ -19171,6 +19308,9 @@
       root.querySelectorAll("[data-open-operator]").forEach(btn => {
         btn.onclick = () => openOperatorDetail(btn.dataset.openOperator);
       });
+      root.querySelectorAll("[data-open-channel]").forEach(btn => {
+        btn.onclick = () => openChannelDetail(btn.dataset.openChannel);
+      });
       root.querySelectorAll("[data-view-kyc]").forEach(btn => {
         btn.onclick = () => openUserKycDrawer(btn.dataset.viewKyc);
       });
@@ -19266,7 +19406,10 @@
         btn.onclick = () => openBindCorpAccountForm(btn.dataset.bindCorpAccount);
       });
       root.querySelectorAll("[data-edit-operator-corp]").forEach(btn => {
-        btn.onclick = () => openOperatorCorpAccountForm(btn.dataset.editOperatorCorp);
+        btn.onclick = () => openEntityCorpAccountForm(btn.dataset.editOperatorCorp);
+      });
+      root.querySelectorAll("[data-edit-corp-account]").forEach(btn => {
+        btn.onclick = () => openEntityCorpAccountForm(btn.dataset.editCorpAccount);
       });
       root.querySelectorAll("[data-apply-partner-withdraw]").forEach(btn => {
         btn.onclick = () => openPartnerWithdrawForm();
@@ -20405,6 +20548,7 @@
       else if (state.detailSwapId) openSwapDetail(state.detailSwapId);
       else if (state.detailLeaseId) openLeaseDetail(state.detailLeaseId);
       else if (state.detailOperatorId) openOperatorDetail(state.detailOperatorId);
+      else if (state.detailChannelId) openChannelDetail(state.detailChannelId);
       bindNotes();
       if (state.platformDeviceOpenImportModal) {
         state.platformDeviceOpenImportModal = false;
