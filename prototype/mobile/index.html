@@ -218,7 +218,7 @@
         <div class="channel-attr-banner">您通过骑士卡推广链接进入绿色出行小程序</div>
         <div class="login-hero"><div class="logo">智</div><h3>智格换电</h3>
           <button class="btn-login">微信一键登录</button>
-          <div class="agree-row"><span>☑</span><span>登录后 24h 内享渠道专享价</span></div></div>`),
+          <div class="agree-row"><span>☑</span><span>登录后 24h 内 · 仅新客享渠道专享价</span></div></div>`),
       kyc: () => phoneShell("实名认证", "mine", `
         <div class="sheet-page"><div class="form-row"><label>真实姓名</label><input value="张骑手" readonly /></div>
           <div class="form-row"><label>身份证号</label><input value="310***********1234" readonly /></div>
@@ -302,11 +302,11 @@
           <div class="pay-summary"><span class="total">应付 ¥299</span></div>
           <button class="btn-block" style="margin-top:8px">确认支付</button></div>`, { hideTab: true }),
       purchaseCardAttr: () => phoneShell("服务购买", "mine", `
-        <div class="sheet-page"><div class="channel-attr-banner" style="margin:0 0 8px">🟡 骑士卡 · 首笔渠道专享价 · 剩余 18h</div>
-          <div class="pkg-card"><h5>30天畅换</h5><div class="price"><span style="text-decoration:line-through;color:var(--muted);font-size:11px">¥299</span> ¥279</div></div>
+        <div class="sheet-page"><div class="channel-attr-banner" style="margin:0 0 8px">🟡 骑士卡 · 新客首笔专享价 · 剩余 18h</div>
+          <div class="pkg-card"><h5>30天畅换</h5><div class="price"><span style="text-decoration:line-through;color:var(--muted);font-size:11px">¥299</span> ¥279</div><div class="desc">本链接仅新客专享价</div></div>
           <button class="btn-block" style="margin-top:8px">确认支付 ¥279</button></div>`, { hideTab: true }),
       purchaseCardRebuy: () => phoneShell("服务购买", "mine", `
-        <div class="sheet-page"><div style="background:#f6f6f6;border:1px solid #e0e0e0;border-radius:8px;padding:8px;font-size:9px;margin-bottom:8px">ℹ️ 再次购卡走<strong>正式零售价</strong></div>
+        <div class="sheet-page"><div style="background:#f6f6f6;border:1px solid #e0e0e0;border-radius:8px;padding:8px;font-size:9px;margin-bottom:8px">ℹ️ 本链接仅<strong>新客</strong>专享价；您已购过，按<strong>正式零售价</strong>（召回优惠走活动券）</div>
           <div class="pkg-card"><h5>30天畅换</h5><div class="price">¥299</div></div>
           <button class="btn-block" style="margin-top:8px">确认支付 ¥299</button></div>`, { hideTab: true }),
       depositWaiver: () => phoneShell("缴纳押金", "mine", `
