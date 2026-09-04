@@ -6332,7 +6332,7 @@
         return n ? " (" + n + ")" : "";
       };
       const map = {
-        pricing: { stateKey: "pricingTab", tabs: [["pkg", "个人套餐价"], ["deposit", "押金设置"], ["quota", "人天批发价"], ["card", "渠道分销价"], ["swapRange", "换电范围"]] },
+        pricing: { stateKey: "pricingTab", tabs: [["pkg", "个人套餐价"], ["deposit", "押金设置"], ["refund", "退款设置"], ["quota", "人天批发价"], ["card", "渠道分销价"], ["swapRange", "换电范围"]] },
         channelSales: { stateKey: "channelSalesTab", tabs: [["contracts", "签约渠道"], ["orders", "渠道订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]] },
         sites: { stateKey: "siteManageTab", tabs: [["info", "站点信息"], ["fees", "场费电费"], ["bills", "站点支出"], ["partners", "站点合伙人"]] },
         devices: { stateKey: "deviceTab", tabs: () => [["cabinet", "换电柜"], ["battery", "电池"], ["alerts", "设备告警" + alertBadge()], ["iccid", "ICCID"]] },
@@ -6362,7 +6362,6 @@
             ];
           }
         },
-        refundManage: { stateKey: "refundTab", tabs: () => [["queue", "退款申请" + refundBadge()], ["settings", "退款设置"]] },
         financeManage: { stateKey: "financeTab", tabs: [["dashboard", "工作台"], ["packages", "资产包"], ["ledger", "融资台账"], ["projects", "授信项目"], ["assets", "资产池"], ["repayments", "还款日历"]] },
         leaseAgreements: { stateKey: "leaseAgreementsTab", tabs: [["contracts", "租赁协议"], ["deviceLists", "设备清单"]] },
         dayPool: {
@@ -14533,29 +14532,19 @@
         </section>`)}`;
     }
 
-    function renderRefundManage() {
-      const tab = state.refundTab || "queue";
+    /** 退款设置正文（decision-124：入口在平台设置） */
+    function renderRefundSettingsBody() {
       const settings = myRefundSettings();
       const mode = settings.mode || "manual";
-      const allRows = myRefundRequests();
-      const rows = filterRefundRequests(allRows);
-      const pending = allRows.filter(r => r.status === "待审核").length;
-      const advance = allRows.filter(r => r.status === "待审核" && r.needAdvance).length;
-      const refundedMonth = allRows.filter(r => r.status === "已退款" && String(r.processedTime || "").startsWith("2026-06")).length;
-      const tabDefs = [
-        ["queue", "退款申请" + (pending ? " (" + pending + ")" : "")],
-        ["settings", "退款设置"]
-      ];
-      const sidebar = tabSidebar(tabDefs, tab, "refund-tab");
-      if (tab === "settings") {
-        const autoActive = mode === "auto";
-        const depMode = settings.depositRefundMode || "manual";
-        const depAuto = depMode === "auto";
-        const coolDays = settings.coolingPeriodDays ?? 3;
-        return `${ownScopeBanner()}
+      const autoActive = mode === "auto";
+      const depMode = settings.depositRefundMode || "manual";
+      const depAuto = depMode === "auto";
+      const coolDays = settings.coolingPeriodDays ?? 3;
+      return `
           <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("refund_manage")}${noteBtn("refund_cooling_period")}${noteBtn("refund_mode_auto")}${noteBtn("refund_mode_manual")}${noteBtn("deposit_refund_mode")}
-            套餐退款：<strong>${autoActive ? "自动" : "手动"}</strong> · 押金退还：<strong>${depAuto ? "自动" : "手动"}</strong> · 冷静期 <strong>${coolDays} 天</strong> · 最近更新 ${settings.updatedAt} · ${settings.updatedBy}</div>
-          ${pageWithTabs(sidebar, `<section class="panel">
+            套餐退款：<strong>${autoActive ? "自动" : "手动"}</strong> · 押金退还：<strong>${depAuto ? "自动" : "手动"}</strong> · 冷静期 <strong>${coolDays} 天</strong> · 最近更新 ${settings.updatedAt} · ${settings.updatedBy}
+            <br><small style="opacity:.9">配置按本运营商生效 · 日清审核在「订单与服务 → 退款管理」（decision-124）</small></div>
+          <section class="panel">
             ${panelHead("3 天冷静期", "开通后用户可申请退大部分费用；超过冷静期平台不主动退", "refund_cooling_period")}
             <div class="panel-body">
               <div class="detail-grid">
@@ -14613,21 +14602,38 @@
               </table>
               <p style="font-size:12px;color:var(--muted);margin:12px 0 0">${noteBtn("refund_platform_fee")} 支付渠道<strong>按比例原路退</strong>：退套餐费时平台 C 端 1% <strong>同步冲正退还</strong>（decision-008）。押金不参与清分，退押无平台费冲正。</p>
             </div>
-          </section>`)}`;
-      }
+          </section>`;
+    }
+
+    function jumpToRefundSettings() {
+      state.view = "pricing";
+      state.pricingTab = "refund";
+      render();
+    }
+
+    function renderRefundManage() {
+      state.refundTab = "queue";
+      const settings = myRefundSettings();
+      const mode = settings.mode || "manual";
+      const allRows = myRefundRequests();
+      const rows = filterRefundRequests(allRows);
+      const pending = allRows.filter(r => r.status === "待审核").length;
+      const advance = allRows.filter(r => r.status === "待审核" && r.needAdvance).length;
+      const refundedMonth = allRows.filter(r => r.status === "已退款" && String(r.processedTime || "").startsWith("2026-06")).length;
       const auditPerm = canAuditRefund();
       const depMode = settings.depositRefundMode || "manual";
+      const settingsBtn = `<button type="button" class="btn" data-jump-refund-settings>退款设置</button>`;
       return `${ownScopeBanner()}
         <div class="kpi-grid">
           ${kpi("待审核", pending, advance ? advance + " 笔须运营商垫付" : "无待办", "审", "refund_manage")}
           ${kpi("本月已退", refundedMonth, "笔退款已完成", "退", "refund_manage")}
-          ${kpi("套餐模式", mode === "auto" ? "自动" : "手动", mode === "auto" ? "合规单可免审" : "确认后系统执行", "套", "refund_mode_" + mode)}
-          ${kpi("押金模式", depMode === "auto" ? "自动" : "手动", depMode === "auto" ? "还电后自动退押" : "待审确认后退押", "押", "deposit_refund_mode")}
+          <div data-jump-refund-settings role="button" tabindex="0" style="cursor:pointer">${kpi("套餐模式", mode === "auto" ? "自动" : "手动", "去平台设置修改", "套", "refund_mode_" + mode)}</div>
+          <div data-jump-refund-settings role="button" tabindex="0" style="cursor:pointer">${kpi("押金模式", depMode === "auto" ? "自动" : "手动", "去平台设置修改", "押", "deposit_refund_mode")}</div>
         </div>
-        ${pageWithTabs(sidebar, `<section class="panel">
-          ${panelHead("退款申请", `共 ${rows.length} 条 · 套餐 ${mode === "auto" ? "自动" : "手动"} · 押金 ${depMode === "auto" ? "自动" : "手动"}`, "refund_manage")}
+        <section class="panel">
+          ${panelHead("退款申请", `共 ${rows.length} 条 · 套餐 ${mode === "auto" ? "自动" : "手动"} · 押金 ${depMode === "auto" ? "自动" : "手动"}`, "refund_manage", settingsBtn)}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("refund_manage")}${noteBtn("refund_cooling_period")}${noteBtn("deposit_refund_mode")}${noteBtn("refund_platform_fee")}${noteBtn("orders_early_end")} 含<strong>押金退还</strong>。确认后<strong>运营商子商户原路退</strong>用户；退套餐费时<strong>平台 1% 按比例冲正退还</strong>。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("refund_manage")}${noteBtn("refund_cooling_period")}${noteBtn("deposit_refund_mode")}${noteBtn("refund_platform_fee")}${noteBtn("orders_early_end")} 含<strong>押金退还</strong>。确认后<strong>运营商子商户原路退</strong>用户；退套餐费时<strong>平台 1% 按比例冲正退还</strong>。自动/手动规则在<strong>平台设置 → 退款设置</strong>（decision-124）。</p>
             <table>
               <thead><tr>
                 <th>退款单</th><th>类型</th><th>套餐单</th><th>用户</th><th>站点</th>
@@ -14661,7 +14667,7 @@
               }).join("") : "<tr><td colspan='11'>暂无退款申请</td></tr>"}</tbody>
             </table>
           </div>
-        </section>`)}`;
+        </section>`;
     }
 
     function accrualCols() {
@@ -16533,6 +16539,8 @@
             </table>
           </div>
         </section>`;
+      } else if (tab === "refund") {
+        body = renderRefundSettingsBody();
       } else if (tab === "swapRange") {
         body = renderSwapRangeSettings();
       }
@@ -19890,11 +19898,8 @@
           });
         };
       });
-      root.querySelectorAll("[data-refund-tab]").forEach(btn => {
-        btn.onclick = () => {
-          state.refundTab = btn.dataset.refundTab;
-          render();
-        };
+      root.querySelectorAll("[data-jump-refund-settings]").forEach(btn => {
+        btn.onclick = () => jumpToRefundSettings();
       });
       root.querySelectorAll("[data-refund-mode]").forEach(btn => {
         btn.onclick = () => {
@@ -20575,7 +20580,7 @@
           } else if (state.view === "orderService" && cur === "audit") {
             desc = "订单/服务生命周期审计：冻结、消耗、换电、退款等跨模块时间线。";
           } else if (state.view === "orderService" && cur === "refund") {
-            desc = "C 端退订/中途完结退款：申请队列、审核确认、退款设置与追溯。";
+            desc = "C 端退订/中途完结退款：申请队列与审核确认；规则在平台设置 → 退款设置。";
           }
           pageMeta = [title, desc];
         }
