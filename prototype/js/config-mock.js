@@ -133,7 +133,7 @@
     };
 
     const CHANNEL_REGISTRY = {
-      "CH-SF": { id: "CH-SF", name: "顺丰同城渠道", settlementMode: "人天池", logo: "🚚", tree: "向运营商采购人天额度 · 团队登记 · 预占确认消耗" },
+      "CH-SF": { id: "CH-SF", name: "顺丰同城渠道", settlementMode: "人天池", logo: "🚚", tree: "向运营商采购人天额度 · 团队登记 · 按日确认消耗" },
       "CH-CARD": { id: "CH-CARD", name: "骑士卡渠道", settlementMode: "链接类", logo: "🟡", tree: "推广链接 · 用户直购 · 渠道标记 · 佣金结算" },
       "CH-RENT": { id: "CH-RENT", name: "京东物流租赁渠道", settlementMode: "设备租赁", logo: "🔴", tree: "租赁设备+月租 · 白名单套餐 · 渠道收款" },
       "CH-ACT": { id: "CH-ACT", name: "蜂鸟激活码渠道", settlementMode: "激活码", logo: "🎫", tree: "批发激活码 · 骑手核销获套餐 · 不经平台收款" }
@@ -261,7 +261,7 @@
       activationCodes: ["激活码", "渠道申请批发 → 确认到账按单造码；标记发放；一码一用；作废需运营商确认（无退款）。"],
       activationRecords: ["核销记录", "激活码核销成功记录；触发平台向运营商 B 端 1% 计提（与人天池确认消耗同类费率）。"],
       accounts: ["收款账户管理", "运营商与链接类渠道：唯一对公银行卡（开户名称/卡号/开户银行/开户支行）；未绑定则运营商不可提现、链接类不可开线上结算。设备租赁/资方仍为进件+对公。"],
-      dayPool: ["人天额度池", "渠道商向签约运营商购买人天额度，登记骑手并分配/收回；换电时按日预占与确认消耗。"],
+      dayPool: ["人天额度池", "渠道商向签约运营商购买人天额度，登记骑手并分配/收回；按个人剩余闸门，换电或日终持电确认消耗（decision-126）。"],
       pricing: ["平台设置", "含个人套餐价、押金设置、退款设置、人天批发价、渠道分销价、换电范围。"],
       channelSales: ["渠道管理", "签约渠道商、渠道订单与渠道权益；维护各渠道权益与定价。"],
       interOp: ["运营商往来账", "已并入「平台服务 → 运营商往来」页内 Tab：概况 / 跨网服务费明细 / 日清账单 / 周月汇总。"],
@@ -403,11 +403,12 @@
       orders_service_change: { title: "服务变更", content: "骑手发起的<strong>中途完结</strong>及<strong>冻结/解冻</strong>记录。中途完结进入退款流程；冻结/解冻在个人用户满足条件时<strong>系统自动生效</strong>，本后台只读查询。" },
       orders_early_end: { title: "中途完结与退款", content: "<strong>中途完结只退未使用套餐费</strong>，与押金解耦（decision-070）。<br>· 套餐费：进入「退款管理」按规则原路退<br>· 押金：不随中途完结一并退；用户在<strong>电池已还且订单完结</strong>后可自行申请「押金退还」<br>· 退款详情抽屉展示进度、关联单与流水" },
       refund_manage: { title: "退款管理", content: "C 端退订/中途完结/冷静期/<strong>押金退还</strong>统一<strong>作业</strong>入口（decision-124）。待审单点「处理退款」：展示可退口径，快捷策略（手动/全部/仅押金/拒绝），录入实退押金与实退订单金额（≤可退）。<strong>中途完结默认仅退套餐费</strong>（decision-070）。套餐/押金自动·手动在<strong>平台设置 → 退款设置</strong>。<strong>支付渠道按比例原路退</strong>：退套餐费时<strong>平台 C 端 1% 同步按比例冲正退还</strong>（见 decision-008）。押金不参与 1%，退押无平台费冲正。" },
-      pricing_refund: { title: "退款设置", content: "运营商「平台设置」二级 Tab（decision-124）。套餐退款与押金退还可<strong>分别</strong>切换自动/手动；冷静期始终须审。配置按本运营商生效；日清审核在「订单与服务 → 退款管理」。" },
+      pricing_refund: { title: "退款设置", content: "运营商「平台设置」二级 Tab（decision-124/127）。套餐/押金自动·手动可分别切换；<strong>冷静期按天比例自动退、无需人工</strong>。日清审核在「订单与服务 → 退款管理」。" },
       refund_platform_fee: { title: "平台费退还", content: "微信/支付宝等通道退款按分账比例回退。<br>· 退套餐费 R 时：平台费退还 ≈ R × C 端费率（或 原平台费 × R/原实付）<br>· 清分明细记「平台费冲正」<br>· <strong>押金</strong>未参与分账 → 退押不冲平台费<br>· 废止旧口径「平台 1% 不退」（D24）在 C 端原路退场景的适用" },
-      refund_cooling_period: { title: "3 天冷静期", content: "自<strong>支付成功/开通服务</strong>起 <strong>3 个自然日</strong>内，用户可申请退款。<br>建议应退套餐费 = 实付 ×（总天数 − 已使用天数）÷ 总天数；押金按还电规则另计。<br><strong>默认须运营商审核</strong>；确认退款时可修改实退金额。<br>超过 3 天：不享受冷静期强制退款权益；平台不主动退还，用户可尝试中途完结（须符合 SKU 规则）。" },
-      refund_mode_auto: { title: "套餐退款 · 自动", content: "开启后，符合 §5.2.1 SKU 规则（<strong>不含冷静期</strong>）且已还电 → 系统自动原路退。<strong>冷静期申请始终须人工确认</strong>（不受自动模式影响）。" },
-      refund_mode_manual: { title: "套餐退款 · 手动", content: "关闭自动退款时，所有<strong>套餐类</strong>退款申请进入待审核；运营商<strong>确认退款</strong>后系统自动执行原路退/垫付记账。" },
+      refund_cooling_period: { title: "3 天冷静期", content: "自<strong>开通服务</strong>起 <strong>3 个自然日</strong>内，用户可申请退款。<br>应退套餐费 = 实付 × 剩余天数 ÷ 总天数；押金按还电规则另计。<br><strong>系统按公式自动原路退，无需人工审核</strong>（decision-127）；与套餐自动/手动开关无关。<br>超过 3 天：不享受冷静期强制退款；可走中途完结/SKU 规则。按次生效后不适用。" },
+      refund_mode_auto: { title: "套餐退款 · 自动", content: "开启后，冷静期外符合 §5.2.1（<strong>不含按次已生效</strong>）且已还电 → 系统自动原路退。<strong>冷静期本身已按天比例自动退</strong>（decision-127）。切换模式须确认弹窗。" },
+      refund_mode_manual: { title: "套餐退款 · 手动", content: "关闭自动退款时，冷静期外的套餐类申请进入待审核；确认后系统原路退。冷静期申请仍自动退、不进待审（decision-127）。按次已生效不可进队。" },
+      times_no_refund_after_active: { title: "按次生效不可退", content: "次卡 / 单次换电：服务<strong>生效后不可退套餐费</strong>（冷静期、中途完结、SKU 退订均不适用）。仅<strong>待激活</strong>（首次领电且未领电）可全额退。1 天畅换属按天，不按本条（decision-125）。" },
       deposit_refund_mode: { title: "押金退还模式", content: "骑手申请<strong>仅退电池押金</strong>统一进入「退款管理」。<br>· 前提：<strong>电池已还回且服务/订单已完结</strong>（decision-070）<br>· <strong>自动退款</strong>：已还电且无争议 → 系统自动原路退运营商子商户实收押金<br>· <strong>手动确认</strong>：进入待审核，确认后系统执行<br>· 与套餐退款模式<strong>独立配置</strong>；中途完结<strong>不含</strong>押金子项；冷静期押金是否同单另计" },
       orders_freeze: { title: "服务冻结", content: "<strong>个人套餐</strong>用户在<strong>套餐有效期内</strong>且<strong>未持有电池</strong>时可申请冻结/解除冻结，<strong>满足条件即系统自动生效</strong>，无需运营商审核。冻结期间不可换电；解冻后 <code>valid_to</code> 按冻结天数顺延，骑手端首次服务为领取电池。<strong>服务中</strong>套餐详情<strong>不展示</strong>解冻/首服信息块（decision-070）。渠道人天用户不适用。" },
       orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>押金方式（全站统一）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）；不单列「无需押金」<br>· <strong>套餐购买订单</strong>：押金方式与<strong>收款状态</strong>（已收 / 待付 / ——）分列；仅实付有收款状态（decision-067）<br>· <strong>实付</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用达标免实付（仍须还电规则；已移除微信支付分，decision-100）" },
@@ -487,26 +488,26 @@
       channel_card_accounts: { title: "链接类收款账户", content: "与运营商对齐（decision-106/122）。<strong>唯一对公银行卡</strong>：开户名称、银行卡号、开户银行、开户支行；联行号选填。同一时间仅 1 户，变更覆盖。<strong>线上结算</strong>（佣金及时到付）必须已绑定，否则不可开启；结算打款至此卡。<strong>线下结算</strong>打佣也用本账户。渠道可自行绑定；<strong>平台</strong>在渠道商详情可代添加/代改。" },
       channel_instant_commission: { title: "佣金及时到付", content: "仅<strong>渠道分销（链接类）</strong>签约可开，即与运营商<strong>线上结算</strong>。须渠道已绑定对公银行卡（字段同运营商）。开启后设置<strong>渠道佣金比例</strong>。<br><strong>变更（decision-065）</strong>：即时↔线下切换于<strong>次日 00:00</strong>生效；历史订单不回溯；对账月度汇总按结算方式<strong>拆行</strong>。" },
       pricing_card: { title: "渠道分销价", content: "同一运营商可签多个<strong>分销商·链接类</strong>渠道，各渠道独立维护授权 SKU（须绑定<strong>电池型号</strong>，继承城市底价型号）、正式价、<strong>专享价</strong>与佣金。「平台设置 → 渠道分销价」为<strong>唯一</strong>维护入口（签约资料页不再配价，decision-084/085）；签约档案在「渠道管理 → 签约渠道」。专享价 ≤ 正式零售价。" },
-      day_pool_panel: { title: "人天额度池", content: "渠道商向签约运营商批发换电人天额度。<br><strong>可用</strong>=Σ DayPool.availableDays；<strong>预占中</strong>=Σ frozenDays。00:00 预占 → 换电/持电池确认消耗 → 日终释放未消耗预占。" },
-      day_pool_reserve: { title: "预占与确认消耗", content: "天级模式：每日 00:00 预占 1 人天。当日<strong>有换电或持有电池</strong>→确认消耗 1 人天（每骑手每日 1 条记录）；<strong>无换电且未持电池</strong>→日终释放。同一骑手同一天只扣 1 人天，但记录当日换电次数。" },
-      day_pool_consume: { title: "骑手日消耗（渠道商说明）", content: "每骑手每个自然日最多 1 条确认消耗记录，含<strong>当日换电次数</strong>与<strong>持有电池数</strong>。<br><br><strong>判定规则</strong>：① 当天有换电 → 确认消耗；② 当天未换电但<strong>持有电池</strong> → 仍视为使用服务，确认消耗；③ 不持有电池且未换电 → 不产生消耗，日终释放预占。" },
+      day_pool_panel: { title: "人天额度池", content: "渠道商向签约运营商批发换电人天额度。<br><strong>可用</strong>=未分配余额；分配后进入骑手个人剩余。<strong>确认消耗</strong>：当日换电或日终持电扣 1；未用不扣（decision-126，已取消整批预占主路径）。" },
+      day_pool_reserve: { title: "按日确认消耗", content: "闸门：个人剩余 ≥ 1。当日<strong>有换电或日终持电</strong>→确认消耗 1 人天（每骑手每日最多 1）；<strong>无换电且未持电</strong>→不扣。已取消 0 点整批预占（decision-126）。" },
+      day_pool_consume: { title: "骑手日消耗（渠道商说明）", content: "每骑手每个自然日最多 1 条确认消耗记录，含<strong>当日换电次数</strong>与<strong>持有电池数</strong>。<br><br><strong>判定规则</strong>：① 当天有换电 → 确认消耗；② 当天未换电但<strong>持有电池</strong> → 仍确认消耗；③ 不持电且未换电 → 不扣（decision-126）。" },
       day_pool_swap_sync: { title: "换电同步", content: "渠道骑手<strong>每一次</strong>成功换电均实时同步至渠道商后台，可与人天消耗记录勾稽。跨网换电同样同步（含站点、换电单号）。" },
-      day_pool_insufficient: { title: "预占失败（池不够当天）", content: "不允许透支。0 点可用余额不足以覆盖<strong>当日需预占人数</strong>时，整批预占失败（不做部分分配）。这是账本约束，不是第二条「余额不足」定义。池状态/顶栏/短信统一为<strong>可用 &lt; 在职×10</strong>（decision-113）。管理员可续费后手动或自动重试。<strong>骑手无可用额度时禁止换电</strong>（持电池仅可还电）；<strong>无自费兜底</strong>。见 decision-054。" },
+      day_pool_insufficient: { title: "个人无额度", content: "闸门看个人剩余人天。剩余=0 → 禁止换电（持电池仅可还电）；<strong>无自费兜底</strong>（decision-054）。整批预占失败已废止（decision-126）。池「余额不足」预警仍为<strong>可用 &lt; 在职×10</strong>（decision-113），管续费跑道。" },
       day_pool_rules: { title: "额度使用规则（已下线）", content: "<strong>decision-062</strong>：已移除「额度使用规则」与<strong>团队周期额度上限</strong>。额度仅受<strong>额度池可用余额</strong>与<strong>骑手个人已分配剩余</strong>约束；团队仅作编排（绑定消耗池）。池级扣天/激活口径见「额度池」详情。" },
       day_pool_b2b_refund: { title: "额度池退款说明（渠道商）", content: "人天额度池<strong>不支持在线退款</strong>。若需退未使用额度，须与<strong>签约运营商线下协商</strong>；达成一致后由运营商在后台执行额度扣减（账本类型：<strong>退款</strong>），资金按对公约定另行结算。渠道商后台不可自行发起池退款。" },
       day_pool_operator_adjust: { title: "运营商额度调整", content: "运营商在「渠道管理 → 渠道权益 → 已售额度池」手工调账。类型：充值、赠送、退款、修正、过期恢复（30 天内）。" },
       entitlement_api: { title: "渠道骑手可换电校验", content: "换电前调用 <code>POST /api/v1/entitlement/check</code>：返回 allowed_swap / allowed_return、fail_reason、gate_reason。无人天额度时 <strong>allowed_swap=false</strong>，持电池仅可还电；<strong>无自费兜底 SKU</strong>。见 decision-054。" },
       day_pool_team: { title: "骑手团队", content: "入口在<strong>骑手登记</strong>页内 Tab「骑手团队」。<br>· <strong>默认团队</strong>开户自动创建，始终启用，不可改名/停用/删除<br>· 其它团队可新增、编辑（名称本渠道唯一）、启用/停用；<strong>无在职成员</strong>才可停用或删除（decision-116）<br>· 一个渠道商仅一个人天额度池，不按团队切池<br>· 登记/加入/变更只出现<strong>启用中</strong>的团队" },
       day_pool_org: { title: "团队与额度池", content: "编排单元为<strong>团队</strong>（非组织/站点）。团队 <code>pool_id</code> 决定从哪个额度池扣减；额度使用规则为团队配置周期额度上限。" },
-      day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护个人套餐城市价；渠道商只读。<strong>已取消</strong>渠道零额度自费兜底：无预占/无额度时不可换电，仅可还电，须渠道续配。" },
-      day_pool_allocate: { title: "分配与收回", content: "分配：从团队绑定池可用余额划出 N 人天给骑手（分配即开通，按池统一口径预占/确认）。收回/退出团队：剩余未用人天自动退回池余额。" },
-      day_pool_contract: { title: "额度池规则", content: "平台统一（只读）：<strong>分配即开通</strong>；每日预占后<strong>换电或持电池</strong>确认消耗；池过期<strong>不退</strong>。B 端结算节奏由渠道商与运营商线下协商，不在此展示。" },
+      day_pool_retail: { title: "骑手零售价", content: "由运营商在「定价管理」维护个人套餐城市价；渠道商只读。<strong>已取消</strong>渠道零额度自费兜底：个人剩余=0 不可换电，仅可还电，须渠道再分配。" },
+      day_pool_allocate: { title: "分配与收回", content: "分配：从池可用划出 N 人天到骑手个人剩余（分配即开通）。收回/退出团队：剩余未用人天退回池可用。" },
+      day_pool_contract: { title: "额度池规则", content: "平台统一（只读）：<strong>分配即开通</strong>；个人剩余闸门；<strong>换电或日终持电</strong>确认消耗；未用不扣；池过期<strong>不退</strong>。B 端结算节奏线下协商。" },
       day_pool_identity: { title: "个人与渠道互斥", content: "同一骑手<strong>不可同时</strong>拥有生效中个人套餐与渠道团队成员身份。加入团队前须<strong>退订或冻结</strong>个人套餐。退出团队（主动/被移除）时<strong>未用人天自动回池</strong>。" },
       day_pool_channel: { title: "渠道商额度管理", content: "骑手须登记在渠道商名下并归属某一<strong>团队</strong>；团队绑定消耗额度池。登记时校验无生效中个人套餐。在职/离职均可<strong>加入、变更、移除团队</strong>；移除时未用人天自动回池并记离职。<strong>批量导入</strong>支持手工粘贴或上传 CSV/TXT/XLSX（手机号、姓名）。" },
       day_pool_purchase: { title: "购买人天额度", content: "渠道商向签约运营商按批发价采购人天；<strong>同一运营商续费在原池增购</strong>，不因团队再建第二池。向新运营商签约才产生新池实例。线下对公须填流水号，附言填采购单号（decision-114）。" },
-      day_pool_ledger: { title: "额度明细账本", content: "所有额度变动留痕。渠道商可见：购买、分配、收回、预占、确认消耗、释放、续费等。运营商调账类型：<strong>充值、赠送、退款、修正、过期恢复</strong>（协商退款走「退款」；过期恢复仅运营商、池过期后 30 天内）。" },
+      day_pool_ledger: { title: "额度明细账本", content: "所有额度变动留痕。渠道商可见：购买、分配、收回、确认消耗、续费等。运营商调账类型：<strong>充值、赠送、退款、修正、过期恢复</strong>。历史「预占/释放」流水可只读，主路径不再产生（decision-126）。" },
       day_pool_warn: { title: "余额不足（唯一口径）", content: "池状态、顶栏、短信同一条：<strong>可用余额 &lt; 在职骑手数 × 10 人天</strong>。在职含未分配/零额度/待还电，不含离职。刚好 10 天仍为「使用中」。已作废「占总量 20%」规则（decision-113）。触发后短信渠道商+运营商，并写入短信记录。" },
-      day_pool_hold_no_quota: { title: "零额度 / 待还电", content: "渠道商顶栏「骑手零额度」（在职剩余人天=0）。原因：①个人无额度 ②预占失败。持电池→「待还电」：<strong>仅可还电、禁止换电</strong>；不透支；<strong>无自费兜底</strong>。见 decision-049 / 054。" },
+      day_pool_hold_no_quota: { title: "零额度 / 待还电", content: "渠道商顶栏「骑手零额度」（在职剩余人天=0）。原因：<strong>个人无额度</strong>（decision-126）。持电池→「待还电」：<strong>仅可还电、禁止换电</strong>；不透支；<strong>无自费兜底</strong>。见 decision-049 / 054。" },
       day_pool_refund: { title: "续费与退款", content: "<strong>续费</strong>：渠道商在原池上增购人天（在线/线下采购）。<strong>退款</strong>：不支持在线操作，须与运营商线下协商，由运营商后台扣减额度（类型：退款）。详见「额度池退款说明」。" },
       platform_scope: { title: "平台管理范围", content: "平台管理员可查看全业务汇总，治理运营商主体、设备绑定与跨网统价；不替代运营商日常运营与定价。" },
       platform_operators: { title: "运营商管理", content: "运营商主体由平台创建与维护，含基础信息、<strong>登录账号（手机号）</strong>（默认密码 123456）、<strong>商户号</strong>（平台填写）、<strong>收款账户</strong>（平台可在新增/编辑维护，运营商也可自助绑定）。运营商登录后仅见本人经营数据。" },
@@ -544,7 +545,7 @@
 
     const VIEW_MODULE_NOTE = {
       overview: ["scope", "overview_sites", "overview_online", "overview_orders", "overview_net", "overview_site_expense", "overview_site_stats", "overview_power_stats"],
-      pricing: ["pricing_pkg", "pricing_zone", "pricing_quota", "pricing_card", "pricing_deposit", "pricing_refund", "swap_policy", "swap_policy_cross_net", "platform_standard_day_price"],
+      pricing: ["pricing_pkg", "pricing_zone", "pricing_quota", "pricing_card", "pricing_deposit", "pricing_refund", "times_no_refund_after_active", "swap_policy", "swap_policy_cross_net", "platform_standard_day_price"],
       channelSales: ["channel_sales", "channel_partner_manage", "channel_partner_rights", "day_pool_one_per_operator", "day_pool_b2b_settlement", "day_pool_offline_recon"],
       sites: ["sites_panel", "site_expenses_panel", "site_partner_binding", "site_partner_change_log"],
       sitePartners: ["site_partner_panel", "site_partner_open_account", "site_partner_binding", "site_partner_change_log", "site_partner_split"],
@@ -566,7 +567,7 @@
       orderUserDeposit: ["orders_user_deposit", "orders_deposit", "orders_deposit_waiver", "rider_battery_deposit"],
       orderFreeze: ["orders_freeze"],
       orderAudit: ["module_order_audit"],
-      refundManage: ["refund_manage", "refund_cooling_period", "orders_early_end", "pricing_refund"],
+      refundManage: ["refund_manage", "refund_cooling_period", "orders_early_end", "pricing_refund", "times_no_refund_after_active"],
       flows: ["flows_receipt", "flows_accrual", "flows_payout", "arch_b", "platform_no_share"],
       interOp: ["inter_op", "inter_op_pricing", "inter_op_clearing", "operator_deposit", "operator_credit"],
       depositAccount: ["deposit_recharge", "operator_deposit", "operator_credit", "operator_credit_eval"],
@@ -1259,13 +1260,13 @@
       "OP-SX": {
         mode: "manual", depositRefundMode: "manual",
         coolingPeriodDays: 3, coolingPeriodEnabled: true,
-        coolingDefaultAudit: true,
+        coolingDefaultAudit: false,
         updatedAt: "2026-06-10", updatedBy: "绿色出行"
       },
       "OP-LJZ": {
         mode: "manual", depositRefundMode: "auto",
         coolingPeriodDays: 3, coolingPeriodEnabled: true,
-        coolingDefaultAudit: true,
+        coolingDefaultAudit: false,
         updatedAt: "2026-06-01", updatedBy: "陆家嘴联营"
       }
     };
@@ -1355,8 +1356,8 @@
         site: "浦东骑手驿站", type: "冷静期退款", pkgName: "30天畅换", pkgRefund: 279, depositRefund: 99, totalRefund: 378,
         suggestedRefund: 279, usedDays: 2, coolingDaysLeft: 1, payAmount: 299, coolingPeriod: true,
         platformFeeRefund: 2.99, needAdvance: false, advanceReason: null,
-        status: "待审核", applyTime: "2026-06-12 09:30", processedTime: null, processedBy: null, rejectReason: null,
-        operatorNote: "系统建议扣 2 天使用费；押金另退"
+        status: "已退款", applyTime: "2026-06-12 09:30", processedTime: "2026-06-12 09:31", processedBy: "系统自动", processMode: "auto", rejectReason: null,
+        operatorNote: "冷静期按天比例自动退：套餐 ¥279（已用 2 天）+ 押金 ¥99"
       },
       {
         id: "RF-260615-DEP", operatorId: "OP-SX", scId: null, orderId: "SUB260605033", user: "U2188", phone: "136****2188",
@@ -1391,8 +1392,8 @@
       },
       {
         id: "SC260612-COOL", subId: "SUB260612088", user: "U2188", phone: "136****2188", site: "浦东骑手驿站",
-        type: "冷静期退款", applyTime: "2026-06-12 09:30", status: "退款处理中",
-        detail: "开通第 3 天申请；建议退套餐 ¥279（已用 2 天）+ 押金 ¥99", amount: 378, deviceOwnerId: "OP-SX"
+        type: "冷静期退款", applyTime: "2026-06-12 09:30", status: "已退款", processedTime: "2026-06-12 09:31", processedBy: "系统自动", processMode: "auto",
+        detail: "开通第 3 天申请；按天比例自动退套餐 ¥279（已用 2 天）+ 押金 ¥99", amount: 378, deviceOwnerId: "OP-SX"
       },
       {
         id: "SC26062501", subId: "SUB260525001", user: "U1055", phone: "136****1055", site: "世博换电服务点",
@@ -1610,7 +1611,7 @@
         { t: "08:29:50", kind: "user", type: "用户操作", text: "渠道成员 U2101 扫码换电（权益=渠道人天 QP-2601）" },
         { t: "08:29:51", kind: "req", type: "请求", text: "POST /api/v1/swap/start { poolId:QP-2601, entitlement:day_pool } → 200" },
         { t: "08:30:00", kind: "dev", type: "设备动作", text: "还电 #6 / 换电 #2 完成" },
-        { t: "08:30:01", kind: "req", type: "请求", text: "POST /swap/complete → 200；预占转确认消耗 1 人天" },
+        { t: "08:30:01", kind: "req", type: "请求", text: "POST /swap/complete → 200；确认消耗 1 人天" },
         { t: "08:30:02", kind: "req", type: "请求", text: "平台服务费计提 PF-001（确认消耗）" }
       ],
       "SW2606091430": [
@@ -2031,9 +2032,9 @@
       { id: "U3321", phone: "136****3321", site: "陆家嘴分站", city: "上海", deviceOwnerId: "OP-LJZ", pkg: "次卡 · 剩7次", swaps: 3, last: "05-23 09:50", deposit: "免押·芝麻", serviceState: "服务中" },
       { id: "U2101", phone: "138****2101", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "人天池 · 今日已用", swaps: 1, last: "今日 08:30", poolTeam: "默认团队", poolEligibility: "已确认消耗", poolId: "QP-2601",
         kycStatus: "已实名", realName: "王骑手", idNo: "310115199205153366", kycSubmittedAt: "2026-01-05 10:00", kycPassedAt: "2026-01-05 10:02" },
-      { id: "U2102", phone: "139****2102", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "人天池 · 今日预占", swaps: 0, last: "—", poolTeam: "默认团队", poolEligibility: "已预占", poolId: "QP-2601" },
-      { id: "U2103", phone: "137****2103", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "人天池", serviceState: "不可用", swaps: 0, last: "—", poolTeam: "默认团队", poolEligibility: "预占失败", poolId: "QP-2601", poolFailReason: "余额不足" },
-      { id: "U2110", phone: "136****2110", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "人天池 · 今日预占", swaps: 0, last: "—", poolTeam: "世博车队", poolEligibility: "已预占", poolId: "QP-2601" },
+      { id: "U2102", phone: "139****2102", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "人天池 · 今日可用", swaps: 0, last: "—", poolTeam: "默认团队", poolEligibility: "今日可用", poolId: "QP-2601" },
+      { id: "U2103", phone: "137****2103", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "人天池", serviceState: "不可用", swaps: 0, last: "—", poolTeam: "默认团队", poolEligibility: "个人无额度", poolId: "QP-2601", poolFailReason: "未分配" },
+      { id: "U2110", phone: "136****2110", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "人天池 · 今日可用", swaps: 0, last: "—", poolTeam: "世博车队", poolEligibility: "今日可用", poolId: "QP-2601" },
       { id: "U2111", phone: "135****2111", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "已离职", swaps: 12, last: "06-07 16:20", poolTeam: "世博车队", poolEligibility: "已回池", poolId: "QP-2601", serviceState: "已离职" },
       { id: "U9001", phone: "135****9001", site: "浦东骑手驿站", city: "上海", deviceOwnerId: "OP-SX", pkg: "已完结", swaps: 2, last: "06-01 10:00", serviceState: "中途完结" },
       { id: "U2199", phone: "139****2199", site: "世博换电服务点", city: "上海", deviceOwnerId: "OP-SX", pkg: "单次 · 已退", swaps: 0, last: "06-08 16:05", serviceState: "已完结" },
@@ -2095,10 +2096,10 @@
 
     const dayPoolRiders = [
       { id: "U2101", name: "王骑手", phone: "138****2101", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 30, usedDays: 12, remainingDays: 18, quotaStatus: "使用中", todayEligibility: "已确认消耗", todaySwaps: 1, batteryHeld: 1, ruleId: "RULE-01" },
-      { id: "U2102", name: "李骑手", phone: "139****2102", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 30, usedDays: 8, remainingDays: 22, quotaStatus: "使用中", todayEligibility: "已预占", todaySwaps: 0, batteryHeld: 0, ruleId: "RULE-01" },
-      { id: "U2103", name: "赵骑手", phone: "137****2103", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 0, usedDays: 0, remainingDays: 0, quotaStatus: "未分配", todayEligibility: "待还电", todaySwaps: 0, batteryHeld: 1, ruleId: "RULE-01", failReason: "余额不足", gateReason: "预占失败" },
-      { id: "U2104", name: "钱骑手", phone: "136****2104", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 0, usedDays: 0, remainingDays: 0, quotaStatus: "未分配", todayEligibility: "预占失败", todaySwaps: 0, batteryHeld: 0, ruleId: "RULE-01", failReason: "余额不足", gateReason: "预占失败" },
-      { id: "U2110", name: "孙骑手", phone: "136****2110", teamId: "TEAM-WB", team: "世博车队", poolId: "QP-2601", site: "世博换电服务点", city: "上海", status: "在职", allocatedDays: 15, usedDays: 2, remainingDays: 13, quotaStatus: "使用中", todayEligibility: "已预占", todaySwaps: 0, batteryHeld: 0, ruleId: "RULE-02" },
+      { id: "U2102", name: "李骑手", phone: "139****2102", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 30, usedDays: 8, remainingDays: 22, quotaStatus: "使用中", todayEligibility: "今日可用", todaySwaps: 0, batteryHeld: 0, ruleId: "RULE-01" },
+      { id: "U2103", name: "赵骑手", phone: "137****2103", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 0, usedDays: 0, remainingDays: 0, quotaStatus: "未分配", todayEligibility: "待还电", todaySwaps: 0, batteryHeld: 1, ruleId: "RULE-01", failReason: "未分配", gateReason: "个人无额度" },
+      { id: "U2104", name: "钱骑手", phone: "136****2104", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 0, usedDays: 0, remainingDays: 0, quotaStatus: "未分配", todayEligibility: "个人无额度", todaySwaps: 0, batteryHeld: 0, ruleId: "RULE-01", failReason: "未分配", gateReason: "个人无额度" },
+      { id: "U2110", name: "孙骑手", phone: "136****2110", teamId: "TEAM-WB", team: "世博车队", poolId: "QP-2601", site: "世博换电服务点", city: "上海", status: "在职", allocatedDays: 15, usedDays: 2, remainingDays: 13, quotaStatus: "使用中", todayEligibility: "今日可用", todaySwaps: 0, batteryHeld: 0, ruleId: "RULE-02" },
       { id: "U2106", name: "陈骑手", phone: "135****2106", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 30, usedDays: 10, remainingDays: 20, quotaStatus: "使用中", todayEligibility: "已确认消耗", todaySwaps: 0, batteryHeld: 1, ruleId: "RULE-01", confirmReason: "持电池" },
       { id: "U2112", name: "吴骑手", phone: "134****2112", teamId: "TEAM-DEFAULT", team: "默认团队", poolId: "QP-2601", site: "浦东骑手驿站", city: "上海", status: "在职", allocatedDays: 30, usedDays: 30, remainingDays: 0, quotaStatus: "已用尽", todayEligibility: "待还电", todaySwaps: 0, batteryHeld: 1, ruleId: "RULE-01", gateReason: "个人无额度", holdNote: "昨日确认消耗后额度用尽，仍持电池" },
       { id: "U2111", name: "周骑手", phone: "135****2111", teamId: "TEAM-WB", team: "世博车队", poolId: "QP-2601", site: "世博换电服务点", city: "上海", status: "离职", allocatedDays: 30, usedDays: 12, remainingDays: 0, quotaStatus: "已收回", todayEligibility: "已回池", todaySwaps: 0, batteryHeld: 0, ruleId: "RULE-02", recycledDays: 18 }
@@ -2121,7 +2122,7 @@
     const dayPoolRiderDailyConsume = [
       { id: "DC-0609-01", date: "2026-06-09", poolId: "QP-2601", riderId: "U2101", riderName: "王骑手", team: "默认团队", site: "浦东骑手驿站", swapCount: 1, batteryHeld: 1, confirmedDays: 1, confirmReason: "换电", status: "已确认" },
       { id: "DC-0609-02", date: "2026-06-09", poolId: "QP-2601", riderId: "U2106", riderName: "陈骑手", team: "默认团队", site: "浦东骑手驿站", swapCount: 0, batteryHeld: 1, confirmedDays: 1, confirmReason: "持电池", status: "已确认" },
-      { id: "DC-0609-03", date: "2026-06-09", poolId: "QP-2601", riderId: "U2102", riderName: "李骑手", team: "默认团队", site: "浦东骑手驿站", swapCount: 0, batteryHeld: 0, confirmedDays: 0, confirmReason: "—", status: "已预占" },
+      { id: "DC-0609-03", date: "2026-06-09", poolId: "QP-2601", riderId: "U2102", riderName: "李骑手", team: "默认团队", site: "浦东骑手驿站", swapCount: 0, batteryHeld: 0, confirmedDays: 0, confirmReason: "—", status: "今日可用" },
       { id: "DC-0608-01", date: "2026-06-08", poolId: "QP-2601", riderId: "U2101", riderName: "王骑手", team: "默认团队", site: "浦东骑手驿站", swapCount: 2, batteryHeld: 1, confirmedDays: 1, confirmReason: "换电", status: "已确认" }
     ];
 
@@ -2139,7 +2140,7 @@
     ];
 
     const dayPoolExceptions = [
-      { id: "EX-0609-01", poolId: "QP-2601", type: "预占失败", reason: "余额不足", batchDate: "2026-06-09", affected: 2, status: "待重试", retrySource: "—", detail: "需 12 人天，可用仅 9 人天（演示：整批失败）" },
+      { id: "EX-0609-01", poolId: "QP-2601", type: "个人无额度", reason: "余额不足", batchDate: "2026-06-09", affected: 2, status: "待重试", retrySource: "—", detail: "历史整批预占失败样例；主路径已改为个人无额度（decision-126）" },
       { id: "EX-0608-02", poolId: "QP-2601", type: "支付退款待处理", reason: "人工处理", batchDate: "2026-06-08", affected: 1, status: "待处理", retrySource: "—", detail: "骑手自费订单 RC-POOL-088 退款，资格/额度不自动回退" },
       { id: "EX-0607-03", poolId: "QP-2601", type: "用户冲突", reason: "多团队", batchDate: "2026-06-07", affected: 1, status: "已拒绝", retrySource: "—", detail: "导入 U2199 已属于其他团队" }
     ];
@@ -2148,12 +2149,12 @@
       { id: "LG-001", poolId: "QP-2601", time: "2026-01-05 10:00", type: "购买入账", deltaDays: 10000, balanceAfter: 10000, operator: PAYEE_OPERATOR, ref: "PO-202601-088", reason: "向运营商批发采购" },
       { id: "LG-002", poolId: "QP-2601", time: "2026-02-01 09:00", type: "赠送入账", deltaDays: 200, balanceAfter: 10200, operator: PAYEE_OPERATOR, ref: "—", reason: "运营商活动赠送" },
       { id: "LG-T01", poolId: "QP-2602", time: "2026-03-05 11:00", type: "购买入账", deltaDays: 2000, balanceAfter: 2000, operator: PAYEE_OPERATOR, ref: "PO-202603-015", reason: "临时渠道首批采购" },
-      { id: "LG-003", poolId: "QP-2601", time: "2026-06-09 00:00", type: "用户资格预占", deltaDays: -12, balanceAfter: 197, operator: "系统", ref: "RULE-01", reason: "顺丰浦东 12 人预占" },
-      { id: "LG-004", poolId: "QP-2601", time: "2026-06-09 08:30", type: "预占确认消耗", deltaDays: 0, balanceAfter: 185, operator: "系统", ref: "U2101", reason: "换电确认 1 人天" },
-      { id: "LG-004b", poolId: "QP-2601", time: "2026-06-09 12:00", type: "预占确认消耗", deltaDays: 0, balanceAfter: 184, operator: "系统", ref: "U2106", reason: "持电池确认 1 人天（当日无换电）" },
-      { id: "LG-T02", poolId: "QP-2602", time: "2026-06-09 00:00", type: "用户资格预占", deltaDays: -20, balanceAfter: 1680, operator: "系统", ref: "—", reason: "临时渠道 20 人预占" },
-      { id: "LG-T03", poolId: "QP-2602", time: "2026-06-08 18:00", type: "预占确认消耗", deltaDays: 0, balanceAfter: 1700, operator: "系统", ref: "U-TEMP-01", reason: "换电确认 1 人天" },
-      { id: "LG-005", poolId: "QP-2601", time: "2026-06-08 23:59", type: "预占释放", deltaDays: 3, balanceAfter: 209, operator: "系统", ref: "RULE-01", reason: "3 人未换电日终释放" },
+      { id: "LG-003", poolId: "QP-2601", time: "2026-06-09 00:00", type: "日初资格（历史）", deltaDays: -12, balanceAfter: 197, operator: "系统", ref: "RULE-01", reason: "历史预占流水（decision-126 后主路径不再产生）" },
+      { id: "LG-004", poolId: "QP-2601", time: "2026-06-09 08:30", type: "确认消耗", deltaDays: 0, balanceAfter: 185, operator: "系统", ref: "U2101", reason: "换电确认消耗 1 人天" },
+      { id: "LG-004b", poolId: "QP-2601", time: "2026-06-09 12:00", type: "确认消耗", deltaDays: 0, balanceAfter: 184, operator: "系统", ref: "U2106", reason: "日终持电确认消耗 1 人天" },
+      { id: "LG-T02", poolId: "QP-2602", time: "2026-06-09 00:00", type: "日初资格（历史）", deltaDays: -20, balanceAfter: 1680, operator: "系统", ref: "—", reason: "历史预占流水（decision-126 后主路径不再产生）" },
+      { id: "LG-T03", poolId: "QP-2602", time: "2026-06-08 18:00", type: "确认消耗", deltaDays: 0, balanceAfter: 1700, operator: "系统", ref: "U-TEMP-01", reason: "换电确认消耗 1 人天" },
+      { id: "LG-005", poolId: "QP-2601", time: "2026-06-08 23:59", type: "未消耗回滚（历史）", deltaDays: 3, balanceAfter: 209, operator: "系统", ref: "RULE-01", reason: "历史释放流水（decision-126 后主路径不再产生）" },
       { id: "LG-006", poolId: "QP-2601", time: "2026-06-07 16:20", type: "回池", deltaDays: 18, balanceAfter: 227, operator: "系统", ref: "U2111", reason: "离职回池 resign" },
       { id: "LG-007", poolId: "QP-2601", time: "2026-05-20 15:00", type: "退款", deltaDays: -500, balanceAfter: 9500, operator: PAYEE_OPERATOR, ref: "协商单 REF-0520", reason: "运营商协商扣减未使用购买额度（线下已退款）" },
       { id: "LG-T04", poolId: "QP-2602", time: "2026-05-12 10:30", type: "购买入账", deltaDays: 0, balanceAfter: 2000, operator: PAYEE_OPERATOR, ref: "PO-202603-015", reason: "确认到账入账完成" }

@@ -159,7 +159,7 @@
         { id: "P07", title: "续费" }, { id: "P08", title: "冻结与解冻" }, { id: "P09", title: "退款/退租/完结" }
       ]},
       channel: { story: "channel", steps: [
-        { id: "C01", title: "登录授权" }, { id: "C02", title: "权益到账" }, { id: "C03", title: "今日预占" },
+        { id: "C01", title: "登录授权" }, { id: "C02", title: "权益到账" }, { id: "C03", title: "今日可用" },
         { id: "C04", title: "首次领取电池" }, { id: "C05", title: "日常换电与确认消耗" }, { id: "C06", title: "额度异常·仅还电" },
         { id: "C07", title: "离职/移除" }, { id: "C08", title: "还电与回池完结" }
       ]}
@@ -249,12 +249,12 @@
         <div class="service-card warn"><h4>30天畅换</h4><p>剩余 28 天 · 冷静期剩余 1 天 · 未持电池</p><span class="btn-gold">申请退款</span></div>`),
       mineChannel: (opts = {}) => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****2110</span><span class="tag-sm ok">已认证</span></div></div>
-        <div class="service-card channel"><h4>渠道人天额度</h4><p>顺丰同城 · 世博车队<br>剩余人天 13 · ${opts.today || "今日已预占"}${opts.depositPending ? " · 押金待办理" : ""}${opts.confirmed ? " · 换电 1 次" : ""}</p>
+        <div class="service-card channel"><h4>渠道人天额度</h4><p>顺丰同城 · 世博车队<br>剩余人天 13 · ${opts.today || "今日可用"}${opts.depositPending ? " · 押金待办理" : ""}${opts.confirmed ? " · 换电 1 次" : ""}</p>
           ${opts.depositPending ? `<span class="btn-gold">办理押金</span>` : opts.pickup ? `<span class="btn-gold">扫码领取</span>` : ""}</div>
         ${opts.depositPending ? `<div class="deposit-status-card"><div class="ds-title">电池押金 · 待办理</div>首次领电前须免押或实缴</div>` : ""}`),
       mineChannelFail: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">137****2103</span><span class="tag-sm ok">已认证</span></div></div>
-        <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>预占失败 · 额度池余额不足<br>持有电池：仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
+        <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>个人无额度 · 剩余人天 0<br>持有电池：仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
       mineChannelNoQuota: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">134****2112</span><span class="tag-sm ok">已认证</span></div></div>
         <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>个人无额度 · 分配人天已用尽<br>持有电池：仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
@@ -412,8 +412,8 @@
     function buildChannelTrack() {
       return [
         flowCell("C01", "登录授权", SCREENS.login(), "● 不引导购套餐"),
-        connector(""), flowCell("C02", "权益到账", SCREENS.mineChannel({ depositPending: true, today: "今日已预占" }), "◆ channel U2110"),
-        connector(""), flowCell("C03", "今日预占", SCREENS.mineChannel({ depositPending: true, today: "今日已预占" }), "◆ 已预占可换"),
+        connector(""), flowCell("C02", "权益到账", SCREENS.mineChannel({ depositPending: true, today: "今日可用" }), "◆ channel U2110"),
+        connector(""), flowCell("C03", "今日可用", SCREENS.mineChannel({ depositPending: true, today: "今日可用" }), "◆ 有剩余可换"),
         connector(""), flowCell("C04a", "办理押金", SCREENS.channelDeposit(), "● 首领前"),
         connector(""), flowCell("C04b", "扫码领取", SCREENS.scanPickup(), "● 出电"),
         connector(""), flowCell("C04c", "领取成功", SCREENS.resultPickup(), "● 押金已办结"),
@@ -438,7 +438,7 @@
     ];
     const SUPPLEMENT_CHANNEL = [
       { id: "SC-01", title: "押金已办·持电池", key: "channel_deposit_done", fn: () => SCREENS.mineChannel({ confirmed: true, today: "今日已确认消耗" }) },
-      { id: "SC-02", title: "预占失败·待还电", key: "channel_fail", fn: () => SCREENS.mineChannelFail() },
+      { id: "SC-02", title: "个人无额度·待还电", key: "channel_fail", fn: () => SCREENS.mineChannelFail() },
       { id: "SC-03", title: "个人无额度·待还电", key: "channel_no_quota", fn: () => SCREENS.mineChannelNoQuota() },
       { id: "SC-04", title: "渠道跨网·案例3", key: "channel_cross3", fn: () => SCREENS.failCrossNet() },
       { id: "SC-05", title: "离职还电回池", key: "channel_resign", fn: () => SCREENS.mineResigned() }
@@ -475,7 +475,7 @@
           <p class="section-desc">登录 → 实名 → 定 OP → 购套餐 → 待领电 → 扫码领取 → 换电 → 续费 → 冻结/解冻 → 冷静期退款。</p>
           <div class="flow-track">${buildPersonalTrack()}</div>${buildPersonalBranch()}</section>
         <section class="flow-section"><h2>主线二 · 渠道人天 <span class="badge">C01–C08</span></h2>
-          <p class="section-desc">权益到账 → 预占 → 首领押金 → 领电 → 换电确认消耗 → 额度异常仅还电 → 离职 → 还电回池。无主套餐入口，无自费兜底。</p>
+          <p class="section-desc">权益到账 → 今日可用 → 首领押金 → 领电 → 换电确认消耗 → 额度异常仅还电 → 离职 → 还电回池。无主套餐入口，无自费兜底。</p>
           <div class="flow-track">${buildChannelTrack()}</div>
           <div class="flow-note" style="margin-top:16px"><h4>渠道 vs 个人 · 互斥</h4>
             <p>不可同时持有个人套餐与渠道人天；零额度持电池<strong>仅可还电</strong>，须联系渠道续配。</p></div></section>

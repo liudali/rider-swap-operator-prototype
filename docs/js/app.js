@@ -3139,7 +3139,7 @@
       return list.filter(p => dayPoolIsLowBalance(p));
     }
 
-    /** 渠道商：在职且剩余人天=0（个人无额度或预占失败等导致今日无可用额度） */
+    /** 渠道商：在职且剩余人天=0（个人无额度 → 今日不可换电） */
     function zeroQuotaActiveRidersAlert() {
       if (!isChannelRole()) return [];
       return dayPoolRiders.filter(r =>
@@ -4018,7 +4018,7 @@
           <div class="detail-item"><span>批发单价</span><strong>¥${sel.wholesalePrice}/人天</strong></div>
           <div class="detail-item"><span>总购买</span><strong>${(sel.totalDays || 0) - (sel.giftedDays || 0)} 人天</strong></div>
           <div class="detail-item"><span>赠送</span><strong>${sel.giftedDays || 0} 人天</strong></div>
-          <div class="detail-item"><span>预占/冻结</span><strong>${sel.frozenDays || 0} 人天</strong></div>
+          <div class="detail-item"><span>冻结（兼容）</span><strong>${sel.frozenDays || 0} 人天</strong></div>
           <div class="detail-item"><span>已消耗</span><strong>${sel.consumedDays || 0} 人天</strong></div>
           <div class="detail-item"><span>可用余额</span><strong>${sel.availableDays || 0} 人天</strong></div>
           <div class="detail-item"><span>在职 / 需支撑</span><strong>${dayPoolActiveRiderCount(sel.id)} 人 / ${dayPoolRunwayNeed(sel)} 人天</strong><br><small style="font-weight:400;color:var(--muted)">余额不足 = 可用 &lt; 在职×${DAY_POOL_RUNWAY_DAYS}</small></div>
@@ -4026,7 +4026,7 @@
           <div class="detail-item"><span>有效期</span><strong>${sel.validFrom || "—"} ~ ${sel.validTo || "—"}</strong></div>
         </div>
         <div class="usage-bar" style="margin-top:12px"><i style="width:${Math.min(100, (dayPoolRunwayNeed(sel) ? Math.round((sel.availableDays || 0) / dayPoolRunwayNeed(sel) * 100) : 100))}%"></i></div>
-        <p style="font-size:12px;color:var(--muted);margin:8px 0 0">已消耗 ${sel.consumedDays || 0} · 预占 ${sel.frozenDays || 0} · 可用 ${sel.availableDays || 0} / 总量 ${sel.totalDays || 0}</p>
+        <p style="font-size:12px;color:var(--muted);margin:8px 0 0">已消耗 ${sel.consumedDays || 0} · 可用 ${sel.availableDays || 0} / 总量 ${sel.totalDays || 0}</p>
         <div class="stat-pills" style="margin-top:12px">
           <span class="stat-pill">底层 <strong>分钟账本</strong>（1人天=1440分钟）</span>
           <span class="stat-pill">跑道 <strong>${sel.availableDays || 0} / ${dayPoolRunwayNeed(sel)}</strong>（在职×${DAY_POOL_RUNWAY_DAYS}）</span>
@@ -4053,7 +4053,7 @@
     }
 
     function poolStatusTag(status) {
-      const risk = ["余额不足", "已到期", "已关闭", "预占失败"];
+      const risk = ["余额不足", "已到期", "已关闭", "个人无额度"];
       const warn = ["待配置", "待重试", "待处理"];
       const cls = risk.some(k => status.includes(k)) ? "risk" : warn.some(k => status.includes(k)) ? "warn" : "";
       return `<span class="tag ${cls}">${status}</span>`;
@@ -4061,7 +4061,7 @@
 
     function eligibilityTag(el) {
       const map = {
-        "已确认消耗": "tag", "已预占": "tag warn", "预占失败": "tag risk", "待还电": "tag risk",
+        "已确认消耗": "tag", "今日可用": "tag warn", "已预占": "tag warn", "个人无额度": "tag risk", "预占失败": "tag risk", "待还电": "tag risk",
         "待首换": "tag warn", "待首换开通": "tag warn", "已回池": "tag neutral", "不可用": "tag risk"
       };
       const cls = (map[el] || "tag neutral").replace("tag ", "");
@@ -4417,12 +4417,12 @@
         { key: "city", label: "城市", type: "select", options: [{ v: "全部", t: "全部" }, { v: "上海", t: "上海" }] }
       ],
       dayPool_exceptions: [
-        { key: "type", label: "异常类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "预占失败", t: "预占失败" }, { v: "支付退款待处理", t: "支付退款待处理" }, { v: "用户冲突", t: "用户冲突" }] },
+        { key: "type", label: "异常类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "个人无额度", t: "个人无额度" }, { v: "支付退款待处理", t: "支付退款待处理" }, { v: "用户冲突", t: "用户冲突" }] },
         { key: "status", label: "处理状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待重试", t: "待重试" }, { v: "待处理", t: "待处理" }, { v: "已拒绝", t: "已拒绝" }] }
       ],
       dayPool_ledger: [
         { key: "poolId", label: "额度池", type: "select", options: () => [{ v: "全部", t: "全部" }].concat(myDayPools().map(p => ({ v: p.id, t: p.id }))) },
-        { key: "type", label: "账本类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "购买入账", t: "购买入账" }, { v: "续费入账", t: "续费入账" }, { v: "充值", t: "充值" }, { v: "赠送入账", t: "赠送" }, { v: "退款", t: "退款" }, { v: "修正", t: "修正" }, { v: "分配出账", t: "分配出账" }, { v: "收回入账", t: "收回入账" }, { v: "用户资格预占", t: "预占" }, { v: "预占确认消耗", t: "确认消耗" }, { v: "预占释放", t: "释放" }, { v: "回池", t: "回池" }] }
+        { key: "type", label: "账本类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "购买入账", t: "购买入账" }, { v: "续费入账", t: "续费入账" }, { v: "充值", t: "充值" }, { v: "赠送入账", t: "赠送" }, { v: "退款", t: "退款" }, { v: "修正", t: "修正" }, { v: "分配出账", t: "分配出账" }, { v: "收回入账", t: "收回入账" }, { v: "确认消耗", t: "确认消耗" }, { v: "日初资格（历史）", t: "历史预占" }, { v: "未消耗回滚（历史）", t: "历史释放" }, { v: "回池", t: "回池" }] }
       ],
       operators_list: [
         { key: "keyword", label: "名称/ID/联系人", placeholder: "OP-SX" },
@@ -4700,14 +4700,14 @@
       if (!operatorRefundSettings[eid]) {
         operatorRefundSettings[eid] = {
           mode: "manual", depositRefundMode: "manual",
-          coolingPeriodDays: 3, coolingPeriodEnabled: true, coolingDefaultAudit: true,
+          coolingPeriodDays: 3, coolingPeriodEnabled: true, coolingDefaultAudit: false,
           updatedAt: new Date().toISOString().slice(0, 10), updatedBy: entityNameById(eid)
         };
       }
       const s = operatorRefundSettings[eid];
       if (s.coolingPeriodDays == null) s.coolingPeriodDays = 3;
       if (s.coolingPeriodEnabled == null) s.coolingPeriodEnabled = true;
-      if (s.coolingDefaultAudit == null) s.coolingDefaultAudit = true;
+      if (s.coolingDefaultAudit == null) s.coolingDefaultAudit = false;
       if (!s.depositRefundMode) s.depositRefundMode = "manual";
       return s;
     }
@@ -11810,7 +11810,7 @@
             <strong>人天额度池余额不足</strong>：${lowPool.name}（${lowPool.id}）可用 <strong>${lowPool.availableDays}</strong> 人天，在职 ${dayPoolActiveRiderCount(lowPool.id)} 人需支撑 ${dayPoolRunwayNeed(lowPool)} 人天。
             <button type="button" class="link-btn" data-view-jump="dayPool">进入额度池</button></div>` : ""}
           <div class="kpi-grid">
-            ${kpi("人天池可用", poolAvail + " 人天", "预占中 " + poolFrozen + " 人天", "池", "day_pool_panel")}
+            ${kpi("人天池可用", poolAvail + " 人天", "未分配可用 · decision-126", "池", "day_pool_panel")}
             ${kpi("在职骑手", riderCount, "已登记团队成员", "骑", "day_pool_channel")}
             ${kpi("签约运营商", contract ? contract.operatorName : "—", contract ? "批发 ¥" + contract.wholesalePrice + "/人天" : "", "运", "day_pool_contract")}
             ${kpi(lowPool ? "额度池预警" : "额度池数", lowPool ? lowPool.id + " · 可用 " + lowPool.availableDays : pools.length + " 个", lowPool ? "可用不足在职×" + DAY_POOL_RUNWAY_DAYS + "天" : "向运营商采购", lowPool ? "!" : "池", lowPool ? "day_pool_warn" : "day_pool_purchase")}
@@ -14053,7 +14053,7 @@
       ];
       if (rf.status === "已驳回" && batteryOk) steps[2].state = "fail";
       if (rf.status === "已退款" && rf.processMode === "auto") steps[2].label = "系统自动审核";
-      if (rf.coolingPeriod || rf.type === "冷静期退款") steps[2].label = "运营商审核（冷静期）";
+      if (rf.coolingPeriod || rf.type === "冷静期退款") steps[2].label = "系统自动退款（冷静期）";
       if (isDepositOnlyRefund(rf)) {
         steps[2].label = rf.status === "已退款" && rf.processMode === "auto" ? "系统自动退押" : "运营商审核（押金退还）";
       }
@@ -14104,7 +14104,7 @@
             ${rf.status === "待审核" && canAuditRefund() ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
               <button type="button" class="btn primary" data-approve-refund="${rf.id}">处理退款</button>
               <button type="button" class="btn" data-reject-refund="${rf.id}">驳回</button>
-            </div>${isDepositOnlyRefund(rf) ? `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">${noteBtn("deposit_refund_mode")} 仅退押金，套餐继续有效；确认后原路退运营商子商户实收。</p>` : rf.coolingPeriod ? `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">${noteBtn("refund_cooling_period")} 冷静期退款须运营商确认实退金额，系统仅提供建议值。</p>` : ""}` : rf.status === "待审核" ? `<p class="perm-banner" style="margin:12px 0 0">待有「退款确认操作」权限的员工审核</p>` : ""}
+            </div>${isDepositOnlyRefund(rf) ? `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">${noteBtn("deposit_refund_mode")} 仅退押金，套餐继续有效；确认后原路退运营商子商户实收。</p>` : rf.coolingPeriod ? `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">${noteBtn("refund_cooling_period")} 冷静期按天比例<strong>自动退</strong>，无需人工改额（decision-127）。</p>` : ""}` : rf.status === "待审核" ? `<p class="perm-banner" style="margin:12px 0 0">待有「退款确认操作」权限的员工审核</p>` : ""}
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
@@ -14543,25 +14543,25 @@
       return `
           <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("refund_manage")}${noteBtn("refund_cooling_period")}${noteBtn("refund_mode_auto")}${noteBtn("refund_mode_manual")}${noteBtn("deposit_refund_mode")}
             套餐退款：<strong>${autoActive ? "自动" : "手动"}</strong> · 押金退还：<strong>${depAuto ? "自动" : "手动"}</strong> · 冷静期 <strong>${coolDays} 天</strong> · 最近更新 ${settings.updatedAt} · ${settings.updatedBy}
-            <br><small style="opacity:.9">配置按本运营商生效 · 日清审核在「订单与服务 → 退款管理」（decision-124）</small></div>
+            <br><small style="opacity:.9">配置按本运营商生效 · 日清审核在「订单与服务 → 退款管理」· <strong>冷静期按天比例自动退、无需人工</strong>（decision-127）· 次卡/单次生效后不可退 · 切换模式须确认</small></div>
           <section class="panel">
-            ${panelHead("3 天冷静期", "开通后用户可申请退大部分费用；超过冷静期平台不主动退", "refund_cooling_period")}
+            ${panelHead("3 天冷静期", "开通后按天比例自动退；超过冷静期平台不主动退", "refund_cooling_period")}
             <div class="panel-body">
               <div class="detail-grid">
                 <div class="detail-item"><span>冷静期时长</span><strong>${coolDays} 个自然日</strong><br><small style="color:var(--muted)">自支付成功/开通服务起算</small></div>
-                <div class="detail-item"><span>审核方式</span><strong>${settings.coolingDefaultAudit !== false ? "须运营商审核" : "可配置"}</strong><br><small style="color:var(--muted)">不受自动退款模式影响</small></div>
-                <div class="detail-item"><span>建议应退</span><strong>实付 × 剩余天数 ÷ 总天数</strong><br><small style="color:var(--muted)">押金按还电规则另计</small></div>
-                <div class="detail-item"><span>超过冷静期</span><strong>不强制退款</strong><br><small style="color:var(--muted)">平台不主动退还；可走中途完结/SKU 退订</small></div>
+                <div class="detail-item"><span>审核方式</span><strong>无需人工 · 系统自动退</strong><br><small style="color:var(--muted)">与套餐自动/手动开关无关（decision-127）</small></div>
+                <div class="detail-item"><span>应退金额</span><strong>实付 × 剩余天数 ÷ 总天数</strong><br><small style="color:var(--muted)">按公式原路退；押金按还电规则另计</small></div>
+                <div class="detail-item"><span>超过冷静期</span><strong>不强制退款</strong><br><small style="color:var(--muted)">可走中途完结/SKU 退订（受自动/手动约束）</small></div>
               </div>
             </div>
           </section>
           <section class="panel">
-            ${panelHead("套餐退款处理模式", "冷静期 / 中途完结 / SKU 退订；切换后对新申请立即生效", "refund_manage")}
+            ${panelHead("套餐退款处理模式", "仅约束冷静期外的中途完结 / SKU 退订；切换后对新申请立即生效", "refund_manage")}
             <div class="panel-body">
               <div class="detail-grid" style="grid-template-columns:repeat(2,1fr);gap:14px">
                 <button type="button" class="btn ${autoActive ? "primary" : ""}" data-refund-mode="auto" style="text-align:left;padding:16px;height:auto">
                   <strong>自动退款</strong>
-                  <p style="margin:8px 0 0;font-size:12px;color:var(--muted);font-weight:normal">符合 §5.2.1 SKU 规则且已还电 → 系统自动原路退款。<strong>冷静期申请除外</strong>。</p>
+                  <p style="margin:8px 0 0;font-size:12px;color:var(--muted);font-weight:normal">冷静期外、符合 §5.2.1 且已还电 → 系统自动原路退。<strong>冷静期本身已自动退</strong>。</p>
                 </button>
                 <button type="button" class="btn ${!autoActive ? "primary" : ""}" data-refund-mode="manual" style="text-align:left;padding:16px;height:auto">
                   <strong>手动确认</strong>
@@ -14584,7 +14584,7 @@
                 </button>
               </div>
               ${!canAuditRefund() ? `<p class="perm-banner" style="margin-top:14px">当前账号仅有查看权限，切换模式需「退款确认操作」权限。</p>` : ""}
-              <p style="font-size:12px;color:var(--muted);margin:12px 0 0">${noteBtn("rider_battery_deposit")} 冷静期/中途完结单中的「押金子项」随主单审核，不受本模式单独开关影响。</p>
+              <p style="font-size:12px;color:var(--muted);margin:12px 0 0">${noteBtn("rider_battery_deposit")} 冷静期退款时押金按还电规则<strong>同单自动退</strong>；中途完结默认不含押金，押金走独立「押金退还」。</p>
             </div>
           </section>
           <section class="panel">
@@ -14593,10 +14593,11 @@
               <table>
                 <thead><tr><th>类型 / SKU</th><th>门槛</th><th>说明</th></tr></thead>
                 <tbody>
-                  <tr><td><strong>冷静期退款</strong></td><td>开通后 ≤ ${coolDays} 天、已还电</td><td><strong>始终须运营商审核</strong>；实退金额由运营商决定</td></tr>
+                  <tr><td><strong>冷静期退款</strong></td><td>开通后 ≤ ${coolDays} 天、已还电</td><td><strong>按天比例自动退，无需人工</strong>（decision-127）；按次生效后不适用</td></tr>
                   <tr><td>包月 / 7天</td><td>剩余 ≥ 1 天、未持电池</td><td>套餐模式=手动时须人工确认</td></tr>
-                  <tr><td>1天 / 单次</td><td>购买后 24h 内、未换电</td><td>套餐模式=手动时须人工确认</td></tr>
-                  <tr><td>中途完结</td><td>已还电；退未使用套餐费 + 押金</td><td>超过冷静期后的常规路径</td></tr>
+                  <tr><td>1 天畅换</td><td>未换电可退；已换电不退</td><td>按天 SKU；套餐模式=手动时须人工确认</td></tr>
+                  <tr><td><strong>次卡 / 单次</strong></td><td>仅<strong>未生效</strong>（首次领电且未领电）</td><td><strong>生效后不可退套餐费</strong>（decision-125）；待激活可全额退</td></tr>
+                  <tr><td>中途完结</td><td>已还电；退未使用套餐费</td><td>按天套餐；按次生效后不可走此路径</td></tr>
                   <tr><td><strong>押金退还</strong></td><td>已还电、有在押实付</td><td>由「押金退还处理模式」决定自动/手动；不影响套餐有效期</td></tr>
                 </tbody>
               </table>
@@ -15136,7 +15137,7 @@
             return `<option value="${t.id}">${t.name}${t.isDefault ? "（默认）" : ""}${p ? " · " + p.name : ""}</option>`;
           }).join("");
         const rehireHint = mode === "joinTeam" && rider && (rider.status === "离职" || rider.status === "已退出")
-          ? `<p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">离职骑手加入团队后将<strong>复职为在职</strong>；后续预占/消耗从新团队绑定池扣减。</p>`
+          ? `<p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">离职骑手加入团队后将<strong>复职为在职</strong>；后续消耗从新团队绑定池扣减。</p>`
           : `<p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${mode === "changeTeam" ? "仅变更团队归属，不改变在职/离职状态；" : ""}消耗池随目标团队绑定池切换。</p>`;
         html = `
           <label>骑手<input value="${rider ? rider.name + " · " + rider.id + " · " + (rider.status || "") : ""}" readonly></label>
@@ -15220,7 +15221,7 @@
         pool.balancePct = Math.round(pool.availableDays / pool.totalDays * 1000) / 10;
         syncDayPoolDerived(pool);
         appendPoolLedger(pool, "续费入账", add, pool.orderNo, document.querySelector("#poolForm [name=remark]")?.value || "续费");
-        dayPoolExceptions.filter(e => e.poolId === pool.id && e.type === "预占失败" && e.status === "待重试").forEach(e => {
+        dayPoolExceptions.filter(e => e.poolId === pool.id && (e.type === "个人无额度" || e.type === "预占失败") && e.status === "待重试").forEach(e => {
           e.status = "已自动重试";
           e.retrySource = "续费触发";
         });
@@ -15374,7 +15375,7 @@
           if ((rider.remainingDays || 0) > 0) rider.quotaStatus = "使用中";
           else if (rider.quotaStatus === "已收回" || rider.quotaStatus === "已用尽") { /* keep */ }
           else rider.quotaStatus = rider.quotaStatus || "未分配";
-          if (rider.todayEligibility === "已回池") rider.todayEligibility = "待预占";
+          if (rider.todayEligibility === "已回池") rider.todayEligibility = "今日可用";
         }
         syncTeamRiderCounts();
         if (prevTeam && prevTeam.id !== team.id) syncTeamRiderCounts();
@@ -15387,7 +15388,7 @@
           rider.allocatedDays = (rider.allocatedDays || 0) + days;
           rider.remainingDays = (rider.remainingDays || 0) + days;
           rider.quotaStatus = "使用中";
-          rider.todayEligibility = rider.todayEligibility === "预占失败" ? "预占失败" : (rider.todayEligibility === "未分配" ? "已预占" : (rider.todayEligibility || "已预占"));
+          rider.todayEligibility = (rider.remainingDays > 0) ? "今日可用" : (rider.todayEligibility === "待还电" ? "待还电" : "个人无额度");
           appendPoolLedger(pool, "分配出账", -days, rider.id, document.querySelector("#poolForm [name=remark]")?.value || "分配给骑手");
           dayPoolAllocationLogs.unshift({
             id: "AL-" + Date.now().toString().slice(-4), poolId: pool.id, riderId: rider.id, riderName: rider.name,
@@ -15465,8 +15466,8 @@
       ex.retrySource = "管理员手动";
       const pool = dayPools.find(p => p.id === ex.poolId);
       if (pool && pool.availableDays >= ex.affected) {
-        dayPoolRiders.filter(r => r.todayEligibility === "预占失败" && r.poolId === ex.poolId).forEach(r => {
-          r.todayEligibility = "已预占";
+        dayPoolRiders.filter(r => (r.todayEligibility === "个人无额度" || r.todayEligibility === "预占失败") && r.poolId === ex.poolId).forEach(r => {
+          r.todayEligibility = r.remainingDays > 0 ? "今日可用" : "个人无额度";
           r.failReason = null;
         });
       }
@@ -16902,7 +16903,7 @@
               </table>
               ${renderTablePager(pg, "csasset-page")}
             </div>
-            ${panelHead("额度变动记录", "渠道商 / 时间 / 类型筛选 · 采购入账 / 调账 / 预占 / 确认", "day_pool_ledger")}
+            ${panelHead("额度变动记录", "渠道商 / 时间 / 类型筛选 · 采购入账 / 调账 / 确认消耗", "day_pool_ledger")}
             <div class="panel-body orders-table-wrap">
               <div class="power-filter-bar power-filter-inline" style="margin-bottom:12px">
                 <label class="filter-inline">
@@ -18004,13 +18005,13 @@
       const rows = dayPoolLedger.filter(r => {
         if (!myDayPools().some(p => p.id === r.poolId)) return false;
         if (f.poolId !== "全部" && r.poolId !== f.poolId) return false;
-        if (f.type !== "全部" && !r.type.includes(f.type.replace("预占", "资格预占").replace("确认消耗", "确认消耗").replace("释放", "释放"))) return false;
+        if (f.type !== "全部" && !String(r.type).includes(f.type) && !(f.type === "确认消耗" && String(r.type).includes("确认消耗"))) return false;
         return true;
       });
       return `<section class="panel${topTabsHtml ? " panel-with-top-tabs" : ""}">
         ${topTabsHtml || ""}
         ${inlineFiltersHtml || ""}
-        ${panelHead("额度明细账本", "购买/分配/收回/预占/消耗全链路留痕；余额不得为负", "day_pool_ledger")}
+        ${panelHead("额度明细账本", "购买/分配/收回/确认消耗全链路留痕；余额不得为负", "day_pool_ledger")}
         <div class="panel-body orders-table-wrap">
           <table>
             <thead><tr><th>时间</th><th>额度池</th><th>类型</th><th>变动（人天）</th><th>余额后</th><th>操作人</th><th>关联</th><th>原因</th></tr></thead>
@@ -18075,7 +18076,7 @@
             <table>
               <thead><tr>
                 <th>额度池</th><th>${isSeller ? "购买方" : "售卖方"}</th><th>总购买</th><th>赠送</th>
-                <th>预占/冻结</th><th>已消耗</th><th>可用余额</th><th>余额比例</th>
+                <th>冻结</th><th>已消耗</th><th>可用余额</th><th>余额比例</th>
                 <th>有效期</th><th>状态</th><th>操作</th>
               </tr></thead>
               <tbody>${pools.map(p => `<tr class="${p.id === (sel && sel.id) ? "site-stats-total" : ""}">
@@ -18157,7 +18158,7 @@
         state.dayPoolRidersPage = ridersPg.page;
         const focusBanner = focusZero
           ? `<div class="pool-warn-banner" style="margin-bottom:12px">${noteBtn("day_pool_hold_no_quota")}
-              当前筛选：<strong>在职 · 剩余人天为 0</strong>（共 ${riders.length} 人）。原因须区分 <strong>个人无额度</strong> / <strong>预占失败</strong>；持电池者为「待还电」。
+              当前筛选：<strong>在职 · 剩余人天为 0</strong>（共 ${riders.length} 人）。原因：<strong>个人无额度</strong>；持电池者为「待还电」（decision-126）。
               <button type="button" class="link-btn" data-clear-rider-focus style="margin-left:8px">清除筛选</button>
             </div>`
           : "";
@@ -18342,12 +18343,12 @@
               </table>
             </div>`;
         } else {
-          consumeInner = `${panelHead("团队每日汇总", "预占/确认/释放与换电、持电池勾稽", "day_pool_reserve")}
+          consumeInner = `${panelHead("团队每日汇总", "确认消耗与换电、持电池勾稽", "day_pool_reserve")}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr>
                   <th>日期</th><th>团队</th><th>站点</th>
-                  <th>预占</th><th>确认消耗</th><th>释放</th>
+                  <th>在职应服务</th><th>确认消耗</th><th>未使用</th>
                   <th>换电用户</th><th>换电次数</th><th>仅持电池</th><th>未消耗</th>
                 </tr></thead>
                 <tbody>${sumRows.map(r => `<tr>
@@ -18396,7 +18397,7 @@
           return true;
         });
         body = `<section class="panel">
-          ${panelHead("异常记录", "预占失败整批处理；支付退款资格/额度人工处理", "day_pool_insufficient")}
+          ${panelHead("异常记录", "个人无额度与支付退款等人工处理", "day_pool_insufficient")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>异常</th><th>额度池</th><th>类型</th><th>日期</th><th>影响人数</th><th>说明</th><th>状态</th><th>重试来源</th><th>操作</th></tr></thead>
@@ -18417,14 +18418,14 @@
         ${teamBanner}
         ${isTeamAdminLogin() ? "" : `<div class="pool-hero">${noteBtn("day_pool_panel")}${noteBtn("day_pool_channel")}${noteBtn("entitlement_api")}
           <h2>渠道商人天额度池</h2>
-          <p>向运营商采购额度池 → 创建<strong>骑手团队</strong>并绑定消耗池 → 登记/分配骑手。00:00 预占；<strong>换电或持电池</strong>确认消耗；每次换电同步渠道商。</p>
+          <p>向运营商采购额度池 → 创建<strong>骑手团队</strong>并绑定消耗池 → 登记/分配骑手。闸门看个人剩余；<strong>换电或日终持电</strong>确认消耗（decision-126）；每次换电同步渠道商。</p>
         </div>`}
         ${!isTeamAdminLogin() && warnPool ? `<div class="pool-warn-banner">${noteBtn("day_pool_warn")}${noteBtn("day_pool_insufficient")}
           <strong>${warnPool.name}</strong> 可用 <strong>${warnPool.availableDays}</strong> 人天，在职 ${dayPoolActiveRiderCount(warnPool.id)} 人需支撑 ${dayPoolRunwayNeed(warnPool)} 人天（×${DAY_POOL_RUNWAY_DAYS}）。
           ${canEditDayPool() ? `<button type="button" class="link-btn" data-pool-form="renew" data-pool-id="${warnPool.id}">立即续费</button>` : ""}
         </div>` : ""}
         ${!isTeamAdminLogin() && zeroQuotaN > 0 ? `<div class="pool-warn-banner">${noteBtn("day_pool_hold_no_quota")}
-          <strong>在职骑手零额度</strong>：共 <strong>${zeroQuotaN}</strong> 人剩余人天为 0（含个人无额度 / 预占失败）；持电池须催还。
+          <strong>在职骑手零额度</strong>：共 <strong>${zeroQuotaN}</strong> 人剩余人天为 0（均为个人无额度）；持电池须催还。
           <button type="button" class="link-btn" data-goto-zero-quota style="margin-left:8px">查看名单</button>
         </div>` : ""}
         ${!isTeamAdminLogin() && isChannelRole() ? `<div class="perm-banner" style="margin-bottom:14px">${noteBtn("day_pool_b2b_refund")} 额度池<strong>不支持在线退款</strong>，需与签约运营商线下协商。</div>` : ""}
@@ -19901,30 +19902,58 @@
       root.querySelectorAll("[data-jump-refund-settings]").forEach(btn => {
         btn.onclick = () => jumpToRefundSettings();
       });
-      root.querySelectorAll("[data-refund-mode]").forEach(btn => {
+      root.querySelectorAll("button[data-refund-mode]").forEach(btn => {
         btn.onclick = () => {
           if (!canAuditRefund()) {
             window.alert("当前账号无「退款确认操作」权限，无法切换模式。");
             return;
           }
           const settings = myRefundSettings();
-          settings.mode = btn.dataset.refundMode;
-          settings.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
-          settings.updatedBy = currentEmployee()?.name || currentEntity().name;
-          render();
+          const next = btn.dataset.refundMode;
+          if ((settings.mode || "manual") === next) return;
+          const nextLabel = next === "auto" ? "自动退款" : "手动确认";
+          const curLabel = (settings.mode || "manual") === "auto" ? "自动退款" : "手动确认";
+          openProtoConfirm({
+            title: "切换套餐退款模式",
+            html: `<p style="margin:0 0 8px">将套餐退款从 <strong>${curLabel}</strong> 改为 <strong>${nextLabel}</strong>？</p>
+              <p style="margin:0;font-size:12px;color:var(--muted)">仅影响冷静期外的中途完结/SKU 退订；对新申请立即生效。<strong>冷静期仍按天比例自动退</strong>（decision-127）。按次生效后不可退。</p>`,
+            confirmLabel: "确认切换",
+            cancelLabel: "取消",
+            onConfirm: () => {
+              settings.mode = next;
+              settings.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+              settings.updatedBy = currentEmployee()?.name || currentEntity().name;
+              render();
+              showProtoToast("套餐退款模式已改为「" + nextLabel + "」");
+            }
+          });
         };
       });
-      root.querySelectorAll("[data-deposit-refund-mode]").forEach(btn => {
+      root.querySelectorAll("button[data-deposit-refund-mode]").forEach(btn => {
         btn.onclick = () => {
           if (!canAuditRefund()) {
             window.alert("当前账号无「退款确认操作」权限，无法切换模式。");
             return;
           }
           const settings = myRefundSettings();
-          settings.depositRefundMode = btn.dataset.depositRefundMode;
-          settings.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
-          settings.updatedBy = currentEmployee()?.name || currentEntity().name;
-          render();
+          const next = btn.dataset.depositRefundMode;
+          if ((settings.depositRefundMode || "manual") === next) return;
+          const nextLabel = next === "auto" ? "自动退款" : "手动确认";
+          const curLabel = (settings.depositRefundMode || "manual") === "auto" ? "自动退款" : "手动确认";
+          openProtoConfirm({
+            title: "切换押金退还模式",
+            html: `<p style="margin:0 0 8px">将押金退还从 <strong>${curLabel}</strong> 改为 <strong>${nextLabel}</strong>？</p>
+              <p style="margin:0;font-size:12px;color:var(--muted)">仅影响「押金退还」申请；与套餐退款模式独立。对新申请立即生效。</p>`,
+            confirmLabel: "确认切换",
+            cancelLabel: "取消",
+            onConfirm: () => {
+              settings.depositRefundMode = next;
+              settings.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+              settings.updatedBy = currentEmployee()?.name || currentEntity().name;
+              render();
+              showProtoToast("押金退还模式已改为「" + nextLabel + "」");
+            }
+          });
         };
       });
       root.querySelectorAll("[data-approve-refund]").forEach(btn => {
