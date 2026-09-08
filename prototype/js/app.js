@@ -16630,24 +16630,20 @@
             <table>
               <thead><tr>
                 <th>渠道商</th><th>结算模式</th><th>批发/定价</th><th>权益概要</th>
-                <th>信用额度</th><th>应押/缺口</th><th>待审订单</th>
+                <th>信用额度</th><th>应押/缺口</th>
                 <th>渠道状态</th><th>操作</th>
               </tr></thead>
               <tbody>${rows.map(c => {
                 const usesCredit = channelUsesCreditEval(c.channelId);
                 const prof = usesCredit ? ensureChannelCreditProfile(c.channelId) : null;
-                const pending = usesCredit
-                  ? channelDepositProofs.filter(p => p.channelId === c.channelId && p.status === "待审核").length
-                  : 0;
                 const gap = prof ? (prof.gap || 0) : 0;
                 const ch = platformChannels.find(p => p.id === c.channelId);
                 const holders = prof ? (prof.holdersWithBattery || 0) : 0;
                 const unit = prof ? (prof.batteryDepositUnit || 0) : 0;
                 const creditCells = usesCredit
                   ? `<td>¥${(prof?.creditLimit ?? CHANNEL_DEFAULT_CREDIT_LIMIT).toLocaleString()}</td>
-                     <td>${prof ? `应押 ¥${(prof.requiredDeposit || 0).toLocaleString()}<br><small style="color:var(--muted)">¥${unit.toLocaleString()}×${holders} 持电骑手</small>${gap > 0 ? `<br><small style="color:var(--warn)">缺口 ¥${gap.toLocaleString()}</small>` : ""}` : "—"}</td>
-                     <td>${pending || "—"}</td>`
-                  : `<td colspan="3"><small style="color:var(--muted)">分销不适用渠道信用</small></td>`;
+                     <td>${prof ? `应押 ¥${(prof.requiredDeposit || 0).toLocaleString()}<br><small style="color:var(--muted)">¥${unit.toLocaleString()}×${holders} 持电骑手</small>${gap > 0 ? `<br><small style="color:var(--warn)">缺口 ¥${gap.toLocaleString()}</small>` : ""}` : "—"}</td>`
+                  : `<td colspan="2"><small style="color:var(--muted)">分销不适用渠道信用</small></td>`;
                 const ops = [
                   `<button type="button" class="link-btn" data-edit-channel-partner="${c.id}">编辑</button>`,
                   usesCredit ? `<button type="button" class="link-btn" data-adjust-channel-credit="${c.channelId}">调整额度</button>` : ""
@@ -16661,7 +16657,7 @@
                   <td>${tag(ch?.status || "在营")}</td>
                   <td>${ops}</td>
                 </tr>`;
-              }).join("") || "<tr><td colspan='9'>暂无签约渠道，点击「+ 新增渠道商」创建</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='8'>暂无签约渠道，点击「+ 新增渠道商」创建</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
