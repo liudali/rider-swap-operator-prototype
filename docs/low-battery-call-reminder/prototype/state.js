@@ -21,54 +21,26 @@
   });
 
   var STATUS_COPY = {
-    not_saved: {
-      key: 'not_saved',
-      title: '未保存',
-      description: '保存后，低电来电会优先显示联系人名称',
+    ready: {
+      key: 'ready',
+      title: '可添加',
+      description: '添加后，低电来电会优先显示联系人名称。小程序无法查看通讯录里是否已有该联系人。',
       tone: 'neutral',
-      action: '保存到通讯录'
+      action: '添加到通讯录'
     },
     prompting: {
       key: 'prompting',
-      title: '保存中',
-      description: '请在系统联系人页面确认保存',
+      title: '添加中',
+      description: '请在系统联系人页面确认',
       tone: 'info',
-      action: '继续保存'
+      action: '继续添加'
     },
     permission_denied: {
       key: 'permission_denied',
-      title: '未授权通讯录',
-      description: '开启仅写入权限后可继续保存',
+      title: '未授权写入',
+      description: '开启仅写入权限后可继续添加，不会读取通讯录',
       tone: 'warning',
       action: '查看开启方法'
-    },
-    system_cancelled: {
-      key: 'system_cancelled',
-      title: '未完成保存',
-      description: '你已取消系统联系人保存，可随时重试',
-      tone: 'warning',
-      action: '重新保存'
-    },
-    save_failed: {
-      key: 'save_failed',
-      title: '保存失败',
-      description: '系统未完成联系人写入，请稍后重试',
-      tone: 'error',
-      action: '重新保存'
-    },
-    saved: {
-      key: 'saved',
-      title: '已保存',
-      description: '低电来电将优先显示“智格-电量过低提醒”',
-      tone: 'success',
-      action: '重新保存'
-    },
-    outdated: {
-      key: 'outdated',
-      title: '号码已更新',
-      description: '请保存新号码；旧联系人需在系统通讯录中自行删除',
-      tone: 'warning',
-      action: '更新提醒号码'
     },
     unsupported: {
       key: 'unsupported',
@@ -113,9 +85,9 @@
       soc: 18,
       estimatedMinutes: 32,
       permission: 'prompt',
-      saveStatus: 'not_saved',
-      promptedNumberVersion: null,
-      savedNumberVersion: null,
+      swapPromptShown: false,
+      firstPowerEventAt: null,
+      nowAt: '2026-09-09T14:28:00+08:00',
       currentNumberVersion: REMINDER_CONTACT.numberVersion,
       apiSupported: true,
       configAvailable: true,
@@ -125,8 +97,10 @@
       callStatus: 'idle',
       settingsOriginScreen: null,
       settingsOriginTab: null,
+      detailStack: [],
       callOriginScreen: null,
       callOriginTab: null,
+      lastWriteResult: null,
       eventLog: [
         {
           time: '14:28:00',
@@ -142,6 +116,10 @@
         state.contact = cloneContact(source.contact);
       } else if (key === 'eventLog') {
         state.eventLog = source.eventLog.slice();
+      } else if (key === 'detailStack') {
+        state.detailStack = (source.detailStack || []).map(function (item) {
+          return { screen: item.screen, tab: item.tab };
+        });
       } else {
         state[key] = source[key];
       }
@@ -153,37 +131,82 @@
     return createInitialState(state);
   }
 
+  var MINE_ENTRY_DAYS = 7;
+
+  function dateKey(iso) {
+    return String(iso || '').slice(0, 10);
+  }
+
+  function calendarDaysBetween(startAt, nowAt) {
+    var start = dateKey(startAt);
+    var now = dateKey(nowAt);
+    if (!start || !now) {
+      return null;
+    }
+    var startMs = Date.parse(start + 'T00:00:00+08:00');
+    var nowMs = Date.parse(now + 'T00:00:00+08:00');
+    if (isNaN(startMs) || isNaN(nowMs)) {
+      return null;
+    }
+    return Math.round((nowMs - startMs) / 86400000);
+  }
+
+  function stampFromEvent(state, event) {
+    if (event && event.at && String(event.at).indexOf('T') >= 0) {
+      return event.at;
+    }
+    return state.nowAt || '2026-09-09T14:28:00+08:00';
+  }
+
+  function markFirstPowerEvent(state, event) {
+    if (!state.firstPowerEventAt) {
+      state.firstPowerEventAt = stampFromEvent(state, event);
+    }
+  }
+
   function shouldAutoPrompt(state) {
     return Boolean(
       state.loggedIn &&
       state.configAvailable &&
       state.apiSupported &&
-      state.currentNumberVersion &&
-      state.promptedNumberVersion !== state.currentNumberVersion &&
-      state.savedNumberVersion !== state.currentNumberVersion
+      !state.swapPromptShown
     );
+  }
+
+  function shouldShowMineEntry(state) {
+    if (!state.loggedIn || !state.firstPowerEventAt) {
+      return false;
+    }
+    var days = calendarDaysBetween(state.firstPowerEventAt, state.nowAt);
+    return days !== null && days >= 0 && days < MINE_ENTRY_DAYS;
+  }
+
+  function mineEntryElapsedDays(state) {
+    return calendarDaysBetween(state.firstPowerEventAt, state.nowAt);
+  }
+
+  function remainingMineEntryDays(state) {
+    var elapsed = mineEntryElapsedDays(state);
+    if (elapsed === null || elapsed < 0) {
+      return null;
+    }
+    return Math.max(0, MINE_ENTRY_DAYS - elapsed);
   }
 
   function deriveReminderStatus(state) {
     if (!state.configAvailable) {
       return STATUS_COPY.config_error;
     }
-    if (!state.apiSupported || state.saveStatus === 'unsupported') {
+    if (!state.apiSupported) {
       return STATUS_COPY.unsupported;
     }
-    if (
-      state.savedNumberVersion &&
-      state.savedNumberVersion !== state.currentNumberVersion
-    ) {
-      return STATUS_COPY.outdated;
+    if (state.permission === 'denied') {
+      return STATUS_COPY.permission_denied;
     }
-    if (
-      state.saveStatus === 'saved' &&
-      state.savedNumberVersion === state.currentNumberVersion
-    ) {
-      return STATUS_COPY.saved;
+    if (state.overlay && ['permission', 'contact-choice', 'system-contact'].indexOf(state.overlay) >= 0) {
+      return STATUS_COPY.prompting;
     }
-    return STATUS_COPY[state.saveStatus] || STATUS_COPY.not_saved;
+    return STATUS_COPY.ready;
   }
 
   function appendEvent(state, event, result, properties) {
@@ -198,9 +221,17 @@
     return state;
   }
 
+  function pushDetail(state, screen, tab) {
+    var stack = (state.detailStack || []).slice();
+    stack.push({ screen: screen, tab: tab || 'mine' });
+    state.detailStack = stack;
+  }
+
   function transition(currentState, event) {
     var state = cloneState(currentState);
     var status;
+    var oldVersion;
+    var skipReason;
 
     switch (event.type) {
       case 'NAVIGATE_TAB':
@@ -231,8 +262,7 @@
           return appendEvent(state, event, 'blocked', 'reason=not_logged_in');
         }
         if (state.screen !== 'reminder-settings') {
-          state.settingsOriginScreen = state.screen;
-          state.settingsOriginTab = state.tab;
+          pushDetail(state, state.screen, state.tab);
         }
         state.tab = 'mine';
         state.screen = 'reminder-settings';
@@ -242,9 +272,24 @@
           state,
           { type: event.type, at: event.at, name: 'low_battery_contact_settings_view' },
           'success',
-          'save_status=' + status.key +
+          'capability=' + status.key +
             '&number_version=' + state.currentNumberVersion
         );
+
+      case 'OPEN_APP_SETTINGS':
+        if (!state.loggedIn) {
+          state.tab = 'mine';
+          state.screen = 'login';
+          state.overlay = null;
+          return appendEvent(state, event, 'blocked', 'reason=not_logged_in');
+        }
+        if (state.screen !== 'app-settings') {
+          pushDetail(state, state.screen, state.tab);
+        }
+        state.tab = 'mine';
+        state.screen = 'app-settings';
+        state.overlay = null;
+        return appendEvent(state, event, 'success', 'entry=mine');
 
       case 'RETURN_FROM_DETAIL':
         if (state.screen === 'login') {
@@ -253,8 +298,11 @@
           state.overlay = null;
           return state;
         }
-        state.screen = state.settingsOriginScreen || 'mine';
-        state.tab = state.settingsOriginTab || 'mine';
+        var prev = (state.detailStack || []).slice();
+        var origin = prev.pop() || { screen: 'mine', tab: 'mine' };
+        state.detailStack = prev;
+        state.screen = origin.screen;
+        state.tab = origin.tab || 'mine';
         state.overlay = null;
         return state;
 
@@ -272,18 +320,9 @@
         state.resultKind = 'pickup';
         state.soc = 82;
         state.estimatedMinutes = 286;
-        if (shouldAutoPrompt(state)) {
-          state.overlay = 'intro';
-          state.promptedNumberVersion = state.currentNumberVersion;
-          return appendEvent(
-            state,
-            { type: event.type, at: event.at, name: 'low_battery_contact_prompt_view' },
-            'shown',
-            'entry=first_pickup&number_version=' + state.currentNumberVersion
-          );
-        }
+        markFirstPowerEvent(state, event);
         state.overlay = null;
-        return appendEvent(state, event, 'skipped', 'reason=already_prompted_or_saved');
+        return appendEvent(state, event, 'skipped', 'reason=pickup_no_prompt');
 
       case 'SWAP_SUCCESS':
         if (!state.loggedIn) {
@@ -299,18 +338,22 @@
         state.resultKind = 'swap';
         state.soc = 82;
         state.estimatedMinutes = 286;
+        markFirstPowerEvent(state, event);
         if (shouldAutoPrompt(state)) {
           state.overlay = 'intro';
-          state.promptedNumberVersion = state.currentNumberVersion;
+          state.swapPromptShown = true;
           return appendEvent(
             state,
             { type: event.type, at: event.at, name: 'low_battery_contact_prompt_view' },
             'shown',
-            'entry=swap_success&number_version=' + state.currentNumberVersion
+            'entry=swap_success&user_once=1&number_version=' + state.currentNumberVersion
           );
         }
         state.overlay = null;
-        return appendEvent(state, event, 'skipped', 'reason=already_prompted_or_saved');
+        skipReason = !state.configAvailable
+          ? 'config_unavailable'
+          : (!state.apiSupported ? 'api_unsupported' : 'already_prompted');
+        return appendEvent(state, event, 'skipped', 'reason=' + skipReason);
 
       case 'PICKUP_FAILED':
         state.tab = 'home';
@@ -333,7 +376,6 @@
 
       case 'OPEN_INTRO':
         if (!state.configAvailable) {
-          state.saveStatus = 'config_error';
           state.overlay = 'config-error';
           return appendEvent(state, event, 'failed', 'reason=config_unavailable');
         }
@@ -353,31 +395,28 @@
         }
         status = deriveReminderStatus(state);
         if (!state.configAvailable) {
-          state.saveStatus = 'config_error';
           state.overlay = 'config-error';
           return appendEvent(
             state,
             event,
             'failed',
-            'reason=config_unavailable&previous_status=' + status.key +
+            'reason=config_unavailable&capability=' + status.key +
               '&number_version=' + state.currentNumberVersion
           );
         }
         if (!state.apiSupported) {
-          state.saveStatus = 'unsupported';
           state.overlay = 'unsupported';
           return appendEvent(
             state,
             event,
             'failed',
-            'reason=api_unsupported&previous_status=' + status.key +
+            'reason=api_unsupported&capability=' + status.key +
               '&number_version=' + state.currentNumberVersion
           );
         }
         if (state.permission === 'denied') {
           state.overlay = 'permission-help';
         } else {
-          state.saveStatus = 'prompting';
           state.overlay = state.permission === 'granted'
             ? 'contact-choice'
             : 'permission';
@@ -387,13 +426,12 @@
           { type: event.type, at: event.at, name: 'low_battery_contact_save_click' },
           'success',
           'entry=' + (event.entry || 'manual') +
-            '&previous_status=' + status.key +
+            '&capability=' + status.key +
             '&number_version=' + state.currentNumberVersion
         );
 
       case 'PERMISSION_ALLOWED':
         state.permission = 'granted';
-        state.saveStatus = 'prompting';
         state.overlay = 'contact-choice';
         return appendEvent(
           state,
@@ -404,9 +442,6 @@
 
       case 'PERMISSION_DENIED':
         state.permission = 'denied';
-        state.saveStatus = state.savedNumberVersion === state.currentNumberVersion
-          ? 'saved'
-          : 'permission_denied';
         state.overlay = 'permission-help';
         return appendEvent(
           state,
@@ -417,7 +452,6 @@
 
       case 'PERMISSION_RESTORED':
         state.permission = 'granted';
-        state.saveStatus = 'prompting';
         state.overlay = 'contact-choice';
         return appendEvent(state, event, 'allowed', 'source=settings');
 
@@ -436,9 +470,7 @@
         return state;
 
       case 'SYSTEM_CANCELLED':
-        state.saveStatus = state.savedNumberVersion === state.currentNumberVersion
-          ? 'saved'
-          : 'system_cancelled';
+        state.lastWriteResult = 'cancelled';
         state.screen = 'reminder-settings';
         state.tab = 'mine';
         state.overlay = null;
@@ -450,9 +482,7 @@
         );
 
       case 'SAVE_FAILED':
-        state.saveStatus = state.savedNumberVersion === state.currentNumberVersion
-          ? 'saved'
-          : 'save_failed';
+        state.lastWriteResult = 'failed';
         state.screen = 'reminder-settings';
         state.tab = 'mine';
         state.overlay = 'save-error';
@@ -466,15 +496,14 @@
         );
 
       case 'SAVE_CONFIRMED':
-        state.saveStatus = 'saved';
-        state.savedNumberVersion = state.currentNumberVersion;
+        state.lastWriteResult = 'api_success';
         state.screen = 'reminder-settings';
         state.tab = 'mine';
         state.overlay = 'success';
         return appendEvent(
           state,
           { type: event.type, at: event.at, name: 'low_battery_contact_system_result' },
-          'saved',
+          'api_success',
           'system_mode=unknown&number_version=' + state.currentNumberVersion
         );
 
@@ -484,27 +513,21 @@
 
       case 'API_UNSUPPORTED':
         state.apiSupported = false;
-        state.saveStatus = 'unsupported';
         state.overlay = 'unsupported';
         return appendEvent(state, event, 'failed', 'reason=api_unsupported');
 
       case 'CONFIG_ERROR':
         state.configAvailable = false;
-        state.saveStatus = 'config_error';
         state.overlay = 'config-error';
         return appendEvent(state, event, 'failed', 'reason=config_unavailable');
 
       case 'CONFIG_RESTORED':
         state.configAvailable = true;
-        if (!state.savedNumberVersion) {
-          state.saveStatus = 'not_saved';
-        } else if (state.savedNumberVersion === state.currentNumberVersion) {
-          state.saveStatus = 'saved';
-        }
         state.overlay = null;
         return appendEvent(state, event, 'success', 'number_version=' + state.currentNumberVersion);
 
       case 'NUMBER_UPDATED':
+        oldVersion = state.currentNumberVersion;
         state.currentNumberVersion = event.numberVersion || 'v2';
         state.contact = cloneContact({
           name: REMINDER_CONTACT.name,
@@ -518,31 +541,27 @@
         state.screen = 'reminder-settings';
         state.tab = 'mine';
         state.overlay = event.showOverlay ? 'number-update' : null;
-        if (event.showOverlay) {
-          state.promptedNumberVersion = state.currentNumberVersion;
-        }
         return appendEvent(
           state,
           { type: event.type, at: event.at, name: 'low_battery_contact_update_view' },
           'shown',
-          'old_version=' + (state.savedNumberVersion || 'none') +
+          'old_version=' + (oldVersion || 'none') +
             '&new_version=' + state.currentNumberVersion
         );
 
       case 'SIMULATE_LOW_CALL':
-        status = deriveReminderStatus(state);
         state.callOriginScreen = state.screen;
         state.callOriginTab = state.tab;
         state.screen = 'call-demo';
         state.overlay = null;
         state.soc = event.soc || 12;
         state.callStatus = 'ringing';
-        state.callDisplayName = status.key === 'saved' ? state.contact.name : null;
+        state.callDisplayName = event.assumeName === false ? null : state.contact.name;
         return appendEvent(
           state,
           { type: event.type, at: event.at, name: 'low_battery_call_result' },
           'ringing',
-          'contact_saved=' + String(status.key === 'saved') +
+          'demo_assume_name=' + String(event.assumeName !== false) +
             '&number_version=' + state.currentNumberVersion
         );
 
@@ -595,6 +614,10 @@
     createInitialState: createInitialState,
     transition: transition,
     shouldAutoPrompt: shouldAutoPrompt,
+    shouldShowMineEntry: shouldShowMineEntry,
+    mineEntryElapsedDays: mineEntryElapsedDays,
+    remainingMineEntryDays: remainingMineEntryDays,
+    MINE_ENTRY_DAYS: MINE_ENTRY_DAYS,
     deriveReminderStatus: deriveReminderStatus
   };
 }));

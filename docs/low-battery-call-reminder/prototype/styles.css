@@ -1101,6 +1101,14 @@ select:focus-visible,
   padding: 0 13px 13px;
 }
 
+.reminder-entry + .micro-copy {
+  margin: 8px 4px 12px;
+}
+
+.section-heading + .menu-list {
+  margin-top: 0;
+}
+
 .menu-row {
   width: 100%;
   min-height: 56px;

@@ -35,33 +35,49 @@
           </div>
           <button class="text-button" type="button" data-action="reset-demo">重置</button>
         </div>
-        <p class="panel-hint">主动弹窗只出现在领电/换电成功之后，同一号码版本只弹一次。</p>
+        <p class="panel-hint">主动弹窗只在「换电成功」出现一次（按用户计）。我的页入口从首次取电/换电起展示 7 天，之后只留在设置里。</p>
 
         <div class="scenario-group">
           <h3>主流程</h3>
           <button class="scenario-button active" type="button" data-scenario="default">
             <span class="scenario-icon">首</span>
-            <span><strong>首页低电状态</strong><small>默认未保存</small></span>
+            <span><strong>首页低电状态</strong><small>7 天窗口内，可添加</small></span>
           </button>
           <button class="scenario-button" type="button" data-scenario="first-pickup">
             <span class="scenario-icon">领</span>
-            <span><strong>首次领取电池</strong><small>新客自动引导一次</small></span>
+            <span><strong>首次领取电池</strong><small>不弹窗，开始 7 天入口</small></span>
           </button>
           <button class="scenario-button" type="button" data-scenario="existing-swap">
             <span class="scenario-icon">换</span>
-            <span><strong>存量用户换电成功</strong><small>补一次引导，之后不再弹</small></span>
+            <span><strong>换电成功弹一次</strong><small>每用户仅这一次</small></span>
+          </button>
+          <button class="scenario-button" type="button" data-scenario="swap-again">
+            <span class="scenario-icon">再</span>
+            <span><strong>再次换电</strong><small>不再弹窗</small></span>
           </button>
           <button class="scenario-button" type="button" data-scenario="manual-settings">
+            <span class="scenario-icon">我</span>
+            <span><strong>我的页 7 天入口</strong><small>卡片内直接添加</small></span>
+          </button>
+          <button class="scenario-button" type="button" data-scenario="mine-day-8">
+            <span class="scenario-icon">八</span>
+            <span><strong>第 8 天我的页</strong><small>入口隐藏，走设置</small></span>
+          </button>
+          <button class="scenario-button" type="button" data-scenario="settings-entry">
             <span class="scenario-icon">设</span>
-            <span><strong>手动设置入口</strong><small>我的页直接添加</small></span>
+            <span><strong>设置常驻入口</strong><small>7 天后的唯一入口</small></span>
           </button>
-          <button class="scenario-button" type="button" data-scenario="saved">
+          <button class="scenario-button" type="button" data-scenario="before-power-event">
+            <span class="scenario-icon">前</span>
+            <span><strong>尚未取电/换电</strong><small>我的无卡片，设置可进</small></span>
+          </button>
+          <button class="scenario-button" type="button" data-scenario="added">
             <span class="scenario-icon success">✓</span>
-            <span><strong>已保存</strong><small>可重新保存</small></span>
+            <span><strong>系统页完成</strong><small>一次性反馈，不记已保存</small></span>
           </button>
-          <button class="scenario-button" type="button" data-scenario="call-saved">
+          <button class="scenario-button" type="button" data-scenario="call-named">
             <span class="scenario-icon call">☎</span>
-            <span><strong>低电来电效果</strong><small>显示联系人名称</small></span>
+            <span><strong>添加后来电效果</strong><small>演示假设，非产品状态</small></span>
           </button>
         </div>
 
@@ -73,19 +89,19 @@
           </button>
           <button class="scenario-button" type="button" data-scenario="system-cancelled">
             <span class="scenario-icon warning">×</span>
-            <span><strong>系统页取消</strong><small>不误标为已保存</small></span>
+            <span><strong>系统页取消</strong><small>不留下保存状态</small></span>
           </button>
           <button class="scenario-button" type="button" data-scenario="save-failed">
             <span class="scenario-icon danger">!</span>
-            <span><strong>系统保存失败</strong><small>可恢复错误态</small></span>
+            <span><strong>系统写入失败</strong><small>一次性错误，可再添加</small></span>
           </button>
           <button class="scenario-button" type="button" data-scenario="number-updated">
             <span class="scenario-icon warning">新</span>
-            <span><strong>号码已更新</strong><small>引导保存新号码</small></span>
+            <span><strong>号码已更换</strong><small>建议重新添加新号码</small></span>
           </button>
           <button class="scenario-button" type="button" data-scenario="guest">
             <span class="scenario-icon warning">登</span>
-            <span><strong>未登录游客</strong><small>先登录再保存号码</small></span>
+            <span><strong>未登录游客</strong><small>先登录再添加号码</small></span>
           </button>
           <button class="scenario-button" type="button" data-scenario="pickup-failed">
             <span class="scenario-icon warning">败</span>
@@ -107,9 +123,9 @@
             <span class="scenario-icon danger">旧</span>
             <span><strong>微信版本不支持</strong><small>降级为复制号码</small></span>
           </button>
-          <button class="scenario-button" type="button" data-scenario="call-unsaved">
+          <button class="scenario-button" type="button" data-scenario="call-unknown">
             <span class="scenario-icon neutral">☎</span>
-            <span><strong>未保存时来电</strong><small>仅显示陌生号码</small></span>
+            <span><strong>未添加时来电</strong><small>演示假设，仅显示号码</small></span>
           </button>
         </div>
       </section>
@@ -177,9 +193,9 @@
         <div class="panel-heading">
           <div>
             <span class="eyebrow">当前状态</span>
-            <h2 id="status-title">未保存</h2>
+            <h2 id="status-title">可添加</h2>
           </div>
-          <span class="status-pill neutral" id="status-pill">not_saved</span>
+          <span class="status-pill neutral" id="status-pill">ready</span>
         </div>
         <dl class="state-list" id="state-list">
           <div><dt>联系人</dt><dd>智格-电量过低提醒</dd></div>
@@ -213,7 +229,7 @@
 
       <section class="panel-card reviewer-note">
         <span class="eyebrow">评审提示</span>
-        <p>“已保存”只代表本次系统 API 返回成功。灰色模糊并标注“本期不涉及”的模块不进入评审范围，请只评低电提醒保存链路。</p>
+        <p>小程序不能读取通讯录，因此产品界面不展示“已保存 / 未保存”。主动弹窗按用户只出现一次，且仅换电成功。灰色模糊并标注“本期不涉及”的模块不进入评审范围。</p>
       </section>
     </aside>
   </main>

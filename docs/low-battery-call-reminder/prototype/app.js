@@ -120,6 +120,9 @@
     if (state.screen === 'mine') {
       return 'mine';
     }
+    if (state.screen === 'app-settings') {
+      return 'settings';
+    }
     return 'settings';
   }
 
@@ -137,19 +140,19 @@
     });
   }
 
-  function makeSavedState(screen) {
+  function makeReadyState(screen) {
     return core.createInitialState({
       tab: screen === 'home' ? 'home' : 'mine',
       screen: screen || 'reminder-settings',
       permission: 'granted',
-      saveStatus: 'saved',
-      promptedNumberVersion: 'v1',
-      savedNumberVersion: 'v1',
+      swapPromptShown: true,
+      firstPowerEventAt: '2026-09-09T10:00:00+08:00',
+      lastWriteResult: 'api_success',
       eventLog: [
         {
           time: '14:32:00',
           event: 'low_battery_contact_system_result',
-          result: 'saved',
+          result: 'api_success',
           properties: 'system_mode=unknown&number_version=v1'
         },
         {
@@ -162,7 +165,7 @@
           time: '14:31:40',
           event: 'low_battery_contact_save_click',
           result: 'success',
-          properties: 'entry=first_pickup&previous_status=not_saved&number_version=v1'
+          properties: 'entry=first_pickup&capability=ready&number_version=v1'
         }
       ]
     });
@@ -171,7 +174,9 @@
   function loadScenario(name) {
     switch (name) {
       case 'default':
-        state = core.createInitialState();
+        state = core.createInitialState({
+          firstPowerEventAt: '2026-09-09T10:00:00+08:00'
+        });
         break;
 
       case 'first-pickup':
@@ -185,29 +190,72 @@
         state = core.transition(
           core.createInitialState({
             hasBattery: true,
-            soc: 18,
-            promptedNumberVersion: null,
-            savedNumberVersion: null
+            soc: 18
           }),
           { type: 'SWAP_SUCCESS', at: eventTimeLabel() }
         );
         break;
 
+      case 'swap-again':
+        state = core.createInitialState({
+          hasBattery: true,
+          soc: 18
+        });
+        state = core.transition(state, { type: 'SWAP_SUCCESS', at: eventTimeLabel() });
+        state = core.transition(state, { type: 'DISMISS_INTRO', at: eventTimeLabel() });
+        state = core.transition(state, { type: 'SWAP_SUCCESS', at: eventTimeLabel() });
+        break;
+
       case 'manual-settings':
         state = core.createInitialState({
           tab: 'mine',
-          screen: 'mine'
+          screen: 'mine',
+          firstPowerEventAt: '2026-09-09T10:00:00+08:00'
         });
         break;
 
-      case 'saved':
-        state = makeSavedState('reminder-settings');
+      case 'before-power-event':
+        state = core.createInitialState({
+          tab: 'mine',
+          screen: 'mine',
+          firstPowerEventAt: null
+        });
         break;
 
-      case 'call-saved':
+      case 'mine-day-8':
+        state = core.createInitialState({
+          tab: 'mine',
+          screen: 'mine',
+          firstPowerEventAt: '2026-09-09T10:00:00+08:00',
+          nowAt: '2026-09-16T09:00:00+08:00',
+          swapPromptShown: true
+        });
+        break;
+
+      case 'settings-entry':
         state = core.transition(
-          makeSavedState('home'),
-          { type: 'SIMULATE_LOW_CALL', at: eventTimeLabel(), soc: 12 }
+          core.createInitialState({
+            tab: 'mine',
+            screen: 'mine',
+            firstPowerEventAt: '2026-09-09T10:00:00+08:00',
+            nowAt: '2026-09-16T09:00:00+08:00',
+            swapPromptShown: true
+          }),
+          { type: 'OPEN_APP_SETTINGS', at: eventTimeLabel() }
+        );
+        break;
+
+      case 'added':
+        state = core.transition(
+          makeReadyState('reminder-settings'),
+          { type: 'SAVE_CONFIRMED', at: eventTimeLabel() }
+        );
+        break;
+
+      case 'call-named':
+        state = core.transition(
+          makeReadyState('home'),
+          { type: 'SIMULATE_LOW_CALL', at: eventTimeLabel(), soc: 12, assumeName: true }
         );
         break;
 
@@ -217,7 +265,6 @@
           screen: 'reminder-settings',
           overlay: 'permission-help',
           permission: 'denied',
-          saveStatus: 'permission_denied',
           eventLog: [
             {
               time: '14:30:00',
@@ -230,20 +277,14 @@
         break;
 
       case 'system-cancelled':
-        state = core.createInitialState({
-          tab: 'mine',
-          screen: 'reminder-settings',
-          permission: 'granted',
-          saveStatus: 'system_cancelled',
-          eventLog: [
-            {
-              time: '14:31:00',
-              event: 'low_battery_contact_system_result',
-              result: 'cancelled',
-              properties: 'system_mode=unknown&number_version=v1'
-            }
-          ]
-        });
+        state = core.transition(
+          core.createInitialState({
+            tab: 'mine',
+            screen: 'reminder-settings',
+            permission: 'granted'
+          }),
+          { type: 'SYSTEM_CANCELLED', at: eventTimeLabel() }
+        );
         break;
 
       case 'save-failed':
@@ -251,8 +292,7 @@
           core.createInitialState({
             tab: 'mine',
             screen: 'reminder-settings',
-            permission: 'granted',
-            saveStatus: 'prompting'
+            permission: 'granted'
           }),
           {
             type: 'SAVE_FAILED',
@@ -264,7 +304,7 @@
 
       case 'number-updated':
         state = core.transition(
-          makeSavedState('reminder-settings'),
+          makeReadyState('reminder-settings'),
           {
             type: 'NUMBER_UPDATED',
             numberVersion: 'v2',
@@ -290,7 +330,6 @@
           screen: 'reminder-settings',
           overlay: 'config-error',
           configAvailable: false,
-          saveStatus: 'config_error',
           eventLog: [
             {
               time: '14:33:00',
@@ -308,7 +347,6 @@
           screen: 'reminder-settings',
           overlay: 'unsupported',
           apiSupported: false,
-          saveStatus: 'unsupported',
           eventLog: [
             {
               time: '14:33:00',
@@ -320,10 +358,10 @@
         });
         break;
 
-      case 'call-unsaved':
+      case 'call-unknown':
         state = core.transition(
           core.createInitialState(),
-          { type: 'SIMULATE_LOW_CALL', at: eventTimeLabel(), soc: 12 }
+          { type: 'SIMULATE_LOW_CALL', at: eventTimeLabel(), soc: 12, assumeName: false }
         );
         break;
 
@@ -371,6 +409,17 @@
     ].join('');
   }
 
+  function statusTagHtml(status) {
+    if (!status || status.key === 'ready' || status.key === 'prompting') {
+      return '';
+    }
+    return [
+      '<span class="status-tag ', toneClass(status.tone), '">',
+        escapeHtml(status.title),
+      '</span>'
+    ].join('');
+  }
+
   function reminderCard(status) {
     var action = status.key === 'permission_denied' ? 'restore-permission' : 'open-reminder';
     return [
@@ -381,7 +430,7 @@
             '<strong>低电来电提醒</strong>',
             '<p>', escapeHtml(status.description), '</p>',
           '</div>',
-          '<span class="status-tag ', toneClass(status.tone), '">', escapeHtml(status.title), '</span>',
+          statusTagHtml(status),
         '</div>',
         '<div class="reminder-footer">',
           '<span>', escapeHtml(state.contact.formattedNumber), '</span>',
@@ -402,7 +451,7 @@
           '<section class="empty-state surface-card">',
             '<div class="empty-illustration" aria-hidden="true">☺</div>',
             '<h2>请先登录</h2>',
-            '<p>低电提醒号码保存、电池状态和换电服务都需要登录后使用。</p>',
+            '<p>低电提醒号码添加、电池状态和换电服务都需要登录后使用。</p>',
             '<button class="primary-button" type="button" data-action="login">微信一键登录</button>',
           '</section>',
         '</div>'
@@ -426,6 +475,13 @@
       ].join('');
     }
     if (!state.hasBattery) {
+      var emptyQuick = [
+        outOfScope('<button class="quick-button" type="button" data-action="show-toast" data-message="已打开站点地图"><span>⌖</span><span>附近站点</span></button>', true),
+        outOfScope('<button class="quick-button" type="button" data-action="show-toast" data-message="请扫描柜机二维码"><span>▣</span><span>扫码领电</span></button>', true)
+      ];
+      if (core.shouldShowMineEntry(state)) {
+        emptyQuick.push('<button class="quick-button" type="button" data-action="open-reminder"><span>☎</span><span>来电提醒</span></button>');
+      }
       return [
         '<div class="screen-page">',
           '<div class="welcome-row">',
@@ -438,11 +494,9 @@
             '<p>领取电池后，这里会展示实时电量和低电提醒保障状态。</p>',
             '<button class="primary-button" type="button" data-action="trigger-first-pickup">模拟首次领电</button>',
           '</section>',
-          '<div class="section-heading"><h3>提醒保障</h3></div>',
+          '<div class="section-heading"><h3>快捷操作</h3></div>',
           '<div class="quick-grid">',
-            outOfScope('<button class="quick-button" type="button" data-action="show-toast" data-message="已打开站点地图"><span>⌖</span><span>附近站点</span></button>', true),
-            outOfScope('<button class="quick-button" type="button" data-action="show-toast" data-message="请扫描柜机二维码"><span>▣</span><span>扫码领电</span></button>', true),
-            '<button class="quick-button" type="button" data-action="open-reminder"><span>☎</span><span>来电提醒</span></button>',
+            emptyQuick.join(''),
           '</div>',
         '</div>'
       ].join('');
@@ -451,6 +505,12 @@
     var batteryClass = state.soc <= 15 ? 'critical' : (state.soc <= 30 ? 'low' : '');
     var levelText = state.soc <= 15 ? '电量过低' : (state.soc <= 30 ? '电量偏低' : '电量正常');
     var bannerClass = state.soc <= 15 ? ' danger' : '';
+    var reminderBlock = core.shouldShowMineEntry(state)
+      ? [
+          '<div class="section-heading"><h3>提醒保障</h3><span>识别低电来电 · 余 ', core.remainingMineEntryDays(state), ' 天</span></div>',
+          reminderCard(status)
+        ].join('')
+      : '';
 
     return [
       '<div class="screen-page">',
@@ -483,11 +543,10 @@
             ? '电量已低于安全阈值，请尽快换电。智格可能通过低电专线联系你。'
             : '电量偏低，建议提前规划换电，避免配送途中断电。', '</span>',
         '</div>',
-        '<div class="section-heading"><h3>提醒保障</h3><span>识别低电来电</span></div>',
-        reminderCard(status),
+        reminderBlock,
         '<div class="quick-grid" style="margin-top:12px">',
           outOfScope('<button class="quick-button" type="button" data-action="show-toast" data-message="已打开扫码换电"><span>▣</span><span>扫码换电</span></button>', true),
-          outOfScope('<button class="quick-button" type="button" data-action="show-toast" data-message="已打开附近站点"><span>⌖</span><span>附近站点</span></button>', true),
+          '<button class="quick-button" type="button" data-action="trigger-swap"><span>↻</span><span>模拟换电</span></button>',
           '<button class="quick-button" type="button" data-action="simulate-low-call"><span>☎</span><span>模拟来电</span></button>',
         '</div>',
       '</div>'
@@ -560,16 +619,33 @@
         '<div class="screen-page">',
           '<section class="profile-card">',
             '<span class="avatar" aria-hidden="true">☺</span>',
-            '<div class="profile-copy"><strong>未登录</strong><span>登录后可保存低电提醒号码</span></div>',
+            '<div class="profile-copy"><strong>未登录</strong><span>登录后可添加低电提醒号码</span></div>',
           '</section>',
           '<section class="empty-state surface-card" style="min-height:220px;margin-top:14px">',
             '<h2>请先登录</h2>',
-            '<p>游客可查看功能说明，保存通讯录需要登录后操作。</p>',
+            '<p>游客可查看功能说明，添加通讯录需要登录后操作。</p>',
             '<button class="primary-button" type="button" data-action="login">微信一键登录</button>',
           '</section>',
         '</div>'
       ].join('');
     }
+    var showMineEntry = core.shouldShowMineEntry(state);
+    var remaining = core.remainingMineEntryDays(state);
+    var reminderBlock = '';
+    if (showMineEntry) {
+      reminderBlock = [
+        '<section class="reminder-entry">',
+          '<button class="menu-row" type="button" data-action="open-reminder">',
+            '<span class="menu-icon" aria-hidden="true">☎</span>',
+            '<span class="menu-copy"><strong>来电提醒</strong><small>智格-电量过低提醒</small></span>',
+            statusTagHtml(status) || '<span class="menu-arrow">›</span>',
+          '</button>',
+          mineAddAction(status),
+        '</section>',
+        '<p class="micro-copy">我的页入口展示至第 7 天，当前剩余 ', remaining, ' 天；之后请从设置进入。</p>'
+      ].join('');
+    }
+
     return [
       '<div class="screen-page">',
         '<section class="profile-card">',
@@ -579,18 +655,20 @@
         outOfScope([
           '<section class="service-mini-card">',
             '<div><strong>', state.hasBattery ? '30 天畅换' : '暂未持有电池', '</strong>',
-              '<span>', state.hasBattery ? '剩余 18 天 · 持有电池' : '登录后可领取电池并保存低电提醒', '</span></div>',
+              '<span>', state.hasBattery ? '剩余 18 天 · 持有电池' : '登录后可领取电池并添加低电提醒', '</span></div>',
             '<span class="service-status">', state.hasBattery ? '服务中' : '待领取', '</span>',
           '</section>'
         ].join('')),
         '<div class="section-heading"><h3>安全与提醒</h3></div>',
-        '<section class="reminder-entry">',
-          '<button class="menu-row" type="button" data-action="open-reminder">',
-            '<span class="menu-icon" aria-hidden="true">☎</span>',
-            '<span class="menu-copy"><strong>来电提醒</strong><small>智格-电量过低提醒</small></span>',
-            '<span class="status-tag ', toneClass(status.tone), '">', escapeHtml(status.title), '</span>',
+        reminderBlock,
+        '<section class="menu-list">',
+          '<button class="menu-row" type="button" data-action="open-app-settings">',
+            '<span class="menu-icon" aria-hidden="true">⚙</span>',
+            '<span class="menu-copy"><strong>设置</strong><small>',
+              showMineEntry ? '账号、通知与来电提醒' : '来电提醒已移入此处',
+            '</small></span>',
+            '<span class="menu-arrow">›</span>',
           '</button>',
-          mineAddAction(status),
         '</section>',
         outOfScope([
           '<div class="section-heading"><h3>常用功能</h3></div>',
@@ -617,9 +695,6 @@
   }
 
   function mineAddAction(status) {
-    if (status.key === 'saved') {
-      return '';
-    }
     var action = 'start-save';
     var label = '添加到通讯录';
     if (status.key === 'config_error') {
@@ -631,16 +706,48 @@
     } else if (status.key === 'permission_denied') {
       action = 'restore-permission';
       label = '去开启';
-    } else if (status.key === 'outdated') {
-      label = '更新提醒号码';
-    } else if (status.key === 'system_cancelled' || status.key === 'save_failed') {
-      label = '重新保存';
     }
     return [
       '<div class="reminder-entry-action">',
         '<button class="primary-button full-button" type="button" data-action="', action, '">',
           escapeHtml(label),
         '</button>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderAppSettings() {
+    var numberValue = state.configAvailable ? state.contact.formattedNumber : '暂未获取';
+    return [
+      '<div class="screen-page">',
+        '<p class="page-kicker">来电提醒始终可在此添加。7 天后「我的」页不再展示快捷入口。</p>',
+        '<section class="menu-list">',
+          '<button class="menu-row" type="button" data-action="open-reminder">',
+            '<span class="menu-icon" aria-hidden="true">☎</span>',
+            '<span class="menu-copy"><strong>来电提醒</strong><small>', escapeHtml(state.contact.name), ' · ', escapeHtml(numberValue), '</small></span>',
+            '<span class="menu-arrow">›</span>',
+          '</button>',
+        '</section>',
+        outOfScope([
+          '<div class="section-heading"><h3>其他</h3></div>',
+          '<div class="menu-list">',
+            '<button class="menu-row" type="button" data-action="show-toast" data-message="消息通知设置为原有功能">',
+              '<span class="menu-icon" aria-hidden="true">♢</span>',
+              '<span class="menu-copy"><strong>消息通知</strong><small>服务消息与系统通知</small></span>',
+              '<span class="menu-arrow">›</span>',
+            '</button>',
+            '<button class="menu-row" type="button" data-action="show-toast" data-message="账号与安全为原有功能">',
+              '<span class="menu-icon" aria-hidden="true">🔒</span>',
+              '<span class="menu-copy"><strong>账号与安全</strong><small>登录设备与隐私</small></span>',
+              '<span class="menu-arrow">›</span>',
+            '</button>',
+            '<button class="menu-row" type="button" data-action="show-toast" data-message="关于智格为原有功能">',
+              '<span class="menu-icon" aria-hidden="true">ⓘ</span>',
+              '<span class="menu-copy"><strong>关于智格</strong><small>版本与协议</small></span>',
+              '<span class="menu-arrow">›</span>',
+            '</button>',
+          '</div>'
+        ].join('')),
       '</div>'
     ].join('');
   }
@@ -655,43 +762,43 @@
     if (status.key === 'permission_denied') {
       return '<button class="primary-button full-button" type="button" data-action="restore-permission">查看开启方法</button>';
     }
-    return '<button class="primary-button full-button" type="button" data-action="start-save">' +
-      escapeHtml(status.action) + '</button>';
+    return '<button class="primary-button full-button" type="button" data-action="start-save">添加到通讯录</button>';
   }
 
   function renderReminderSettings(status) {
-    var updateNotice = status.key === 'outdated'
-      ? '<div class="alert-banner"><span class="alert-icon">新</span><span>提醒号码已更新。请保存新号码；旧联系人需在手机通讯录中自行删除。</span></div>'
-      : '';
     var numberValue = state.configAvailable ? state.contact.formattedNumber : '暂未获取';
     var versionValue = state.configAvailable ? state.currentNumberVersion : '—';
+    var capabilityCard = status.key === 'ready' || status.key === 'prompting'
+      ? ''
+      : [
+          '<section class="surface-card status-card">',
+            '<div class="status-row">',
+              '<div><strong>当前能力</strong><p>', escapeHtml(status.description), '</p></div>',
+              statusTagHtml(status),
+            '</div>',
+          '</section>'
+        ].join('');
 
     return [
       '<div class="screen-page">',
         '<section class="settings-hero">',
           '<div class="settings-hero-icon" aria-hidden="true">☎</div>',
           '<h2>低电来电提醒</h2>',
-          '<p>把固定低电专线存入通讯录，来电时更容易识别，不影响正常换电服务。</p>',
+          '<p>把固定低电专线添加到通讯录，来电时更容易识别。小程序只写入、不读取，因此无法显示“已保存”。</p>',
         '</section>',
-        updateNotice,
-        '<section class="surface-card status-card">',
-          '<div class="status-row">',
-            '<div><strong>当前状态</strong><p>', escapeHtml(status.description), '</p></div>',
-            '<span class="status-tag ', toneClass(status.tone), '">', escapeHtml(status.title), '</span>',
-          '</div>',
-        '</section>',
+        capabilityCard,
         '<dl class="surface-card contact-detail">',
           '<div class="detail-row"><dt>联系人名称</dt><dd>', escapeHtml(state.contact.name), '</dd></div>',
           '<div class="detail-row"><dt>提醒号码</dt><dd>', escapeHtml(numberValue), '</dd></div>',
           '<div class="detail-row"><dt>号码来源</dt><dd>', escapeHtml(state.contact.source), '</dd></div>',
           '<div class="detail-row"><dt>号码版本</dt><dd>', escapeHtml(versionValue), '</dd></div>',
         '</dl>',
-        '<div class="privacy-note"><span aria-hidden="true">♢</span><span><strong>仅写入，不读取</strong><br>微信只会打开系统联系人保存页，智格不会读取你的通讯录。</span></div>',
+        '<div class="privacy-note"><span aria-hidden="true">♢</span><span><strong>仅写入，不读取</strong><br>微信只会打开系统联系人页。是否添加成功、之后是否删除，以手机通讯录为准。</span></div>',
         '<div class="button-stack">',
           settingsAction(status),
           '<button class="plain-button full-button" type="button" data-action="simulate-low-call">查看来电显示效果</button>',
         '</div>',
-        '<p class="micro-copy">“已保存”以本次系统返回结果为准；如果之后删除联系人，可再次保存。</p>',
+        '<p class="micro-copy">可随时再次添加。若联系人已存在，请在系统页选择“添加到已有联系人”。</p>',
       '</div>'
     ].join('');
   }
@@ -704,7 +811,7 @@
       reminderSection = [
         '<div class="alert-banner">',
           '<span class="alert-icon" aria-hidden="true">!</span>',
-          '<span>提醒号码暂未配置，本次不展示保存入口，不影响电池领取结果。</span>',
+          '<span>提醒号码暂未配置，本次不展示添加入口，不影响电池领取结果。</span>',
         '</div>'
       ].join('');
       actionButtons = '<button class="primary-button full-button" type="button" data-action="go-home">返回首页</button>';
@@ -712,12 +819,12 @@
       reminderSection = [
         '<section class="surface-card result-reminder">',
           '<span class="reminder-icon" aria-hidden="true">☎</span>',
-          '<div class="reminder-copy"><strong>别错过低电提醒电话</strong><p>', escapeHtml(status.description), '</p></div>',
-          '<span class="status-tag ', toneClass(status.tone), '">', escapeHtml(status.title), '</span>',
+          '<div class="reminder-copy"><strong>别错过低电提醒电话</strong><p>添加到通讯录后，来电更容易识别。小程序无法确认联系人是否仍在。</p></div>',
+          statusTagHtml(status),
         '</section>'
       ].join('');
       actionButtons = [
-        '<button class="primary-button full-button" type="button" data-action="start-save">保存提醒号码</button>',
+        '<button class="primary-button full-button" type="button" data-action="start-save">添加到通讯录</button>',
         '<button class="plain-button full-button" type="button" data-action="go-home">返回首页</button>'
       ].join('');
     }
@@ -746,7 +853,7 @@
       '<div class="pickup-result fail">',
         '<div class="result-mark fail" aria-hidden="true">×</div>',
         '<h2>领取电池失败</h2>',
-        '<p>柜门未按预期打开，本次未领取成功，因此不引导保存低电提醒号码。</p>',
+        '<p>柜门未按预期打开，本次未领取成功，因此不引导添加低电提醒号码。</p>',
         '<div class="button-stack" style="margin-top:18px">',
           '<button class="primary-button full-button" type="button" data-action="trigger-first-pickup">重新扫码领取</button>',
           '<button class="plain-button full-button" type="button" data-action="go-home">返回首页</button>',
@@ -764,7 +871,7 @@
           '<p>安全出行 放心骑行</p>',
         '</div>',
         '<button class="primary-button full-button" type="button" data-action="login">微信一键登录</button>',
-        '<p class="micro-copy">登录后可保存“智格-电量过低提醒”。拒绝通讯录权限不影响换电。</p>',
+        '<p class="micro-copy">登录后可添加“智格-电量过低提醒”。拒绝通讯录写入权限不影响换电。</p>',
         '<div class="agree-row">',
           outOfScope('<span>☑</span><span>同意《隐私政策》《智格换电服务协议》</span>', true),
         '</div>',
@@ -773,9 +880,9 @@
   }
 
   function renderCallDemo() {
-    var saved = Boolean(state.callDisplayName);
-    var displayTitle = saved ? state.callDisplayName : state.contact.formattedNumber;
-    var secondary = saved ? state.contact.formattedNumber : '陌生号码';
+    var named = Boolean(state.callDisplayName);
+    var displayTitle = named ? state.callDisplayName : state.contact.formattedNumber;
+    var secondary = named ? state.contact.formattedNumber : '陌生号码 · 演示假设未添加';
     var statusCopy = '正在呼入…';
     var actions = [
       '<button class="call-action decline" type="button" data-action="decline-call"><span>☎</span><span>拒绝</span></button>',
@@ -813,6 +920,9 @@
     if (state.screen === 'mine') {
       return renderMine(status);
     }
+    if (state.screen === 'app-settings') {
+      return renderAppSettings();
+    }
     if (state.screen === 'reminder-settings') {
       return renderReminderSettings(status);
     }
@@ -832,25 +942,21 @@
   }
 
   function renderIntroOverlay(status) {
-    var title = status.key === 'outdated' ? '保存新的低电提醒号码' : '别错过低电提醒电话';
-    var description = status.key === 'outdated'
-      ? '号码已更新。保存新号码后，后续低电来电会继续显示联系人名称。'
-      : '保存后，电量不足来电会显示联系人名称，更容易识别。';
     return [
       '<div class="scrim align-end" role="dialog" aria-modal="true" aria-labelledby="intro-title">',
         '<section class="bottom-sheet">',
           '<div class="sheet-handle" aria-hidden="true"></div>',
           '<div class="sheet-hero">',
             '<span class="sheet-icon" aria-hidden="true">☎</span>',
-            '<div class="sheet-copy"><h2 id="intro-title">', title, '</h2><p>', description, '</p></div>',
+            '<div class="sheet-copy"><h2 id="intro-title">别错过低电提醒电话</h2><p>添加到通讯录后，电量不足来电会显示联系人名称，更容易识别。</p></div>',
           '</div>',
           '<div class="sheet-contact">',
             '<div><strong>', escapeHtml(state.contact.name), '</strong><span>', escapeHtml(state.contact.formattedNumber), '</span></div>',
             '<span class="write-only-tag">仅写入</span>',
           '</div>',
           '<div class="button-stack">',
-            '<button class="primary-button full-button" type="button" data-action="start-save">保存提醒号码</button>',
-            '<button class="plain-button full-button" type="button" data-action="dismiss-intro">暂不保存</button>',
+            '<button class="primary-button full-button" type="button" data-action="start-save">添加到通讯录</button>',
+            '<button class="plain-button full-button" type="button" data-action="dismiss-intro">暂不添加</button>',
           '</div>',
           '<p class="micro-copy">不会读取你的联系人；拒绝后仍可正常换电。</p>',
         '</section>',
@@ -900,7 +1006,7 @@
       '<div class="scrim align-end" role="dialog" aria-modal="true" aria-labelledby="choice-title">',
         '<section class="bottom-sheet choice-sheet">',
           '<div class="sheet-handle" aria-hidden="true"></div>',
-          '<h2 id="choice-title">保存到手机通讯录</h2>',
+          '<h2 id="choice-title">添加到手机通讯录</h2>',
           '<p>以下页面由手机系统提供；你可以新建联系人，或把号码添加到已有联系人。</p>',
           '<button class="choice-button" type="button" data-action="choose-new">',
             '<span class="choice-symbol">＋</span>',
@@ -963,8 +1069,8 @@
         '<section class="dialog-card">',
           '<div class="dialog-body">',
             '<div class="success-mark" aria-hidden="true">✓</div>',
-            '<h2 id="success-title">提醒号码已保存</h2>',
-            '<p>以后低电来电将优先显示“智格-电量过低提醒”；实际显示以手机系统为准。</p>',
+            '<h2 id="success-title">已提交到系统通讯录</h2>',
+            '<p>请在手机里确认联系人。小程序不能读取通讯录，因此不会显示“已保存”；之后来电是否显示名称，以手机系统为准。</p>',
           '</div>',
           '<div class="dialog-actions one"><button class="confirm" type="button" data-action="close-success">知道了</button></div>',
         '</section>',
@@ -997,7 +1103,7 @@
           '<div class="dialog-body">',
             '<div class="error-mark" aria-hidden="true">!</div>',
             '<h2 id="config-error-title">提醒号码加载失败</h2>',
-            '<p>为了避免写入错误号码，本次不能继续保存。请检查网络后重试。</p>',
+            '<p>为了避免写入错误号码，本次不能继续添加。请检查网络后重试。</p>',
           '</div>',
           '<div class="dialog-actions">',
             '<button type="button" data-action="close-overlay">稍后处理</button>',
@@ -1014,12 +1120,12 @@
         '<section class="dialog-card">',
           '<div class="dialog-body">',
             '<div class="error-mark" aria-hidden="true">!</div>',
-            '<h2 id="save-error-title">联系人保存失败</h2>',
-            '<p>手机系统未完成写入，请稍后重试。已有联系人和换电服务不受影响。</p>',
+            '<h2 id="save-error-title">系统未完成写入</h2>',
+            '<p>手机系统未完成联系人写入，请稍后重试。换电服务不受影响。小程序无法确认通讯录现状。</p>',
           '</div>',
           '<div class="dialog-actions">',
             '<button type="button" data-action="close-overlay">稍后处理</button>',
-            '<button class="confirm" type="button" data-action="start-save">重新保存</button>',
+            '<button class="confirm" type="button" data-action="start-save">重新添加</button>',
           '</div>',
         '</section>',
       '</div>'
@@ -1033,14 +1139,14 @@
           '<div class="sheet-handle" aria-hidden="true"></div>',
           '<div class="sheet-hero">',
             '<span class="sheet-icon" aria-hidden="true">新</span>',
-            '<div class="sheet-copy"><h2 id="number-update-title">低电提醒号码已更新</h2><p>请保存新号码。旧联系人需在手机通讯录中自行删除。</p></div>',
+            '<div class="sheet-copy"><h2 id="number-update-title">低电提醒号码已更换</h2><p>建议把新号码重新添加到通讯录。旧联系人请在手机通讯录中自行删除；小程序无法代删或核对。</p></div>',
           '</div>',
           '<div class="sheet-contact">',
             '<div><strong>', escapeHtml(state.contact.name), '</strong><span>新号码 ', escapeHtml(state.contact.formattedNumber), '</span></div>',
             '<span class="write-only-tag">', escapeHtml(state.currentNumberVersion), '</span>',
           '</div>',
           '<div class="button-stack">',
-            '<button class="primary-button full-button" type="button" data-action="start-save">更新提醒号码</button>',
+            '<button class="primary-button full-button" type="button" data-action="start-save">添加新号码</button>',
             '<button class="plain-button full-button" type="button" data-action="close-overlay">稍后处理</button>',
           '</div>',
         '</section>',
@@ -1088,16 +1194,17 @@
       orders: '订单',
       mine: '我的',
       login: '登录',
+      'app-settings': '设置',
       'reminder-settings': '来电提醒',
       'pickup-success': '领取结果',
       'pickup-failed': '领取结果',
       'call-demo': ''
     };
-    var canGoBack = ['reminder-settings', 'pickup-success', 'pickup-failed', 'login'].indexOf(state.screen) >= 0;
+    var canGoBack = ['reminder-settings', 'app-settings', 'pickup-success', 'pickup-failed', 'login'].indexOf(state.screen) >= 0;
     miniTitle.textContent = titles[state.screen] || '智格换电';
     backButton.classList.toggle('is-hidden', !canGoBack);
     miniHeader.classList.toggle('is-hidden', state.screen === 'call-demo');
-    var hideTabs = ['reminder-settings', 'pickup-success', 'pickup-failed', 'call-demo', 'login'].indexOf(state.screen) >= 0;
+    var hideTabs = ['reminder-settings', 'app-settings', 'pickup-success', 'pickup-failed', 'call-demo', 'login'].indexOf(state.screen) >= 0;
     tabBar.classList.toggle('is-hidden', hideTabs);
     phoneBezel.classList.toggle('without-tabs', hideTabs);
 
@@ -1105,6 +1212,16 @@
       button.classList.toggle('active', button.dataset.tab === state.tab);
       button.classList.toggle('is-out-of-scope-tab', button.dataset.tab === 'orders');
     });
+  }
+
+  function mineEntryInspectorLabel() {
+    if (!state.firstPowerEventAt) {
+      return '未开始（设置可进）';
+    }
+    if (!core.shouldShowMineEntry(state)) {
+      return '已结束（请走设置）';
+    }
+    return '剩余 ' + core.remainingMineEntryDays(state) + ' 天';
   }
 
   function renderInspector(status) {
@@ -1116,7 +1233,10 @@
       '<div><dt>联系人</dt><dd>', escapeHtml(state.contact.name), '</dd></div>',
       '<div><dt>提醒号码</dt><dd>', escapeHtml(state.configAvailable ? state.contact.formattedNumber : '未加载'), '</dd></div>',
       '<div><dt>号码版本</dt><dd>', escapeHtml(state.currentNumberVersion || '—'), '</dd></div>',
-      '<div><dt>已保存版本</dt><dd>', escapeHtml(state.savedNumberVersion || '—'), '</dd></div>',
+      '<div><dt>换电弹窗</dt><dd>', escapeHtml(state.swapPromptShown ? '本用户已展示' : '未展示'), '</dd></div>',
+      '<div><dt>首次取电/换电</dt><dd>', escapeHtml(state.firstPowerEventAt ? String(state.firstPowerEventAt).slice(0, 10) : '—'), '</dd></div>',
+      '<div><dt>我的入口</dt><dd>', escapeHtml(mineEntryInspectorLabel()), '</dd></div>',
+      '<div><dt>最近写入结果</dt><dd>', escapeHtml(state.lastWriteResult || '—'), '</dd></div>',
       '<div><dt>通讯录权限</dt><dd>', escapeHtml(permissionLabel(state.permission)), '</dd></div>',
     ].join('');
 
@@ -1173,7 +1293,7 @@
   }
 
   function handleBack() {
-    if (state.screen === 'reminder-settings' || state.screen === 'login') {
+    if (state.screen === 'reminder-settings' || state.screen === 'app-settings' || state.screen === 'login') {
       dispatch({ type: 'RETURN_FROM_DETAIL' });
       return;
     }
@@ -1199,6 +1319,10 @@
         dispatch({ type: 'FIRST_PICKUP_SUCCESS' });
         break;
 
+      case 'trigger-swap':
+        dispatch({ type: 'SWAP_SUCCESS' });
+        break;
+
       case 'login':
         dispatch({
           type: 'LOGIN',
@@ -1222,6 +1346,10 @@
         dispatch({ type: 'OPEN_REMINDER' });
         break;
 
+      case 'open-app-settings':
+        dispatch({ type: 'OPEN_APP_SETTINGS' });
+        break;
+
       case 'start-save':
         dispatch({
           type: 'START_SAVE',
@@ -1231,7 +1359,7 @@
 
       case 'dismiss-intro':
         dispatch({ type: 'DISMISS_INTRO' });
-        showToast('可在“我的－来电提醒”中再次保存');
+        showToast(core.shouldShowMineEntry(state) ? '可在“我的－来电提醒”中再次添加' : '可在“设置－来电提醒”中再次添加');
         break;
 
       case 'allow-permission':
@@ -1263,7 +1391,7 @@
 
       case 'cancel-system-save':
         dispatch({ type: 'SYSTEM_CANCELLED' });
-        showToast('未完成保存，可稍后重试');
+        showToast('已取消，可稍后再次添加');
         break;
 
       case 'close-success':
