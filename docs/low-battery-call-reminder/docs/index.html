@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>产品文档 · 低电外呼提醒方案</title>
+  <style>
+    :root {
+      --bg: #f4f7fb; --surface: #fff; --ink: #17212b; --muted: #657383;
+      --line: #dce5ee; --brand: #2f6bff; --brand-dark: #1a4fd6; --brand-soft: #eef3ff;
+      --radius: 8px; --shadow: 0 10px 30px rgba(22, 33, 43, .08); --sidebar-w: 260px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--ink); background: var(--bg); }
+    a { color: var(--brand-dark); }
+    .layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+    .sidebar {
+      background: #1a2332; color: #e8eef4; padding: 18px 14px; overflow-y: auto;
+      position: sticky; top: 0; height: 100vh;
+    }
+    .sidebar h1 { margin: 0; font-size: 16px; }
+    .sidebar .sub { font-size: 12px; color: #9aa8b8; margin: 6px 0 16px; line-height: 1.5; }
+    .doc-list { display: grid; gap: 4px; }
+    .doc-list button {
+      border: none; background: transparent; color: #dce5ee; text-align: left;
+      padding: 8px 10px; border-radius: var(--radius); font-size: 13px; cursor: pointer; width: 100%;
+    }
+    .doc-list button:hover { background: rgba(255,255,255,.06); }
+    .doc-list button.active { background: rgba(47, 107, 255, .28); color: #fff; font-weight: 600; }
+    .sidebar .proto-link {
+      display: block; margin-top: 16px; padding: 10px; background: rgba(47,107,255,.2);
+      border-radius: var(--radius); color: #93c5fd; font-size: 12px; text-decoration: none; text-align: center;
+    }
+    .main { min-width: 0; padding: 20px 28px 40px; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; font-size: 13px; color: var(--muted); }
+    .toolbar .file { font-weight: 600; color: var(--ink); }
+    .article { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px 32px 36px; max-width: 920px; }
+    .article .loading, .article .error { color: var(--muted); font-size: 14px; }
+    .md h1 { font-size: 26px; margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+    .md h2 { font-size: 20px; margin: 28px 0 12px; }
+    .md h3 { font-size: 16px; margin: 22px 0 10px; }
+    .md p, .md li { font-size: 14px; line-height: 1.75; }
+    .md ul, .md ol { padding-left: 1.4em; }
+    .md table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+    .md th, .md td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; }
+    .md th { background: var(--brand-soft); }
+    .md code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    .md pre { background: #1e293b; color: #e2e8f0; padding: 14px; border-radius: var(--radius); overflow-x: auto; font-size: 12px; line-height: 1.6; }
+    .md pre code { background: none; padding: 0; color: inherit; }
+    .md blockquote { margin: 12px 0; padding: 10px 14px; border-left: 4px solid var(--brand); background: var(--brand-soft); color: var(--muted); }
+    .md hr { border: none; border-top: 1px solid var(--line); margin: 24px 0; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .sidebar { position: relative; height: auto; } }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h1>低电外呼提醒方案</h1>
+      <p class="sub">方案一 · 微信小程序引导保存固定外呼号码</p>
+      <div class="doc-list" id="docNav"></div>
+      <a class="proto-link" href="../prototype/index.html">打开用户端可交互原型 →</a>
+    </aside>
+    <main class="main">
+      <div class="toolbar">
+        <span class="file" id="currentFile">—</span>
+        <span id="loadStatus"></span>
+      </div>
+      <article class="article">
+        <div id="content" class="md loading">加载中…</div>
+      </article>
+    </main>
+  </div>
+
+  <script src="vendor/marked.min.js"></script>
+  <script>
+    const DOCS = [
+      { file: "PRD.md", label: "用户端 PRD" },
+      { file: "../acceptance-criteria.md", label: "验收标准" },
+      { file: "../decisions/decision-001.md", label: "决策 #001" },
+      { file: "../README.md", label: "项目说明" }
+    ];
+
+    let currentDocFile = "";
+
+    function docFileUrl(file) {
+      return new URL(file, location.href).href;
+    }
+
+    function parseLocationHash() {
+      const raw = decodeURIComponent(location.hash.slice(1) || "");
+      if (!raw) return { file: "PRD.md", anchor: "" };
+      const match = raw.match(/^(.+?\.md)(?:#(.*))?$/);
+      if (match) return { file: match[1], anchor: match[2] || "" };
+      return { file: raw.endsWith(".md") ? raw : "PRD.md", anchor: "" };
+    }
+
+    function setDocHash(file, anchor, push) {
+      const h = anchor ? `${file}#${anchor}` : file;
+      if (push) location.hash = h;
+      else history.replaceState(null, "", "#" + h);
+    }
+
+    function renderNav(activeFile) {
+      const nav = document.getElementById("docNav");
+      nav.innerHTML = DOCS.map(it => `
+        <button type="button" class="${it.file === activeFile ? "active" : ""}" data-doc="${it.file}">${it.label}</button>
+      `).join("");
+      nav.querySelectorAll("[data-doc]").forEach(btn => {
+        btn.onclick = () => loadDoc(btn.dataset.doc, true);
+      });
+    }
+
+    async function loadDoc(file, pushHash, anchor) {
+      const content = document.getElementById("content");
+      const status = document.getElementById("loadStatus");
+      currentDocFile = file;
+      const label = DOCS.find(d => d.file === file)?.label || file;
+      document.getElementById("currentFile").textContent = label;
+      content.className = "md loading";
+      content.textContent = "加载中…";
+      status.textContent = "";
+      renderNav(file);
+      if (pushHash) setDocHash(file, anchor || "", true);
+      else if (anchor) setDocHash(file, anchor, false);
+
+      if (location.protocol === "file:") {
+        content.className = "md error";
+        content.innerHTML = `<p><strong>无法通过本地文件路径打开文档。</strong></p>
+          <p>请执行 <code>cd 低电外呼提醒方案 && python3 main.py</code>，访问
+          <a href="http://127.0.0.1:8776/docs/index.html">http://127.0.0.1:8776/docs/index.html</a></p>`;
+        return;
+      }
+
+      try {
+        const res = await fetch(docFileUrl(file));
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const md = await res.text();
+        content.className = "md";
+        content.innerHTML = marked.parse(md, { gfm: true, breaks: false });
+        status.textContent = file;
+      } catch (e) {
+        content.className = "md error";
+        content.innerHTML = `<p>无法加载 <code>${file}</code>（${e.message}）。</p>`;
+      }
+    }
+
+    const { file: initialFile, anchor: initialAnchor } = parseLocationHash();
+    loadDoc(initialFile.endsWith(".md") ? initialFile : "PRD.md", false, initialAnchor);
+    window.addEventListener("hashchange", () => {
+      const { file, anchor } = parseLocationHash();
+      if (file && file.endsWith(".md")) loadDoc(file, false, anchor);
+    });
+  </script>
+</body>
+</html>
