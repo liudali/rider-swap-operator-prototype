@@ -1086,6 +1086,21 @@ select:focus-visible,
   border-radius: 15px;
 }
 
+.reminder-entry {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+}
+
+.reminder-entry .menu-row {
+  border-bottom: 0;
+}
+
+.reminder-entry-action {
+  padding: 0 13px 13px;
+}
+
 .menu-row {
   width: 100%;
   min-height: 56px;

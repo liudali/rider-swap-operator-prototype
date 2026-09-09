@@ -113,6 +113,16 @@
     document.body.removeChild(field);
   }
 
+  function saveEntry() {
+    if (state.screen === 'pickup-success') {
+      return state.resultKind === 'swap' ? 'swap_success' : 'first_pickup';
+    }
+    if (state.screen === 'mine') {
+      return 'mine';
+    }
+    return 'settings';
+  }
+
   function dispatch(event) {
     event.at = event.at || eventTimeLabel();
     state = core.transition(state, event);
@@ -184,10 +194,10 @@
         break;
 
       case 'manual-settings':
-        state = core.transition(
-          core.createInitialState(),
-          { type: 'OPEN_REMINDER', at: eventTimeLabel() }
-        );
+        state = core.createInitialState({
+          tab: 'mine',
+          screen: 'mine'
+        });
         break;
 
       case 'saved':
@@ -574,13 +584,14 @@
           '</section>'
         ].join('')),
         '<div class="section-heading"><h3>安全与提醒</h3></div>',
-        '<div class="menu-list">',
+        '<section class="reminder-entry">',
           '<button class="menu-row" type="button" data-action="open-reminder">',
             '<span class="menu-icon" aria-hidden="true">☎</span>',
             '<span class="menu-copy"><strong>来电提醒</strong><small>智格-电量过低提醒</small></span>',
             '<span class="status-tag ', toneClass(status.tone), '">', escapeHtml(status.title), '</span>',
           '</button>',
-        '</div>',
+          mineAddAction(status),
+        '</section>',
         outOfScope([
           '<div class="section-heading"><h3>常用功能</h3></div>',
           '<div class="menu-list">',
@@ -601,6 +612,35 @@
             '</button>',
           '</div>'
         ].join('')),
+      '</div>'
+    ].join('');
+  }
+
+  function mineAddAction(status) {
+    if (status.key === 'saved') {
+      return '';
+    }
+    var action = 'start-save';
+    var label = '添加到通讯录';
+    if (status.key === 'config_error') {
+      action = 'retry-config';
+      label = '重试加载';
+    } else if (status.key === 'unsupported') {
+      action = 'copy-number';
+      label = '复制号码';
+    } else if (status.key === 'permission_denied') {
+      action = 'restore-permission';
+      label = '去开启';
+    } else if (status.key === 'outdated') {
+      label = '更新提醒号码';
+    } else if (status.key === 'system_cancelled' || status.key === 'save_failed') {
+      label = '重新保存';
+    }
+    return [
+      '<div class="reminder-entry-action">',
+        '<button class="primary-button full-button" type="button" data-action="', action, '">',
+          escapeHtml(label),
+        '</button>',
       '</div>'
     ].join('');
   }
@@ -1185,9 +1225,7 @@
       case 'start-save':
         dispatch({
           type: 'START_SAVE',
-          entry: state.screen === 'pickup-success'
-            ? (state.resultKind === 'swap' ? 'swap_success' : 'first_pickup')
-            : 'settings'
+          entry: saveEntry()
         });
         break;
 
