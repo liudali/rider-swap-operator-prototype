@@ -24,6 +24,7 @@
       channelLinksSubTab: "packages", channelPackagesPage: 1, channelPackagesPageSize: 8,
       channelPromoLinksPage: 1, channelPromoLinksPageSize: 8,
       commissionStatementSubTab: "summary", commissionDetailPage: 1, commissionDetailPageSize: 8,
+      linkSettleSubTab: "summary", linkSettlePage: 1, linkSettlePageSize: 8,
       pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
       channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
       channelAssetsSubTab: "dayPool", channelAssetsPage: 1, channelAssetsPageSize: 5,
@@ -448,6 +449,107 @@
             status: t === "即时分账" ? "已即时分账" : "——"
           };
         });
+    }
+
+    function orderCommissionClawback(o) {
+      return Number(o?.commissionClawback || 0);
+    }
+
+    function offlineCommissionSettleRecord(channelId, month) {
+      const list = typeof offlineCommissionSettlements !== "undefined" ? offlineCommissionSettlements : [];
+      return list.find(s => s.channelId === channelId && s.month === month) || null;
+    }
+
+    function myLinkContracts() {
+      return myChannelContracts().filter(c => contractSettlementMode(c) === "链接类");
+    }
+
+    function myLinkOrders() {
+      const ids = new Set(myLinkContracts().map(c => c.channelId));
+      return channelLinkOrders.filter(o => ids.has(o.channelId));
+    }
+
+    function channelDisplayName(channelId) {
+      const c = channelContracts.find(x => x.channelId === channelId);
+      if (c?.channelName) return c.channelName;
+      const ch = platformChannels.find(x => x.id === channelId);
+      return ch?.name || channelId;
+    }
+
+    function operatorLinkSettleMonthRows(rangeMonths, channelFilter) {
+      const months = rangeMonths || [];
+      const contracts = myLinkContracts().filter(c => !channelFilter || channelFilter === "全部" || c.channelId === channelFilter);
+      const rows = [];
+      contracts.forEach(c => {
+        months.forEach(month => {
+          const orders = channelLinkOrders.filter(o => o.channelId === c.channelId && payMonthKey(o.payTime) === month);
+          if (!orders.length) return;
+          const grouped = new Map();
+          orders.forEach(o => {
+            const t = orderCommissionSettleType(o);
+            if (!grouped.has(t)) grouped.set(t, []);
+            grouped.get(t).push(o);
+          });
+          ["即时分账", "线下结算"].forEach(t => {
+            const list = grouped.get(t);
+            if (!list) return;
+            const clawback = list.reduce((s, o) => s + orderCommissionClawback(o), 0);
+            const comm = list.reduce((s, o) => s + Number(o.commission || 0), 0);
+            const rec = t === "线下结算" ? offlineCommissionSettleRecord(c.channelId, month) : null;
+            rows.push({
+              key: c.channelId + "|" + month + "|" + t,
+              channelId: c.channelId,
+              channelName: c.channelName,
+              month,
+              settleType: t,
+              orderCount: list.length,
+              totalPaid: list.reduce((s, o) => s + Number(o.paidPrice || 0), 0),
+              totalCommission: comm,
+              totalClawback: clawback,
+              netCommission: Math.round((comm - clawback) * 100) / 100,
+              status: t === "即时分账" ? "已即时分账" : (rec?.status || "待线下结清"),
+              voucherNo: rec?.voucherNo || "",
+              settledAt: rec?.settledAt || ""
+            });
+          });
+        });
+      });
+      return rows.sort((a, b) => {
+        if (a.month !== b.month) return b.month.localeCompare(a.month);
+        if (a.channelName !== b.channelName) return a.channelName.localeCompare(b.channelName, "zh");
+        return a.settleType.localeCompare(b.settleType, "zh");
+      });
+    }
+
+    function pendingOperatorOfflineSettleCount() {
+      if (!isOperatorRole()) return 0;
+      return operatorLinkSettleMonthRows(recentCalendarMonthKeys(12), "全部").filter(r => r.status === "待线下结清").length;
+    }
+
+    function registerOfflineCommissionSettle(channelId, month, voucherNo, settledAt) {
+      if (!channelId || !month) return "缺少渠道或月份";
+      const no = String(voucherNo || "").trim();
+      if (!no) return "请填写打款流水号";
+      const day = String(settledAt || "").trim() || protoBusinessDate();
+      const list = typeof offlineCommissionSettlements !== "undefined" ? offlineCommissionSettlements : [];
+      const existed = list.find(s => s.channelId === channelId && s.month === month);
+      if (existed) {
+        existed.status = "已线下结清";
+        existed.voucherNo = no;
+        existed.settledAt = day;
+        existed.updatedAt = protoBusinessDate();
+      } else {
+        list.push({
+          id: "OCS-" + channelId.replace(/^CH-/, "") + "-" + month.replace("-", ""),
+          channelId,
+          month,
+          status: "已线下结清",
+          voucherNo: no,
+          settledAt: day,
+          updatedAt: protoBusinessDate()
+        });
+      }
+      return true;
     }
 
     /** 人天池 / 设备租赁 / 激活码：默认初始信用额度（decision-098） */
@@ -1464,6 +1566,7 @@
         if ((state.siteManageTab || "info") === "fees" || (state.siteManageTab || "info") === "bills") return "siteExpenses";
         return "sites";
       }
+      if (state.view === "channelSales" && state.channelSalesTab === "linkSettle") return "operatorLinkSettle";
       return state.view;
     }
 
@@ -4590,6 +4693,24 @@
           ].concat(months.map(m => ({ v: m, t: m })));
         }}
       ],
+      operatorLinkSettle: [
+        { key: "month", label: "统计范围", type: "select", options: () => {
+          const months = recentCalendarMonthKeys(12);
+          return [
+            { v: "last6", t: "近6个月" },
+            { v: "last12", t: "近12个月" }
+          ].concat(months.map(m => ({ v: m, t: m })));
+        }},
+        { key: "channelId", label: "渠道商", type: "select", options: () => {
+          const rows = myLinkContracts();
+          return [{ v: "全部", t: "全部渠道" }].concat(rows.map(c => ({ v: c.channelId, t: c.channelName })));
+        }},
+        { key: "settleType", label: "结算方式", type: "select", options: [
+          { v: "全部", t: "全部" },
+          { v: "即时分账", t: "即时分账" },
+          { v: "线下结算", t: "线下结算" }
+        ]}
+      ],
       /* platformAccounts：统计月份下沉到余额/冻结下方，顶部不再展示 */
     };
 
@@ -4606,8 +4727,8 @@
       /* 运营商用户 / 平台用户信息：筛选下沉到页内 Tab 下方 */
       if (state.view === "users") specs = [];
       if (state.view === "platformUsers" && (state.platformUsersTab || "info") === "info") specs = [];
-      /* 骑士卡·佣金对账：筛选下沉到页内 Tab 下方 */
-      if (key === "commissionStatement") specs = [];
+      /* 骑士卡·佣金对账 / 运营商·链接结算：筛选下沉到页内 */
+      if (key === "commissionStatement" || key === "operatorLinkSettle") specs = [];
       /* 服务保证金账户·变动明细：筛选下沉到页内 Tab 下方 */
       if (key === "depositAccount_ledger") specs = [];
       /* 运营商往来：筛选下沉到页内 Tab 下方 */
@@ -5166,9 +5287,37 @@
       if (!bankAccount) return "请填写银行卡号";
       if (!/^\d{8,32}$/.test(bankAccount)) return "银行卡号须为 8～32 位数字";
       if (!bankName) return "请填写开户银行";
+      if (!bankIsCmb(bankName)) return "在线分账账户须在招商银行开户";
       if (!bankBranch) return "请填写开户支行";
       if (bankCode && !/^\d{12}$/.test(bankCode)) return "联行号须为 12 位数字";
       return { bankAccountName, bankName, bankBranch, bankAccount, bankCode };
+    }
+
+    function bankIsCmb(bankName) {
+      return /招商/.test(String(bankName || ""));
+    }
+
+    function needsCmbSplitBank(account) {
+      if (!account) return false;
+      if (account.entityId === "CH-RENT") return true;
+      return String(account.purpose || "").indexOf("白名单") >= 0;
+    }
+
+    function operatorHasCustody(opId) {
+      const op = platformOperators.find(o => o.id === opId);
+      return !!(op && op.custodyAgreement);
+    }
+
+    function cmbSplitAccountNoticeHtml(variant) {
+      const tails = {
+        platform: "平台技术服务费结算户亦为招行。",
+        operator: "平台<strong>仅对已签署托管协议</strong>的运营商有账户控制权；未签托管的由运营商自行管理。",
+        channel: "渠道商账户<strong>不受平台托管限制</strong>，须自行在招行开户后才能接收在线分账。",
+        lease: "白名单套餐在线分账进本渠道账户，须自行在招行开户；<strong>不受平台托管限制</strong>。",
+        financier: "资金方租金收款默认不走 C 端在线分账；若开通在线分账收款，亦须招行开户。",
+        partner: "站点合伙人提现由运营商代付，<strong>不进入</strong>支付通道在线分账，开户行不强制招行。"
+      };
+      return `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("accounts_cmb_split")} 目前支付通道对接<strong>招商银行</strong>。凡需<strong>在线分账</strong>的账户，须在招商银行开户。 ${tails[variant] || ""}</div>`;
     }
 
     function upsertEntityCorpAccount(entityId, fields, actor) {
@@ -5255,6 +5404,14 @@
       const id = entityId || currentEntity()?.id;
       if (!id) return;
       if (entityCorpKind(id) === "channel_corp" && !isLinkChannelEntity(id) && !isCardChannel()) return;
+      if (isPlatformRole() && entityCorpKind(id) === "channel_corp") {
+        showProtoToast("渠道商账户不受平台托管限制，请渠道自行在「收款账户」维护");
+        return;
+      }
+      if (isPlatformRole() && entityCorpKind(id) === "operator_corp" && !operatorHasCustody(id)) {
+        showProtoToast("该运营商未签托管协议，平台不能代维护收款账户");
+        return;
+      }
       const existing = entityCorpAccount(id);
       const bound = paymentAccountCorpBound(existing);
       const byPlatform = isPlatformRole();
@@ -5267,7 +5424,7 @@
         fields: [
           { name: "bankAccountName", label: "开户名称", value: existing?.bankAccountName || "", placeholder: "与对公银行卡户名一致" },
           { name: "bankAccount", label: "银行卡号", value: existing?.bankAccount || "", placeholder: "对公账号，仅数字", inputmode: "numeric", maxlength: 32 },
-          { name: "bankName", label: "开户银行", value: existing?.bankName || "", placeholder: "如：招商银行" },
+          { name: "bankName", label: "开户银行", value: existing?.bankName || "", placeholder: "须为招商银行" },
           { name: "bankBranch", label: "开户支行", value: existing?.bankBranch || "", placeholder: "如：招商银行上海分行营业部" },
           { name: "bankCode", label: "联行号（选填）", value: existing?.bankCode || "", required: false, placeholder: "12 位联行号", inputmode: "numeric", maxlength: 12 }
         ],
@@ -5316,7 +5473,7 @@
           { name: "channel", label: "进件通道", value: a.channel + " · " + a.mchNo, readonly: true },
           { name: "purpose", label: "用途", value: a.purpose || "—", readonly: true },
           { name: "bankAccountName", label: "对公户名", value: a.bankAccountName || a.mchName || "" },
-          { name: "bankName", label: "开户行", value: a.bankName || "" },
+          { name: "bankName", label: "开户行", value: a.bankName || "", placeholder: needsCmbSplitBank(a) ? "须为招商银行" : "开户银行" },
           { name: "bankAccount", label: "对公账号", value: a.bankAccount || "" },
           { name: "bankCode", label: "联行号（选填）", value: a.bankCode || "", required: false }
         ],
@@ -5328,6 +5485,7 @@
           const bankCode = (data.bankCode || "").trim();
           if (!bankAccountName) return "请填写对公户名";
           if (!bankName) return "请填写开户行";
+          if (needsCmbSplitBank(a) && !bankIsCmb(bankName)) return "在线分账账户须在招商银行开户";
           if (!bankAccount) return "请填写对公账号";
           a.bankAccountName = bankAccountName;
           a.bankName = bankName;
@@ -6333,7 +6491,19 @@
       };
       const map = {
         pricing: { stateKey: "pricingTab", tabs: [["pkg", "个人套餐价"], ["deposit", "押金设置"], ["refund", "退款设置"], ["quota", "人天批发价"], ["card", "渠道分销价"], ["swapRange", "换电范围"]] },
-        channelSales: { stateKey: "channelSalesTab", tabs: [["contracts", "签约渠道"], ["orders", "渠道订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]] },
+        channelSales: {
+          stateKey: "channelSalesTab",
+          tabs: () => {
+            const n = pendingOperatorOfflineSettleCount();
+            return [
+              ["contracts", "签约渠道"],
+              ["orders", "渠道订单"],
+              ["linkSettle", "链接结算" + (n ? " (" + n + ")" : "")],
+              ["assets", "渠道权益"],
+              ["platformMarketing", "平台营销"]
+            ];
+          }
+        },
         sites: { stateKey: "siteManageTab", tabs: [["info", "站点信息"], ["fees", "场费电费"], ["bills", "站点支出"], ["partners", "站点合伙人"]] },
         devices: { stateKey: "deviceTab", tabs: () => [["cabinet", "换电柜"], ["battery", "电池"], ["alerts", "设备告警" + alertBadge()], ["iccid", "ICCID"]] },
         flows: { stateKey: "flowTab", tabs: [["receipt", "资金实收"], ["accrual", "清分明细"], ["payout", "提现申请"]] },
@@ -6424,6 +6594,7 @@
       if (view === "platformUsers" && prev !== tab) state.platformUsersPage = 1;
       if (view === "orderService" && tab === "userDeposit" && prev !== tab) state.userDepositPage = 1;
       if (view === "channelSales" && tab === "orders" && prev !== tab) state.channelOrdersPage = 1;
+      if (view === "channelSales" && tab === "linkSettle" && prev !== tab) state.linkSettlePage = 1;
       if (view === "channelSales" && tab === "assets" && prev !== tab) state.channelAssetsPage = 1;
     }
 
@@ -8464,6 +8635,7 @@
         const rows = paymentAccounts.filter(a => a.entityId === opId);
         const unbound = rows.filter(a => paymentAccountNeedsCorp(a) && !paymentAccountCorpBound(a)).length;
         body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("lease_whitelist_pkg")}${noteBtn("accounts_corp_bind")} 设备租赁：白名单购套餐款进本渠道子商户；须绑定<strong>对公结算账户</strong>后方可分账打款。${unbound ? ` 当前 <strong>${unbound}</strong> 个账户待绑定。` : ""}</p>
+          ${cmbSplitAccountNoticeHtml("lease")}
           <table>
             ${tableHead}
             <tbody>${rows.map(a => accountRowHtml(a)).join("") || "<tr><td colspan='10'>暂无账户</td></tr>"}</tbody>
@@ -8479,13 +8651,15 @@
           : `当前为<strong>线下结算</strong>：购卡款进运营商；若改为线上结算，须先绑定与运营商相同的对公银行卡。线下打佣也使用本账户。`;
         if (!bound) {
           body = `<div class="pool-warn-banner" style="margin-bottom:12px">${online ? "尚未绑定收款账户，无法接收线上结算佣金。" : "尚未绑定收款账户。开启线上结算前必须绑定。"}${noteBtn("channel_card_accounts")}</div>
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_panel")} ${settleHint} 必填：开户名称、银行卡号、开户银行、开户支行；联行号选填。同一时间仅 <strong>1</strong> 个账户。</p>
+            ${cmbSplitAccountNoticeHtml("channel")}
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_panel")} ${settleHint} 必填：开户名称、银行卡号、开户银行、开户支行；联行号选填。开户银行须为<strong>招商银行</strong>。同一时间仅 <strong>1</strong> 个账户。</p>
             <div style="padding:36px 16px;text-align:center;border:1px dashed var(--line);border-radius:8px;background:var(--surface-soft)">
               <p style="margin:0 0 12px;font-size:14px;color:var(--muted)">暂无收款账户</p>
               ${canBind ? `<button type="button" class="btn primary" data-edit-corp-account="${opId}">添加收款账户</button>` : `<p style="margin:0;font-size:12px;color:var(--muted)">当前账号无权添加</p>`}
             </div>`;
         } else {
-          body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_card_accounts")}${noteBtn("accounts_corp_bind")} ${settleHint} 同一时间仅 1 个账户；变更即覆盖。</p>
+          body = `${cmbSplitAccountNoticeHtml("channel")}
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("channel_card_accounts")}${noteBtn("accounts_corp_bind")} ${settleHint} 同一时间仅 1 个账户；变更即覆盖。开户银行须为<strong>招商银行</strong>。</p>
             ${uniqueCorpDetailGrid(acct)}`;
         }
         return `
@@ -8503,13 +8677,15 @@
         const changeBtn = canBind && bound ? `<button type="button" class="btn" data-edit-operator-corp="${opId}">变更</button>` : "";
         if (!bound) {
           body = `<div class="pool-warn-banner" style="margin-bottom:12px">尚未绑定收款账户，无法发起提现。${noteBtn("accounts_corp_bind")}</div>
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_panel")} 须运营商本人提交对公银行卡：开户名称、银行卡号、开户银行、开户支行；联行号选填。同一时间仅可绑定 <strong>1</strong> 个收款账户。</p>
+            ${cmbSplitAccountNoticeHtml("operator")}
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_panel")} 须运营商本人提交对公银行卡：开户名称、银行卡号、开户银行、开户支行；联行号选填。开户银行须为<strong>招商银行</strong>。同一时间仅可绑定 <strong>1</strong> 个收款账户。</p>
             <div style="padding:36px 16px;text-align:center;border:1px dashed var(--line);border-radius:8px;background:var(--surface-soft)">
               <p style="margin:0 0 12px;font-size:14px;color:var(--muted)">暂无收款账户</p>
               ${canBind ? `<button type="button" class="btn primary" data-edit-operator-corp="${opId}">添加收款账户</button>` : `<p style="margin:0;font-size:12px;color:var(--muted)">当前账号无权添加</p>`}
             </div>`;
         } else {
-          body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_panel")}${noteBtn("accounts_corp_bind")} 本卡为提现<strong>转出账户</strong>（演示招商银行）。每笔提现工单另填<strong>转账银行卡号</strong>，默认同此卡，可改为其他对公卡。变更后新工单默认新卡，已提交工单不变。</p>
+          body = `${cmbSplitAccountNoticeHtml("operator")}
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_panel")}${noteBtn("accounts_corp_bind")} 本卡为提现<strong>转出账户</strong>，须为招商银行对公户。每笔提现工单另填<strong>转账银行卡号</strong>，默认同此卡，可改为其他对公卡。变更后新工单默认新卡，已提交工单不变。</p>
             <div class="detail-grid">
               <div class="detail-item"><span>开户名称</span><strong>${acct.bankAccountName}</strong></div>
               <div class="detail-item"><span>银行卡号</span><strong>${maskBankAccount(acct.bankAccount)}</strong></div>
@@ -8531,7 +8707,8 @@
       } else {
         const rows = paymentAccounts.filter(a => a.entityId === opId);
         const unbound = rows.filter(a => paymentAccountNeedsCorp(a) && !paymentAccountCorpBound(a)).length;
-        body = `<p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_corp_bind")} 资金方收款账户须绑定<strong>对公结算账户</strong>。${unbound ? ` 当前 <strong>${unbound}</strong> 个账户待绑定。` : ""}</p>
+        body = `${cmbSplitAccountNoticeHtml("financier")}
+          <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("accounts_corp_bind")} 资金方收款账户须绑定<strong>对公结算账户</strong>。${unbound ? ` 当前 <strong>${unbound}</strong> 个账户待绑定。` : ""}</p>
           <table>
             ${tableHead}
             <tbody>${rows.length ? rows.map(a => accountRowHtml(a)).join("") : "<tr><td colspan='10'>暂无账户</td></tr>"}</tbody>
@@ -8556,12 +8733,17 @@
       const st = operatorAggregateStats(op.id);
       const corpAcct = operatorCorpAccount(op.id);
       const boundCorp = paymentAccountCorpBound(corpAcct);
-      const corpBtn = boundCorp
+      const canProxyCorp = operatorHasCustody(op.id);
+      const corpBtn = !canProxyCorp
+        ? ""
+        : boundCorp
         ? `<button type="button" class="btn" data-edit-operator-corp="${op.id}">变更</button>`
         : `<button type="button" class="btn primary" data-edit-operator-corp="${op.id}">代为添加</button>`;
-      const corpBody = !boundCorp
-        ? `<p style="margin:0;font-size:13px;color:var(--muted)">尚未绑定对公银行卡。运营商可自行添加，平台也可代为填写。</p>`
-        : `<div class="detail-grid">
+      const corpBody = `${cmbSplitAccountNoticeHtml("operator")}
+            <p style="margin:0 0 12px;font-size:13px;color:var(--muted)">${canProxyCorp
+              ? (boundCorp ? "已签署托管协议，平台可代维护收款账户。" : "已签署托管协议。尚未绑定对公银行卡，运营商可自行添加，平台也可代为填写。")
+              : (boundCorp ? "未签署托管协议，平台仅可查看，不能代维护。" : "未签署托管协议。账户由运营商自行添加，平台不能代填。")}</p>
+            ${boundCorp ? `<div class="detail-grid">
             <div class="detail-item"><span>开户名称</span><strong>${corpAcct.bankAccountName}</strong></div>
             <div class="detail-item"><span>银行卡号</span><strong>${maskBankAccount(corpAcct.bankAccount)}</strong></div>
             <div class="detail-item"><span>开户银行</span><strong>${corpAcct.bankName}</strong></div>
@@ -8569,7 +8751,8 @@
             <div class="detail-item"><span>联行号</span><strong>${corpAcct.bankCode || "—"}</strong></div>
             <div class="detail-item"><span>绑定时间</span><strong>${corpAcct.corpBoundAt || "—"}</strong></div>
             <div class="detail-item"><span>最近维护</span><strong>${corpAcct.updatedByRole ? `${corpAcct.updatedByRole} · ${corpAcct.updatedBy || "—"}` : "运营商"}</strong></div>
-          </div>`;
+            <div class="detail-item"><span>托管协议</span><strong>${canProxyCorp ? tag("已签署") : tag("未签署")}</strong></div>
+          </div>` : ""}`;
       const swapPol = swapPolicyForOperator(op.id);
       const platOn = !!swapPol.platformEnabled;
       const opOn = !!swapPol.crossNetworkEnabled;
@@ -8638,7 +8821,7 @@
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
-          ${panelHead("收款账户", boundCorp ? "对公银行卡 · 可代改" : "未绑定 · 可代为添加", "accounts", corpBtn)}
+          ${panelHead("收款账户", !canProxyCorp ? (boundCorp ? "对公银行卡 · 仅查看" : "未绑定 · 无托管不可代填") : (boundCorp ? "对公银行卡 · 可代改" : "未绑定 · 可代为添加"), "accounts", corpBtn)}
           <div class="panel-body" style="padding-top:0">
             ${corpBody}
           </div>
@@ -8685,16 +8868,14 @@
       const online = isLink && channelHasOnlineSettle(ch.id);
       const corpAcct = entityCorpAccount(ch.id);
       const boundCorp = paymentAccountCorpBound(corpAcct);
-      const corpBtn = !isLink
-        ? ""
-        : boundCorp
-          ? `<button type="button" class="btn" data-edit-corp-account="${ch.id}">变更</button>`
-          : `<button type="button" class="btn primary" data-edit-corp-account="${ch.id}">代为添加</button>`;
+      const corpBtn = "";
       const corpBody = !isLink
         ? `<p style="margin:0;font-size:13px;color:var(--muted)">人天池 / 非链接类模式无 C 端收款账户；B 端采购款付至运营商。</p>`
-        : !boundCorp
-          ? `<p style="margin:0;font-size:13px;color:var(--muted)">${online ? "线上结算须绑定对公银行卡，否则无法接收佣金。" : "尚未绑定。开启线上结算前必须绑定；线下打佣也使用本账户。"} 渠道可自行添加，平台也可代为填写。字段与运营商相同。</p>`
-          : uniqueCorpDetailGrid(corpAcct);
+        : `${cmbSplitAccountNoticeHtml("channel")}
+          <p style="margin:0 0 12px;font-size:13px;color:var(--muted)">${boundCorp
+            ? (online ? "线上结算佣金打至此招行对公卡。渠道自行维护，平台不能代改。" : "线下打佣也使用本账户。渠道自行维护，平台不能代改。")
+            : (online ? "线上结算须绑定招行对公卡，否则无法接收佣金。请渠道自行添加。" : "尚未绑定。开启线上结算前必须由渠道自行绑定招行对公卡。")}</p>
+          ${boundCorp ? uniqueCorpDetailGrid(corpAcct) : ""}`;
       const contract = cardContractForChannel(ch.id);
       document.querySelector("#drawerTitle").textContent = ch.name;
       document.querySelector("#drawerSub").textContent = ch.id + " · " + (ch.city || "—") + " · " + ch.status;
@@ -8713,7 +8894,7 @@
           </div>
         </section>
         <section class="panel" style="margin:16px 0 0">
-          ${panelHead("收款账户", !isLink ? "本模式不适用" : (boundCorp ? "对公银行卡 · 可代改" : "未绑定 · 可代为添加"), isLink ? "channel_card_accounts" : "channel_no_receipt", corpBtn)}
+          ${panelHead("收款账户", !isLink ? "本模式不适用" : (boundCorp ? "对公银行卡 · 仅查看" : "未绑定 · 渠道自管"), isLink ? "channel_card_accounts" : "channel_no_receipt", corpBtn)}
           <div class="panel-body" style="padding-top:0">
             ${corpBody}
           </div>
@@ -8759,10 +8940,14 @@
         <label>联系电话 <span style="color:var(--red)">*</span><input name="contactPhone" type="tel" value="${op?.contactPhone || ""}" required placeholder="11 位手机号" /></label>
         <label class="form-span-2">地址 <span style="color:var(--red)">*</span><input name="address" value="${op?.address || ""}" required placeholder="省市区 + 门牌号" /></label>
         <label>商户号<input name="mchNo" value="${escProtoAttr(op?.mchNo || "")}" placeholder="支付通道商户号，由平台填写" /></label>
-        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">收款账户（对公银行卡）由平台维护，运营商也可自行绑定。同一时间仅 1 户；未填则保持未绑定。</p>
+        <label>托管协议<select name="custodyAgreement">
+          <option value="1" ${op?.custodyAgreement ? "selected" : ""}>已签署（平台可代维护收款账户）</option>
+          <option value="0" ${!op?.custodyAgreement ? "selected" : ""}>未签署（运营商自管账户）</option>
+        </select></label>
+        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">${noteBtn("accounts_cmb_split")} 目前支付通道对接招商银行，在线分账账户须招行开户。收款账户仅在<strong>已签托管协议</strong>时可代填；未签则留给运营商自行绑定。</p>
         <label>开户名称<input name="bankAccountName" value="${escProtoAttr(corp?.bankAccountName || "")}" placeholder="与对公银行卡户名一致" /></label>
         <label>银行卡号<input name="bankAccount" value="${escProtoAttr(corp?.bankAccount || "")}" inputmode="numeric" maxlength="32" placeholder="对公账号，仅数字" /></label>
-        <label>开户银行<input name="bankName" value="${escProtoAttr(corp?.bankName || "")}" placeholder="如：招商银行" /></label>
+        <label>开户银行<input name="bankName" value="${escProtoAttr(corp?.bankName || "")}" placeholder="须为招商银行" /></label>
         <label>开户支行<input name="bankBranch" value="${escProtoAttr(corp?.bankBranch || "")}" placeholder="如：招商银行上海分行营业部" /></label>
         <label>联行号<input name="bankCode" value="${escProtoAttr(corp?.bankCode || "")}" inputmode="numeric" maxlength="12" placeholder="选填，12 位" /></label>
         <label class="form-span-2">备注<textarea name="remark" rows="2" placeholder="选填">${op?.remark || ""}</textarea></label>`;
@@ -8991,7 +9176,12 @@
         return;
       }
       let corpPayload = null;
+      const custodyAgreement = data.custodyAgreement === "1";
       if (operatorCorpFieldsTouched(data)) {
+        if (!custodyAgreement) {
+          window.alert("未签托管协议不可代维护收款账户，请留空账户字段或先改为已签署");
+          return;
+        }
         const v = validateOperatorCorpFields(data);
         if (typeof v === "string") {
           window.alert(v);
@@ -9006,7 +9196,7 @@
         platformOperators.push({
           id, name: data.name.trim(), logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
           contactName: data.contactName.trim(), contactPhone: data.contactPhone.trim(),
-          loginAccount: loginPhone, mchNo,
+          loginAccount: loginPhone, mchNo, custodyAgreement,
           address: data.address.trim(), onboardDate: new Date().toISOString().slice(0, 10),
           mchWx: "", mchAli: "", remark: data.remark?.trim() || ""
         });
@@ -9025,7 +9215,7 @@
           Object.assign(op, {
             name: data.name.trim(), logoUrl: data.logoUrl.trim(), city: data.city, status: data.status,
             contactName: data.contactName.trim(), contactPhone: data.contactPhone.trim(),
-            loginAccount: loginPhone, mchNo,
+            loginAccount: loginPhone, mchNo, custodyAgreement,
             address: data.address.trim(), remark: data.remark?.trim() || ""
           });
           const loginKey = (op.id === (ENT.operator?.id || "OP-SX")) ? "entity:operator" : `entity:${op.id}`;
@@ -11324,7 +11514,7 @@
       return `${ownScopeBanner()}<section class="panel">
           ${panelHead("渠道商列表", `共 ${rows.length} 家`, "platform_channels")}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_channels")}${noteBtn("channel_partner_manage")}${noteBtn("channel_card_accounts")} 主体仍由运营商签约创建。链接类若与运营商<strong>线上结算</strong>，收款账户与运营商相同（唯一对公银行卡），平台可查看并代改。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_channels")}${noteBtn("channel_partner_manage")}${noteBtn("channel_card_accounts")} 主体仍由运营商签约创建。链接类若与运营商<strong>线上结算</strong>，收款账户为招行对公卡；渠道自行维护，<strong>平台不能代改</strong>。</p>
             <table>
               <thead><tr>
                 <th>渠道商</th><th>结算模式</th><th>账号</th><th>联系人</th><th>状态</th><th>签约运营商</th>
@@ -11661,6 +11851,7 @@
         <section class="panel">
           ${panelHead("平台收款商户", ENT.platform.name, "platform_account")}
           <div class="panel-body">
+            ${cmbSplitAccountNoticeHtml("platform")}
             <div class="detail-grid">
               <div class="detail-item"><span>微信商户号</span><strong>${base.wxMch}</strong></div>
               <div class="detail-item"><span>支付宝商户号</span><strong>${base.aliMch}</strong></div>
@@ -12461,6 +12652,7 @@
            <div class="detail-item"><span>联系人</span>${p.contactName || "—"}</div>`
         : `<div class="detail-item"><span>身份证号</span>${p.idNo || "—"}</div>`;
       return `${ownScopeBanner()}
+        ${cmbSplitAccountNoticeHtml("partner")}
         ${!opened ? `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("site_partner_open_account")} 运营商已将您设为<strong>${type}</strong>合伙人，请按类型补齐开户资料后方可提现。</div>` : ""}
         <section class="panel">
           ${panelHead("收款账户 / 开户信息", `类型锁定为${type} · 按类型绑定资料`, "site_partner_open_account", openBtn)}
@@ -16548,10 +16740,124 @@
       return body;
     }
 
+    function renderOperatorLinkSettle() {
+      const contracts = myLinkContracts();
+      if (!contracts.length) {
+        return `<section class="panel">
+          ${panelHead("链接结算", "与链接类渠道的佣金结算台账（付款/确认方）", "operator_link_settle")}
+          <div class="panel-body">
+            <p style="color:var(--muted);margin:0 0 12px">暂无链接类签约渠道。请先在「签约渠道」新增结算模式为<strong>链接类</strong>的渠道商，并在「平台设置 → 渠道分销价」授权套餐。</p>
+            <button type="button" class="btn primary" data-cstab="contracts">去签约渠道</button>
+          </div>
+        </section>`;
+      }
+      const f = getPf();
+      if (!f.month || f.month === "全部") f.month = "last6";
+      if (!f.channelId) f.channelId = "全部";
+      if (!f.settleType) f.settleType = "全部";
+      const rangeMonths = commissionRangeMonthKeys(f.month);
+      const monthSet = new Set(rangeMonths);
+      const monthRows = operatorLinkSettleMonthRows(rangeMonths, f.channelId)
+        .filter(r => f.settleType === "全部" || r.settleType === f.settleType);
+      const grand = monthRows.reduce((acc, r) => ({
+        orderCount: acc.orderCount + r.orderCount,
+        totalPaid: acc.totalPaid + r.totalPaid,
+        totalCommission: acc.totalCommission + r.totalCommission,
+        totalClawback: acc.totalClawback + r.totalClawback,
+        pendingNet: acc.pendingNet + (r.status === "待线下结清" ? r.netCommission : 0)
+      }), { orderCount: 0, totalPaid: 0, totalCommission: 0, totalClawback: 0, pendingNet: 0 });
+      let detailOrders = myLinkOrders()
+        .filter(o => monthSet.has(payMonthKey(o.payTime)))
+        .filter(o => f.channelId === "全部" || o.channelId === f.channelId)
+        .filter(o => f.settleType === "全部" || orderCommissionSettleType(o) === f.settleType)
+        .sort((a, b) => String(b.payTime).localeCompare(String(a.payTime)));
+      const sub = state.linkSettleSubTab || "summary";
+      const topTabs = panelTopTabs([["summary", "月度汇总"], ["detail", "明细"]], sub, "link-settle-sub");
+      const rangeLabel = commissionRangeLabel(f.month);
+      const isSingleMonth = /^\d{4}-\d{2}$/.test(f.month);
+      const kpiMonthLabel = isSingleMonth ? f.month : rangeLabel;
+      const rangeFilter = `<div style="margin-bottom:14px">${inlinePfBarHtml("operatorLinkSettle")}</div>`;
+      const banner = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("operator_link_settle")} 即时分账已在用户支付时完成，本页只读。线下佣金由运营商对公打款后<strong>登记线下结清</strong>（流水号 + 日期）；渠道「佣金对账」线下状态仍为 ——（decision-074/140）。用户退套餐费时渠道不向骑手退款，佣金按比例冲正（decision-137）。</div>
+        <div class="kpi-grid">
+          ${kpi("统计范围", kpiMonthLabel, grand.orderCount + " 笔成交", "月", "operator_link_settle")}
+          ${kpi("佣金合计", "¥" + grand.totalCommission.toLocaleString(), "含即时与线下", "佣", "channel_card_margin")}
+          ${kpi("冲正合计", "¥" + grand.totalClawback.toFixed(2), "退套餐费按比例", "冲", "channel_instant_commission")}
+          ${kpi("待线下结清", "¥" + grand.pendingNet.toFixed(2), "应付渠道净额", "待", "channel_settlement_card")}
+        </div>`;
+
+      if (sub === "detail") {
+        const pg = paginateList(detailOrders, state.linkSettlePage, state.linkSettlePageSize || 8);
+        state.linkSettlePage = pg.page;
+        return `
+        ${rangeFilter}
+        ${banner}
+        <section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${panelHead(isSingleMonth ? (f.month + " 明细") : (rangeLabel + " 明细"), "本运营商全部链接类渠道成交 · 订单级结算方式与冲正", "operator_link_settle")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>订单</th><th>渠道商</th><th>用户</th><th>套餐</th><th>实付</th><th>佣金</th><th>冲正</th><th>结算方式</th><th>链接用途</th><th>支付时间</th></tr></thead>
+              <tbody>${pg.slice.map(o => {
+                const claw = orderCommissionClawback(o);
+                return `<tr>
+                <td>${o.id}</td>
+                <td>${channelDisplayName(o.channelId)}</td>
+                <td>${o.riderName}<br><small>${o.phone}</small></td>
+                <td>${o.skuName}</td>
+                <td>¥${o.paidPrice}</td><td>¥${o.commission}</td>
+                <td>${claw > 0 ? ("¥" + claw.toFixed(2)) : "—"}</td>
+                <td>${linkOrderSettleCell(o, o.channelId)}</td>
+                <td>${o.linkPurpose || "—"}</td><td>${o.payTime}</td>
+              </tr>`;
+              }).join("") || "<tr><td colspan='10'>该范围内暂无明细</td></tr>"}</tbody>
+            </table>
+            ${renderTablePager(pg, "link-settle-page")}
+          </div>
+        </section>`;
+      }
+
+      const pg = paginateList(monthRows, state.linkSettlePage, state.linkSettlePageSize || 8);
+      state.linkSettlePage = pg.page;
+      return `
+        ${rangeFilter}
+        ${banner}
+        <section class="panel panel-with-top-tabs">
+          ${topTabs}
+          ${panelHead("月度链接结算", "按自然月 × 渠道 × 结算方式拆行（同月可多行）· decision-065/140", "operator_link_settle")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>月份</th><th>渠道商</th><th>结算方式</th><th>成交笔数</th><th>实付合计</th><th>佣金</th><th>冲正</th><th>应结净额</th><th>结算状态</th><th>操作</th></tr></thead>
+              <tbody>${pg.slice.map(r => {
+                let op = "—";
+                if (r.settleType === "线下结算" && r.status === "待线下结清") {
+                  op = `<button type="button" class="link-btn" data-register-offline-settle="${r.channelId}|${r.month}">登记线下结清</button>`;
+                } else if (r.settleType === "线下结算" && r.status === "已线下结清") {
+                  op = `<button type="button" class="link-btn" data-view-offline-settle="${r.channelId}|${r.month}">查看凭证</button>`;
+                }
+                return `<tr>
+                <td>${r.month}</td>
+                <td>${r.channelName}<br><small style="color:var(--muted)">${r.channelId}</small></td>
+                <td>${tag(r.settleType)}</td>
+                <td>${r.orderCount}</td>
+                <td>¥${r.totalPaid.toLocaleString()}</td>
+                <td>¥${r.totalCommission.toLocaleString()}</td>
+                <td>${r.totalClawback > 0 ? ("¥" + r.totalClawback.toFixed(2)) : "—"}</td>
+                <td>¥${r.netCommission.toFixed(2)}</td>
+                <td>${tag(r.status)}</td>
+                <td>${op}</td>
+              </tr>`;
+              }).join("") || "<tr><td colspan='10'>该范围内暂无成交</td></tr>"}</tbody>
+            </table>
+            ${renderTablePager(pg, "link-settle-page")}
+          </div>
+        </section>`;
+    }
+
     function renderChannelSales() {
       if (state.channelSalesTab === "pools") state.channelSalesTab = "assets";
       const tab = state.channelSalesTab;
-      const tabs = [["contracts", "签约渠道"], ["orders", "渠道订单"], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]];
+      const pendingLink = pendingOperatorOfflineSettleCount();
+      const tabs = [["contracts", "签约渠道"], ["orders", "渠道订单"], ["linkSettle", "链接结算" + (pendingLink ? " (" + pendingLink + ")" : "")], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]];
       const sidebar = tabSidebar(tabs, tab, "cstab");
       let body = "";
       if (tab === "platformMarketing") {
@@ -16736,6 +17042,8 @@
             ${renderTablePager(pg, "csorder-page")}
           </div>
         </section>`;
+      } else if (tab === "linkSettle") {
+        body = renderOperatorLinkSettle();
       } else {
         const sub = state.channelAssetsSubTab || "dayPool";
         const subTabs = [
@@ -16761,7 +17069,7 @@
           );
           const pg = paginateList(cardRows, state.channelAssetsPage, pageSize);
           state.channelAssetsPage = pg.page;
-          content = `${panelHead("渠道分销概况", `推广链接成交与佣金（无批发入库）· 共 ${pg.total} 条`, "channel_settlement_card")}
+          content = `${panelHead("渠道分销概况", `推广链接成交与佣金（无批发入库）· 共 ${pg.total} 条`, "channel_settlement_card", `<button type="button" class="btn" data-goto-link-settle>去链接结算</button>`)}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr><th>渠道商</th><th>电池型号</th><th>SKU</th><th>专享价</th><th>佣金/单</th><th>链接成交</th><th>状态</th></tr></thead>
@@ -18700,6 +19008,66 @@
           render();
         };
       });
+      root.querySelectorAll("[data-link-settle-sub]").forEach(btn => {
+        btn.onclick = () => {
+          state.linkSettleSubTab = btn.dataset.linkSettleSub;
+          state.linkSettlePage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-link-settle-page]").forEach(btn => {
+        btn.onclick = () => {
+          if (btn.disabled) return;
+          const p = Number(btn.dataset.linkSettlePage);
+          if (!Number.isFinite(p) || p < 1) return;
+          state.linkSettlePage = p;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-goto-link-settle]").forEach(btn => {
+        btn.onclick = () => {
+          state.channelSalesTab = "linkSettle";
+          state.linkSettlePage = 1;
+          render();
+        };
+      });
+      root.querySelectorAll("[data-register-offline-settle]").forEach(btn => {
+        btn.onclick = () => {
+          const [channelId, month] = String(btn.dataset.registerOfflineSettle || "").split("|");
+          const name = channelDisplayName(channelId);
+          openProtoForm({
+            title: "登记线下结清",
+            submitLabel: "确认登记",
+            fields: [
+              { name: "voucherNo", label: "打款流水号", value: "", placeholder: "银行回单 / 对公转账流水号" },
+              { name: "settledAt", label: "结清日期", type: "date", value: protoBusinessDate() }
+            ],
+            onSubmit: (data) => {
+              const ok = registerOfflineCommissionSettle(channelId, month, data.voucherNo, data.settledAt);
+              if (typeof ok === "string") return ok;
+              return {
+                successMessage: `已登记 ${name} ${month} 线下结清（演示，不产生真实打款）`,
+                afterClose: () => render()
+              };
+            }
+          });
+        };
+      });
+      root.querySelectorAll("[data-view-offline-settle]").forEach(btn => {
+        btn.onclick = () => {
+          const [channelId, month] = String(btn.dataset.viewOfflineSettle || "").split("|");
+          const rec = offlineCommissionSettleRecord(channelId, month);
+          openProtoConfirm({
+            title: "线下结清凭证",
+            html: `<p style="margin:0 0 8px"><strong>${channelDisplayName(channelId)}</strong> · ${month}</p>
+              <p style="margin:0;color:var(--muted);font-size:13px">流水号：${rec?.voucherNo || "—"}<br>结清日期：${rec?.settledAt || "—"}<br>状态：${rec?.status || "已线下结清"}</p>
+              <p style="margin:10px 0 0;font-size:12px;color:var(--muted)">演示登记不可撤销。渠道「佣金对账」线下状态仍为 ——。</p>`,
+            confirmLabel: "关闭",
+            cancelLabel: "关闭",
+            onConfirm: () => {}
+          });
+        };
+      });
       root.querySelectorAll("[data-cancel-promo-link]").forEach(btn => {
         btn.onclick = () => { state.channelLinkForm = null; render(); };
       });
@@ -18865,6 +19233,7 @@
         btn.onclick = () => {
           state.channelSalesTab = btn.dataset.cstab;
           if (btn.dataset.cstab === "orders") state.channelOrdersPage = 1;
+          if (btn.dataset.cstab === "linkSettle") state.linkSettlePage = 1;
           if (btn.dataset.cstab === "assets") state.channelAssetsPage = 1;
           render();
         };
@@ -20839,6 +21208,7 @@
       if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
       if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
       if (pfKey() === "commissionStatement") state.commissionDetailPage = 1;
+      if (pfKey() === "operatorLinkSettle") state.linkSettlePage = 1;
       if (state.view === "depositManage" && (state.depositTab || "pending") === "pending") {
         state.depositRechargePendingPage = 1;
         state.depositRechargeProcessedPage = 1;
@@ -20855,6 +21225,7 @@
       if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
       if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
       if (pfKey() === "commissionStatement") state.commissionDetailPage = 1;
+      if (pfKey() === "operatorLinkSettle") state.linkSettlePage = 1;
       render();
     });
     document.querySelector(".main").addEventListener("keydown", e => {
@@ -20869,6 +21240,7 @@
       if (pfKey() === "dayPool_riders") state.dayPoolRidersPage = 1;
       if (pfKey() === "dayPool_teams") state.dayPoolTeamsPage = 1;
       if (pfKey() === "commissionStatement") state.commissionDetailPage = 1;
+      if (pfKey() === "operatorLinkSettle") state.linkSettlePage = 1;
       render();
     });
 
