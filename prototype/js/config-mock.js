@@ -161,7 +161,7 @@
     };
     const NAV_LABEL = {
       overview: "总览", employees: "员工", sites: "站点管理", sitePartners: "站点合伙人", siteExpenses: "站点支出", devices: "我的设备",
-      orderService: "订单与服务", orderPackage: "套餐购买订单", orderSwap: "换电订单", orderUserDeposit: "用户押金", orderFreeze: "服务冻结", orderAudit: "变更记录", refundManage: "退款管理",
+      orderService: "订单与服务", orderPackage: "套餐购买订单", orderSwap: "换电订单", orderUserDeposit: "用户押金", orderFreeze: "服务冻结", orderAudit: "变更记录", refundManage: "退款管理", orderOverdue: "逾期管理",
       flows: "我的流水", users: "用户",
       leaseAgreements: "协议与设备", leaseCollect: "租金收缴", leaseRent: "月租金",
       financeManage: "融资管理", financeDrawdown: "放款申请",
@@ -184,7 +184,7 @@
       "site_partners.view": ["sites"], "site_partners.edit": ["sites"],
       "site_expenses.view": ["sites"], "site_expenses.edit": ["sites"],
       "devices.view": ["devices"], "devices.edit": ["devices"],
-      "orders.view": ["orderService", "orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit"],
+      "orders.view": ["orderService", "orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit", "orderOverdue"],
       "orders.audit": ["orderService", "orderPackage", "orderFreeze"],
       "refunds.view": ["orderService", "refundManage", "pricing"], "refunds.audit": ["orderService", "refundManage", "pricing"],
       "flows.view": ["flows"],
@@ -243,12 +243,13 @@
       partnerAccount: ["收款账户", "按个人/公司类型展示开户资料；待开户可自助补齐。"],
       siteExpenses: ["站点支出", "跨站点全部周期账单与支付记录；按站配置见「场费电费」。"],
       devices: ["我的设备", "换电柜/电池台账；二期含流转导出、运维记录、电柜组成、端口操作。"],
-      orderService: ["订单与服务", "二级：套餐购买订单 / 换电订单 / 用户押金 / 服务冻结 / 变更记录 / 退款管理。"],
+      orderService: ["订单与服务", "二级：套餐购买订单 / 换电订单 / 用户押金 / 服务冻结 / 变更记录 / 退款管理 / 逾期管理。"],
       orderPackage: ["套餐购买订单", "已并入「订单与服务」；个人用户购买包月/次卡；含待退款状态。"],
       orderSwap: ["换电订单", "已并入「订单与服务」；换电行为与三元组；个人套餐不展示应分（支付已清分）。"],
       orderUserDeposit: ["用户押金", "已并入「订单与服务」；用户购套餐同笔实付押金与信用免押明细；筛选+分页；退押走退款管理。"],
       orderFreeze: ["服务冻结", "已并入「订单与服务」；个人套餐冻结/解冻记录；满足条件时系统自动生效。"],
       refundManage: ["退款管理", "已并入「订单与服务」；C 端退订/中途完结退款：申请队列与审核确认。自动/手动规则在「平台设置 → 退款设置」。"],
+      orderOverdue: ["逾期管理", "持电但权益已结束：个人套餐按日收占用费；人天剩余 0 从渠道额度池扣人天。"],
       orderAudit: ["变更记录", "已并入「订单与服务」（运营商）；订单/服务生命周期审计时间线（C-02）。"],
       flows: ["我的流水", "C 端支付成功实时清分；提现须平台审核；本页展示资金实收、清分明细与提现申请。"],
       employees: ["员工", "运营员工维护与功能权限配置。"],
@@ -413,6 +414,9 @@
       orders_freeze: { title: "服务冻结", content: "<strong>个人套餐</strong>用户在<strong>套餐有效期内</strong>且<strong>未持有电池</strong>时可申请冻结/解除冻结，<strong>满足条件即系统自动生效</strong>，无需运营商审核。冻结期间不可换电；解冻后 <code>valid_to</code> 按冻结天数顺延，骑手端首次服务为领取电池。<strong>服务中</strong>套餐详情<strong>不展示</strong>解冻/首服信息块（decision-070）。渠道人天用户不适用。" },
       orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>押金方式（全站统一）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）；不单列「无需押金」<br>· <strong>套餐购买订单</strong>：押金方式与<strong>收款状态</strong>（已收 / 待付 / ——）分列；仅实付有收款状态（decision-067）<br>· <strong>实付</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用达标免实付（仍须还电规则；已移除微信支付分，decision-100）" },
       orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：<strong>仅实付押金</strong>流水（decision-086）。<br>· 与套餐无关联；列含支付时间/退款时间<br>· 操作列「<strong>退款日志</strong>」：抽屉展示各节点动作与时间（入账、申请、还电校验、审核、原路退等）<br>· 信用免押、渠道担保不在本页" },
+      orders_overdue: { title: "逾期管理", content: "持电但权益已结束（decision-136 / 143）。<strong>个人套餐</strong>：按日收占用费，<strong>须先付清才能还电</strong>；运营商可改本单应付（含 0）并写减免日志。占用费全额进运营商，不分润。<strong>人天池</strong>：剩余 0 仍持电，从渠道额度池扣人天，不向骑手收现金。" },
+      flows_receipt: { title: "资金实收", content: "骑手套餐/自费支付进入<strong>运营商</strong>进件商户的实收流水；<strong>退款亦由运营商子商户原路出款</strong>。含类型「电池占用费」（decision-143）。" },
+      flows_receipt_overdue: { title: "逾期占用费", content: "个人套餐逾期支付的电池占用费。<strong>全额进运营商</strong>，不抽平台 1%、不切站点合伙人、不进清分明细。减免为 0 不产生流水。" },
       orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>芝麻信用免押（≥500）</strong>（运营商押金设置页只读展示，不可改；decision-100）。详情页与实付押金分开展示。" },
       rider_battery_deposit: { title: "骑手电池押金", content: "与「平台保证金」不同。<br>· 个人：购套餐<strong>同笔</strong>免押或实缴 → 运营商子商户<br>· 渠道人天：<strong>首次领电前</strong>免押或实缴（非静默渠道担保）<br>· <strong>押金方式（全站）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）<br>· 运营商「订单与服务 → 用户押金」明细；「用户」台账；平台「用户管理 → 用户押金统计」只读汇总<br>· 数额见「定价管理 → 押金设置」；<strong>仅退押</strong>进「退款管理」" },
       platform_users_info: { title: "用户信息", content: "全平台注册用户（含未购套餐）。<br>· <strong>实名认证</strong>（本表仅两态）：<strong>已实名</strong>（查看实名信息）/ <strong>未实名</strong>；机审未通过不在本表，进入「待审认证」<br>· 运营商用户列表只含已成交的已实名客户（decision-119）<br>· <strong>电池押金</strong>：实付（实收¥xx）/ 信用免押（芝麻 xx分）/ 渠道担保（渠道名）/ ——<br>· <strong>押金状态</strong>：仅<strong>实付</strong>有「在押 / 退押中」；信用免押、渠道担保、无记录统一 ——<br>· <strong>服务状态</strong>与<strong>生效周期</strong>分列（decision-080）<br>· <strong>持有电池</strong>：编码-SOC-SOH（归属运营商）或未持有" },
@@ -427,9 +431,8 @@
       orders_usage: { title: "有效期内使用情况", content: "在套餐 valid_from～valid_to 内汇总：已换电次数、涉及站点、换电明细列表。次卡展示剩余次数；包月展示剩余天数与期内换电次数。" },
       accrual_swap: { title: "换电清分", content: "C 端支付成功后<strong>实时清分</strong>至平台/运营商；换电记录关联清分状态为已清分。" },
       payout_pkg: { title: "支付即清分", content: "套餐/次卡支付成功时实时清分：平台 C 端服务费、站点合伙人分润、运营商净额；押金不参与切分。提现须平台审核。" },
-      arch_b: { title: "架构 B · 运营商收款", content: "骑手 C 端支付进入<strong>运营商</strong>微信/支付宝子商户；支付成功时 1% 分账至平台商户。人天池/激活码渠道无 C 端收款账户；<strong>链接类线上结算</strong>佣金打至渠道<strong>唯一对公银行卡</strong>（与运营商收款账户同结构，decision-122）。" },
-      flows_receipt: { title: "资金实收", content: "骑手套餐/自费支付进入<strong>运营商</strong>进件商户的实收流水；<strong>退款亦由运营商子商户原路出款</strong>。" },
-      flows_accrual: { title: "清分明细", content: "C 端支付成功后的分账明细：平台 1%、运营商净额；开启<strong>佣金及时到付</strong>的骑士卡链接订单另含渠道佣金分账；含退款冲正记录。" },
+      arch_b: { title: "架构 B · 运营商收款", content: "骑手 C 端支付进入<strong>运营商</strong>微信/支付宝子商户；支付成功时 1% 分账至平台商户。人天池/激活码渠道无 C 端收款账户；<strong>链接类线上结算</strong>佣金打至渠道<strong>唯一对公银行卡</strong>（与运营商收款账户同结构，decision-122）。占用费不分账。" },
+      flows_accrual: { title: "清分明细", content: "C 端<strong>套餐</strong>支付成功后的分账明细：平台 1%、运营商净额；开启<strong>佣金及时到付</strong>的骑士卡链接订单另含渠道佣金分账；含退款冲正记录。<strong>电池占用费不进本表</strong>（decision-143）。" },
       flows_payout: { title: "提现申请", content: "运营商从可提现余额发起<strong>内部工单</strong> → 平台审核 → 通过后向支付渠道发起<strong>转账指令</strong>：从收款账户（演示招商银行对公户）转到申请单上的<strong>转账银行卡</strong>。<br>申请必填转账卡：开户名称、银行卡号、开户银行、开户支行；联行号选填。默认同收款账户，可改为任意对公卡；提交后快照，事后改收款账户不影响在途单。<br><strong>一期</strong>可提现 = 已清分 − 已提现 − 待审。<strong>未绑定收款账户不可提现</strong>。设备租赁不适用。" },
       flows_withdraw_apply: { title: "发起提现", content: "金额不得超过可提现余额。须填写<strong>转账银行卡号</strong>（及开户名称/开户银行/开户支行）；默认同收款账户，可改。提交后为「待审核」工单，平台审核通过后发转账指令。" },
       platform_withdraw_review: { title: "运营商提现审核", content: "平台内部工单：核对金额、转出户（收款账户）与<strong>转账银行卡号</strong>。通过后向支付渠道发起转账指令（招商银行户 → 申请单转入卡）；驳回须填原因。不含渠道商-设备租赁。" },
@@ -563,14 +566,15 @@
       leaseRent: ["lease_rent_monthly", "lease_cover_gap", "lease_manual_pay", "lease_offline_ticket"],
       financeManage: ["finance_scope", "finance_dashboard", "finance_operator_credit", "finance_asset_package", "finance_ledger", "finance_projects", "finance_assets", "finance_agreement", "finance_repayments", "finance_repay_ticket", "finance_due_diligence", "finance_disburse", "finance_penalty"],
       financeDrawdown: ["finance_drawdown", "finance_operator_credit", "finance_due_diligence", "finance_disburse", "finance_pre_plan", "finance_repay_ticket", "finance_penalty"],
-      orderService: ["orders_pkg", "orders_swap", "orders_user_deposit", "orders_freeze", "module_order_audit", "refund_manage"],
+      orderService: ["orders_pkg", "orders_swap", "orders_user_deposit", "orders_freeze", "module_order_audit", "refund_manage", "orders_overdue"],
       orderPackage: ["orders_pkg", "orders_deposit", "orders_deposit_waiver", "arch_b", "payout_pkg"],
       orderSwap: ["orders_swap", "orders_swap_triplet", "orders_swap_entitlement", "orders_swap_log"],
       orderUserDeposit: ["orders_user_deposit", "orders_deposit", "orders_deposit_waiver", "rider_battery_deposit"],
       orderFreeze: ["orders_freeze"],
       orderAudit: ["module_order_audit"],
       refundManage: ["refund_manage", "refund_cooling_period", "orders_early_end", "pricing_refund", "times_no_refund_after_active"],
-      flows: ["flows_receipt", "flows_accrual", "flows_payout", "arch_b", "platform_no_share"],
+      orderOverdue: ["orders_overdue"],
+      flows: ["flows_receipt", "flows_receipt_overdue", "flows_accrual", "flows_payout", "arch_b", "platform_no_share"],
       interOp: ["inter_op", "inter_op_pricing", "inter_op_clearing", "operator_deposit", "operator_credit"],
       depositAccount: ["deposit_recharge", "operator_deposit", "operator_credit", "operator_credit_eval"],
       platformService: ["deposit_recharge", "operator_deposit", "platform_fee", "inter_op", "inter_op_clearing"],
@@ -1224,6 +1228,15 @@
       { id: "DEP260522-LJZ", operatorId: "OP-LJZ", userId: "U3300", user: "王换网", phone: "135****3300", amount: 199, status: "在押", payTime: "2026-05-22 09:00", refundTime: null, relatedRefundId: null }
     ];
 
+    /** 逾期管理（decision-136）：持电且权益结束。status=open|done */
+    const overdueCases = [
+      { id: "OD-P-01", operatorId: "OP-SX", type: "personal", status: "open", userId: "U1028", user: "张骑手", phone: "138****1028", sku: "包月30天", orderId: "SUB260524001", reason: "到期", startAt: "2026-09-12T23:59:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-8831", model: "48V30AH", lastSwap: "2026-09-12 18:22", site: "浦东骑手驿站", payStatus: "unpaid", adjLogs: [] },
+      { id: "OD-P-02", operatorId: "OP-SX", type: "personal", status: "open", userId: "U1055", user: "钱骑手", phone: "136****1055", sku: "次卡10次", orderId: "SUB260525088", reason: "次数耗尽", startAt: "2026-09-14T18:05:00+08:00", deposit: "信用免押", batSn: "BAT-HZ-2207", model: "30V30AH", lastSwap: "2026-09-14 17:40", site: "世博换电服务点", payStatus: "unpaid", adjLogs: [] },
+      { id: "OD-D-01", operatorId: "OP-SX", type: "daypool", status: "open", userId: "U-SF-01", user: "丁舒洋", phone: "176****3868", channel: "顺丰同城", team: "浦东站", startAt: "2026-09-13T00:00:00+08:00", poolAfter: -2, batSn: "BAT-SF-0199", model: "48V30AH", lastSwap: "2026-09-12 21:03", site: "浦东骑手驿站" },
+      { id: "OD-D-02", operatorId: "OP-SX", type: "daypool", status: "open", userId: "U-SF-06", user: "赵六", phone: "186****3666", channel: "顺丰同城", team: "默认团队", startAt: "2026-09-15T09:10:00+08:00", poolAfter: 9, batSn: "BAT-SF-0044", model: "30V30AH", lastSwap: "2026-09-14 20:18", site: "陆家嘴分站" },
+      { id: "OD-P-09", operatorId: "OP-SX", type: "personal", status: "done", userId: "U2201", user: "周骑手", phone: "138****2201", sku: "包月30天", orderId: "SUB260610088", reason: "到期", startAt: "2026-09-08T23:59:00+08:00", returnedAt: "2026-09-10T08:12:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-1102", model: "48V30AH", lastSwap: "2026-09-08 11:00", site: "浦东骑手驿站", days: 2, sysDue: 20, feePaid: 20, payStatus: "paid", paidAmount: 20, adjLogs: [{ at: "2026-09-10 08:00", actor: "运营·王客服", from: 20, to: 20, reason: "按系统计费收取（无减免）" }] }
+    ];
+
     /** 押金退款日志：按流水号记录各节点动作与时间（decision-086） */
     const depositRefundLogs = {
       "DEP260524001": [
@@ -1643,7 +1656,8 @@
       { id: "RC260610088", type: "套餐支付", order: "SUB260610088", site: "浦东骑手驿站", city: "上海", user: "U2201", pkg: "7天套餐", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 89, fee: 0.89, net: 88.11, channel: "微信支付", time: "2026-06-03 08:00", status: "成功" },
       { id: "RC260606001", type: "套餐支付", order: "SUB260606001", site: "浦东骑手驿站", city: "上海", user: "U2107", pkg: "1天套餐", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 29, fee: 0.29, net: 28.71, channel: "微信支付", time: "2026-06-06 06:30", status: "成功" },
       { id: "RC260615033D", type: "押金退还", order: "SUB260615033", site: "浦东骑手驿站", city: "上海", user: "U1066", pkg: "包月30天", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: -99, fee: 0, net: -99, channel: "原路退回", time: "—", status: "待审核", note: "订单完结后用户自行申请退押" },
-      { id: "RC260606BJ", type: "套餐支付", order: "SUB260606BJ", site: "滨江换电站", city: "上海", user: "U-LJZ-01", pkg: "包月30天", payee: "滨江联营", deviceOwnerId: "OP-BJ", mch: "1900000789***", amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-06-05 10:00", status: "成功" }
+      { id: "RC260606BJ", type: "套餐支付", order: "SUB260606BJ", site: "滨江换电站", city: "上海", user: "U-LJZ-01", pkg: "包月30天", payee: "滨江联营", deviceOwnerId: "OP-BJ", mch: "1900000789***", amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-06-05 10:00", status: "成功" },
+      { id: "RC-OD-P09", type: "电池占用费", order: "OD-P-09", site: "浦东骑手驿站", city: "上海", user: "U2201", pkg: "电池占用费", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 20, fee: 0, net: 20, channel: "微信支付", time: "2026-09-10 08:05", status: "成功", note: "全额进运营商 · 不分润" }
     ];
 
     const accrualLedger = [
@@ -2972,6 +2986,7 @@
       platformFlows_platformFee: { operatorId: "全部", trigger: "全部", dateFrom: "", dateTo: "" },
       platformAccounts: { month: "2026-06" },
       refundManage: { refundId: "", orderId: "", phone: "", type: "全部", status: "全部", applyFrom: "", applyTo: "" },
+      orderOverdue: { keyword: "", reason: "全部" },
       orderAudit: { keyword: "", eventType: "全部", dateFrom: "", dateTo: "" },
       commissionStatement: { month: "last6" },
       operatorLinkSettle: { month: "last6", channelId: "全部", settleType: "全部" }

@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>运营商 · 逾期管理</title>
+  <style>
+    :root {
+      --bg: #f4f7fb; --surface: #fff; --ink: #17212b; --muted: #657383;
+      --line: #dce5ee; --brand: #0d9488; --brand-dark: #0f766e; --brand-soft: #ecfdf5;
+      --red: #c84545; --orange: #c2410c; --radius: 8px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--ink); background: var(--bg); }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: 52px 1fr; height: 100vh; }
+    header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: #fff; border-bottom: 1px solid var(--line); }
+    header strong { color: var(--brand-dark); }
+    header .meta { font-size: 12px; color: var(--muted); }
+    header a { color: var(--brand-dark); font-size: 12px; margin-left: 12px; }
+    aside { background: #0f172a; color: #cbd5e1; padding: 16px 0; }
+    .brand { padding: 0 16px 16px; border-bottom: 1px solid #1e293b; }
+    .brand span { display: block; font-size: 12px; color: #64748b; margin-top: 4px; }
+    .nav-l1 { padding: 8px 16px; font-size: 12px; color: #64748b; }
+    .nav-item { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: #cbd5e1; padding: 8px 22px; font-size: 13px; }
+    .nav-item.active { background: #134e4a; color: #ecfdf5; }
+    main { overflow: auto; padding: 20px 24px 40px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .kpi { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+    .kpi b { display: block; font-size: 22px; margin-top: 4px; }
+    .kpi span { font-size: 12px; color: var(--muted); }
+    .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); }
+    .tabs button { border: 0; background: transparent; padding: 12px 18px; color: var(--muted); border-bottom: 2px solid transparent; }
+    .tabs button.on { color: var(--brand-dark); font-weight: 600; border-bottom-color: var(--brand); }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    .filters input, .filters select { height: 34px; border: 1px solid var(--line); border-radius: 6px; padding: 0 10px; }
+    .btn { height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line); background: #f8fafc; }
+    .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { background: #f8fafc; color: var(--muted); font-weight: 600; }
+    .tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; }
+    .tag.red { background: #fee2e2; color: var(--red); }
+    .tag.orange { background: #ffedd5; color: var(--orange); }
+    .tag.teal { background: var(--brand-soft); color: var(--brand-dark); }
+    .tag.gray { background: #f1f5f9; color: var(--muted); }
+    .link { border: 0; background: none; color: var(--brand-dark); padding: 0 6px 0 0; }
+    .empty { padding: 48px; text-align: center; color: var(--muted); }
+    .toast { position: fixed; top: 18px; right: 18px; background: #0f172a; color: #fff; padding: 10px 14px; border-radius: 8px; display: none; z-index: 40; }
+    .drawer-mask { position: fixed; inset: 0; background: rgba(15,23,42,.35); display: none; z-index: 30; }
+    .drawer { position: fixed; top: 0; right: 0; width: min(440px, 100%); height: 100%; background: #fff; overflow: auto; padding: 20px; display: none; z-index: 31; box-shadow: -8px 0 24px rgba(0,0,0,.08); }
+    .drawer h3 { margin: 0 0 12px; }
+    .block { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .block h4 { margin: 0 0 8px; font-size: 13px; }
+    .kv { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 13px; }
+    .kv span { color: var(--muted); }
+    .hint { font-size: 12px; color: var(--muted); padding: 0 16px 12px; }
+    .form { padding: 20px; max-width: 420px; display: grid; gap: 12px; }
+    .form label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+    .err { color: var(--red); font-size: 12px; display: none; }
+    .neg { color: var(--red); font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div><strong>绿色出行</strong> · 运营商工作台</div>
+    <div class="meta">
+      逾期管理演示 · 2026-09-15
+      <a href="../docs/PRD.md">PRD</a>
+      <a href="../acceptance-criteria.md">验收标准</a>
+    </div>
+  </header>
+  <aside>
+    <div class="brand"><strong style="color:#fff">智格超能</strong><span>订单与服务</span></div>
+    <div class="nav-l1">订单与服务</div>
+    <button class="nav-item" disabled>套餐购买订单</button>
+    <button class="nav-item" disabled>换电订单</button>
+    <button class="nav-item" disabled>用户押金</button>
+    <button class="nav-item" disabled>退款管理</button>
+    <button class="nav-item active">逾期管理</button>
+  </aside>
+  <main>
+    <div class="kpis" id="kpis"></div>
+    <section class="panel">
+      <div class="tabs" id="tabs"></div>
+      <div class="filters" id="filters"></div>
+      <p class="hint" id="hint"></p>
+      <div id="body"></div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<div class="drawer-mask" id="mask"></div>
+<div class="drawer" id="drawer"></div>
+<script>
+const NOW = new Date("2026-09-15T13:40:00+08:00");
+const state = {
+  tab: "personal",
+  fee: 10,
+  q: "",
+  reason: "全部",
+  rows: null
+};
+
+function hoursBetween(fromIso) {
+  return Math.max(0, (NOW - new Date(fromIso)) / 36e5);
+}
+function billDays(fromIso) {
+  return Math.max(1, Math.ceil(hoursBetween(fromIso) / 24));
+}
+function fmtAt(iso) {
+  if (!iso) return "—";
+  return String(iso).replace("T", " ").replace(/\+08:00$/, "").slice(0, 16);
+}
+function payCleared(r) {
+  if (!r || r.type !== "personal") return true;
+  return Number(r.payable) <= 0 || r.payStatus === "paid";
+}
+function payLabel(r) {
+  if (r.type !== "personal") return "—";
+  if (Number(r.payable) <= 0) return "已减免";
+  if (r.payStatus === "paid") return "已付清";
+  return "待支付";
+}
+function logHtml(logs) {
+  if (!logs || !logs.length) return "<p style='font-size:12px;color:var(--muted);margin:8px 0 0'>暂无减免记录</p>";
+  return `<table style="margin-top:8px"><thead><tr><th>时间</th><th>操作人</th><th>原应付</th><th>新应付</th><th>原因</th></tr></thead><tbody>${logs.map(l =>
+    `<tr><td>${l.at}</td><td>${l.actor}</td><td>¥${l.from}</td><td>¥${l.to}</td><td>${l.reason}</td></tr>`).join("")}</tbody></table>`;
+}
+
+function seed() {
+  return [
+    { id: "OD-P-01", type: "personal", status: "open", userId: "U17867085901622225", name: "王康", phone: "191****1966", sku: "包月30天", orderId: "OI-PKG-0912", reason: "到期", startAt: "2026-09-12T23:59:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-8831", model: "48V30AH", lastSwap: "2026-09-12 18:22", site: "杭州西湖文三路换电站", payStatus: "unpaid", adjLogs: [] },
+    { id: "OD-P-02", type: "personal", status: "open", userId: "U17878176742715044", name: "李庚南", phone: "182****2356", sku: "次卡10次", orderId: "OI-TIMES-0914", reason: "次数耗尽", startAt: "2026-09-14T18:05:00+08:00", deposit: "信用免押", batSn: "BAT-HZ-2207", model: "30V30AH", lastSwap: "2026-09-14 17:40", site: "杭州上城钱江新城换电站", payStatus: "unpaid", adjLogs: [] },
+    { id: "OD-D-01", type: "daypool", status: "open", userId: "U17668113868", name: "丁舒洋", phone: "176****3868", channel: "测试运营商1-人天池", team: "测试团队", startAt: "2026-09-13T00:00:00+08:00", poolAfter: -2, batSn: "BAT-SF-0199", model: "48V30AH", lastSwap: "2026-09-12 21:03", site: "杭州西湖文三路换电站" },
+    { id: "OD-D-02", type: "daypool", status: "open", userId: "U18668113666", name: "赵六", phone: "186****3666", channel: "测试运营商1-人天池", team: "默认团队", startAt: "2026-09-15T09:10:00+08:00", poolAfter: 9, batSn: "BAT-SF-0044", model: "30V30AH", lastSwap: "2026-09-14 20:18", site: "杭州拱墅武林广场换电站" },
+    { id: "OD-P-09", type: "personal", status: "done", userId: "U18800001850", name: "刘杰", phone: "188****1850", sku: "包月30天", orderId: "OI-PKG-0908", reason: "到期", startAt: "2026-09-08T23:59:00+08:00", returnedAt: "2026-09-10T08:12:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-1102", model: "48V30AH", lastSwap: "2026-09-08 11:00", site: "杭州西湖文三路换电站", days: 2, sysDue: 20, feePaid: 20, payStatus: "paid", adjLogs: [{ at: "2026-09-10 08:00", actor: "运营·王客服", from: 20, to: 20, reason: "按系统计费收取" }] }
+  ];
+}
+if (!state.rows) state.rows = seed();
+
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 2200);
+}
+function enrich(r) {
+  if (r.status === "done") {
+    return { ...r, days: r.days, due: r.sysDue || r.feePaid || 0, payable: r.feePaid || 0 };
+  }
+  const days = billDays(r.startAt);
+  const sysDue = r.type === "personal" ? days * state.fee : null;
+  const payable = r.type === "personal" ? (r.payableAdj != null ? Number(r.payableAdj) : sysDue) : null;
+  return { ...r, days, due: sysDue, payable, quota: r.type === "daypool" ? days : null };
+}
+function list(tab) {
+  const want = tab === "done" ? "done" : "open";
+  const type = tab === "personal" ? "personal" : tab === "daypool" ? "daypool" : null;
+  return state.rows.map(enrich).filter(r => {
+    if (r.status !== want) return false;
+    if (type && r.type !== type) return false;
+    const blob = [r.name, r.phone, r.userId, r.batSn, r.orderId, r.channel].join(" ").toLowerCase();
+    if (state.q && !blob.includes(state.q.toLowerCase().replace(/\*/g, ""))) return false;
+    if (tab === "personal" && state.reason !== "全部" && r.reason !== state.reason) return false;
+    return true;
+  });
+}
+
+function render() {
+  const personal = list("personal");
+  const daypool = list("daypool");
+  const dueSum = personal.reduce((s, r) => s + (payCleared(r) ? 0 : (Number(r.payable) || 0)), 0);
+  const quotaSum = state.rows.filter(r => r.type === "daypool").map(enrich).reduce((s, r) => s + (r.status === "open" ? r.quota : 0), 0);
+  document.getElementById("kpis").innerHTML = [
+    ["进行中人数", personal.length + daypool.length],
+    ["个人待收占用费", "¥" + dueSum],
+    ["人天已记占用", quotaSum + " 人天"],
+    ["当前日费", "¥" + state.fee + " / 天"]
+  ].map(([k, v]) => `<div class="kpi"><span>${k}</span><b>${v}</b></div>`).join("");
+
+  const tabs = [
+    ["personal", "个人套餐逾期 (" + personal.length + ")"],
+    ["daypool", "人天池占用 (" + daypool.length + ")"],
+    ["done", "已完结"],
+    ["settings", "逾期设置"]
+  ];
+  document.getElementById("tabs").innerHTML = tabs.map(([id, label]) =>
+    `<button class="${state.tab === id ? "on" : ""}" data-tab="${id}">${label}</button>`
+  ).join("");
+
+  if (state.tab === "settings") {
+    document.getElementById("filters").innerHTML = "";
+    document.getElementById("hint").textContent = "只对个人套餐逾期生效。人天池占用不收现金，按天扣渠道额度池。";
+    document.getElementById("body").innerHTML = `<div class="form">
+      <label>逾期日费（元 / 天）<input id="feeInput" type="number" min="0.01" step="0.01" value="${state.fee}"></label>
+      <p class="err" id="feeErr">日费须大于 0</p>
+      <p style="font-size:12px;color:var(--muted);margin:0">不足一天按一天。无宽限期。个人占用费<strong>须先付清才能还电</strong>，<strong>暂不封顶</strong>。运营商可减免本单应付（含 0）。占用费全额进运营商，不分润。</p>
+      <button class="btn primary" id="saveFee">保存</button>
+    </div>`;
+    return;
+  }
+
+  const isP = state.tab === "personal";
+  const isD = state.tab === "daypool";
+  document.getElementById("filters").innerHTML = `
+    <input id="q" placeholder="姓名 / 手机 / 电池 SN" value="${state.q}">
+    ${isP ? `<select id="reason"><option>全部</option><option>到期</option><option>次数耗尽</option></select>` : ""}
+    <button class="btn" id="doFilter">查询</button>
+    <button class="btn" id="reset">重置</button>
+  `;
+  if (isP) {
+    document.getElementById("reason").value = state.reason;
+  }
+  document.getElementById("hint").textContent = isP
+    ? "个人套餐结束仍持电：须先付清占用费才能还电。运营商可减免（含 0）。占用费全额进运营商，不分润。"
+    : isD
+      ? "个人剩余人天 = 0 仍持电：从渠道额度池扣人天，不向骑手收现金。骑手端展示「无需支付占用费」。"
+      : "还电或续配成功后进入已完结。占用费 / 已扣人天不退。";
+
+  const rows = list(state.tab);
+  if (!rows.length) {
+    document.getElementById("body").innerHTML = `<div class="empty">暂无逾期持电用户</div>`;
+    return;
+  }
+  const head = isP
+    ? "<th>用户</th><th>套餐</th><th>结束原因</th><th>逾期时间</th><th>逾期费用</th><th>支付</th><th>电池</th><th>操作</th>"
+    : isD
+      ? "<th>骑手</th><th>渠道 / 团队</th><th>占用时间</th><th>已扣人天</th><th>池可用（扣后）</th><th>电池</th><th>操作</th>"
+      : "<th>用户</th><th>类型</th><th>逾期时间</th><th>逾期费用 / 人天</th><th>电池</th><th>完结时间</th>";
+  const body = rows.map(r => {
+    if (state.tab === "done") {
+      const fee = r.type === "personal" ? ("¥" + r.feePaid) : (r.days + " 人天（不退）");
+      return `<tr><td>${r.name}<br><small>${r.phone}</small></td><td>${r.type === "personal" ? "个人套餐逾期" : "人天池占用"}</td><td>${fmtAt(r.startAt)}<br><small>${r.days} 天</small></td><td>${fee}</td><td>${r.batSn}<br><small>${r.model}</small></td><td>${fmtAt(r.returnedAt)}</td></tr>`;
+    }
+    const ops = `<button class="link" data-detail="${r.id}">详情</button>
+      <button class="link" data-remind="${r.id}">催还</button>
+      ${r.type === "personal" && !payCleared(r) ? `<button class="link" data-pay="${r.id}">模拟支付</button>` : ""}
+      <button class="link" data-return="${r.id}">模拟还电</button>
+      ${r.type === "daypool" ? `<button class="link" data-alloc="${r.id}">模拟续配</button>` : ""}`;
+    if (isP) {
+      const feeTxt = Number(r.payable) !== Number(r.due) ? `¥${r.payable}<br><small>系统 ¥${r.due}</small>` : `¥${r.payable}`;
+      return `<tr>
+        <td>${r.name}<br><small>${r.phone}<br>${r.userId}</small></td>
+        <td>${r.sku}<br><small>${r.orderId}</small></td>
+        <td><span class="tag ${r.reason === "到期" ? "orange" : "red"}">${r.reason}</span></td>
+        <td>${fmtAt(r.startAt)}<br><small>已逾期 ${r.days} 天</small></td>
+        <td>${feeTxt}</td>
+        <td><span class="tag">${payLabel(r)}</span></td>
+        <td>${r.batSn}<br><small>${r.model}</small></td>
+        <td>${ops}</td>
+      </tr>`;
+    }
+    const poolCls = r.poolAfter < 0 ? "neg" : "";
+    return `<tr>
+      <td>${r.name}<br><small>${r.phone}</small></td>
+      <td>${r.channel}<br><small>${r.team}</small></td>
+      <td>${fmtAt(r.startAt)}<br><small>已占用 ${r.days} 天</small></td>
+      <td>${r.quota} 人天</td>
+      <td class="${poolCls}">${r.poolAfter} ${r.poolAfter < 0 ? "欠人天" : ""}</td>
+      <td>${r.batSn}<br><small>${r.model}</small></td>
+      <td>${ops}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("body").innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function openDetail(id) {
+  const r = enrich(state.rows.find(x => x.id === id));
+  if (!r) return;
+  const typeLabel = r.type === "personal" ? "个人套餐逾期" : "人天池占用";
+  const extra = r.type === "personal"
+    ? `<div class="block"><h4>逾期费用</h4>
+        <div class="kv"><span>逾期时间</span><div>${fmtAt(r.startAt)}</div>
+        <span>已逾期</span><div>${r.days} 天（不足一天按一天）</div>
+        <span>系统计费</span><div>¥${r.due} · 暂不封顶</div>
+        <span>当前应付</span><div>¥${r.payable}</div>
+        <span>支付状态</span><div>${payLabel(r)}</div>
+        <span>还电门槛</span><div>${payCleared(r) ? "占用费已结清，可还电" : "须先付清占用费才能还电"}</div>
+        <span>资金归属</span><div>全额进运营商 · 不分润</div></div></div>
+       ${r.status === "open" ? `<div class="block"><h4>修改逾期费用</h4>
+        <p style="font-size:12px;color:var(--muted)">0 ≤ 改后应付 ≤ 系统计费。改为 0 则无需支付，直接还电。</p>
+        <div class="form" style="padding:0">
+          <label>改后应付<input id="adjAmt" type="number" min="0" max="${r.due}" step="0.01" value="${r.payable}"></label>
+          <label>原因<input id="adjReason" placeholder="必填"></label>
+          <p class="err" id="adjErr">请填写原因，且金额不超过系统计费</p>
+          <button class="btn primary" data-adj="${r.id}">保存减免</button>
+        </div>
+        <h4>减免日志</h4>${logHtml(r.adjLogs)}</div>` : `<div class="block"><h4>减免日志</h4>${logHtml(r.adjLogs)}</div>`}`
+    : `<div class="block"><h4>占用扣减</h4>
+        <div class="kv"><span>占用时间</span><div>${fmtAt(r.startAt)}</div>
+        <span>已扣人天</span><div>${r.quota}（不足一天按 1）</div>
+        <span>扣减对象</span><div>${r.channel} 额度池可用</div>
+        <span>扣后可用</span><div>${r.poolAfter}${r.poolAfter < 0 ? " · 欠人天" : ""}</div>
+        <span>骑手现金</span><div>不收取占用费 · 可直接还电</div></div></div>`;
+  document.getElementById("drawer").innerHTML = `
+    <h3>逾期详情</h3>
+    <p><span class="tag ${r.type === "personal" ? "orange" : "teal"}">${typeLabel}</span></p>
+    <div class="block"><h4>用户信息</h4>
+      <div class="kv">
+        <span>用户 ID</span><div>${r.userId}</div>
+        <span>姓名</span><div>${r.name}</div>
+        <span>手机</span><div>${r.phone}</div>
+        <span>权益来源</span><div>${r.type === "personal" ? "个人套餐 · " + r.sku : "人天池 · " + r.channel}</div>
+        ${r.type === "personal" ? `<span>套餐单</span><div>${r.orderId}</div><span>结束原因</span><div>${r.reason}</div>` : `<span>团队</span><div>${r.team}</div><span>个人剩余</span><div>0 人天</div>`}
+      </div>
+    </div>
+    <div class="block"><h4>电池信息</h4>
+      <div class="kv">
+        <span>SN</span><div>${r.batSn}</div>
+        <span>型号</span><div>${r.model}</div>
+        <span>SOC</span><div>—</div>
+        <span>最后换电</span><div>${r.lastSwap}</div>
+        <span>最后站点</span><div>${r.site}</div>
+        <span>进入时刻</span><div>${fmtAt(r.startAt)}</div>
+      </div>
+    </div>
+    ${extra}
+    <button class="btn" id="closeDrawer">关闭</button>`;
+  document.getElementById("drawer").style.display = "block";
+  document.getElementById("mask").style.display = "block";
+}
+
+document.body.addEventListener("click", e => {
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { state.tab = tab.dataset.tab; render(); return; }
+  if (e.target.id === "doFilter") {
+    state.q = document.getElementById("q").value.trim();
+    if (document.getElementById("reason")) state.reason = document.getElementById("reason").value;
+    render(); return;
+  }
+  if (e.target.id === "reset") { state.q = ""; state.reason = "全部"; render(); return; }
+  if (e.target.id === "saveFee") {
+    const v = Number(document.getElementById("feeInput").value);
+    const err = document.getElementById("feeErr");
+    if (!v || v <= 0) { err.style.display = "block"; return; }
+    err.style.display = "none";
+    state.fee = v;
+    toast("日费已更新为 ¥" + v + " / 天");
+    render(); return;
+  }
+  const detail = e.target.closest("[data-detail]");
+  if (detail) { openDetail(detail.dataset.detail); return; }
+  if (e.target.id === "closeDrawer" || e.target.id === "mask") {
+    document.getElementById("drawer").style.display = "none";
+    document.getElementById("mask").style.display = "none";
+    return;
+  }
+  const remind = e.target.closest("[data-remind]");
+  if (remind) { toast("已向骑手发送还电提醒"); return; }
+  const pay = e.target.closest("[data-pay]");
+  if (pay) {
+    const row = state.rows.find(x => x.id === pay.dataset.pay);
+    const en = enrich(row);
+    if (payCleared(en)) { toast("占用费已结清"); return; }
+    row.payStatus = "paid";
+    row.paidAmount = Number(en.payable);
+    toast("已支付占用费 ¥" + en.payable + "，可进入还电");
+    render(); return;
+  }
+  const adj = e.target.closest("[data-adj]");
+  if (adj) {
+    const row = state.rows.find(x => x.id === adj.dataset.adj);
+    const en = enrich(row);
+    const next = Number(document.getElementById("adjAmt").value);
+    const reason = (document.getElementById("adjReason").value || "").trim();
+    const err = document.getElementById("adjErr");
+    if (Number.isNaN(next) || next < 0 || next > Number(en.due) || !reason) {
+      err.style.display = "block";
+      return;
+    }
+    err.style.display = "none";
+    row.adjLogs = row.adjLogs || [];
+    row.adjLogs.push({ at: "2026-09-15 13:40", actor: "运营·演示", from: en.payable, to: next, reason });
+    row.payableAdj = next;
+    row.payStatus = next <= 0 ? "waived" : row.payStatus;
+    toast(next <= 0 ? "应付已改为 ¥0，可直接还电" : "应付已改为 ¥" + next);
+    openDetail(row.id);
+    return;
+  }
+  const ret = e.target.closest("[data-return]");
+  if (ret) {
+    const row = state.rows.find(x => x.id === ret.dataset.return);
+    const en = enrich(row);
+    if (row.type === "personal" && !payCleared(en)) {
+      toast("须先付清占用费或减免为 0，才能还电");
+      return;
+    }
+    row.status = "done";
+    row.returnedAt = "2026-09-15T13:40:00+08:00";
+    row.days = en.days;
+    row.sysDue = en.due;
+    row.feePaid = row.type === "personal" ? (en.payStatus === "paid" ? (row.paidAmount || en.payable) : 0) : 0;
+    toast(row.type === "personal"
+      ? (Number(en.payable) <= 0 ? "已还电，占用费已减免为 ¥0" : "已还电，占用费 ¥" + row.feePaid + " 已结清，不退")
+      : "已还电，已扣 " + en.quota + " 人天不退；骑手无需付现金");
+    render(); return;
+  }
+  const alloc = e.target.closest("[data-alloc]");
+  if (alloc) {
+    const row = state.rows.find(x => x.id === alloc.dataset.alloc);
+    row.status = "done";
+    row.returnedAt = "2026-09-15T13:40:00+08:00";
+    row.days = enrich(row).quota;
+    toast("已续配，骑手剩余 ≥ 1，退出占用名单；已扣人天不退");
+    render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>

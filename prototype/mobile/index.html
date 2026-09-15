@@ -156,7 +156,8 @@
       personal: { story: "personal", steps: [
         { id: "P01", title: "登录授权" }, { id: "P02", title: "实名认证" }, { id: "P03", title: "确定服务运营商" },
         { id: "P04", title: "购买套餐" }, { id: "P05", title: "首次领取电池" }, { id: "P06", title: "日常换电" },
-        { id: "P07", title: "续费" }, { id: "P08", title: "冻结与解冻" }, { id: "P09", title: "退款/退租/完结" }
+        { id: "P07", title: "续费" }, { id: "P08", title: "冻结与解冻" }, { id: "P09", title: "退款/退租/完结" },
+        { id: "P10", title: "套餐结束·待还电（占用费）" }
       ]},
       channel: { story: "channel", steps: [
         { id: "C01", title: "登录授权" }, { id: "C02", title: "权益到账" }, { id: "C03", title: "今日可用" },
@@ -252,12 +253,26 @@
         <div class="service-card channel"><h4>渠道人天额度</h4><p>顺丰同城 · 世博车队<br>剩余人天 13 · ${opts.today || "今日可用"}${opts.depositPending ? " · 押金待办理" : ""}${opts.confirmed ? " · 换电 1 次" : ""}</p>
           ${opts.depositPending ? `<span class="btn-gold">办理押金</span>` : opts.pickup ? `<span class="btn-gold">扫码领取</span>` : ""}</div>
         ${opts.depositPending ? `<div class="deposit-status-card"><div class="ds-title">电池押金 · 待办理</div>首次领电前须免押或实缴</div>` : ""}`),
+      minePersonalOverdue: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">138****1028</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>套餐已结束 · 请还电</h4><p>已逾期 3 天 · 电池占用费 ¥30<br>须先支付占用费才能还电 · 暂不封顶</p><span class="btn-gold">支付占用费 ¥30</span></div>
+        <div class="deposit-status-card"><div class="ds-title">电池押金 · 实付 ¥99 · 在押</div>押金不抵占用费 · 还电后按规则退押</div>`),
+      minePersonalOverduePaid: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">138****1028</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>占用费已付清 · 请还电</h4><p>已逾期 3 天 · 占用费 ¥30 已支付<br>可进入还电</p><span class="btn-gold">扫码还电</span></div>`),
+      minePersonalOverdueWaived: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">138****1028</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>套餐已结束 · 请还电</h4><p>已逾期 3 天 · 占用费已减免为 ¥0<br>无需支付，可直接还电</p><span class="btn-gold">扫码还电</span></div>`),
+      minePersonalOverdueWaiver: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****1055</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>套餐已结束 · 请还电</h4><p>已逾期 1 天 · 电池占用费 ¥10<br>免押 · 须先支付占用费才能还电</p><span class="btn-gold">支付占用费 ¥10</span></div>
+        <div class="deposit-status-card"><div class="ds-title">电池押金 · 信用免押</div>无在押可抵 · 先付占用费再还电</div>`),
       mineChannelFail: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">137****2103</span><span class="tag-sm ok">已认证</span></div></div>
-        <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>个人无额度 · 剩余人天 0<br>持有电池：仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
+        <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>个人剩余 0 · 持电池仅可还电<br>已从渠道额度扣除 3 人天<br><strong>你无需支付占用费</strong></p><span class="btn-gold">扫码还电</span></div>`),
       mineChannelNoQuota: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">134****2112</span><span class="tag-sm ok">已认证</span></div></div>
-        <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>个人无额度 · 分配人天已用尽<br>持有电池：仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
+        <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>个人剩余 0 · 分配人天已用尽<br>已从渠道额度扣除 1 人天<br><strong>你无需支付占用费</strong></p><span class="btn-gold">扫码还电</span></div>`),
       mineResigned: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****2110</span><span class="tag-sm ok">已认证</span></div></div>
         <div class="service-card done"><h4>服务已终止（离职）</h4><p>请还电入柜后完结 · 仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
@@ -328,10 +343,37 @@
           <p>SW2605241201 · SOC 96%${channel ? "<br><small style='color:#1a8f4a'>✓ 今日人天：已确认消耗</small>" : ""}</p></div>`, { hideTab: true }),
       resultReturn: () => phoneShell("扫码换电", "home", `
         <div class="result-ok"><div class="big">✓</div><h4>还电成功</h4>
-          <p>剩余人天已回池 · 不向骑手退款</p></div>`, { hideTab: true }),
+          <p>已扣 3 人天不退 · <strong>你无需支付占用费</strong><br>剩余人天已回池 · 不向骑手退款</p></div>`, { hideTab: true }),
+      resultReturnSettle: () => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big">✓</div><h4>还电成功</h4>
+          <p>占用费 ¥30 已预先结清，不退<br>押金按退租规则另退</p></div>`, { hideTab: true }),
+      resultReturnPay: () => phoneShell("扫码换电", "home", `
+        <div class="result-ok"><div class="big fail">✕</div><h4>无法还电</h4>
+          <p>请先支付电池占用费 ¥10<br>付清后才能进入还电</p>
+          <button class="btn-block" style="margin-top:10px;width:80%">去支付 ¥10</button></div>`, { hideTab: true }),
+      payOccupancy: () => phoneShell("支付占用费", "mine", `
+        <div class="sheet-page">
+          <p style="font-weight:600;margin-bottom:6px">电池占用费</p>
+          <p style="font-size:9px;color:var(--muted);margin-bottom:8px">已逾期 3 天 · 暂不封顶 · 全额给运营商，不分润</p>
+          <div class="pay-summary"><span class="total">应付 ¥30</span></div>
+          <button class="btn-block" style="margin-top:12px">确认支付 ¥30</button>
+          <p style="font-size:9px;color:var(--muted);margin-top:8px;text-align:center">支付成功后才可扫码还电</p>
+        </div>`, { hideTab: true }),
+      scanReturnOverduePersonal: () => phoneShell("扫码换电", "home", `
+        <div class="scan-box"><div class="scan-frame"><div class="scan-line"></div></div>
+          <p style="color:#d97706">占用费已付清：仅可还电</p>
+          <p style="font-size:9px;margin-top:8px">电池占用费 ¥30 已支付<br>不足一天按一天 · 暂不封顶</p>
+          <button class="btn-block" style="margin-top:10px">确认还电入柜</button></div>`, { hideTab: true }),
+      scanReturnOverdueWaiver: () => phoneShell("扫码换电", "home", `
+        <div class="scan-box"><div class="scan-frame"><div class="scan-line"></div></div>
+          <p style="color:#d97706">套餐已结束：请先支付占用费</p>
+          <p style="font-size:9px;margin-top:8px">本次电池占用费 <strong>¥10</strong>（已逾期 1 天）<br>未付清不可还电</p>
+          <button class="btn-block" style="margin-top:10px;background:#ccc;color:#666">还电不可用</button></div>`, { hideTab: true }),
       scanReturnOnly: () => phoneShell("扫码换电", "home", `
         <div class="scan-box"><div class="scan-frame"><div class="scan-line"></div></div>
-          <p style="color:#d97706">无人天额度：仅可还电</p><button class="btn-block" style="margin-top:10px">模拟还电入柜</button></div>`, { hideTab: true }),
+          <p style="color:#d97706">无人天额度：仅可还电</p>
+          <p style="font-size:9px;margin-top:8px">已从渠道额度扣除 3 人天<br><strong>你无需支付占用费</strong></p>
+          <button class="btn-block" style="margin-top:10px">模拟还电入柜</button></div>`, { hideTab: true }),
       channelDeposit: () => phoneShell("扫码换电", "home", `
         <div class="sheet-page"><p style="margin-bottom:8px">渠道人天 · 首次领电前须办押金</p>
           <div class="deposit-opt selected"><div class="opt-title">☑ 芝麻信用免押</div></div>
@@ -391,7 +433,11 @@
         connector(""), flowCell("P07", "续费", SCREENS.purchaseRenew(), "● 正式零售价"),
         connector(""), flowCell("P08a", "已冻结", SCREENS.mineFrozen(), "● 须先还电"),
         connector("解除冻结"), flowCell("P08b", "解冻待领电", SCREENS.minePendingPickup(), "◆ 顺延有效期"),
-        connector(""), flowCell("P09", "冷静期退款", SCREENS.mineCooling(), "● 须还电")
+        connector(""), flowCell("P09", "冷静期退款", SCREENS.mineCooling(), "● 须还电"),
+        connector(""), flowCell("P10a", "套餐结束待还电", SCREENS.minePersonalOverdue(), "! 先付费"),
+        connector(""), flowCell("P10pay", "支付占用费", SCREENS.payOccupancy(), "● 付清才还电"),
+        connector(""), flowCell("P10b", "已付清·仅还电", SCREENS.scanReturnOverduePersonal(), "! 可还电"),
+        connector(""), flowCell("P10c", "还电成功", SCREENS.resultReturnSettle(), "◆ 占用费不退")
       ].join("");
     }
 
@@ -434,7 +480,11 @@
       { id: "SP-06", title: "柜机超时/无空电", key: "cabinet_timeout", fn: () => SCREENS.wireCabinetTimeout() },
       { id: "SP-07", title: "解冻待领电池", key: "pending_pickup", fn: () => SCREENS.minePendingPickup() },
       { id: "SP-08", title: "冷静期退款", key: "cooling_refund", fn: () => SCREENS.mineCooling() },
-      { id: "SP-09", title: "订单空态", key: "orders_empty", fn: () => SCREENS.ordersEmptySwap() }
+      { id: "SP-09", title: "订单空态", key: "orders_empty", fn: () => SCREENS.ordersEmptySwap() },
+      { id: "SP-10", title: "免押·待付占用费", key: "personal_overdue_waiver", fn: () => SCREENS.minePersonalOverdueWaiver() },
+      { id: "SP-11", title: "未付清拦截还电", key: "personal_overdue_block", fn: () => SCREENS.scanReturnOverdueWaiver() },
+      { id: "SP-12", title: "未付清扫码失败", key: "personal_overdue_unpaid", fn: () => SCREENS.resultReturnPay() },
+      { id: "SP-13", title: "运营减免为0", key: "personal_overdue_waived", fn: () => SCREENS.minePersonalOverdueWaived() }
     ];
     const SUPPLEMENT_CHANNEL = [
       { id: "SC-01", title: "押金已办·持电池", key: "channel_deposit_done", fn: () => SCREENS.mineChannel({ confirmed: true, today: "今日已确认消耗" }) },
@@ -471,11 +521,11 @@
         <section class="flow-section"><h2>信息架构 · 三 Tab 基础页 <span class="badge">IA</span></h2>
           <p class="section-desc">首页地图 + 订单三 Tab（换电/服务购买/退租）+ 我的服务态 + 设置。个人与人天共用 Tab 结构；渠道人天通常无自购套餐单。</p>
           <div class="flow-track">${buildIATrack()}</div></section>
-        <section class="flow-section"><h2>主线一 · 个人套餐 <span class="badge">P01–P09</span></h2>
-          <p class="section-desc">登录 → 实名 → 定 OP → 购套餐 → 待领电 → 扫码领取 → 换电 → 续费 → 冻结/解冻 → 冷静期退款。</p>
+        <section class="flow-section"><h2>主线一 · 个人套餐 <span class="badge">P01–P10</span></h2>
+          <p class="section-desc">登录 → 实名 → 定 OP → 购套餐 → 待领电 → 扫码领取 → 换电 → 续费 → 冻结/解冻 → 冷静期退款 → 套餐结束须先支付占用费再还电。</p>
           <div class="flow-track">${buildPersonalTrack()}</div>${buildPersonalBranch()}</section>
         <section class="flow-section"><h2>主线二 · 渠道人天 <span class="badge">C01–C08</span></h2>
-          <p class="section-desc">权益到账 → 今日可用 → 首领押金 → 领电 → 换电确认消耗 → 额度异常仅还电 → 离职 → 还电回池。无主套餐入口，无自费兜底。</p>
+          <p class="section-desc">权益到账 → 今日可用 → 首领押金 → 领电 → 换电确认消耗 → 额度异常仅还电（展示已扣人天、无需付占用费）→ 离职 → 还电回池。无主套餐入口，无自费兜底。</p>
           <div class="flow-track">${buildChannelTrack()}</div>
           <div class="flow-note" style="margin-top:16px"><h4>渠道 vs 个人 · 互斥</h4>
             <p>不可同时持有个人套餐与渠道人天；零额度持电池<strong>仅可还电</strong>，须联系渠道续配。</p></div></section>

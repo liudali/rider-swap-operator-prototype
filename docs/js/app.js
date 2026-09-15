@@ -47,6 +47,8 @@
       orderServiceTab: "package",
       userDepositPage: 1,
       userDepositPageSize: 8,
+      overdueInnerTab: "personal",
+      overdueFee: 10,
       depositAccountTab: "overview",
       platformFeeTab: "overview",
       sitePartnersTab: "profiles",
@@ -1490,6 +1492,7 @@
         if (t === "package") return "orders_package";
         if (t === "swap") return "orders_swap";
         if (t === "userDeposit") return "orders_user_deposit";
+        if (t === "overdue") return "orderOverdue";
         if (t === "freeze") return "orderFreeze";
         if (t === "refund") return "refundManage";
         if (t === "audit") return "orderAudit";
@@ -4412,7 +4415,7 @@
       ],
       flows_receipt: [
         { key: "orderId", label: "关联单号", placeholder: "套餐单号" },
-        { key: "flowType", label: "流水类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "套餐支付", t: "套餐支付" }, { v: "额度池采购", t: "额度池采购" }, { v: "额度池零售", t: "额度池零售" }, { v: "退款出款", t: "退款出款" }, { v: "押金退还", t: "押金退还" }] },
+        { key: "flowType", label: "流水类型", type: "select", options: [{ v: "全部", t: "全部" }, { v: "套餐支付", t: "套餐支付" }, { v: "电池占用费", t: "电池占用费" }, { v: "额度池采购", t: "额度池采购" }, { v: "额度池零售", t: "额度池零售" }, { v: "退款出款", t: "退款出款" }, { v: "押金退还", t: "押金退还" }] },
         { key: "timeFrom", label: "交易日起", type: "date" },
         { key: "timeTo", label: "交易日止", type: "date" }
       ],
@@ -4458,6 +4461,10 @@
         { key: "status", label: "处理状态", type: "select", options: [{ v: "全部", t: "全部" }, { v: "待审核", t: "待审核" }, { v: "已退款", t: "已退款" }, { v: "已驳回", t: "已驳回" }] },
         { key: "applyFrom", label: "申请日起", type: "date" },
         { key: "applyTo", label: "申请日止", type: "date" }
+      ],
+      orderOverdue: [
+        { key: "keyword", label: "用户 / 电池", placeholder: "姓名 / 手机 / SN" },
+        { key: "reason", label: "结束原因", type: "select", options: [{ v: "全部", t: "全部" }, { v: "到期", t: "到期" }, { v: "次数耗尽", t: "次数耗尽" }] }
       ],
       leaseAgreements: [
         { key: "contractId", label: "协议编号", placeholder: "LC-" },
@@ -6528,7 +6535,8 @@
               ["userDeposit", "用户押金"],
               ["freeze", "服务冻结"],
               ["audit", "变更记录"],
-              ["refund", "退款管理" + (n ? " (" + n + ")" : "")]
+              ["refund", "退款管理" + (n ? " (" + n + ")" : "")],
+              ["overdue", "逾期管理" + (typeof pendingOverdueCount === "function" && pendingOverdueCount() ? " (" + pendingOverdueCount() + ")" : "")]
             ];
           }
         },
@@ -6625,10 +6633,10 @@
         state.view = "operators";
         state.operatorsTab = "channels";
       }
-      if (isOperatorRole() && ["orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit", "refundManage"].includes(state.view)) {
+      if (isOperatorRole() && ["orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit", "refundManage", "orderOverdue"].includes(state.view)) {
         const map = {
           orderPackage: "package", orderSwap: "swap", orderUserDeposit: "userDeposit", orderFreeze: "freeze",
-          orderAudit: "audit", refundManage: "refund"
+          orderAudit: "audit", refundManage: "refund", orderOverdue: "overdue"
         };
         state.orderServiceTab = map[state.view];
         if (state.view === "orderPackage" || state.view === "orderSwap" || state.view === "orderFreeze") {
@@ -6716,7 +6724,7 @@
         const t = state.orderServiceTab || "package";
         const map = {
           package: "orderPackage", swap: "orderSwap", userDeposit: "orderUserDeposit",
-          freeze: "orderFreeze", audit: "orderAudit", refund: "refundManage"
+          freeze: "orderFreeze", audit: "orderAudit", refund: "refundManage", overdue: "orderOverdue"
         };
         return map[t] || "orderService";
       }
@@ -6862,11 +6870,11 @@
         return;
       }
 
-      const orderKeys = ["orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit", "refundManage"];
+      const orderKeys = ["orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit", "refundManage", "orderOverdue"];
       if (isOperatorRole() && orderKeys.includes(viewKey)) {
         const map = {
           orderPackage: "package", orderSwap: "swap", orderUserDeposit: "userDeposit",
-          orderFreeze: "freeze", orderAudit: "audit", refundManage: "refund"
+          orderFreeze: "freeze", orderAudit: "audit", refundManage: "refund", orderOverdue: "overdue"
         };
         state.view = "orderService";
         state.orderServiceTab = map[viewKey];
@@ -6989,7 +6997,7 @@
         const tab = state.orderServiceTab || "package";
         const keyMap = {
           package: "orderPackage", swap: "orderSwap", userDeposit: "orderUserDeposit", freeze: "orderFreeze",
-          audit: "orderAudit", refund: "refundManage"
+          audit: "orderAudit", refund: "refundManage", overdue: "orderOverdue"
         };
         const key = keyMap[tab] || "orderService";
         const ids = VIEW_MODULE_NOTE[key];
@@ -14598,11 +14606,247 @@
         </section>`;
     }
 
+    function overdueNow() {
+      return new Date("2026-09-15T13:40:00+08:00");
+    }
+    function overdueBillDays(startAt) {
+      const hours = Math.max(0, (overdueNow() - new Date(startAt)) / 36e5);
+      return Math.max(1, Math.ceil(hours / 24));
+    }
+    function fmtOverdueAt(iso) {
+      if (!iso) return "—";
+      return String(iso).replace("T", " ").replace(/\+08:00$/, "").slice(0, 16);
+    }
+    function parseOverdueDepositHeld(deposit) {
+      if (!deposit || /免押/.test(deposit)) return 0;
+      const m = String(deposit).match(/¥\s*(\d+(?:\.\d+)?)/);
+      return m ? Number(m[1]) : 0;
+    }
+    function overduePayCleared(r) {
+      if (!r || r.type !== "personal") return true;
+      const p = Number(r.payable);
+      return p <= 0 || r.payStatus === "paid";
+    }
+    function overduePayStatusLabel(r) {
+      if (r.type !== "personal") return "—";
+      if (Number(r.payable) <= 0) return "已减免";
+      if (r.payStatus === "paid") return "已付清";
+      return "待支付";
+    }
+    function fmtOverdueAdjLogs(logs) {
+      if (!logs || !logs.length) return `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">暂无减免记录</p>`;
+      return `<table style="margin-top:8px;font-size:12px"><thead><tr><th>时间</th><th>操作人</th><th>原应付</th><th>新应付</th><th>原因</th></tr></thead><tbody>${logs.map(l =>
+        `<tr><td>${l.at}</td><td>${l.actor}</td><td>¥${l.from}</td><td>¥${l.to}</td><td>${l.reason}</td></tr>`
+      ).join("")}</tbody></table>`;
+    }
+    function pushOverdueReceipt(row, amount) {
+      if (!amount || amount <= 0) return;
+      fundReceipts.unshift({
+        id: "RC-OD-" + row.id + "-" + Date.now().toString().slice(-4),
+        type: "电池占用费",
+        order: row.id,
+        site: row.site || "—",
+        city: "上海",
+        user: row.userId,
+        pkg: "电池占用费",
+        payee: "绿色出行",
+        deviceOwnerId: row.operatorId || "OP-SX",
+        mch: "19000001***",
+        amount: amount,
+        fee: 0,
+        net: amount,
+        channel: "微信支付",
+        time: "2026-09-15 13:40",
+        status: "成功",
+        note: "全额进运营商 · 不分润"
+      });
+    }
+    function pendingOverdueCount() {
+      return (typeof overdueCases !== "undefined" ? overdueCases : []).filter(r => r.operatorId === currentEntity().id && r.status === "open").length;
+    }
+    function enrichOverdue(r) {
+      if (r.status === "done") {
+        const sysDue = r.sysDue != null ? r.sysDue : (r.feePaid || 0);
+        return { ...r, days: r.days, due: sysDue, payable: r.feePaid || 0, quota: r.days };
+      }
+      const days = overdueBillDays(r.startAt);
+      const sysDue = r.type === "personal" ? days * (state.overdueFee || 10) : null;
+      const payable = r.type === "personal" ? (r.payableAdj != null ? Number(r.payableAdj) : sysDue) : null;
+      return { ...r, days, due: sysDue, payable, quota: r.type === "daypool" ? days : null };
+    }
+    function filterOverdueRows(tab) {
+      const pf = getPf();
+      const want = tab === "done" ? "done" : "open";
+      const type = tab === "personal" ? "personal" : tab === "daypool" ? "daypool" : null;
+      return overdueCases.filter(r => r.operatorId === currentEntity().id).map(enrichOverdue).filter(r => {
+        if (r.status !== want) return false;
+        if (type && r.type !== type) return false;
+        const q = (pf.keyword || "").trim().toLowerCase();
+        if (q) {
+          const blob = [r.user, r.phone, r.userId, r.batSn, r.orderId, r.channel].join(" ").toLowerCase();
+          if (!blob.includes(q.replace(/\*/g, ""))) return false;
+        }
+        if (tab === "personal" && pf.reason && pf.reason !== "全部" && r.reason !== pf.reason) return false;
+        return true;
+      });
+    }
+    function openOverdueDetail(id) {
+      const raw = overdueCases.find(x => x.id === id);
+      if (!raw) return;
+      const r = enrichOverdue(raw);
+      const typeLabel = r.type === "personal" ? "个人套餐逾期" : "人天池占用";
+      const payOk = overduePayCleared(r);
+      const feeBlock = r.type === "personal"
+        ? `<div class="detail-item"><span>逾期时间</span><strong>${fmtOverdueAt(r.startAt)}<br><small>已逾期 ${r.days} 天（不足一天按一天）</small></strong></div>
+           <div class="detail-item"><span>系统计费</span><strong>¥${r.due}<br><small>日费 ¥${state.overdueFee || 10} / 天 · 暂不封顶</small></strong></div>
+           <div class="detail-item"><span>当前应付</span><strong>¥${r.payable}</strong></div>
+           <div class="detail-item"><span>支付状态</span><strong>${overduePayStatusLabel(r)}</strong></div>
+           <div class="detail-item"><span>还电门槛</span><strong>${payOk ? "占用费已结清，可还电" : "须先付清占用费才能还电"}</strong></div>
+           <div class="detail-item"><span>资金归属</span><strong>全额进运营商 · 不分润</strong></div>`
+        : `<div class="detail-item"><span>占用时间</span><strong>${fmtOverdueAt(r.startAt)}<br><small>已占用 ${r.quota} 天（不足一天按 1 人天）</small></strong></div>
+           <div class="detail-item"><span>已扣人天</span><strong>${r.quota} 人天<br><small>扣 ${r.channel} 额度池${r.poolAfter < 0 ? " · 欠人天 " + r.poolAfter : " · 扣后可用 " + r.poolAfter}</small></strong></div>
+           <div class="detail-item"><span>骑手现金</span><strong>不收取占用费 · 可直接还电</strong></div>`;
+      const adjBlock = r.type === "personal" && r.status === "open"
+        ? `<h4 style="margin:16px 0 8px">修改逾期费用</h4>
+           <p style="font-size:12px;color:var(--muted);margin:0 0 8px">0 ≤ 改后应付 ≤ 系统计费 ¥${r.due}。改为 0 则无需支付，直接还电。必填原因并写入减免日志。</p>
+           <div class="detail-grid" style="margin-bottom:8px">
+             <div class="detail-item"><span>改后应付</span><input id="overdueAdjAmt" type="number" min="0" max="${r.due}" step="0.01" value="${r.payable}" style="height:32px;padding:0 8px"></div>
+             <div class="detail-item"><span>原因</span><input id="overdueAdjReason" placeholder="必填，如客诉减免" style="height:32px;padding:0 8px"></div>
+           </div>
+           <p id="overdueAdjErr" style="color:var(--red);font-size:12px;display:none;margin:0 0 8px"></p>
+           <p style="margin:0 0 12px"><button type="button" class="btn" data-overdue-adj-save="${r.id}">保存减免</button></p>
+           <h4 style="margin:0 0 8px">减免日志</h4>
+           ${fmtOverdueAdjLogs(r.adjLogs)}`
+        : (r.type === "personal" ? `<h4 style="margin:16px 0 8px">减免日志</h4>${fmtOverdueAdjLogs(r.adjLogs)}` : "");
+      document.querySelector("#drawerTitle").textContent = "逾期详情 · " + r.user;
+      document.querySelector("#drawerSub").textContent = typeLabel + " · " + r.phone;
+      document.querySelector("#drawerBody").innerHTML = `
+        <p style="margin:0 0 12px">${tag(typeLabel)}</p>
+        <h4 style="margin:0 0 8px">用户信息</h4>
+        <div class="detail-grid" style="margin-bottom:16px">
+          <div class="detail-item"><span>用户 ID</span><strong>${r.userId}</strong></div>
+          <div class="detail-item"><span>姓名</span><strong>${r.user}</strong></div>
+          <div class="detail-item"><span>手机</span><strong>${r.phone}</strong></div>
+          <div class="detail-item"><span>权益来源</span><strong>${r.type === "personal" ? "个人套餐 · " + r.sku : "人天池 · " + r.channel}</strong></div>
+          ${r.type === "personal"
+            ? `<div class="detail-item"><span>套餐单</span><strong>${r.orderId}</strong></div><div class="detail-item"><span>结束原因</span><strong>${r.reason}</strong></div>`
+            : `<div class="detail-item"><span>团队</span><strong>${r.team}</strong></div><div class="detail-item"><span>个人剩余</span><strong>0 人天</strong></div>`}
+          ${feeBlock}
+        </div>
+        <h4 style="margin:0 0 8px">电池信息</h4>
+        <div class="detail-grid">
+          <div class="detail-item"><span>SN</span><strong>${r.batSn}</strong></div>
+          <div class="detail-item"><span>型号</span><strong>${r.model}</strong></div>
+          <div class="detail-item"><span>SOC</span><strong>—</strong></div>
+          <div class="detail-item"><span>最后换电</span><strong>${r.lastSwap}</strong></div>
+          <div class="detail-item"><span>最后站点</span><strong>${r.site}</strong></div>
+          <div class="detail-item"><span>进入时刻</span><strong>${fmtOverdueAt(r.startAt)}</strong></div>
+        </div>
+        ${adjBlock}`;
+      document.querySelector("#drawerMask").classList.add("open");
+      document.querySelector("#orderDrawer").classList.add("open");
+      document.querySelector("#orderDrawer").setAttribute("aria-hidden", "false");
+      bindDrawerActions();
+    }
+    function renderOverdue() {
+      const inner = state.overdueInnerTab || "personal";
+      const personal = filterOverdueRows("personal");
+      const daypool = filterOverdueRows("daypool");
+      const dueSum = personal.reduce((s, r) => s + (overduePayCleared(r) ? 0 : (Number(r.payable) || 0)), 0);
+      const quotaSum = filterOverdueRows("daypool").reduce((s, r) => s + (r.quota || 0), 0);
+      const tabs = [
+        ["personal", "个人套餐逾期 (" + personal.length + ")"],
+        ["daypool", "人天池占用 (" + daypool.length + ")"],
+        ["done", "已完结"],
+        ["settings", "逾期设置"]
+      ];
+      const tabBar = `<div class="sub-tabs" style="display:flex;gap:8px;margin-bottom:12px">${tabs.map(([id, label]) =>
+        `<button type="button" class="btn ${inner === id ? "primary" : ""}" data-overdue-tab="${id}">${label}</button>`
+      ).join("")}</div>`;
+      const kpi = `<div class="kpi-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+        <div class="kpi"><span>进行中</span><b>${personal.length + daypool.length}</b></div>
+        <div class="kpi"><span>个人待收占用费</span><b>¥${dueSum}</b></div>
+        <div class="kpi"><span>人天已记占用</span><b>${quotaSum} 人天</b></div>
+        <div class="kpi"><span>日费</span><b>¥${state.overdueFee || 10}/天</b></div>
+      </div>`;
+      if (inner === "settings") {
+        return `${ownScopeBanner()}<section class="panel">
+          ${panelHead("逾期设置", "只对个人套餐逾期生效；人天池占用扣渠道额度池", "orders_overdue")}
+          <div class="panel-body">
+            ${kpi}${tabBar}
+            <p style="font-size:12px;color:var(--muted)">不足一天按一天。无宽限期。个人占用费<strong>须先付清才能还电</strong>，<strong>暂不封顶</strong>。运营商可减免本单应付（含 0）。占用费全额进运营商，不分润。</p>
+            <label style="display:grid;gap:6px;max-width:280px;font-size:13px;color:var(--muted)">逾期日费（元 / 天）
+              <input id="overdueFeeInput" type="number" min="0.01" step="0.01" value="${state.overdueFee || 10}">
+            </label>
+            <p id="overdueFeeErr" style="color:var(--red);font-size:12px;display:none">日费须大于 0</p>
+            <p style="margin-top:12px"><button type="button" class="btn primary" data-overdue-save-fee>保存</button></p>
+          </div>
+        </section>`;
+      }
+      const rows = filterOverdueRows(inner);
+      const isP = inner === "personal";
+      const isD = inner === "daypool";
+      const head = inner === "done"
+        ? "<th>用户</th><th>类型</th><th>逾期时间</th><th>逾期费用 / 人天</th><th>电池</th><th>完结时间</th><th>操作</th>"
+        : isP
+          ? "<th>用户</th><th>套餐</th><th>结束原因</th><th>逾期时间</th><th>逾期费用</th><th>支付</th><th>电池</th><th>操作</th>"
+          : "<th>骑手</th><th>渠道 / 团队</th><th>占用时间</th><th>已扣人天</th><th>池可用（扣后）</th><th>电池</th><th>操作</th>";
+      const body = rows.length ? rows.map(r => {
+        if (inner === "done") {
+          const fee = r.type === "personal" ? ("¥" + (r.feePaid || r.due || 0)) : (r.days + " 人天（不退）");
+          return `<tr><td>${r.user}<br><small>${r.phone}</small></td><td>${r.type === "personal" ? "个人套餐逾期" : "人天池占用"}</td><td>${fmtOverdueAt(r.startAt)}<br><small>${r.days} 天</small></td><td>${fee}</td><td>${r.batSn}<br><small>${r.model}</small></td><td>${fmtOverdueAt(r.returnedAt)}</td><td><button type="button" class="link-btn" data-overdue-detail="${r.id}">详情</button></td></tr>`;
+        }
+        const ops = `<button type="button" class="link-btn" data-overdue-detail="${r.id}">详情</button>
+          <button type="button" class="link-btn" data-overdue-remind="${r.id}">催还</button>
+          ${r.type === "personal" && !overduePayCleared(r) ? `<button type="button" class="link-btn" data-overdue-pay="${r.id}">模拟支付</button>` : ""}
+          <button type="button" class="link-btn" data-overdue-return="${r.id}">模拟还电</button>
+          ${r.type === "daypool" ? `<button type="button" class="link-btn" data-overdue-alloc="${r.id}">模拟续配</button>` : ""}`;
+        if (isP) {
+          const feeTxt = Number(r.payable) !== Number(r.due)
+            ? `¥${r.payable}<br><small>系统 ¥${r.due}</small>`
+            : `¥${r.payable}`;
+          return `<tr>
+            <td>${r.user}<br><small>${r.phone}<br>${r.userId}</small></td>
+            <td>${r.sku}<br><small>${r.orderId}</small></td>
+            <td>${tag(r.reason)}</td>
+            <td>${fmtOverdueAt(r.startAt)}<br><small>已逾期 ${r.days} 天</small></td>
+            <td>${feeTxt}</td>
+            <td>${tag(overduePayStatusLabel(r))}</td>
+            <td>${r.batSn}<br><small>${r.model}</small></td>
+            <td class="row-actions">${ops}</td>
+          </tr>`;
+        }
+        return `<tr>
+          <td>${r.user}<br><small>${r.phone}</small></td>
+          <td>${r.channel}<br><small>${r.team}</small></td>
+          <td>${fmtOverdueAt(r.startAt)}<br><small>已占用 ${r.days} 天</small></td>
+          <td>${r.quota} 人天</td>
+          <td${r.poolAfter < 0 ? " style='color:var(--red);font-weight:600'" : ""}>${r.poolAfter}${r.poolAfter < 0 ? " 欠人天" : ""}</td>
+          <td>${r.batSn}<br><small>${r.model}</small></td>
+          <td class="row-actions">${ops}</td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="7">暂无逾期持电用户</td></tr>`;
+      const hint = isP
+        ? "个人套餐结束仍持电：须先付清占用费才能还电。运营商可减免（含 0）。占用费全额进运营商，不分润。"
+        : isD
+          ? "个人剩余人天 = 0 仍持电：从渠道额度池扣人天，不向骑手收现金。"
+          : "还电或续配后进入已完结。占用费 / 已扣人天不退。";
+      return `${ownScopeBanner()}<section class="panel">
+          ${panelHead("逾期管理", `进行中 ${personal.length + daypool.length} 人 · 日费 ¥${state.overdueFee || 10}/天`, "orders_overdue")}
+          <div class="panel-body orders-table-wrap">
+            ${kpi}${tabBar}
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_overdue")} ${hint}</p>
+            <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+          </div>
+        </section>`;
+    }
+
     function renderOrderService() {
       const tab = state.orderServiceTab || "package";
       if (tab === "audit") return renderOrderAudit();
       if (tab === "refund") return renderRefundManage();
       if (tab === "userDeposit") return renderUserDeposit();
+      if (tab === "overdue") return renderOverdue();
       return renderOrders();
     }
 
@@ -14938,7 +15182,7 @@
           }
           return true;
         });
-        const hint = "<p style=\"font-size:12px;color:var(--muted);margin:0 0 12px\">" + noteBtn("flows_accrual") + " " + noteBtn("platform_no_share") + " C 端支付成功后实时清分至平台/运营商。</p>";
+        const hint = "<p style=\"font-size:12px;color:var(--muted);margin:0 0 12px\">" + noteBtn("flows_accrual") + " " + noteBtn("platform_no_share") + " C 端套餐支付成功后实时清分。电池占用费<strong>不分润</strong>，只出现在资金实收。</p>";
         return `${pageWithTabs(sidebar, `<section class="panel">
             ${panelHead("清分明细", "支付成功分账明细；退款冲正", "flows_accrual")}
             <div class="panel-body">
@@ -14955,17 +15199,36 @@
             </div>
           </section>`)}`;
       }
-      const rc = filterFundReceipts(fundReceipts.filter(filterOwnRow));
-      const paySum = rc.filter(r => r.type === "套餐支付" && r.status === "成功").reduce((s, r) => s + r.net, 0);
-      const refundSum = rc.filter(r => r.type.includes("退款") || r.type.includes("押金")).reduce((s, r) => s + r.net, 0);
-      const hint = "<p style=\"font-size:12px;color:var(--muted);margin:0 0 12px\">" + noteBtn("flows_receipt") + " 实收 <strong>¥" + paySum.toFixed(2) + "</strong>，退款出款 <strong>¥" + Math.abs(refundSum).toFixed(2) + "</strong>。</p>";
+      const rcAll = filterFundReceipts(fundReceipts.filter(filterOwnRow));
+      const recInner = state.flowReceiptInner || "all";
+      const rc = recInner === "overdue"
+        ? rcAll.filter(r => r.type === "电池占用费")
+        : recInner === "pkg"
+          ? rcAll.filter(r => r.type !== "电池占用费")
+          : rcAll;
+      const paySum = rcAll.filter(r => r.type === "套餐支付" && r.status === "成功").reduce((s, r) => s + r.net, 0);
+      const overdueSum = rcAll.filter(r => r.type === "电池占用费" && r.status === "成功").reduce((s, r) => s + r.net, 0);
+      const refundSum = rcAll.filter(r => r.type.includes("退款") || r.type.includes("押金")).reduce((s, r) => s + r.net, 0);
+      const recTabs = [["all", "全部"], ["pkg", "套餐与采购"], ["overdue", "逾期占用费"]];
+      const recTabBar = `<div class="sub-tabs" style="display:flex;gap:8px;margin-bottom:12px">${recTabs.map(([id, label]) =>
+        `<button type="button" class="btn ${recInner === id ? "primary" : ""}" data-flow-receipt-inner="${id}">${label}</button>`
+      ).join("")}</div>`;
+      const recKpi = `<div class="kpi-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+        <div class="kpi"><span>套餐实收</span><b>¥${paySum.toFixed(2)}</b></div>
+        <div class="kpi"><span>占用费实收</span><b>¥${overdueSum.toFixed(2)}</b></div>
+        <div class="kpi"><span>退款出款</span><b>¥${Math.abs(refundSum).toFixed(2)}</b></div>
+      </div>`;
+      const hint = recInner === "overdue"
+        ? "<p style=\"font-size:12px;color:var(--muted);margin:0 0 12px\">" + noteBtn("flows_receipt_overdue") + " 电池占用费<strong>全额进运营商</strong>，不抽平台 1%、不切合伙人、<strong>不进清分明细</strong>。</p>"
+        : "<p style=\"font-size:12px;color:var(--muted);margin:0 0 12px\">" + noteBtn("flows_receipt") + " 套餐实收 <strong>¥" + paySum.toFixed(2) + "</strong>，占用费 <strong>¥" + overdueSum.toFixed(2) + "</strong>，退款出款 <strong>¥" + Math.abs(refundSum).toFixed(2) + "</strong>。</p>";
       return `${ownScopeBanner()}${pageWithTabs(sidebar, `<section class="panel">
-          ${panelHead("资金实收", "仅自有设备关联套餐", "flows_receipt")}
+          ${panelHead("资金实收", recInner === "overdue" ? "逾期占用费 · 不分润" : "仅自有设备关联套餐", recInner === "overdue" ? "flows_receipt_overdue" : "flows_receipt")}
           <div class="panel-body">
             ${arch}
+            ${recTabBar}${recKpi}
             ${hint}
             <table>
-              <thead><tr><th>流水号</th><th>类型</th><th>套餐单</th><th>收款主体</th><th>商户号</th><th>用户</th><th>站点</th><th>实收</th><th>手续费</th><th>入账</th><th>通道</th><th>时间</th><th>状态</th></tr></thead>
+              <thead><tr><th>流水号</th><th>类型</th><th>套餐单 / 逾期单</th><th>收款主体</th><th>商户号</th><th>用户</th><th>站点</th><th>实收</th><th>手续费</th><th>入账</th><th>通道</th><th>时间</th><th>状态</th></tr></thead>
               <tbody>${rc.map(r => `<tr>
                 <td>${r.id}</td><td>${tag(r.type)}</td><td>${r.order}</td>
                 <td>${r.payee}</td><td><small style="color:var(--muted)">${r.mch}</small></td>
@@ -20344,10 +20607,10 @@
             state.view = "platformService";
             state.platformServiceTab = "interOverview";
             state.interOpTab = "overview";
-          } else if (isOperatorRole() && ["orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit", "refundManage"].includes(jump)) {
+          } else if (isOperatorRole() && ["orderPackage", "orderSwap", "orderUserDeposit", "orderFreeze", "orderAudit", "refundManage", "orderOverdue"].includes(jump)) {
             const map = {
               orderPackage: "package", orderSwap: "swap", orderUserDeposit: "userDeposit", orderFreeze: "freeze",
-              orderAudit: "audit", refundManage: "refund"
+              orderAudit: "audit", refundManage: "refund", orderOverdue: "overdue"
             };
             state.view = "orderService";
             state.orderServiceTab = map[jump];
@@ -20366,6 +20629,105 @@
       });
       root.querySelectorAll("[data-deposit-refund-log]").forEach(btn => {
         btn.onclick = () => openDepositRefundLog(btn.dataset.depositRefundLog);
+      });
+      root.querySelectorAll("[data-overdue-tab]").forEach(btn => {
+        btn.onclick = () => { state.overdueInnerTab = btn.dataset.overdueTab; render(); };
+      });
+      root.querySelectorAll("[data-flow-receipt-inner]").forEach(btn => {
+        btn.onclick = () => { state.flowReceiptInner = btn.dataset.flowReceiptInner; render(); };
+      });
+      root.querySelectorAll("[data-overdue-save-fee]").forEach(btn => {
+        btn.onclick = () => {
+          const input = document.querySelector("#overdueFeeInput");
+          const err = document.querySelector("#overdueFeeErr");
+          const v = Number(input && input.value);
+          if (!v || v <= 0) { if (err) err.style.display = "block"; return; }
+          if (err) err.style.display = "none";
+          state.overdueFee = v;
+          showProtoToast("日费已更新为 ¥" + v + " / 天");
+          render();
+        };
+      });
+      root.querySelectorAll("[data-overdue-detail]").forEach(btn => {
+        btn.onclick = () => openOverdueDetail(btn.dataset.overdueDetail);
+      });
+      root.querySelectorAll("[data-overdue-remind]").forEach(btn => {
+        btn.onclick = () => showProtoToast("已向骑手发送还电提醒");
+      });
+      root.querySelectorAll("[data-overdue-pay]").forEach(btn => {
+        btn.onclick = () => {
+          const row = overdueCases.find(x => x.id === btn.dataset.overduePay);
+          if (!row) return;
+          const en = enrichOverdue(row);
+          if (overduePayCleared(en)) { showProtoToast("占用费已结清"); return; }
+          const amt = Number(en.payable);
+          row.payStatus = "paid";
+          row.paidAmount = amt;
+          row.paidAt = "2026-09-15T13:40:00+08:00";
+          pushOverdueReceipt(row, amt);
+          showProtoToast("已支付占用费 ¥" + amt + "，可进入还电");
+          render();
+        };
+      });
+      root.querySelectorAll("[data-overdue-adj-save]").forEach(btn => {
+        btn.onclick = () => {
+          const row = overdueCases.find(x => x.id === btn.dataset.overdueAdjSave);
+          if (!row) return;
+          const en = enrichOverdue(row);
+          const err = document.querySelector("#overdueAdjErr");
+          const amtEl = document.querySelector("#overdueAdjAmt");
+          const reasonEl = document.querySelector("#overdueAdjReason");
+          const next = Number(amtEl && amtEl.value);
+          const reason = (reasonEl && reasonEl.value || "").trim();
+          const showErr = (msg) => { if (err) { err.textContent = msg; err.style.display = "block"; } };
+          if (Number.isNaN(next) || next < 0) return showErr("应付须 ≥ 0");
+          if (next > Number(en.due)) return showErr("不可高于系统计费 ¥" + en.due);
+          if (!reason) return showErr("请填写减免原因");
+          row.adjLogs = row.adjLogs || [];
+          row.adjLogs.push({ at: "2026-09-15 13:40", actor: "运营·演示", from: en.payable, to: next, reason });
+          row.payableAdj = next;
+          if (next <= 0) {
+            row.payStatus = "waived";
+            showProtoToast("应付已改为 ¥0，无需支付，可直接还电");
+          } else {
+            if (row.payStatus === "paid" && next > Number(row.paidAmount || 0)) row.payStatus = "unpaid";
+            showProtoToast("应付已改为 ¥" + next);
+          }
+          openOverdueDetail(row.id);
+        };
+      });
+      root.querySelectorAll("[data-overdue-return]").forEach(btn => {
+        btn.onclick = () => {
+          const row = overdueCases.find(x => x.id === btn.dataset.overdueReturn);
+          if (!row) return;
+          const en = enrichOverdue(row);
+          if (row.type === "personal" && !overduePayCleared(en)) {
+            showProtoToast("须先付清占用费或减免为 0，才能还电");
+            return;
+          }
+          row.status = "done";
+          row.returnedAt = "2026-09-15T13:40:00+08:00";
+          row.days = en.days;
+          row.sysDue = en.due;
+          row.feePaid = row.type === "personal" ? (en.payStatus === "paid" ? (row.paidAmount || en.payable) : 0) : 0;
+          if (row.type === "personal") {
+            showProtoToast(Number(en.payable) <= 0 ? "已还电，占用费已减免为 ¥0" : "已还电，占用费 ¥" + row.feePaid + " 已结清，不退");
+          } else {
+            showProtoToast("已还电，已扣 " + en.quota + " 人天不退；骑手无需付现金");
+          }
+          render();
+        };
+      });
+      root.querySelectorAll("[data-overdue-alloc]").forEach(btn => {
+        btn.onclick = () => {
+          const row = overdueCases.find(x => x.id === btn.dataset.overdueAlloc);
+          if (!row) return;
+          row.status = "done";
+          row.returnedAt = "2026-09-15T13:40:00+08:00";
+          row.days = enrichOverdue(row).quota;
+          showProtoToast("已续配，骑手剩余 ≥ 1，退出占用名单；已扣人天不退");
+          render();
+        };
       });
       root.querySelectorAll("[data-open-sub]").forEach(btn => {
         btn.onclick = () => openPackageDetail(btn.dataset.openSub);
@@ -20975,6 +21337,8 @@
             desc = "订单/服务生命周期审计：冻结、消耗、换电、退款等跨模块时间线。";
           } else if (state.view === "orderService" && cur === "refund") {
             desc = "C 端退订/中途完结退款：申请队列与审核确认；规则在平台设置 → 退款设置。";
+          } else if (state.view === "orderService" && cur === "overdue") {
+            desc = "持电但权益已结束：个人套餐按日收占用费；人天剩余 0 从渠道额度池扣人天。";
           }
           pageMeta = [title, desc];
         }
