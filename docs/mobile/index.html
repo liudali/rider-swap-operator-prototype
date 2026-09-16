@@ -53,6 +53,27 @@
     .map-pin::after { content: ""; position: absolute; left: 50%; top: 0; width: 14px; height: 14px; background: var(--danger); border-radius: 50% 50% 50% 0; transform: translateX(-50%) rotate(-45deg); border: 1px solid #fff; }
     .map-pin.dedicated::after { background: #1677ff; }
     .map-legend { position: absolute; left: 8px; bottom: 52px; font-size: 8px; color: var(--muted); background: rgba(255,255,255,.92); padding: 4px 6px; border-radius: 4px; max-width: 120px; line-height: 1.4; }
+    .sd-page { display: flex; flex-direction: column; height: 100%; background: #f4f6f8; position: relative; }
+    .sd-nav { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 6px; background: #fff; font-size: 12px; font-weight: 600; }
+    .sd-nav .sd-back { font-size: 14px; color: #1a2233; }
+    .sd-hero { height: 128px; position: relative; flex-shrink: 0; background: #cfd8e0; overflow: hidden; }
+    .sd-hero img { width: 100%; height: 100%; object-fit: cover; display: none; }
+    .sd-hero img.on { display: block; }
+    .sd-hero.default { background: url("../assets/site-photos/default.svg") center/cover no-repeat; }
+    .sd-dots { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; justify-content: center; gap: 4px; }
+    .sd-dots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.5); }
+    .sd-dots i.on { background: #fff; }
+    .sd-body { flex: 1; overflow: hidden; padding: 8px 8px 40px; }
+    .sd-card { background: #fff; border-radius: 10px; padding: 8px; margin-bottom: 8px; }
+    .sd-card h4 { font-size: 11px; margin-bottom: 4px; }
+    .sd-addr { font-size: 8px; color: var(--muted); line-height: 1.4; display: flex; gap: 4px; }
+    .sd-cab-top { display: flex; justify-content: space-between; align-items: center; font-size: 9px; margin-bottom: 6px; }
+    .sd-cab-top .more { color: var(--blue); font-size: 8px; }
+    .sd-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; text-align: center; }
+    .sd-stats strong { display: block; font-size: 13px; color: var(--blue); }
+    .sd-stats span { font-size: 8px; color: var(--muted); }
+    .sd-stats div + div { border-left: 1px solid var(--border); }
+    .sd-nav-btn { position: absolute; left: 12px; right: 12px; bottom: 8px; height: 28px; border: none; border-radius: 14px; background: var(--blue); color: #fff; font-size: 11px; font-weight: 600; }
     .map-fab-row { position: absolute; left: 0; right: 0; bottom: 8px; display: flex; align-items: flex-end; justify-content: center; gap: 8px; padding: 0 10px; }
     .fab-circle { width: 28px; height: 28px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.12); border: none; font-size: 12px; display: grid; place-items: center; }
     .fab-scan { flex: 1; max-width: 120px; height: 32px; border-radius: 16px; background: var(--blue); color: #fff; border: none; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; box-shadow: 0 2px 10px rgba(47,107,255,.35); }
@@ -188,13 +209,58 @@
       return `<div class="flow-cell" data-step="${id}"><div class="frame-label"><span class="step-id">${id}</span>${title}</div>${html}${hint ? `<div class="frame-hint">${hint}</div>` : ""}</div>`;
     }
 
+    function siteDetailShell(cfg) {
+      const photos = cfg.photos || [];
+      const hero = photos.length
+        ? `<div class="sd-hero" data-carousel>${photos.map((src, i) => `<img class="${i === 0 ? "on" : ""}" src="${src}" alt="">`).join("")}<div class="sd-dots">${photos.map((_, i) => `<i class="${i === 0 ? "on" : ""}"></i>`).join("")}</div></div>`
+        : `<div class="sd-hero default"></div>`;
+      const cab = cfg.cabinet;
+      const navMsg = cfg.navOk ? `已打开导航：${cfg.name}` : "该站点暂无坐标，无法导航";
+      return `<div class="phone-frame">
+        <div class="status-bar"><span>14:50</span><span>5G ▮▮▮</span></div>
+        <div class="sd-page">
+          <div class="sd-nav"><span class="sd-back">‹</span><span>站点详情</span><span>…</span></div>
+          ${hero}
+          <div class="sd-body">
+            <div class="sd-card">
+              <h4>${cfg.name}</h4>
+              <div class="sd-addr">📍 ${cfg.address}</div>
+            </div>
+            <div class="sd-card">
+              <div class="sd-cab-top"><span>${cab.name} · ${cab.sn}…</span><span class="more">查看详情 ›</span></div>
+              <div class="sd-stats">
+                <div><strong>${cab.voltage}</strong><span>电池型号</span></div>
+                <div><strong>${cab.available}颗</strong><span>可用电池</span></div>
+                <div><strong>${cab.charging}颗</strong><span>充电中</span></div>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="sd-nav-btn" data-nav="${navMsg}">➤ 开始导航</button>
+        </div>
+      </div>`;
+    }
+
     const SCREENS = {
       home: () => phoneShell("首页", "home", `
         <div class="map-area">
           <div class="map-pin" style="left:42%;top:48%"></div><div class="map-pin" style="left:58%;top:62%"></div>
-          <div class="map-legend">图例：蓝钉=可换电站 · 扫一扫换电</div>
+          <div class="map-legend">图例：蓝钉=可换电站 · 点 Marker 进站点详情</div>
           <div class="map-fab-row"><button class="fab-circle">?</button><button class="fab-scan">⊞ 扫一扫</button><button class="fab-circle">⌖</button></div>
         </div>`),
+      siteDetailPhotos: () => siteDetailShell({
+        name: "浦东骑手驿站",
+        address: "上海市浦东新区张杨路1588号",
+        photos: ["../assets/site-photos/pudong-01.jpg", "../assets/site-photos/cabinet.svg", "../assets/site-photos/entrance.svg"],
+        cabinet: { name: "浦东骑手驿站-1号柜", sn: "2401C00876", voltage: "48V", available: 8, charging: 1 },
+        navOk: true
+      }),
+      siteDetailDefault: () => siteDetailShell({
+        name: "世博换电服务点",
+        address: "上海市浦东新区世博大道1368号",
+        photos: [],
+        cabinet: { name: "世博换电服务点-主柜", sn: "2401C01002", voltage: "48V", available: 5, charging: 2 },
+        navOk: true
+      }),
       homeDedicated: () => phoneShell("首页", "home", `
         <div class="map-area">
           <div class="map-pin" style="left:42%;top:48%"></div><div class="map-pin dedicated" style="left:36%;top:56%"></div>
@@ -406,7 +472,11 @@
 
     function buildIATrack() {
       return [
-        flowCell("IA-01", "首页 · 地图", SCREENS.home(), "站点 Marker · 扫一扫 · 定位"),
+        flowCell("IA-01", "首页 · 地图", SCREENS.home(), "点 Marker → 站点详情"),
+        connector("有照片"),
+        flowCell("IA-01a", "站点详情 · 实景", SCREENS.siteDetailPhotos(), "运营商上传 · 可轮播"),
+        connector("未上传"),
+        flowCell("IA-01b", "站点详情 · 默认背景", SCREENS.siteDetailDefault(), "0 张照片 · 系统默认"),
         connector(""),
         flowCell("IA-02", "订单 · 换电", SCREENS.ordersSwap(), "换电订单列表"),
         connector(""),
@@ -519,7 +589,7 @@
           <span>用户操作</span><span class="sys">系统自动</span><span class="warn">警告/阻断</span><span class="phase2">二期</span>
         </div>
         <section class="flow-section"><h2>信息架构 · 三 Tab 基础页 <span class="badge">IA</span></h2>
-          <p class="section-desc">首页地图 + 订单三 Tab（换电/服务购买/退租）+ 我的服务态 + 设置。个人与人天共用 Tab 结构；渠道人天通常无自购套餐单。</p>
+          <p class="section-desc">首页地图 → 站点详情（有实景轮播 / 无图默认背景）+ 订单三 Tab + 我的服务态 + 设置。个人与人天共用 Tab 结构；渠道人天通常无自购套餐单。</p>
           <div class="flow-track">${buildIATrack()}</div></section>
         <section class="flow-section"><h2>主线一 · 个人套餐 <span class="badge">P01–P10</span></h2>
           <p class="section-desc">登录 → 实名 → 定 OP → 购套餐 → 待领电 → 扫码领取 → 换电 → 续费 → 冻结/解冻 → 冷静期退款 → 套餐结束须先支付占用费再还电。</p>
@@ -539,6 +609,20 @@
     }
 
     renderFlowBoard();
+    document.querySelectorAll("[data-carousel]").forEach(el => {
+      el.addEventListener("click", () => {
+        const imgs = [...el.querySelectorAll("img")];
+        const dots = [...el.querySelectorAll(".sd-dots i")];
+        if (imgs.length < 2) return;
+        const i = imgs.findIndex(img => img.classList.contains("on"));
+        const n = (i + 1) % imgs.length;
+        imgs.forEach((img, k) => img.classList.toggle("on", k === n));
+        dots.forEach((d, k) => d.classList.toggle("on", k === n));
+      });
+    });
+    document.querySelectorAll("[data-nav]").forEach(btn => {
+      btn.addEventListener("click", () => window.alert(btn.dataset.nav));
+    });
     (function () {
       var href = "../documentation/index.html";
       ["navDocsLink", "navDocsLink2"].forEach(function (id) { var el = document.getElementById(id); if (el) el.href = href; });

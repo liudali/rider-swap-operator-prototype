@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 420" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8eb8e8"/>
+      <stop offset="55%" stop-color="#c5d6c4"/>
+      <stop offset="100%" stop-color="#9aae8e"/>
+    </linearGradient>
+    <linearGradient id="cab" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3d4a5c"/>
+      <stop offset="100%" stop-color="#1f2836"/>
+    </linearGradient>
+  </defs>
+  <rect width="750" height="420" fill="url(#sky)"/>
+  <rect x="0" y="300" width="750" height="120" fill="#7d8f78" opacity=".55"/>
+  <rect x="80" y="170" width="220" height="160" rx="6" fill="#d9c4a8"/>
+  <rect x="100" y="210" width="70" height="90" rx="3" fill="#6b8cae"/>
+  <rect x="185" y="210" width="90" height="120" rx="3" fill="#5a6a7a"/>
+  <circle cx="620" cy="86" r="28" fill="#fff4c4" opacity=".85"/>
+  <g transform="translate(390,150)">
+    <rect width="220" height="200" rx="10" fill="url(#cab)"/>
+    <rect x="16" y="18" width="188" height="28" rx="6" fill="#2f6bff"/>
+    <text x="110" y="38" text-anchor="middle" fill="#fff" font-size="14" font-family="PingFang SC, sans-serif">z<b5</text>
+    <g fill="#2a3344">
+      <rect x="22" y="62" width="50" height="58" rx="4"/>
+      <rect x="85" y="62" width="50" height="58" rx="4"/>
+      <rect x="148" y="62" width="50" height="58" rx="4"/>
+      <rect x="22" y="132" width="50" height="52" rx="4"/>
+      <rect x="85" y="132" width="50" height="52" rx="4"/>
+      <rect x="148" y="132" width="50" height="52" rx="4"/>
+    </g>
+    <g fill="#3dd68c">
+      <rect x="28" y="70" width="38" height="42" rx="3"/>
+      <rect x="91" y="70" width="38" height="42" rx="3"/>
+      <rect x="154" y="140" width="38" height="36" rx="3"/>
+    </g>
+  </g>
+</svg>

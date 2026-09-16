@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 420" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6ea4d8"/>
+      <stop offset="100%" stop-color="#dfe7d6"/>
+    </linearGradient>
+  </defs>
+  <rect width="750" height="420" fill="url(#sky2)"/>
+  <rect x="0" y="250" width="750" height="170" fill="#6d7a72"/>
+  <rect x="160" y="90" width="430" height="250" fill="#c4a882"/>
+  <rect x="190" y="120" width="160" height="90" fill="#7ea0c4"/>
+  <rect x="380" y="120" width="180" height="220" fill="#3f4d5c"/>
+  <rect x="430" y="160" width="80" height="180" fill="#2c3642"/>
+  <rect x="200" y="230" width="140" height="110" fill="#8b3a32"/>
+  <circle cx="330" cy="288" r="6" fill="#f0d27a"/>
+  <text x="375" y="70" text-anchor="middle" fill="#1a2233" font-size="22" font-family="PingFang SC, sans-serif" font-weight="700">Ù¹eã</text>
+</svg>

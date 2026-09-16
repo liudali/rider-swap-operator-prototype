@@ -237,6 +237,12 @@ for dir in css js data-panel; do
   fi
 done
 
+if [[ -d "$PROTOTYPE_ASSETS/assets" ]]; then
+  mkdir -p "$DOCS_ASSETS/assets"
+  cp -R "$PROTOTYPE_ASSETS/assets/." "$DOCS_ASSETS/assets/"
+  echo "已同步: prototype/assets → docs/assets"
+fi
+
 # GitHub Pages：误访问 /prototype/index.html 时重定向到根入口
 PROTOTYPE_REDIRECT="$ROOT/docs/prototype/index.html"
 mkdir -p "$(dirname "$PROTOTYPE_REDIRECT")"
@@ -303,6 +309,7 @@ git add "$DST" "$SRC"
 [[ -d "$PROTOTYPE_ASSETS/css" ]] && git add docs/css/ prototype/css/
 [[ -d "$PROTOTYPE_ASSETS/js" ]] && git add docs/js/ prototype/js/
 [[ -d "$PROTOTYPE_ASSETS/data-panel" ]] && git add docs/data-panel/ prototype/data-panel/
+[[ -d "$PROTOTYPE_ASSETS/assets" ]] && git add docs/assets/ prototype/assets/
 [[ -f "$CHANGELOG" ]] && git add "$CHANGELOG"
 [[ -f "$DOC_VIEWER_DST" ]] && git add "$DOC_VIEWER_SRC" "$DOC_VIEWER_DST"
 [[ -d "$ROOT/docs/documentation/md" ]] && git add docs/documentation/

@@ -35,7 +35,7 @@
       refundTab: "queue",
       employeeTab: "staff", pf: {},
       employeeForm: null, poolForm: null, pricingEditId: null, cardPricingEditId: null, quotaPricingEditId: null,
-      operatorFormId: null, platformFeeRateEditId: null, leasingCompanyFormId: null, siteFormId: null, channelPartnerContractId: null, bindInventorySn: null,
+      operatorFormId: null, platformFeeRateEditId: null, leasingCompanyFormId: null, siteFormId: null, siteFormPhotos: [], sitePreviewIdx: 0, channelPartnerContractId: null, bindInventorySn: null,
       leaseFormId: null, leaseFormMode: null, followBillId: null, rentPayBillId: null,
       leaseAgreementsTab: "contracts", deviceListFormId: null, deviceReplaceListId: null,
       financeTab: "dashboard", financeSelectedAppId: "FDA-2606-01", financeAssetFilter: "全部", financeSelectedPackageId: "FAP-2606-01",
@@ -9059,34 +9059,117 @@
       return { lng, lat };
     }
 
+    function sitePhotoList(site) {
+      return Array.isArray(site?.photos) ? site.photos.filter(p => p && p.url) : [];
+    }
+
+    function cloneSitePhotos(list) {
+      return (list || []).map(p => ({ id: p.id, url: p.url, name: p.name || "实景.jpg" }));
+    }
+
+    function sitePhotoEditorHtml() {
+      const photos = state.siteFormPhotos || [];
+      const atMax = photos.length >= SITE_PHOTO_MAX;
+      const idx = Math.min(state.sitePreviewIdx || 0, Math.max(photos.length - 1, 0));
+      const thumbs = photos.map((p, i) => `
+        <div class="site-photo-thumb">
+          <img src="${p.url}" alt="${p.name || "实景"}" />
+          ${i === 0 ? `<span class="cover-flag">封面</span>` : ""}
+          <button type="button" class="site-photo-del" data-remove-site-photo="${i}" aria-label="删除">×</button>
+        </div>`).join("");
+      const heroImgs = photos.map((p, i) => `<img class="${i === idx ? "on" : ""}" src="${p.url}" alt="">`).join("");
+      const dots = photos.length > 1
+        ? `<div class="site-rider-dots">${photos.map((_, i) => `<i class="${i === idx ? "on" : ""}" data-site-preview-dot="${i}"></i>`).join("")}</div>`
+        : "";
+      const heroClass = photos.length ? "site-rider-hero" : "site-rider-hero default";
+      return `<div class="form-span-2 site-photo-editor" id="sitePhotoEditor">
+        <div>
+          <strong style="font-size:13px;color:var(--ink)">实景照片</strong>
+          <span style="font-size:12px;color:var(--muted);margin-left:6px">非必填 · ${photos.length}/${SITE_PHOTO_MAX}</span>
+        </div>
+        <div class="site-photo-grid">
+          ${thumbs}
+          <button type="button" class="site-photo-add" data-add-site-photo ${atMax ? "disabled" : ""}>${atMax ? "已达上限" : "+ 添加"}</button>
+          <input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" hidden data-site-photo-file />
+        </div>
+        <p class="site-photo-hint">jpg / png / webp，单张 ≤ 5MB。第一张为封面，骑手端站点详情按此顺序轮播。不上传则显示系统默认背景。${noteBtn("sites_photos")}</p>
+        ${photos.length ? "" : `<button type="button" class="link-btn" data-sample-site-photos>填入示例实景（演示）</button>`}
+        <div class="site-rider-preview">
+          <div class="srp-label">骑手端站点详情 · 头图预览</div>
+          <div class="${heroClass}" data-site-preview-hero>${photos.length ? heroImgs + dots : ""}</div>
+        </div>
+      </div>`;
+    }
+
+    function refreshSitePhotoEditor() {
+      const slot = document.querySelector("#sitePhotoEditor");
+      if (slot) slot.outerHTML = sitePhotoEditorHtml();
+    }
+
+    function addSitePhotoFiles(fileList) {
+      const files = [...(fileList || [])];
+      if (!files.length) return;
+      const photos = state.siteFormPhotos || [];
+      const room = SITE_PHOTO_MAX - photos.length;
+      if (room <= 0) {
+        window.alert("最多上传 " + SITE_PHOTO_MAX + " 张");
+        return;
+      }
+      const accepted = ["image/jpeg", "image/png", "image/webp"];
+      let added = 0;
+      for (const file of files.slice(0, room)) {
+        if (file.type && !accepted.includes(file.type) && !/\.(jpe?g|png|webp)$/i.test(file.name || "")) {
+          window.alert("仅支持 jpg / png / webp：" + (file.name || "未命名"));
+          continue;
+        }
+        if (file.size > SITE_PHOTO_MAX_BYTES) {
+          window.alert("单张不超过 5MB：" + (file.name || "未命名"));
+          continue;
+        }
+        photos.push({
+          id: "ph-" + Date.now() + "-" + photos.length,
+          url: URL.createObjectURL(file),
+          name: file.name || "实景.jpg"
+        });
+        added += 1;
+      }
+      if (added && photos.length > SITE_PHOTO_MAX) state.siteFormPhotos = photos.slice(0, SITE_PHOTO_MAX);
+      else state.siteFormPhotos = photos;
+      refreshSitePhotoEditor();
+    }
+
     function openSiteForm(siteId) {
       const site = siteId ? sites.find(s => s.id === siteId) : null;
       const dedicated = !!site?.channelDedicated;
       state.siteFormId = siteId || "new";
+      state.siteFormPhotos = cloneSitePhotos(sitePhotoList(site));
+      state.sitePreviewIdx = 0;
       document.querySelector("#siteFormTitle").textContent = site ? "编辑站点 · " + site.name : "新增站点";
-      const dedicatedNote = dedicated ? `<p class="perm-banner" style="grid-column:1/-1;margin:0">渠道专属站点由<strong>渠道合同</strong>创建；此处仅可修改地址、定位坐标与营业状态。</p>` : "";
+      const dedicatedNote = dedicated ? `<p class="perm-banner form-span-2" style="margin:0">渠道专属站点由<strong>渠道合同</strong>创建；此处仅可修改地址、定位坐标、实景照片与营业状态。</p>` : "";
       const lngVal = site?.lng != null && site.lng !== "" ? site.lng : "";
       const latVal = site?.lat != null && site.lat !== "" ? site.lat : "";
       document.querySelector("#siteForm").innerHTML = dedicatedNote + `
         <label>站点名称<input name="name" value="${site?.name || ""}" required placeholder="如：浦东骑手驿站" ${dedicated ? "readonly" : ""} /></label>
         <label>城市<select name="city" ${dedicated ? "disabled" : ""}><option ${(!site || site.city === "上海") ? "selected" : ""}>上海</option><option ${site?.city === "杭州" ? "selected" : ""}>杭州</option></select></label>
-        <label style="grid-column:1/-1">详细地址<input name="address" value="${site?.address || ""}" required placeholder="省市区 + 门牌号" /></label>
+        <label class="form-span-2">详细地址<input name="address" value="${site?.address || ""}" required placeholder="省市区 + 门牌号" /></label>
         <label>经度（可选）<input name="lng" type="number" step="any" value="${lngVal}" placeholder="如 121.527" /></label>
         <label>纬度（可选）<input name="lat" type="number" step="any" value="${latVal}" placeholder="如 31.230" /></label>
-        <p style="grid-column:1/-1;font-size:12px;color:var(--muted);margin:0">定位坐标非必填；填写时经度、纬度需成对。用于地图展示 / 导航，可采用 GCJ-02（国测局）坐标。</p>
+        <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">定位坐标非必填；填写时经度、纬度需成对。用于地图展示 / 导航，可采用 GCJ-02（国测局）坐标。</p>
         <label>站点类型<select name="type" ${dedicated ? "disabled" : ""}>
           <option ${(!site || site.type === "配送站") ? "selected" : ""}>配送站</option>
           <option ${site?.type === "写字楼" ? "selected" : ""}>写字楼</option>
           ${dedicated ? `<option selected>渠道专属</option>` : ""}
         </select></label>
         <label>营业状态<select name="status"><option ${(!site || site.status === "在营") ? "selected" : ""}>在营</option><option ${site?.status === "建设中" ? "selected" : ""}>建设中</option><option ${site?.status === "已停用" ? "selected" : ""}>已停用</option></select></label>
-        ${site ? `<label>站点编号<input value="${site.id}" readonly /></label>` : ""}`;
+        ${site ? `<label>站点编号<input value="${site.id}" readonly /></label>` : ""}
+        ${sitePhotoEditorHtml()}`;
       document.querySelector("#siteModal").classList.add("open");
       document.querySelector("#siteMask").classList.add("open");
     }
 
     function closeSiteForm() {
       state.siteFormId = null;
+      state.siteFormPhotos = [];
       document.querySelector("#siteModal").classList.remove("open");
       document.querySelector("#siteMask").classList.remove("open");
     }
@@ -9103,6 +9186,7 @@
         window.alert(coords.error);
         return;
       }
+      const photos = cloneSitePhotos(state.siteFormPhotos).slice(0, SITE_PHOTO_MAX);
       if (state.siteFormId === "new") {
         const seq = String(sites.length + 1).padStart(2, "0");
         const id = "ST-SH-" + seq;
@@ -9110,7 +9194,7 @@
           id, name: data.name.trim(), city: data.city, address: data.address.trim(),
           lng: coords.lng, lat: coords.lat,
           type: data.type, cabinets: 0, batteries: 0, status: data.status,
-          operatorId: currentEntity().id, waitingCount: 0
+          operatorId: currentEntity().id, waitingCount: 0, photos
         });
       } else {
         const site = sites.find(s => s.id === state.siteFormId);
@@ -9129,6 +9213,7 @@
           site.type = data.type;
           site.status = data.status;
         }
+        site.photos = photos;
       }
       closeSiteForm();
       render();
@@ -12778,7 +12863,7 @@
           ${panelHead("站点列表", "本运营商名下站点（含筹备中、无设备站点）", "sites_panel", canEditSites ? `<button type="button" class="btn primary" data-new-site>+ 新增站点</button>` : "")}
           <div class="panel-body">
             <table>
-              <thead><tr><th>站点</th><th>城市</th><th>类型</th><th>开放范围</th><th>站点合伙人</th><th>换电柜</th><th>电池</th><th>状态</th>${canEditSites ? "<th>操作</th>" : ""}</tr></thead>
+              <thead><tr><th>站点</th><th>实景</th><th>城市</th><th>类型</th><th>开放范围</th><th>站点合伙人</th><th>换电柜</th><th>电池</th><th>状态</th>${canEditSites ? "<th>操作</th>" : ""}</tr></thead>
               <tbody>${ss.map(s => {
                 const partnerCell = s.channelDedicated
                   ? `<span style="color:var(--muted)">渠道专属</span><br><small>默认不参与</small>`
@@ -12787,15 +12872,20 @@
                   ? `<button type="button" class="link-btn" data-site-partners="${s.id}">合伙人</button>`
                   : "";
                 const coord = formatSiteCoord(s);
+                const photos = sitePhotoList(s);
+                const cover = photos[0]
+                  ? `<div class="site-cover-cell"><img src="${photos[0].url}" alt=""><span>${photos.length} 张</span></div>`
+                  : `<div class="site-cover-cell"><span class="site-cover-fallback">默认</span><span style="color:var(--muted)">未上传</span></div>`;
                 return `<tr>
                 <td>${s.name}<br><small style="color:var(--muted)">${s.id}${coord ? " · " + coord : ""}</small></td>
+                <td>${cover}</td>
                 <td>${s.city}</td><td>${s.type}</td>
                 <td>${s.channelDedicated ? `<span style="color:var(--brand)">渠道专用</span><br><small>仅白名单可见</small>` : "公众开放"}</td>
                 <td>${partnerCell}</td>
                 <td>${s.cabinets}</td><td>${s.batteries}</td><td>${tag(s.status)}</td>
                 ${canEditSites ? `<td><button type="button" class="link-btn" data-edit-site="${s.id}">编辑</button>${partnerBtn ? " · " + partnerBtn : ""}</td>` : ""}
               </tr>`;
-              }).join("") || `<tr><td colspan='${canEditSites ? 9 : 8}'>暂无</td></tr>`}</tbody>
+              }).join("") || `<tr><td colspan='${canEditSites ? 10 : 9}'>暂无</td></tr>`}</tbody>
             </table>
           </div>
         </section>`;
@@ -21511,6 +21601,39 @@
     document.querySelector("#closeSiteForm").addEventListener("click", closeSiteForm);
     document.querySelector("#cancelSiteForm").addEventListener("click", closeSiteForm);
     document.querySelector("#siteMask").addEventListener("click", closeSiteForm);
+    document.querySelector("#siteForm").addEventListener("click", e => {
+      const addBtn = e.target.closest("[data-add-site-photo]");
+      if (addBtn && !addBtn.disabled) {
+        document.querySelector("[data-site-photo-file]")?.click();
+        return;
+      }
+      const rm = e.target.closest("[data-remove-site-photo]");
+      if (rm) {
+        const i = Number(rm.dataset.removeSitePhoto);
+        state.siteFormPhotos.splice(i, 1);
+        if (state.sitePreviewIdx >= state.siteFormPhotos.length) state.sitePreviewIdx = Math.max(0, state.siteFormPhotos.length - 1);
+        refreshSitePhotoEditor();
+        return;
+      }
+      const sample = e.target.closest("[data-sample-site-photos]");
+      if (sample) {
+        state.siteFormPhotos = cloneSitePhotos(SAMPLE_SITE_PHOTOS);
+        state.sitePreviewIdx = 0;
+        refreshSitePhotoEditor();
+        return;
+      }
+      const dot = e.target.closest("[data-site-preview-dot]");
+      if (dot) {
+        state.sitePreviewIdx = Number(dot.dataset.sitePreviewDot);
+        refreshSitePhotoEditor();
+      }
+    });
+    document.querySelector("#siteForm").addEventListener("change", e => {
+      if (e.target.matches("[data-site-photo-file]")) {
+        addSitePhotoFiles(e.target.files);
+        e.target.value = "";
+      }
+    });
     document.querySelector("#saveSiteForm").addEventListener("click", saveSiteForm);
     document.querySelector("#siteForm").addEventListener("submit", e => { e.preventDefault(); saveSiteForm(); });
     document.querySelector("#closeChannelPartnerForm").addEventListener("click", closeChannelPartnerForm);

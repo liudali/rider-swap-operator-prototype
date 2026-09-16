@@ -23,6 +23,7 @@
         { file: "原型变更记录.md", label: "原型变更记录" },
         { file: "站点经营分析-Mock字段清单.md", label: "站点经营分析 · Mock 字段" },
         { file: "骑手端PRD.md", label: "骑手端 PRD" },
+        { file: "站点照片.md", label: "站点实景照片" },
         { file: "user-stories.md", label: "用户故事" },
         { file: "acceptance-criteria.md", label: "验收标准" },
         { file: "业务文档写作规范.md", label: "业务文档写作规范" },
@@ -145,7 +146,7 @@
    */
   const VIEW_DOC_PREFER = {
     overview: ["功能结构与业务流程.md", "角色与功能清单.md", "PRD.md"],
-    sites: ["站点合伙人.md", "PRD.md"],
+    sites: ["站点照片.md", "站点合伙人.md", "PRD.md"],
     sitePartners: ["站点合伙人.md", "合伙人站点分佣.md", "站点合伙人-Mock字段清单.md"],
     siteExpenses: ["站点合伙人.md", "PRD.md"],
     devices: ["PRD.md", "功能结构与业务流程.md"],

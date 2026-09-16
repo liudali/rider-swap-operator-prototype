@@ -234,7 +234,7 @@
 
     const meta = {
       overview: ["总览", "设备四类 KPI + 经营汇总；站点繁忙度（实时等级 + 按日换电高峰时段）与用电量汇总统计。"],
-      sites: ["站点管理", "站点信息、场费电费、站点支出与站点合伙人。"],
+      sites: ["站点管理", "站点信息（含实景照片，同步骑手端）、场费电费、站点支出与站点合伙人。"],
       sitePartners: ["站点合伙人", "按个人/公司建档并完成开户；一站多位、一人多站；在「站点管理」中按站配置比例。"],
       partnerOverview: ["总览", "累计分润、本月分润、绑定站点；只读查看运营商为您配置的站点与比例。"],
       partnerBindings: ["我的站点", "各绑定站点的当前分润比例（只读）。"],
@@ -390,7 +390,8 @@
       partner_withdraw: { title: "提现结算", content: "须<strong>已开户</strong>。累计分润达可提现余额后可申请；<strong>运营商</strong>审核后打款至开户收款账户。与运营商向平台提现（平台审核）流程不同。" },
       overview_power_site: { title: "站点用电", content: "Σ 该站点下所有柜机在筛选期内的日用电量；柜机数为去重 SN 数。" },
       overview_power_cabinet: { title: "单柜用电", content: "单台柜机在筛选期内的累计用电；可跳转「我的设备 → 换电柜」查看实时读数。" },
-      sites_panel: { title: "站点信息", content: "运营商负责站点 CRUD 与设备分配；入口在「站点管理 → 站点信息」。可维护<strong>定位坐标</strong>（经度/纬度，非必填，成对填写）。换电范围见「平台设置 → 换电范围」。" },
+      sites_panel: { title: "站点信息", content: "运营商负责站点 CRUD 与设备分配；入口在「站点管理 → 站点信息」。可维护<strong>定位坐标</strong>（经度/纬度，非必填，成对填写）与<strong>实景照片</strong>（非必填，最多 9 张；骑手端站点详情展示，无图用系统默认背景）。换电范围见「平台设置 → 换电范围」。" },
+      sites_photos: { title: "站点实景", content: "照片<strong>非必填</strong>。有图则骑手「站点详情」按上传顺序轮播（第一张为封面）；<strong>0 张时显示系统默认背景</strong>，不留白、不借用其他站照片。jpg/png/webp，单张 ≤ 5MB，最多 9 张。渠道专属站同样可传。" },
       devices_cab: { title: "换电柜管理", content: "列表字段对齐 IoT 台账。<strong>仅换电柜</strong>可绑定/变更站点；电池与站点无绑定关系。站点允许空（展示「未分配站点」）：导入后未投放、或移柜卸站。所有自有柜机可<strong>移柜</strong>（首次投放 / 改站 / 卸站）。<br>详情「换电模式切换」枚举：<strong>正常换电 / MQTT离线换电 / 蓝牙换电</strong>。<br><span class='badge-p2'>二期</span>：导出电池流转记录、运维操作记录、电柜组成、详情页<strong>远程运维按钮条</strong>（快照/通断电/风扇/重启等）、端口状态·操作 — 一期不交付，原型可浏览。" },
       devices_cab_remote_ops: { title: "换电柜详情 · 远程运维（二期）", content: "【二期】详情页运维按钮条：查看快照/发送请求/运维记录、通断电、风扇、主板重启、更新版本、上传二维码、反向供电等。一期不交付；原型可浏览并提示二期。" },
       devices_cab_compose: { title: "电柜组成（二期）", content: "【二期】模块清单与格口快照；含隔口开关、上下电演示。一期不交付。" },
@@ -552,7 +553,7 @@
       overview: ["scope", "overview_sites", "overview_online", "overview_orders", "overview_net", "overview_site_expense", "overview_site_stats", "overview_power_stats"],
       pricing: ["pricing_pkg", "pricing_zone", "pricing_quota", "pricing_card", "pricing_deposit", "pricing_refund", "times_no_refund_after_active", "swap_policy", "swap_policy_cross_net", "platform_standard_day_price"],
       channelSales: ["channel_sales", "operator_link_settle", "channel_partner_manage", "channel_partner_rights", "day_pool_one_per_operator", "day_pool_b2b_settlement", "day_pool_offline_recon"],
-      sites: ["sites_panel", "site_expenses_panel", "site_partner_binding", "site_partner_change_log"],
+      sites: ["sites_panel", "sites_photos", "site_expenses_panel", "site_partner_binding", "site_partner_change_log"],
       sitePartners: ["site_partner_panel", "site_partner_open_account", "site_partner_binding", "site_partner_change_log", "site_partner_split"],
       partnerOverview: ["partner_portal", "site_partner_open_account"],
       partnerBindings: ["partner_bindings_readonly", "site_partner_binding"],
@@ -610,13 +611,22 @@
     };
 
 
+    const SITE_PHOTO_MAX = 9;
+    const SITE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+    const SITE_DEFAULT_BG = "assets/site-photos/default.svg";
+    const SAMPLE_SITE_PHOTOS = [
+      { id: "ph-demo-01", url: "assets/site-photos/pudong-01.jpg", name: "门头实景.jpg" },
+      { id: "ph-demo-02", url: "assets/site-photos/cabinet.svg", name: "柜机近景.jpg" },
+      { id: "ph-demo-03", url: "assets/site-photos/entrance.svg", name: "站点入口.jpg" }
+    ];
+
     const sites = [
-      { id: "ST-SH-01", name: "浦东骑手驿站", city: "上海", address: "上海市浦东新区张杨路1588号", lng: 121.5275, lat: 31.2304, type: "配送站", cabinets: 3, batteries: 36, status: "在营", operatorId: "OP-SX", waitingCount: 2 },
-      { id: "ST-SH-02", name: "世博换电服务点", city: "上海", address: "上海市浦东新区世博大道1368号", lng: 121.4892, lat: 31.1901, type: "配送站", cabinets: 1, batteries: 12, status: "在营", operatorId: "OP-SX", waitingCount: 0 },
-      { id: "ST-SH-04", name: "陆家嘴分站", city: "上海", address: "上海市浦东新区世纪大道88号", lng: 121.5056, lat: 31.2397, type: "写字楼", cabinets: 2, batteries: 24, status: "在营", operatorId: "OP-LJZ", waitingCount: 1 },
-      { id: "ST-SH-JD", name: "京东物流专属站", city: "上海", address: "上海市浦东新区康桥路888号", lng: 121.589, lat: 31.142, type: "渠道专属", cabinets: 4, batteries: 24, status: "在营", operatorId: "OP-SX", channelId: "CH-RENT", channelDedicated: true, publicOpen: false, visibilityMode: "whitelist_only", waitingCount: 1 },
-      { id: "ST-SH-05", name: "张江筹备站", city: "上海", address: "上海市浦东新区张江路2000号", lng: null, lat: null, type: "配送站", cabinets: 0, batteries: 0, status: "建设中", operatorId: "OP-SX", waitingCount: 0 },
-      { id: "ST-SH-LG", name: "临港偏远站", city: "上海", address: "上海市浦东新区临港大道1888号", lng: 121.923, lat: 30.893, type: "配送站", cabinets: 2, batteries: 18, status: "在营", operatorId: "OP-SX", waitingCount: 0, remoteHint: true }
+      { id: "ST-SH-01", name: "浦东骑手驿站", city: "上海", address: "上海市浦东新区张杨路1588号", lng: 121.5275, lat: 31.2304, type: "配送站", cabinets: 3, batteries: 36, status: "在营", operatorId: "OP-SX", waitingCount: 2, photos: SAMPLE_SITE_PHOTOS.map(p => ({ ...p })), cabPreview: { name: "浦东骑手驿站-1号柜", sn: "2401C00876", voltage: "48V", available: 8, charging: 1 } },
+      { id: "ST-SH-02", name: "世博换电服务点", city: "上海", address: "上海市浦东新区世博大道1368号", lng: 121.4892, lat: 31.1901, type: "配送站", cabinets: 1, batteries: 12, status: "在营", operatorId: "OP-SX", waitingCount: 0, photos: [], cabPreview: { name: "世博换电服务点-主柜", sn: "2401C01002", voltage: "48V", available: 5, charging: 2 } },
+      { id: "ST-SH-04", name: "陆家嘴分站", city: "上海", address: "上海市浦东新区世纪大道88号", lng: 121.5056, lat: 31.2397, type: "写字楼", cabinets: 2, batteries: 24, status: "在营", operatorId: "OP-LJZ", waitingCount: 1, photos: [] },
+      { id: "ST-SH-JD", name: "京东物流专属站", city: "上海", address: "上海市浦东新区康桥路888号", lng: 121.589, lat: 31.142, type: "渠道专属", cabinets: 4, batteries: 24, status: "在营", operatorId: "OP-SX", channelId: "CH-RENT", channelDedicated: true, publicOpen: false, visibilityMode: "whitelist_only", waitingCount: 1, photos: [{ id: "ph-jd-01", url: "assets/site-photos/entrance.svg", name: "专属站入口.jpg" }] },
+      { id: "ST-SH-05", name: "张江筹备站", city: "上海", address: "上海市浦东新区张江路2000号", lng: null, lat: null, type: "配送站", cabinets: 0, batteries: 0, status: "建设中", operatorId: "OP-SX", waitingCount: 0, photos: [] },
+      { id: "ST-SH-LG", name: "临港偏远站", city: "上海", address: "上海市浦东新区临港大道1888号", lng: 121.923, lat: 30.893, type: "配送站", cabinets: 2, batteries: 18, status: "在营", operatorId: "OP-SX", waitingCount: 0, remoteHint: true, photos: [{ id: "ph-lg-01", url: "assets/site-photos/cabinet.svg", name: "临港柜机.jpg" }, { id: "ph-lg-02", url: "assets/site-photos/entrance.svg", name: "临港入口.jpg" }] }
     ];
 
     const sitePartners = [
