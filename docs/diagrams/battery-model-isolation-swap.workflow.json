@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "同柜多型号 · 换电隔离（兼容集）",
+    "subtitle": "decision-096 · 双向兼容挂型号字典 · 售卖A · 换电S",
+    "output": "battery-model-isolation-swap.html",
+    "viewBox": [720, 760]
+  },
+  "lanes": [
+    { "id": "rider", "label": "骑手端" },
+    { "id": "cloud", "label": "云端匹配（隔离核心）" },
+    { "id": "cabinet", "label": "柜端 / IoT" },
+    { "id": "fail", "label": "失败与引导", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "auth", "label": "扫柜 · 解析权益", "fromCol": 0, "toCol": 0 },
+    { "id": "isolate", "label": "兼容集校验", "fromCol": 2, "toCol": 2, "variant": "emphasis" },
+    { "id": "match", "label": "仓位匹配", "fromCol": 4, "toCol": 4 },
+    { "id": "exec", "label": "开仓换电", "fromCol": 5, "toCol": 5 }
+  ],
+  "groups": [
+    {
+      "id": "match_core",
+      "label": "满电 ∈ S · 优先 A",
+      "lane": "cloud",
+      "fromCol": 2,
+      "toCol": 4,
+      "variant": "emphasis"
+    }
+  ],
+  "mainPath": ["scan", "entitle", "hold", "pick", "open", "done"],
+  "nodes": [
+    {
+      "id": "scan",
+      "lane": "rider",
+      "col": 0,
+      "type": "frontend",
+      "label": "扫柜二维码",
+      "sublabel": "发起换电"
+    },
+    {
+      "id": "done",
+      "lane": "rider",
+      "col": 5,
+      "type": "backend",
+      "label": "换电成功",
+      "sublabel": "持有更新为满电"
+    },
+    {
+      "id": "entitle",
+      "lane": "cloud",
+      "col": 0,
+      "type": "backend",
+      "label": "解析权益",
+      "sublabel": "主型号A · S={A,B,C}",
+      "tag": "定价仍绑 A"
+    },
+    {
+      "id": "hold",
+      "lane": "cloud",
+      "col": 2,
+      "type": "security",
+      "label": "持有校验",
+      "sublabel": "持有 ∈ S ?",
+      "tag": "有持有时"
+    },
+    {
+      "id": "pick",
+      "lane": "cloud",
+      "col": 4,
+      "type": "backend",
+      "label": "匹配仓位",
+      "sublabel": "满电∈S 优先A",
+      "tag": "双匹配"
+    },
+    {
+      "id": "open",
+      "lane": "cabinet",
+      "col": 5,
+      "type": "cloud",
+      "label": "先还后取开仓",
+      "sublabel": "空仓→满电仓",
+      "tag": "云端二次校验"
+    },
+    {
+      "id": "hold_fail",
+      "lane": "fail",
+      "col": 2,
+      "type": "security",
+      "label": "持有不在S",
+      "sublabel": "仅还电 / 阻断取电"
+    },
+    {
+      "id": "stock_fail",
+      "lane": "fail",
+      "col": 4,
+      "type": "security",
+      "label": "S内无可用",
+      "sublabel": "无满电或无空仓"
+    },
+    {
+      "id": "guide",
+      "lane": "fail",
+      "col": 5,
+      "type": "frontend",
+      "label": "引导附近柜",
+      "sublabel": "按可换集汇总"
+    }
+  ],
+  "edges": [
+    {
+      "from": "scan",
+      "to": "entitle",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "drop"
+    },
+    { "from": "entitle", "to": "hold", "variant": "default" },
+    { "from": "hold", "to": "pick", "label": "通过", "variant": "emphasis" },
+    {
+      "from": "hold",
+      "to": "hold_fail",
+      "label": "不在S",
+      "variant": "security",
+      "role": "error",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "drop",
+      "labelSegment": 1
+    },
+    {
+      "from": "pick",
+      "to": "open",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "from": "pick",
+      "to": "stock_fail",
+      "label": "无仓可配",
+      "variant": "security",
+      "role": "error",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "drop",
+      "labelSegment": 1
+    },
+    {
+      "from": "open",
+      "to": "done",
+      "variant": "emphasis",
+      "role": "return",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "drop"
+    },
+    {
+      "from": "hold_fail",
+      "to": "guide",
+      "variant": "dashed",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "route": "bottom-channel"
+    },
+    { "from": "stock_fail", "to": "guide", "variant": "dashed", "role": "branch" }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "已锁定（096）",
+      "items": [
+        "兼容双向：A↔B，B 套餐也可换 A",
+        "兼容挂平台电池型号字典；SKU 只选主型号",
+        "多选 B/C 保存时写完全图（A/B/C 两两互通）",
+        "S=主型号∪字典兼容；S 外禁止"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "出电优先级",
+      "items": [
+        "优先开主型号 A 满电",
+        "无 A 再开 S 内其他型号",
+        "用户不手选仓口"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "失败文案",
+      "items": [
+        "本柜暂无你可换的型号",
+        "勿说「柜内无电」若仅有 S 外型号",
+        "引导附近柜按可换集汇总"
+      ]
+    }
+  ]
+}

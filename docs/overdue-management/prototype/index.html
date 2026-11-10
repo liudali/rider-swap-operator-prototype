@@ -102,6 +102,8 @@ const state = {
   fee: 10,
   q: "",
   reason: "全部",
+  batStatus: "未归还",
+  feeStatus: "全部",
   rows: null
 };
 
@@ -117,13 +119,27 @@ function fmtAt(iso) {
 }
 function payCleared(r) {
   if (!r || r.type !== "personal") return true;
-  return Number(r.payable) <= 0 || r.payStatus === "paid";
+  return Number(r.payable) <= 0 || r.payStatus === "paid" || r.payStatus === "waived";
 }
-function payLabel(r) {
-  if (r.type !== "personal") return "—";
-  if (Number(r.payable) <= 0) return "已减免";
-  if (r.payStatus === "paid") return "已付清";
-  return "待支付";
+function batStatus(r) {
+  return (r && (r.status === "done" || r.returnedAt)) ? "已归还" : "未归还";
+}
+function feeStatus(r) {
+  if (!r || r.type !== "personal") return "无需支付";
+  return payCleared(r) ? "已支付" : "未支付";
+}
+function payLabel(r) { return feeStatus(r); }
+function batCell(r) {
+  const st = batStatus(r);
+  return `<span class="tag ${st === "未归还" ? "orange" : "teal"}">${st}</span><br><small>${r.batSn}<br>${r.model}</small>`;
+}
+function feeCell(r) {
+  const st = feeStatus(r);
+  const cls = st === "未支付" ? "red" : st === "无需支付" ? "gray" : "teal";
+  if (r.type !== "personal") return `<span class="tag ${cls}">${st}</span>`;
+  const amt = r.status === "done" ? (r.feePaid || r.payable || 0) : r.payable;
+  const extra = Number(r.payable) <= 0 ? "<br><small>减免 ¥0</small>" : "";
+  return `<span class="tag ${cls}">${st}</span><br>¥${amt}${extra}`;
 }
 function logHtml(logs) {
   if (!logs || !logs.length) return "<p style='font-size:12px;color:var(--muted);margin:8px 0 0'>暂无减免记录</p>";
@@ -135,6 +151,7 @@ function seed() {
   return [
     { id: "OD-P-01", type: "personal", status: "open", userId: "U17867085901622225", name: "王康", phone: "191****1966", sku: "包月30天", orderId: "OI-PKG-0912", reason: "到期", startAt: "2026-09-12T23:59:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-8831", model: "48V30AH", lastSwap: "2026-09-12 18:22", site: "杭州西湖文三路换电站", payStatus: "unpaid", adjLogs: [] },
     { id: "OD-P-02", type: "personal", status: "open", userId: "U17878176742715044", name: "李庚南", phone: "182****2356", sku: "次卡10次", orderId: "OI-TIMES-0914", reason: "次数耗尽", startAt: "2026-09-14T18:05:00+08:00", deposit: "信用免押", batSn: "BAT-HZ-2207", model: "30V30AH", lastSwap: "2026-09-14 17:40", site: "杭州上城钱江新城换电站", payStatus: "unpaid", adjLogs: [] },
+    { id: "OD-P-03", type: "personal", status: "open", userId: "U13700001188", name: "孙骑手", phone: "137****1188", sku: "包月7天", orderId: "OI-PKG-0914", reason: "到期", startAt: "2026-09-14T23:59:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-4410", model: "48V30AH", lastSwap: "2026-09-14 20:01", site: "杭州西湖文三路换电站", payStatus: "paid", paidAmount: 10, adjLogs: [] },
     { id: "OD-D-01", type: "daypool", status: "open", userId: "U17668113868", name: "丁舒洋", phone: "176****3868", channel: "测试运营商1-人天池", team: "测试团队", startAt: "2026-09-13T00:00:00+08:00", poolAfter: -2, batSn: "BAT-SF-0199", model: "48V30AH", lastSwap: "2026-09-12 21:03", site: "杭州西湖文三路换电站" },
     { id: "OD-D-02", type: "daypool", status: "open", userId: "U18668113666", name: "赵六", phone: "186****3666", channel: "测试运营商1-人天池", team: "默认团队", startAt: "2026-09-15T09:10:00+08:00", poolAfter: 9, batSn: "BAT-SF-0044", model: "30V30AH", lastSwap: "2026-09-14 20:18", site: "杭州拱墅武林广场换电站" },
     { id: "OD-P-09", type: "personal", status: "done", userId: "U18800001850", name: "刘杰", phone: "188****1850", sku: "包月30天", orderId: "OI-PKG-0908", reason: "到期", startAt: "2026-09-08T23:59:00+08:00", returnedAt: "2026-09-10T08:12:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-1102", model: "48V30AH", lastSwap: "2026-09-08 11:00", site: "杭州西湖文三路换电站", days: 2, sysDue: 20, feePaid: 20, payStatus: "paid", adjLogs: [{ at: "2026-09-10 08:00", actor: "运营·王客服", from: 20, to: 20, reason: "按系统计费收取" }] }
@@ -158,33 +175,38 @@ function enrich(r) {
   return { ...r, days, due: sysDue, payable, quota: r.type === "daypool" ? days : null };
 }
 function list(tab) {
-  const want = tab === "done" ? "done" : "open";
   const type = tab === "personal" ? "personal" : tab === "daypool" ? "daypool" : null;
   return state.rows.map(enrich).filter(r => {
-    if (r.status !== want) return false;
     if (type && r.type !== type) return false;
+    if (tab === "done" && r.status !== "done") return false;
+    if (state.batStatus && state.batStatus !== "全部" && batStatus(r) !== state.batStatus) return false;
+    if (state.feeStatus && state.feeStatus !== "全部" && feeStatus(r) !== state.feeStatus) return false;
     const blob = [r.name, r.phone, r.userId, r.batSn, r.orderId, r.channel].join(" ").toLowerCase();
     if (state.q && !blob.includes(state.q.toLowerCase().replace(/\*/g, ""))) return false;
-    if (tab === "personal" && state.reason !== "全部" && r.reason !== state.reason) return false;
+    if (r.type === "personal" && state.reason !== "全部" && r.reason !== state.reason) return false;
     return true;
   });
 }
 
+function hold(type) {
+  return state.rows.map(enrich).filter(r => batStatus(r) === "未归还" && (!type || r.type === type));
+}
 function render() {
-  const personal = list("personal");
-  const daypool = list("daypool");
-  const dueSum = personal.reduce((s, r) => s + (payCleared(r) ? 0 : (Number(r.payable) || 0)), 0);
-  const quotaSum = state.rows.filter(r => r.type === "daypool").map(enrich).reduce((s, r) => s + (r.status === "open" ? r.quota : 0), 0);
+  const personalHold = hold("personal");
+  const dayHold = hold("daypool");
+  const dueSum = personalHold.reduce((s, r) => s + (feeStatus(r) === "未支付" ? (Number(r.payable) || 0) : 0), 0);
+  const paidHold = personalHold.filter(r => feeStatus(r) === "已支付").length;
+  const quotaSum = dayHold.reduce((s, r) => s + (r.quota || 0), 0);
   document.getElementById("kpis").innerHTML = [
-    ["进行中人数", personal.length + daypool.length],
-    ["个人待收占用费", "¥" + dueSum],
-    ["人天已记占用", quotaSum + " 人天"],
-    ["当前日费", "¥" + state.fee + " / 天"]
+    ["未归还", personalHold.length + dayHold.length],
+    ["逾期费未支付", "¥" + dueSum],
+    ["已支付待还电", paidHold],
+    ["人天已记占用", quotaSum + " 人天"]
   ].map(([k, v]) => `<div class="kpi"><span>${k}</span><b>${v}</b></div>`).join("");
 
   const tabs = [
-    ["personal", "个人套餐逾期 (" + personal.length + ")"],
-    ["daypool", "人天池占用 (" + daypool.length + ")"],
+    ["personal", "个人套餐逾期 (" + personalHold.length + ")"],
+    ["daypool", "人天池占用 (" + dayHold.length + ")"],
     ["done", "已完结"],
     ["settings", "逾期设置"]
   ];
@@ -209,32 +231,34 @@ function render() {
   document.getElementById("filters").innerHTML = `
     <input id="q" placeholder="姓名 / 手机 / 电池 SN" value="${state.q}">
     ${isP ? `<select id="reason"><option>全部</option><option>到期</option><option>次数耗尽</option></select>` : ""}
+    <select id="batStatus"><option>全部</option><option>未归还</option><option>已归还</option></select>
+    <select id="feeStatus"><option>全部</option><option>未支付</option><option>已支付</option><option>无需支付</option></select>
     <button class="btn" id="doFilter">查询</button>
     <button class="btn" id="reset">重置</button>
   `;
-  if (isP) {
-    document.getElementById("reason").value = state.reason;
-  }
+  if (isP) document.getElementById("reason").value = state.reason;
+  document.getElementById("batStatus").value = state.batStatus;
+  const feeSel = document.getElementById("feeStatus");
+  if (feeSel) feeSel.value = state.feeStatus;
   document.getElementById("hint").textContent = isP
-    ? "个人套餐结束仍持电：须先付清占用费才能还电。运营商可减免（含 0）。占用费全额进运营商，不分润。"
+    ? "电池（未归还 / 已归还）与逾期费（未支付 / 已支付）分开看。个人须先支付才能还电；减免为 0 记已支付。"
     : isD
-      ? "个人剩余人天 = 0 仍持电：从渠道额度池扣人天，不向骑手收现金。骑手端展示「无需支付占用费」。"
-      : "还电或续配成功后进入已完结。占用费 / 已扣人天不退。";
+      ? "人天占用不向骑手收现金，逾期费为「无需支付」。电池仍区分未归还 / 已归还。"
+      : "已完结 = 电池已归还。个人逾期费为已支付；人天为无需支付。";
 
   const rows = list(state.tab);
   if (!rows.length) {
-    document.getElementById("body").innerHTML = `<div class="empty">暂无逾期持电用户</div>`;
+    document.getElementById("body").innerHTML = `<div class="empty">暂无符合筛选的逾期订单</div>`;
     return;
   }
   const head = isP
-    ? "<th>用户</th><th>套餐</th><th>结束原因</th><th>逾期时间</th><th>逾期费用</th><th>支付</th><th>电池</th><th>操作</th>"
+    ? "<th>用户</th><th>套餐</th><th>结束原因</th><th>逾期时间</th><th>电池</th><th>逾期费</th><th>操作</th>"
     : isD
-      ? "<th>骑手</th><th>渠道 / 团队</th><th>占用时间</th><th>已扣人天</th><th>池可用（扣后）</th><th>电池</th><th>操作</th>"
-      : "<th>用户</th><th>类型</th><th>逾期时间</th><th>逾期费用 / 人天</th><th>电池</th><th>完结时间</th>";
+      ? "<th>骑手</th><th>渠道 / 团队</th><th>占用时间</th><th>已扣人天</th><th>池可用（扣后）</th><th>电池</th><th>逾期费</th><th>操作</th>"
+      : "<th>用户</th><th>类型</th><th>逾期时间</th><th>电池</th><th>逾期费</th><th>完结时间</th>";
   const body = rows.map(r => {
     if (state.tab === "done") {
-      const fee = r.type === "personal" ? ("¥" + r.feePaid) : (r.days + " 人天（不退）");
-      return `<tr><td>${r.name}<br><small>${r.phone}</small></td><td>${r.type === "personal" ? "个人套餐逾期" : "人天池占用"}</td><td>${fmtAt(r.startAt)}<br><small>${r.days} 天</small></td><td>${fee}</td><td>${r.batSn}<br><small>${r.model}</small></td><td>${fmtAt(r.returnedAt)}</td></tr>`;
+      return `<tr><td>${r.name}<br><small>${r.phone}</small></td><td>${r.type === "personal" ? "个人套餐逾期" : "人天池占用"}</td><td>${fmtAt(r.startAt)}<br><small>${r.days} 天</small></td><td>${batCell(r)}</td><td>${feeCell(r)}</td><td>${fmtAt(r.returnedAt)}</td></tr>`;
     }
     const ops = `<button class="link" data-detail="${r.id}">详情</button>
       <button class="link" data-remind="${r.id}">催还</button>
@@ -242,15 +266,13 @@ function render() {
       <button class="link" data-return="${r.id}">模拟还电</button>
       ${r.type === "daypool" ? `<button class="link" data-alloc="${r.id}">模拟续配</button>` : ""}`;
     if (isP) {
-      const feeTxt = Number(r.payable) !== Number(r.due) ? `¥${r.payable}<br><small>系统 ¥${r.due}</small>` : `¥${r.payable}`;
       return `<tr>
         <td>${r.name}<br><small>${r.phone}<br>${r.userId}</small></td>
         <td>${r.sku}<br><small>${r.orderId}</small></td>
         <td><span class="tag ${r.reason === "到期" ? "orange" : "red"}">${r.reason}</span></td>
         <td>${fmtAt(r.startAt)}<br><small>已逾期 ${r.days} 天</small></td>
-        <td>${feeTxt}</td>
-        <td><span class="tag">${payLabel(r)}</span></td>
-        <td>${r.batSn}<br><small>${r.model}</small></td>
+        <td>${batCell(r)}</td>
+        <td>${feeCell(r)}</td>
         <td>${ops}</td>
       </tr>`;
     }
@@ -261,7 +283,8 @@ function render() {
       <td>${fmtAt(r.startAt)}<br><small>已占用 ${r.days} 天</small></td>
       <td>${r.quota} 人天</td>
       <td class="${poolCls}">${r.poolAfter} ${r.poolAfter < 0 ? "欠人天" : ""}</td>
-      <td>${r.batSn}<br><small>${r.model}</small></td>
+      <td>${batCell(r)}</td>
+      <td>${feeCell(r)}</td>
       <td>${ops}</td>
     </tr>`;
   }).join("");
@@ -278,8 +301,8 @@ function openDetail(id) {
         <span>已逾期</span><div>${r.days} 天（不足一天按一天）</div>
         <span>系统计费</span><div>¥${r.due} · 暂不封顶</div>
         <span>当前应付</span><div>¥${r.payable}</div>
-        <span>支付状态</span><div>${payLabel(r)}</div>
-        <span>还电门槛</span><div>${payCleared(r) ? "占用费已结清，可还电" : "须先付清占用费才能还电"}</div>
+        <span>逾期费</span><div>${feeStatus(r)}</div>
+        <span>还电门槛</span><div>${payCleared(r) ? "占用费已支付，可还电" : "须先支付占用费才能还电"}</div>
         <span>资金归属</span><div>全额进运营商 · 不分润</div></div></div>
        ${r.status === "open" ? `<div class="block"><h4>修改逾期费用</h4>
         <p style="font-size:12px;color:var(--muted)">0 ≤ 改后应付 ≤ 系统计费。改为 0 则无需支付，直接还电。</p>
@@ -295,6 +318,7 @@ function openDetail(id) {
         <span>已扣人天</span><div>${r.quota}（不足一天按 1）</div>
         <span>扣减对象</span><div>${r.channel} 额度池可用</div>
         <span>扣后可用</span><div>${r.poolAfter}${r.poolAfter < 0 ? " · 欠人天" : ""}</div>
+        <span>逾期费</span><div>无需支付</div>
         <span>骑手现金</span><div>不收取占用费 · 可直接还电</div></div></div>`;
   document.getElementById("drawer").innerHTML = `
     <h3>逾期详情</h3>
@@ -311,6 +335,7 @@ function openDetail(id) {
     <div class="block"><h4>电池信息</h4>
       <div class="kv">
         <span>SN</span><div>${r.batSn}</div>
+        <span>电池</span><div>${batStatus(r)}</div>
         <span>型号</span><div>${r.model}</div>
         <span>SOC</span><div>—</div>
         <span>最后换电</span><div>${r.lastSwap}</div>
@@ -326,13 +351,30 @@ function openDetail(id) {
 
 document.body.addEventListener("click", e => {
   const tab = e.target.closest("[data-tab]");
-  if (tab) { state.tab = tab.dataset.tab; render(); return; }
+  if (tab) {
+    const id = tab.dataset.tab;
+    state.tab = id;
+    if (id === "done" && state.batStatus === "未归还") state.batStatus = "已归还";
+    if ((id === "personal" || id === "daypool") && state.batStatus === "已归还") state.batStatus = "未归还";
+    render();
+    return;
+  }
   if (e.target.id === "doFilter") {
     state.q = document.getElementById("q").value.trim();
     if (document.getElementById("reason")) state.reason = document.getElementById("reason").value;
+    const batSel = document.getElementById("batStatus");
+    const feeSel = document.getElementById("feeStatus");
+    if (batSel) state.batStatus = batSel.value;
+    if (feeSel) state.feeStatus = feeSel.value;
     render(); return;
   }
-  if (e.target.id === "reset") { state.q = ""; state.reason = "全部"; render(); return; }
+  if (e.target.id === "reset") {
+    state.q = "";
+    state.reason = "全部";
+    state.batStatus = state.tab === "done" ? "已归还" : "未归还";
+    state.feeStatus = "全部";
+    render(); return;
+  }
   if (e.target.id === "saveFee") {
     const v = Number(document.getElementById("feeInput").value);
     const err = document.getElementById("feeErr");
@@ -358,7 +400,7 @@ document.body.addEventListener("click", e => {
     if (payCleared(en)) { toast("占用费已结清"); return; }
     row.payStatus = "paid";
     row.paidAmount = Number(en.payable);
-    toast("已支付占用费 ¥" + en.payable + "，可进入还电");
+    toast("已支付占用费 ¥" + en.payable + "（电池仍为未归还，可进入还电）");
     render(); return;
   }
   const adj = e.target.closest("[data-adj]");

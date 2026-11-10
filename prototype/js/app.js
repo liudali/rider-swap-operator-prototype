@@ -26,6 +26,7 @@
       commissionStatementSubTab: "summary", commissionDetailPage: 1, commissionDetailPageSize: 8,
       linkSettleSubTab: "summary", linkSettlePage: 1, linkSettlePageSize: 8,
       pricingTab: "pkg", pricingPkgSubTab: "city", pricingSelectedZoneId: "PZ-SH-REMOTE",
+      swapRangeSubTab: "settings",
       channelSalesTab: "contracts", channelOrdersSubTab: "day", channelOrdersPage: 1, channelOrdersPageSize: 5,
       channelAssetsSubTab: "dayPool", channelAssetsPage: 1, channelAssetsPageSize: 5,
       channelAssetsLedgerChannel: "全部", channelAssetsLedgerType: "全部",
@@ -683,6 +684,36 @@
         keys.push(x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0"));
       }
       return keys;
+    }
+
+    function monthsBetweenKeys(fromYm, toYm) {
+      const a = String(fromYm || "").slice(0, 7);
+      const b = String(toYm || "").slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(a) || !/^\d{4}-\d{2}$/.test(b)) return [];
+      let [ys, ms] = a.split("-").map(Number);
+      let [ye, me] = b.split("-").map(Number);
+      if (ys * 12 + ms > ye * 12 + me) { [ys, ms, ye, me] = [ye, me, ys, ms]; }
+      const out = [];
+      while (ys < ye || (ys === ye && ms <= me)) {
+        out.push(ys + "-" + String(ms).padStart(2, "0"));
+        ms += 1;
+        if (ms > 12) { ms = 1; ys += 1; }
+      }
+      return out;
+    }
+    function promoSettleRangeMonths(f) {
+      const from = f.monthFrom || "";
+      const to = f.monthTo || f.monthFrom || "";
+      if (/^\d{4}-\d{2}$/.test(String(from).slice(0, 7)) && /^\d{4}-\d{2}$/.test(String(to).slice(0, 7))) {
+        return monthsBetweenKeys(from, to);
+      }
+      return commissionRangeMonthKeys(f.month || "last6");
+    }
+    function promoSettleRangeLabel(f) {
+      const months = promoSettleRangeMonths(f);
+      if (!months.length) return "—";
+      if (months.length === 1) return months[0];
+      return months[0] + " 至 " + months[months.length - 1];
     }
 
     function commissionRangeMonthKeys(rangeVal) {
@@ -4464,7 +4495,9 @@
       ],
       orderOverdue: [
         { key: "keyword", label: "用户 / 电池", placeholder: "姓名 / 手机 / SN" },
-        { key: "reason", label: "结束原因", type: "select", options: [{ v: "全部", t: "全部" }, { v: "到期", t: "到期" }, { v: "次数耗尽", t: "次数耗尽" }] }
+        { key: "reason", label: "结束原因", type: "select", options: [{ v: "全部", t: "全部" }, { v: "到期", t: "到期" }, { v: "次数耗尽", t: "次数耗尽" }] },
+        { key: "batStatus", label: "电池", type: "select", options: [{ v: "全部", t: "全部" }, { v: "未归还", t: "未归还" }, { v: "已归还", t: "已归还" }] },
+        { key: "feeStatus", label: "逾期费", type: "select", options: [{ v: "全部", t: "全部" }, { v: "未支付", t: "未支付" }, { v: "已支付", t: "已支付" }, { v: "无需支付", t: "无需支付" }] }
       ],
       leaseAgreements: [
         { key: "contractId", label: "协议编号", placeholder: "LC-" },
@@ -4701,19 +4734,14 @@
         }}
       ],
       operatorLinkSettle: [
-        { key: "month", label: "统计范围", type: "select", options: () => {
-          const months = recentCalendarMonthKeys(12);
-          return [
-            { v: "last6", t: "近6个月" },
-            { v: "last12", t: "近12个月" }
-          ].concat(months.map(m => ({ v: m, t: m })));
-        }},
+        { key: "monthFrom", label: "统计月份", type: "month" },
+        { key: "monthTo", label: "~", type: "month" },
         { key: "channelId", label: "渠道商", type: "select", options: () => {
           const rows = myLinkContracts();
-          return [{ v: "全部", t: "全部渠道" }].concat(rows.map(c => ({ v: c.channelId, t: c.channelName })));
+          return [{ v: "全部", t: "全部推广渠道" }].concat(rows.map(c => ({ v: c.channelId, t: c.channelName })));
         }},
         { key: "settleType", label: "结算方式", type: "select", options: [
-          { v: "全部", t: "全部" },
+          { v: "全部", t: "全部结算方式" },
           { v: "即时分账", t: "即时分账" },
           { v: "线下结算", t: "线下结算" }
         ]}
@@ -4763,9 +4791,15 @@
       if (!state.pf[fKey]) state.pf[fKey] = PF_DEFAULTS[fKey] ? { ...PF_DEFAULTS[fKey] } : {};
       const f = state.pf[fKey];
       const confirmLabel = PF_CONFIRM_LABELS[fKey] || "确认筛选";
-      const confirmBtn = PF_CONFIRM_KEYS.has(fKey)
+      let confirmBtn = PF_CONFIRM_KEYS.has(fKey)
         ? `<div class="field pf-actions"><label>&nbsp;</label><button type="button" class="btn primary" data-pf-confirm>${confirmLabel}</button></div>`
         : "";
+      if (fKey === "operatorLinkSettle") {
+        confirmBtn = `<div class="field pf-actions"><label>&nbsp;</label>
+          <button type="button" class="btn primary" data-pf-confirm>查询</button>
+          <button type="button" class="btn" data-promo-settle-reset style="margin-left:8px">重置</button>
+        </div>`;
+      }
       return `<div class="panel-inline-filters" data-inline-pf="${fKey}" aria-label="页面筛选">${specs.map(s => renderFilterField(s, f)).join("")}${confirmBtn}</div>`;
     }
 
@@ -6505,7 +6539,7 @@
             return [
               ["contracts", "签约渠道"],
               ["orders", "渠道订单"],
-              ["linkSettle", "链接结算" + (n ? " (" + n + ")" : "")],
+              ["linkSettle", "推广结算" + (n ? " (" + n + ")" : "")],
               ["assets", "渠道权益"],
               ["platformMarketing", "平台营销"]
             ];
@@ -12815,15 +12849,140 @@
       });
     }
 
+    function batteryInCabinetSn(b) {
+      const cab = b && b.inCab;
+      return cab && String(cab).startsWith("CAB") ? String(cab) : null;
+    }
+    function batteryLocationOperatorId(b) {
+      if (!b) return null;
+      const cabSn = batteryInCabinetSn(b);
+      if (cabSn) {
+        const cab = cabinets.find(c => c.sn === cabSn);
+        if (cab?.deviceOwnerId) return cab.deviceOwnerId;
+      }
+      const site = sites.find(s => s.name === b.site);
+      return site?.operatorId || null;
+    }
+    function userServiceOperatorId(u) {
+      if (!u) return null;
+      if (u.poolId) {
+        const pool = dayPools.find(p => p.id === u.poolId);
+        if (pool?.sellerId) return pool.sellerId;
+      }
+      return u.deviceOwnerId || null;
+    }
+    function computeCrossNetBoard(opId) {
+      const ownUsersHoldForeign = [];
+      const foreignUsersHoldOwn = [];
+      const ownCabForeignBats = [];
+      const foreignCabOwnBats = [];
+      batteries.forEach(b => {
+        if (!b || !b.deviceOwnerId) return;
+        if (b.heldByUser) {
+          const uid = b.holderUserId;
+          if (!uid) return;
+          const u = users.find(x => x.id === uid);
+          const svcOp = userServiceOperatorId(u);
+          if (!svcOp) return;
+          const row = {
+            userId: uid,
+            userName: b.holderName || u?.name || u?.phone || uid,
+            phone: u?.phone || "—",
+            batSn: b.sn,
+            batOwnerId: b.deviceOwnerId,
+            batOwnerName: b.deviceOwnerName || operatorLabel(b.deviceOwnerId),
+            site: b.site || "—"
+          };
+          if (svcOp === opId && b.deviceOwnerId !== opId) ownUsersHoldForeign.push(row);
+          if (svcOp !== opId && b.deviceOwnerId === opId) foreignUsersHoldOwn.push(row);
+          return;
+        }
+        const cabSn = batteryInCabinetSn(b);
+        if (!cabSn) return;
+        const locOp = batteryLocationOperatorId(b);
+        if (!locOp) return;
+        const row = {
+          batSn: b.sn,
+          model: b.batteryModel || b.specs || "—",
+          batOwnerId: b.deviceOwnerId,
+          batOwnerName: b.deviceOwnerName || operatorLabel(b.deviceOwnerId),
+          cabSn,
+          site: b.site || "—",
+          locOpId: locOp,
+          locOpName: operatorLabel(locOp)
+        };
+        if (locOp === opId && b.deviceOwnerId !== opId) ownCabForeignBats.push(row);
+        if (b.deviceOwnerId === opId && locOp !== opId) foreignCabOwnBats.push(row);
+      });
+      return {
+        ownUsersHoldForeign, foreignUsersHoldOwn, ownCabForeignBats, foreignCabOwnBats,
+        total: ownUsersHoldForeign.length + foreignUsersHoldOwn.length + ownCabForeignBats.length + foreignCabOwnBats.length
+      };
+    }
+    function renderCrossNetBoard(opId) {
+      const board = computeCrossNetBoard(opId);
+      const kpi = `<div class="kpi-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        <div class="kpi"><span>持异网电用户数</span><b>${board.ownUsersHoldForeign.length}</b><small style="display:block;color:var(--muted);margin-top:4px">本网用户 · 手持他网电池</small></div>
+        <div class="kpi"><span>异网用户持本网电</span><b>${board.foreignUsersHoldOwn.length}</b><small style="display:block;color:var(--muted);margin-top:4px">他网用户 · 手持本网电池</small></div>
+        <div class="kpi"><span>本柜异网电</span><b>${board.ownCabForeignBats.length}</b><small style="display:block;color:var(--muted);margin-top:4px">本运营商柜内 · 他网电池</small></div>
+        <div class="kpi"><span>他柜本网电</span><b>${board.foreignCabOwnBats.length}</b><small style="display:block;color:var(--muted);margin-top:4px">他网柜内 · 本网电池</small></div>
+      </div>`;
+      const holdRows = (rows, empty) => rows.length
+        ? rows.map(r => `<tr><td>${r.userName}<br><small>${r.phone}<br>${r.userId}</small></td><td>${r.batSn}</td><td>${r.batOwnerName}</td><td>${r.site}</td></tr>`).join("")
+        : `<tr><td colspan="4">${empty}</td></tr>`;
+      const cabRows = (rows, empty) => rows.length
+        ? rows.map(r => `<tr><td>${r.batSn}<br><small>${r.model}</small></td><td>${r.batOwnerName}</td><td>${r.cabSn}<br><small>${r.site}</small></td><td>${r.locOpName}</td></tr>`).join("")
+        : `<tr><td colspan="4">${empty}</td></tr>`;
+      return `${kpi}
+        <p style="font-size:12px;color:var(--muted);margin:0 0 14px">${noteBtn("swap_policy_board")} 关停跨网前先消化四类存量（decision-147）。当前合计 <strong>${board.total}</strong> 条纠缠。</p>
+        <h4 style="margin:0 0 8px;font-size:13px">持异网电用户</h4>
+        <div class="orders-table-wrap" style="margin-bottom:16px">
+          <table><thead><tr><th>用户</th><th>电池 SN</th><th>电池归属</th><th>最近站点</th></tr></thead>
+          <tbody>${holdRows(board.ownUsersHoldForeign, "暂无本网用户持异网电池")}</tbody></table>
+        </div>
+        <h4 style="margin:0 0 8px;font-size:13px">异网用户持本网电</h4>
+        <div class="orders-table-wrap" style="margin-bottom:16px">
+          <table><thead><tr><th>用户</th><th>电池 SN</th><th>电池归属</th><th>最近站点</th></tr></thead>
+          <tbody>${holdRows(board.foreignUsersHoldOwn, "暂无异网用户持本网电池")}</tbody></table>
+        </div>
+        <h4 style="margin:0 0 8px;font-size:13px">本柜异网电</h4>
+        <div class="orders-table-wrap" style="margin-bottom:16px">
+          <table><thead><tr><th>电池</th><th>电池归属</th><th>所在柜 / 站</th><th>柜机运营商</th></tr></thead>
+          <tbody>${cabRows(board.ownCabForeignBats, "本柜暂无异网电池")}</tbody></table>
+        </div>
+        <h4 style="margin:0 0 8px;font-size:13px">他柜本网电</h4>
+        <div class="orders-table-wrap">
+          <table><thead><tr><th>电池</th><th>电池归属</th><th>所在柜 / 站</th><th>柜机运营商</th></tr></thead>
+          <tbody>${cabRows(board.foreignCabOwnBats, "本网电池暂不在他柜")}</tbody></table>
+        </div>`;
+    }
     function renderSwapRangeSettings() {
       const canEdit = isEntityLogin() || employeeHasPerm("sites.edit") || employeeHasPerm("pricing.edit");
       const opId = currentEntity().id;
+      const sub = state.swapRangeSubTab || "settings";
       const policy = swapPolicyForOperator(opId);
       const creditOk = operatorCreditAllowsCross(opId);
       const dual = operatorPolicyAllowsCrossNetwork(opId);
       const actual = operatorEffectiveOutboundCross(opId);
       const opOn = !!policy.crossNetworkEnabled;
       const platOn = !!policy.platformEnabled;
+      const board = computeCrossNetBoard(opId);
+      const tabs = [
+        ["settings", "换电范围"],
+        ["board", "跨网看板" + (board.total ? " (" + board.total + ")" : "")]
+      ];
+      const tabBar = `<div class="sub-tabs" style="display:flex;gap:8px;margin-bottom:14px">${tabs.map(([id, label]) =>
+        `<button type="button" class="btn ${sub === id ? "primary" : ""}" data-swap-range-sub="${id}">${label}</button>`
+      ).join("")}</div>`;
+      if (sub === "board") {
+        return `<section class="panel">
+          ${panelHead("跨网看板", "四类混持 / 混库存量 · 关停前排空参考", "swap_policy_board")}
+          <div class="panel-body">
+            ${tabBar}
+            ${renderCrossNetBoard(opId)}
+          </div>
+        </section>`;
+      }
       const switchHtml = canEdit
         ? `<div>
             <p style="margin:0 0 10px;font-size:13px">本网开关：<strong>${opOn ? "已开启" : "已关闭"}</strong></p>
@@ -12834,6 +12993,7 @@
       return `<section class="panel">
           ${panelHead("换电范围设置", "跨网须平台与运营商双开 · 变更须确认", "swap_policy")}
           <div class="panel-body">
+            ${tabBar}
             <p style="font-size:12px;color:var(--muted);margin:0 0 14px">同运营商内<strong>任意站点</strong>均可购套餐、换电。跨网须<strong>平台开关</strong>与<strong>本网开关同时开启</strong>。${noteBtn("swap_policy_cross_net")}</p>
             <div class="detail-grid" style="margin-bottom:16px">
               <div class="detail-item"><span>实际跨网</span><strong>${actual ? tag("可跨网") : tag("不可跨网")}</strong></div>
@@ -12844,6 +13004,7 @@
             <div style="max-width:520px">${switchHtml}</div>
             ${!platOn ? `<p class="perm-banner" style="margin-top:14px">平台尚未开启本运营商跨网。即使打开本网开关，实际仍不可跨网。</p>` : ""}
             ${dual && !creditOk ? `<p class="perm-banner" style="margin-top:14px">⚠ 信用额度用尽，平台已停本网用户<strong>出站跨网</strong>（双开关仍开着，恢复额度后自动解除）。</p>` : ""}
+            ${board.total ? `<p style="margin:16px 0 0;font-size:12px;color:var(--muted)">当前跨网纠缠 <strong>${board.total}</strong> 条，可先看「跨网看板」再关停。</p>` : ""}
           </div>
         </section>`;
     }
@@ -14715,13 +14876,31 @@
     function overduePayCleared(r) {
       if (!r || r.type !== "personal") return true;
       const p = Number(r.payable);
-      return p <= 0 || r.payStatus === "paid";
+      return p <= 0 || r.payStatus === "paid" || r.payStatus === "waived";
+    }
+    function overdueBatStatus(r) {
+      return (r && (r.status === "done" || r.returnedAt)) ? "已归还" : "未归还";
+    }
+    function overdueFeeStatus(r) {
+      if (!r || r.type !== "personal") return "无需支付";
+      return overduePayCleared(r) ? "已支付" : "未支付";
+    }
+    function overdueBatCell(r) {
+      const st = overdueBatStatus(r);
+      const cls = st === "未归还" ? "warn" : "";
+      return `<span class="tag ${cls}">${st}</span><br><small>${r.batSn || "—"}<br>${r.model || ""}</small>`;
+    }
+    function overdueFeeCell(r) {
+      const st = overdueFeeStatus(r);
+      const cls = st === "未支付" ? "risk" : st === "无需支付" ? "neutral" : "";
+      if (r.type !== "personal") return `<span class="tag ${cls}">${st}</span>`;
+      const amt = r.status === "done" ? (r.feePaid || r.payable || 0) : r.payable;
+      const waived = Number(r.payable) <= 0 || r.payStatus === "waived";
+      const extra = waived && st === "已支付" ? "<br><small>减免 ¥0</small>" : "";
+      return `<span class="tag ${cls}">${st}</span><br>¥${amt}${extra}`;
     }
     function overduePayStatusLabel(r) {
-      if (r.type !== "personal") return "—";
-      if (Number(r.payable) <= 0) return "已减免";
-      if (r.payStatus === "paid") return "已付清";
-      return "待支付";
+      return overdueFeeStatus(r);
     }
     function fmtOverdueAdjLogs(logs) {
       if (!logs || !logs.length) return `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">暂无减免记录</p>`;
@@ -14764,19 +14943,27 @@
       const payable = r.type === "personal" ? (r.payableAdj != null ? Number(r.payableAdj) : sysDue) : null;
       return { ...r, days, due: sysDue, payable, quota: r.type === "daypool" ? days : null };
     }
+    function overdueUnreturned(type) {
+      return overdueCases.filter(r => r.operatorId === currentEntity().id).map(enrichOverdue).filter(r => {
+        if (overdueBatStatus(r) !== "未归还") return false;
+        if (type && r.type !== type) return false;
+        return true;
+      });
+    }
     function filterOverdueRows(tab) {
       const pf = getPf();
-      const want = tab === "done" ? "done" : "open";
       const type = tab === "personal" ? "personal" : tab === "daypool" ? "daypool" : null;
       return overdueCases.filter(r => r.operatorId === currentEntity().id).map(enrichOverdue).filter(r => {
-        if (r.status !== want) return false;
         if (type && r.type !== type) return false;
+        if (tab === "done" && r.status !== "done") return false;
+        if (pf.batStatus && pf.batStatus !== "全部" && overdueBatStatus(r) !== pf.batStatus) return false;
+        if (pf.feeStatus && pf.feeStatus !== "全部" && overdueFeeStatus(r) !== pf.feeStatus) return false;
         const q = (pf.keyword || "").trim().toLowerCase();
         if (q) {
           const blob = [r.user, r.phone, r.userId, r.batSn, r.orderId, r.channel].join(" ").toLowerCase();
           if (!blob.includes(q.replace(/\*/g, ""))) return false;
         }
-        if (tab === "personal" && pf.reason && pf.reason !== "全部" && r.reason !== pf.reason) return false;
+        if (r.type === "personal" && pf.reason && pf.reason !== "全部" && r.reason !== pf.reason) return false;
         return true;
       });
     }
@@ -14790,11 +14977,12 @@
         ? `<div class="detail-item"><span>逾期时间</span><strong>${fmtOverdueAt(r.startAt)}<br><small>已逾期 ${r.days} 天（不足一天按一天）</small></strong></div>
            <div class="detail-item"><span>系统计费</span><strong>¥${r.due}<br><small>日费 ¥${state.overdueFee || 10} / 天 · 暂不封顶</small></strong></div>
            <div class="detail-item"><span>当前应付</span><strong>¥${r.payable}</strong></div>
-           <div class="detail-item"><span>支付状态</span><strong>${overduePayStatusLabel(r)}</strong></div>
-           <div class="detail-item"><span>还电门槛</span><strong>${payOk ? "占用费已结清，可还电" : "须先付清占用费才能还电"}</strong></div>
+           <div class="detail-item"><span>逾期费</span><strong>${overdueFeeStatus(r)}${Number(r.payable) <= 0 ? "（减免）" : ""}</strong></div>
+           <div class="detail-item"><span>还电门槛</span><strong>${payOk ? "占用费已支付，可还电" : "须先支付占用费才能还电"}</strong></div>
            <div class="detail-item"><span>资金归属</span><strong>全额进运营商 · 不分润</strong></div>`
         : `<div class="detail-item"><span>占用时间</span><strong>${fmtOverdueAt(r.startAt)}<br><small>已占用 ${r.quota} 天（不足一天按 1 人天）</small></strong></div>
            <div class="detail-item"><span>已扣人天</span><strong>${r.quota} 人天<br><small>扣 ${r.channel} 额度池${r.poolAfter < 0 ? " · 欠人天 " + r.poolAfter : " · 扣后可用 " + r.poolAfter}</small></strong></div>
+           <div class="detail-item"><span>逾期费</span><strong>无需支付</strong></div>
            <div class="detail-item"><span>骑手现金</span><strong>不收取占用费 · 可直接还电</strong></div>`;
       const adjBlock = r.type === "personal" && r.status === "open"
         ? `<h4 style="margin:16px 0 8px">修改逾期费用</h4>
@@ -14840,13 +15028,14 @@
     }
     function renderOverdue() {
       const inner = state.overdueInnerTab || "personal";
-      const personal = filterOverdueRows("personal");
-      const daypool = filterOverdueRows("daypool");
-      const dueSum = personal.reduce((s, r) => s + (overduePayCleared(r) ? 0 : (Number(r.payable) || 0)), 0);
-      const quotaSum = filterOverdueRows("daypool").reduce((s, r) => s + (r.quota || 0), 0);
+      const personalHold = overdueUnreturned("personal");
+      const dayHold = overdueUnreturned("daypool");
+      const dueSum = personalHold.reduce((s, r) => s + (overdueFeeStatus(r) === "未支付" ? (Number(r.payable) || 0) : 0), 0);
+      const paidHold = personalHold.filter(r => overdueFeeStatus(r) === "已支付").length;
+      const quotaSum = dayHold.reduce((s, r) => s + (r.quota || 0), 0);
       const tabs = [
-        ["personal", "个人套餐逾期 (" + personal.length + ")"],
-        ["daypool", "人天池占用 (" + daypool.length + ")"],
+        ["personal", "个人套餐逾期 (" + personalHold.length + ")"],
+        ["daypool", "人天池占用 (" + dayHold.length + ")"],
         ["done", "已完结"],
         ["settings", "逾期设置"]
       ];
@@ -14854,10 +15043,10 @@
         `<button type="button" class="btn ${inner === id ? "primary" : ""}" data-overdue-tab="${id}">${label}</button>`
       ).join("")}</div>`;
       const kpi = `<div class="kpi-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
-        <div class="kpi"><span>进行中</span><b>${personal.length + daypool.length}</b></div>
-        <div class="kpi"><span>个人待收占用费</span><b>¥${dueSum}</b></div>
+        <div class="kpi"><span>未归还</span><b>${personalHold.length + dayHold.length}</b></div>
+        <div class="kpi"><span>逾期费未支付</span><b>¥${dueSum}</b></div>
+        <div class="kpi"><span>已支付待还电</span><b>${paidHold}</b></div>
         <div class="kpi"><span>人天已记占用</span><b>${quotaSum} 人天</b></div>
-        <div class="kpi"><span>日费</span><b>¥${state.overdueFee || 10}/天</b></div>
       </div>`;
       if (inner === "settings") {
         return `${ownScopeBanner()}<section class="panel">
@@ -14877,14 +15066,13 @@
       const isP = inner === "personal";
       const isD = inner === "daypool";
       const head = inner === "done"
-        ? "<th>用户</th><th>类型</th><th>逾期时间</th><th>逾期费用 / 人天</th><th>电池</th><th>完结时间</th><th>操作</th>"
+        ? "<th>用户</th><th>类型</th><th>逾期时间</th><th>电池</th><th>逾期费</th><th>完结时间</th><th>操作</th>"
         : isP
-          ? "<th>用户</th><th>套餐</th><th>结束原因</th><th>逾期时间</th><th>逾期费用</th><th>支付</th><th>电池</th><th>操作</th>"
-          : "<th>骑手</th><th>渠道 / 团队</th><th>占用时间</th><th>已扣人天</th><th>池可用（扣后）</th><th>电池</th><th>操作</th>";
+          ? "<th>用户</th><th>套餐</th><th>结束原因</th><th>逾期时间</th><th>电池</th><th>逾期费</th><th>操作</th>"
+          : "<th>骑手</th><th>渠道 / 团队</th><th>占用时间</th><th>已扣人天</th><th>池可用（扣后）</th><th>电池</th><th>逾期费</th><th>操作</th>";
       const body = rows.length ? rows.map(r => {
         if (inner === "done") {
-          const fee = r.type === "personal" ? ("¥" + (r.feePaid || r.due || 0)) : (r.days + " 人天（不退）");
-          return `<tr><td>${r.user}<br><small>${r.phone}</small></td><td>${r.type === "personal" ? "个人套餐逾期" : "人天池占用"}</td><td>${fmtOverdueAt(r.startAt)}<br><small>${r.days} 天</small></td><td>${fee}</td><td>${r.batSn}<br><small>${r.model}</small></td><td>${fmtOverdueAt(r.returnedAt)}</td><td><button type="button" class="link-btn" data-overdue-detail="${r.id}">详情</button></td></tr>`;
+          return `<tr><td>${r.user}<br><small>${r.phone}</small></td><td>${r.type === "personal" ? "个人套餐逾期" : "人天池占用"}</td><td>${fmtOverdueAt(r.startAt)}<br><small>${r.days} 天</small></td><td>${overdueBatCell(r)}</td><td>${overdueFeeCell(r)}</td><td>${fmtOverdueAt(r.returnedAt)}</td><td><button type="button" class="link-btn" data-overdue-detail="${r.id}">详情</button></td></tr>`;
         }
         const ops = `<button type="button" class="link-btn" data-overdue-detail="${r.id}">详情</button>
           <button type="button" class="link-btn" data-overdue-remind="${r.id}">催还</button>
@@ -14892,17 +15080,13 @@
           <button type="button" class="link-btn" data-overdue-return="${r.id}">模拟还电</button>
           ${r.type === "daypool" ? `<button type="button" class="link-btn" data-overdue-alloc="${r.id}">模拟续配</button>` : ""}`;
         if (isP) {
-          const feeTxt = Number(r.payable) !== Number(r.due)
-            ? `¥${r.payable}<br><small>系统 ¥${r.due}</small>`
-            : `¥${r.payable}`;
           return `<tr>
             <td>${r.user}<br><small>${r.phone}<br>${r.userId}</small></td>
             <td>${r.sku}<br><small>${r.orderId}</small></td>
             <td>${tag(r.reason)}</td>
             <td>${fmtOverdueAt(r.startAt)}<br><small>已逾期 ${r.days} 天</small></td>
-            <td>${feeTxt}</td>
-            <td>${tag(overduePayStatusLabel(r))}</td>
-            <td>${r.batSn}<br><small>${r.model}</small></td>
+            <td>${overdueBatCell(r)}</td>
+            <td>${overdueFeeCell(r)}</td>
             <td class="row-actions">${ops}</td>
           </tr>`;
         }
@@ -14912,17 +15096,18 @@
           <td>${fmtOverdueAt(r.startAt)}<br><small>已占用 ${r.days} 天</small></td>
           <td>${r.quota} 人天</td>
           <td${r.poolAfter < 0 ? " style='color:var(--red);font-weight:600'" : ""}>${r.poolAfter}${r.poolAfter < 0 ? " 欠人天" : ""}</td>
-          <td>${r.batSn}<br><small>${r.model}</small></td>
+          <td>${overdueBatCell(r)}</td>
+          <td>${overdueFeeCell(r)}</td>
           <td class="row-actions">${ops}</td>
         </tr>`;
-      }).join("") : `<tr><td colspan="7">暂无逾期持电用户</td></tr>`;
+      }).join("") : `<tr><td colspan="8">暂无符合筛选的逾期订单</td></tr>`;
       const hint = isP
-        ? "个人套餐结束仍持电：须先付清占用费才能还电。运营商可减免（含 0）。占用费全额进运营商，不分润。"
+        ? "电池（未归还 / 已归还）与逾期费（未支付 / 已支付）分开看。个人须先支付才能还电；减免为 0 记已支付。占用费全额进运营商，不分润。"
         : isD
-          ? "个人剩余人天 = 0 仍持电：从渠道额度池扣人天，不向骑手收现金。"
-          : "还电或续配后进入已完结。占用费 / 已扣人天不退。";
+          ? "人天占用不向骑手收现金，逾期费为「无需支付」。电池仍区分未归还 / 已归还。"
+          : "已完结 = 电池已归还。个人逾期费为已支付；人天为无需支付。占用费 / 已扣人天不退。";
       return `${ownScopeBanner()}<section class="panel">
-          ${panelHead("逾期管理", `进行中 ${personal.length + daypool.length} 人 · 日费 ¥${state.overdueFee || 10}/天`, "orders_overdue")}
+          ${panelHead("逾期管理", `未归还 ${personalHold.length + dayHold.length} 人 · 日费 ¥${state.overdueFee || 10}/天`, "orders_overdue")}
           <div class="panel-body orders-table-wrap">
             ${kpi}${tabBar}
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_overdue")} ${hint}</p>
@@ -15347,25 +15532,130 @@
     }
 
     function platformAdminTemplateLabel(templateId) {
-      return PLATFORM_ADMIN_TEMPLATES[templateId]?.label || "自定义";
+      return platformAdminTemplateById(templateId)?.label || "自定义";
     }
 
-    function permCheckboxes(selected, disabled) {
+    function platformAdminTemplateSelectOptions(currentId, includeSuper) {
+      const opts = platformAdminTemplateStore
+        .filter(t => (t.status === "启用" || t.id === currentId) && (includeSuper || t.id !== "super"))
+        .map(t => `<option value="${t.id}" ${currentId === t.id ? "selected" : ""}>${t.label}${t.status !== "启用" ? "（已停用）" : ""}</option>`);
+      opts.push(`<option value="custom" ${currentId === "custom" ? "selected" : ""}>自定义</option>`);
+      return opts.join("");
+    }
+
+    function countAdminsUsingTemplate(templateId) {
+      return myStaff().filter(e => (e.adminTemplate || "custom") === templateId).length;
+    }
+
+    function permCheckboxes(selected, disabled, inputName) {
       const sel = selected || [];
+      const name = inputName || "perm";
       const perms = employeePermissionOptions();
       return `<div class="perm-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
         ${perms.map(p => `<label style="display:flex;align-items:center;gap:6px;font-size:13px">
-          <input type="checkbox" name="perm" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""} ${disabled ? "disabled" : ""}> ${p.label}
+          <input type="checkbox" name="${name}" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""} ${disabled ? "disabled" : ""}> ${p.label}
         </label>`).join("")}
       </div>`;
     }
 
     function applyAdminTemplateToForm(templateId) {
-      const template = PLATFORM_ADMIN_TEMPLATES[templateId];
+      const template = platformAdminTemplateById(templateId);
       if (!template || templateId === "custom") return;
-      const selected = new Set(template.permissions);
+      const selected = new Set(template.permissions || []);
       document.querySelectorAll("#employeeForm input[name=perm]").forEach(input => {
         input.checked = selected.has(input.value);
+      });
+    }
+
+    function syncAdminsToTemplate(tpl) {
+      if (!tpl || tpl.protected) return 0;
+      const eid = ENT.platform.id;
+      const list = employeeStore[eid] || [];
+      let n = 0;
+      list.forEach((e, idx) => {
+        if (e.protected || e.adminTemplate !== tpl.id) return;
+        list[idx] = {
+          ...e,
+          jobTitle: tpl.label,
+          permissions: (tpl.permissions || []).slice()
+        };
+        n += 1;
+      });
+      return n;
+    }
+
+    function openRoleTemplateForm(mode, id) {
+      const isEdit = mode === "edit";
+      const tpl = isEdit ? platformAdminTemplateById(id) : null;
+      if (isEdit && !tpl) return showProtoToast("模板不存在");
+      if (isEdit && tpl.protected) return showProtoToast("超级管理员模板受保护，不可修改");
+      const selected = isEdit ? (tpl.permissions || []) : [];
+      openProtoForm({
+        title: (isEdit ? "编辑" : "新增") + "角色模板",
+        submitLabel: "保存模板",
+        modalWidth: "min(560px,calc(100vw - 32px))",
+        html: `
+          <label>模板名称<input name="label" required maxlength="20" value="${tpl?.label || ""}" placeholder="如：客服管理员"></label>
+          <label>状态<select name="status"><option ${(tpl?.status || "启用") === "启用" ? "selected" : ""}>启用</option><option ${tpl?.status === "停用" ? "selected" : ""}>停用</option></select></label>
+          <fieldset style="border:0;padding:0;margin:0;grid-column:1/-1"><legend style="font-size:13px;color:var(--muted)">菜单权限 ${noteBtn("role_templates")}</legend>${permCheckboxes(selected, false, "perm")}</fieldset>
+          ${isEdit && tpl.system ? `<p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">系统预置模板可改名称与权限，不可删除。</p>` : ""}`,
+        onSubmit: (data) => {
+          const label = String(data.label || "").trim();
+          if (!label) return "请填写模板名称";
+          const perms = Array.isArray(data.perm) ? data.perm : (data.perm ? [data.perm] : []);
+          if (!perms.length) return "至少选择一个菜单权限";
+          const dup = platformAdminTemplateStore.some(t => t.id !== id && t.label === label);
+          if (dup) return "模板名称已存在";
+          const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+          if (isEdit) {
+            const idx = platformAdminTemplateStore.findIndex(t => t.id === id);
+            if (idx < 0) return "模板不存在";
+            if (platformAdminTemplateStore[idx].protected) return "超级管理员模板受保护";
+            platformAdminTemplateStore[idx] = {
+              ...platformAdminTemplateStore[idx],
+              label,
+              status: data.status || "启用",
+              permissions: perms.slice(),
+              updatedAt: now
+            };
+            const synced = syncAdminsToTemplate(platformAdminTemplateStore[idx]);
+            return {
+              successMessage: synced
+                ? `已保存「${label}」，并同步 ${synced} 个绑定账号的菜单权限`
+                : `已保存「${label}」`,
+              afterClose: () => { state.employeeTab = "templates"; render(); }
+            };
+          }
+          const newId = "TPL-" + Date.now().toString().slice(-6);
+          platformAdminTemplateStore.push({
+            id: newId, label, permissions: perms.slice(),
+            system: false, protected: false, status: data.status || "启用", updatedAt: now
+          });
+          return {
+            successMessage: `已新增角色模板「${label}」`,
+            afterClose: () => { state.employeeTab = "templates"; render(); }
+          };
+        }
+      });
+    }
+
+    function deleteRoleTemplate(id) {
+      const tpl = platformAdminTemplateById(id);
+      if (!tpl) return showProtoToast("模板不存在");
+      if (tpl.system || tpl.protected) return showProtoToast("系统预置模板不可删除");
+      const used = countAdminsUsingTemplate(id);
+      if (used > 0) return showProtoToast(`仍有 ${used} 个管理员绑定该模板，请先改绑后再删除`);
+      openProtoConfirm({
+        title: "删除角色模板",
+        message: `确认删除「${tpl.label}」？删除后不可恢复。`,
+        confirmLabel: "删除",
+        onConfirm: () => {
+          const idx = platformAdminTemplateStore.findIndex(t => t.id === id);
+          if (idx >= 0) platformAdminTemplateStore.splice(idx, 1);
+          showProtoToast("已删除角色模板");
+          state.employeeTab = "templates";
+          render();
+        }
       });
     }
 
@@ -15379,14 +15669,16 @@
       const commonFields = `
           <label>姓名<input name="name" required value="${entity.name || ""}" ${protectedAdmin ? "disabled" : ""}></label>
           <label>手机号<input name="phone" required value="${entity.phone || ""}" ${protectedAdmin ? "disabled" : ""}></label>`;
+      const defaultTplId = entity.adminTemplate || "operations";
+      const defaultPerms = entity.permissions || platformAdminTemplateById("operations")?.permissions || [];
       const fields = platformAdmin ? `
           ${commonFields}
           <label>角色模板<select name="adminTemplate" id="adminTemplateSelect" ${protectedAdmin ? "disabled" : ""}>
-            ${Object.entries(PLATFORM_ADMIN_TEMPLATES).filter(([key]) => key !== "super" || protectedAdmin).map(([key, tpl]) => `<option value="${key}" ${(entity.adminTemplate || "operations") === key ? "selected" : ""}>${tpl.label}</option>`).join("")}
+            ${platformAdminTemplateSelectOptions(defaultTplId, protectedAdmin)}
           </select></label>
           <label>状态<select name="status" ${protectedAdmin ? "disabled" : ""}><option ${(entity.status || "启用") === "启用" ? "selected" : ""}>启用</option><option ${entity.status === "停用" ? "selected" : ""}>停用</option></select></label>
-          ${protectedAdmin ? `<p class="form-span-2" style="font-size:12px;color:var(--warn);margin:0">超级管理员受保护：不可修改权限、不可停用。</p>` : ""}
-          <fieldset style="border:0;padding:0;margin:0"><legend style="font-size:13px;color:var(--muted)">菜单权限 ${noteBtn("employees_perms")}</legend>${permCheckboxes(entity.permissions || PLATFORM_ADMIN_TEMPLATES.operations.permissions, protectedAdmin)}</fieldset>` : `
+          ${protectedAdmin ? `<p class="form-span-2" style="font-size:12px;color:var(--warn);margin:0">超级管理员受保护：不可修改权限、不可停用。</p>` : `<p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">模板可在「角色模板」Tab 单独维护；改勾选后与模板不一致将记为自定义。</p>`}
+          <fieldset style="border:0;padding:0;margin:0"><legend style="font-size:13px;color:var(--muted)">菜单权限 ${noteBtn("employees_perms")}</legend>${permCheckboxes(defaultPerms, protectedAdmin)}</fieldset>` : `
           ${commonFields}
           <label>岗位<input name="jobTitle" value="${entity.jobTitle || ""}"></label>
           <label>状态<select name="status"><option ${(entity.status || "启用") === "启用" ? "selected" : ""}>启用</option><option ${entity.status === "停用" ? "selected" : ""}>停用</option></select></label>
@@ -15429,7 +15721,7 @@
       }
       let adminTemplate = data.adminTemplate || "custom";
       if (platformAdmin && adminTemplate !== "custom") {
-        const templatePerms = PLATFORM_ADMIN_TEMPLATES[adminTemplate]?.permissions || [];
+        const templatePerms = platformAdminTemplateById(adminTemplate)?.permissions || [];
         const sameTemplate = [...perms].sort().join("|") === [...templatePerms].sort().join("|");
         if (!sameTemplate) adminTemplate = "custom";
       }
@@ -15476,18 +15768,61 @@
       const rows = myEmployees().filter(filterRow);
       const staffCount = myStaff().length;
       if (platformAdmin) {
+        const tab = state.employeeTab === "templates" ? "templates" : "staff";
+        const topTabs = panelTopTabs([["staff", "管理员列表"], ["templates", "角色模板"]], tab, "emptab");
         const enabledCount = myStaff().filter(e => e.status === "启用").length;
-        const templateCount = new Set(myStaff().map(e => e.adminTemplate || "custom")).size;
+        const templateCount = platformAdminTemplateStore.filter(t => t.status === "启用").length;
         const permissionOptions = employeePermissionOptions();
+        if (tab === "templates") {
+          return `
+            ${ownScopeBanner()}
+            ${topTabs}
+            <div class="kpi-grid">
+              ${kpi("模板总数", platformAdminTemplateStore.length, "含系统预置", "类", "role_templates")}
+              ${kpi("启用中", templateCount, "可选入管理员表单", "类", "role_templates")}
+              ${kpi("自建模板", platformAdminTemplateStore.filter(t => !t.system).length, "可删除（无人绑定）", "类", "role_templates")}
+            </div>
+            <section class="panel">
+              ${panelHead("角色模板", "单独维护权限包 · 绑定账号后可同步菜单权限", "role_templates", canEdit ? `<button type="button" class="btn primary" data-role-tpl-add>新增模板</button>` : "")}
+              <div class="panel-body orders-table-wrap">
+                <table>
+                  <thead><tr><th>模板名称</th><th>类型</th><th>状态</th><th>菜单权限</th><th>绑定人数</th><th>更新时间</th><th>操作</th></tr></thead>
+                  <tbody>${platformAdminTemplateStore.map(t => {
+                    const used = countAdminsUsingTemplate(t.id);
+                    const permLabels = (t.permissions || []).slice(0, 4).map(pid => permissionOptions.find(x => x.id === pid)?.label || pid).join("、");
+                    const more = (t.permissions || []).length > 4 ? "…" : "";
+                    let actions = "—";
+                    if (canEdit) {
+                      if (t.protected) actions = `<span style="color:var(--muted)">受保护</span>`;
+                      else {
+                        actions = `<button type="button" class="link-btn" data-role-tpl-edit="${t.id}">编辑</button>`;
+                        if (!t.system) actions += ` <button type="button" class="link-btn" data-role-tpl-del="${t.id}">删除</button>`;
+                      }
+                    }
+                    return `<tr>
+                      <td><strong>${t.label}</strong><br><small style="color:var(--muted)">${t.id}</small></td>
+                      <td>${tag(t.system ? "系统预置" : "自建")}</td>
+                      <td>${tag(t.status)}</td>
+                      <td><small>${permLabels}${more || ((t.permissions || []).length ? "" : "—")}</small></td>
+                      <td>${used}</td>
+                      <td>${t.updatedAt || "—"}</td>
+                      <td class="row-actions">${actions}</td>
+                    </tr>`;
+                  }).join("") || "<tr><td colspan='7'>暂无角色模板</td></tr>"}</tbody>
+                </table>
+              </div>
+            </section>`;
+        }
         return `
           ${ownScopeBanner()}
+          ${topTabs}
           <div class="kpi-grid">
             ${kpi("管理员总数", staffCount, "平台内部账号", "人", "employees_panel")}
             ${kpi("启用账号", enabledCount, "可登录后台", "人", "employees_panel")}
-            ${kpi("角色模板", templateCount, "含自定义权限", "类", "employees_perms")}
+            ${kpi("角色模板", templateCount, "可在「角色模板」Tab 维护", "类", "role_templates")}
           </div>
           <section class="panel">
-            ${panelHead("管理员列表", "角色模板 + 可自定义菜单权限 · 一期", "employees_panel", canEdit ? `<button type="button" class="btn primary" data-employee-add-staff>新增管理员</button>` : "")}
+            ${panelHead("管理员列表", "选用角色模板 + 可自定义菜单权限", "employees_panel", canEdit ? `<button type="button" class="btn primary" data-employee-add-staff>新增管理员</button>` : "")}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr><th>姓名 / 手机号</th><th>角色模板</th><th>状态</th><th>权限摘要</th><th>最后登录</th><th>操作</th></tr></thead>
@@ -17097,7 +17432,7 @@
       const contracts = myLinkContracts();
       if (!contracts.length) {
         return `<section class="panel">
-          ${panelHead("链接结算", "与链接类渠道的佣金结算台账（付款/确认方）", "operator_link_settle")}
+          ${panelHead("推广结算", "查看推广渠道佣金、退款冲正，并登记线下结算凭证", "operator_link_settle")}
           <div class="panel-body">
             <p style="color:var(--muted);margin:0 0 12px">暂无链接类签约渠道。请先在「签约渠道」新增结算模式为<strong>链接类</strong>的渠道商，并在「平台设置 → 渠道分销价」授权套餐。</p>
             <button type="button" class="btn primary" data-cstab="contracts">去签约渠道</button>
@@ -17105,10 +17440,11 @@
         </section>`;
       }
       const f = getPf();
-      if (!f.month || f.month === "全部") f.month = "last6";
+      if (!f.monthFrom) f.monthFrom = "2026-05";
+      if (!f.monthTo) f.monthTo = "2026-10";
       if (!f.channelId) f.channelId = "全部";
       if (!f.settleType) f.settleType = "全部";
-      const rangeMonths = commissionRangeMonthKeys(f.month);
+      const rangeMonths = promoSettleRangeMonths(f);
       const monthSet = new Set(rangeMonths);
       const monthRows = operatorLinkSettleMonthRows(rangeMonths, f.channelId)
         .filter(r => f.settleType === "全部" || r.settleType === f.settleType);
@@ -17125,17 +17461,17 @@
         .filter(o => f.settleType === "全部" || orderCommissionSettleType(o) === f.settleType)
         .sort((a, b) => String(b.payTime).localeCompare(String(a.payTime)));
       const sub = state.linkSettleSubTab || "summary";
-      const topTabs = panelTopTabs([["summary", "月度汇总"], ["detail", "明细"]], sub, "link-settle-sub");
-      const rangeLabel = commissionRangeLabel(f.month);
+      const topTabs = panelTopTabs([["summary", "月度汇总"], ["detail", "订单明细"]], sub, "link-settle-sub");
+      const rangeLabel = promoSettleRangeLabel(f);
       const isSingleMonth = /^\d{4}-\d{2}$/.test(f.month);
       const kpiMonthLabel = isSingleMonth ? f.month : rangeLabel;
       const rangeFilter = `<div style="margin-bottom:14px">${inlinePfBarHtml("operatorLinkSettle")}</div>`;
-      const banner = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("operator_link_settle")} 即时分账已在用户支付时完成，本页只读。线下佣金由运营商对公打款后<strong>登记线下结清</strong>（流水号 + 日期）；渠道「佣金对账」线下状态仍为 ——（decision-074/140）。用户退套餐费时渠道不向骑手退款，佣金按比例冲正（decision-137）。</div>
+      const banner = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("operator_link_settle")} 即时分账在用户支付时完成，本页只读；线下结算由运营商人工登记，不代表银行权威到账。</div>
         <div class="kpi-grid">
           ${kpi("统计范围", kpiMonthLabel, grand.orderCount + " 笔成交", "月", "operator_link_settle")}
-          ${kpi("佣金合计", "¥" + grand.totalCommission.toLocaleString(), "含即时与线下", "佣", "channel_card_margin")}
-          ${kpi("冲正合计", "¥" + grand.totalClawback.toFixed(2), "退套餐费按比例", "冲", "channel_instant_commission")}
-          ${kpi("待线下结清", "¥" + grand.pendingNet.toFixed(2), "应付渠道净额", "待", "channel_settlement_card")}
+          ${kpi("佣金毛额", "¥" + grand.totalCommission.toLocaleString(), "即时与线下合计", "佣", "channel_card_margin")}
+          ${kpi("退款冲正", "¥" + grand.totalClawback.toFixed(2), "仅成功套餐退款", "冲", "channel_instant_commission")}
+          ${kpi("待线下结算", "¥" + grand.pendingNet.toFixed(2), "应付渠道净额", "待", "channel_settlement_card")}
         </div>`;
 
       if (sub === "detail") {
@@ -17176,14 +17512,14 @@
         ${banner}
         <section class="panel panel-with-top-tabs">
           ${topTabs}
-          ${panelHead("月度链接结算", "按自然月 × 渠道 × 结算方式拆行（同月可多行）· decision-065/140", "operator_link_settle")}
+          ${panelHead("月度汇总", "按自然月 × 渠道 × 结算方式拆行（同月可多行）· decision-065/140", "operator_link_settle")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>月份</th><th>渠道商</th><th>结算方式</th><th>成交笔数</th><th>实付合计</th><th>佣金</th><th>冲正</th><th>应结净额</th><th>结算状态</th><th>操作</th></tr></thead>
               <tbody>${pg.slice.map(r => {
                 let op = "—";
                 if (r.settleType === "线下结算" && r.status === "待线下结清") {
-                  op = `<button type="button" class="link-btn" data-register-offline-settle="${r.channelId}|${r.month}">登记线下结清</button>`;
+                  op = `<button type="button" class="link-btn" data-register-offline-settle="${r.channelId}|${r.month}">登记线下结算</button>`;
                 } else if (r.settleType === "线下结算" && r.status === "已线下结清") {
                   op = `<button type="button" class="link-btn" data-view-offline-settle="${r.channelId}|${r.month}">查看凭证</button>`;
                 }
@@ -17210,7 +17546,7 @@
       if (state.channelSalesTab === "pools") state.channelSalesTab = "assets";
       const tab = state.channelSalesTab;
       const pendingLink = pendingOperatorOfflineSettleCount();
-      const tabs = [["contracts", "签约渠道"], ["orders", "渠道订单"], ["linkSettle", "链接结算" + (pendingLink ? " (" + pendingLink + ")" : "")], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]];
+      const tabs = [["contracts", "签约渠道"], ["orders", "渠道订单"], ["linkSettle", "推广结算" + (pendingLink ? " (" + pendingLink + ")" : "")], ["assets", "渠道权益"], ["platformMarketing", "平台营销"]];
       const sidebar = tabSidebar(tabs, tab, "cstab");
       let body = "";
       if (tab === "platformMarketing") {
@@ -17422,7 +17758,7 @@
           );
           const pg = paginateList(cardRows, state.channelAssetsPage, pageSize);
           state.channelAssetsPage = pg.page;
-          content = `${panelHead("渠道分销概况", `推广链接成交与佣金（无批发入库）· 共 ${pg.total} 条`, "channel_settlement_card", `<button type="button" class="btn" data-goto-link-settle>去链接结算</button>`)}
+          content = `${panelHead("渠道分销概况", `推广链接成交与佣金（无批发入库）· 共 ${pg.total} 条`, "channel_settlement_card", `<button type="button" class="btn" data-goto-link-settle>去推广结算</button>`)}
             <div class="panel-body orders-table-wrap">
               <table>
                 <thead><tr><th>渠道商</th><th>电池型号</th><th>SKU</th><th>专享价</th><th>佣金/单</th><th>链接成交</th><th>状态</th></tr></thead>
@@ -19384,6 +19720,13 @@
           render();
         };
       });
+            root.querySelectorAll("[data-promo-settle-reset]").forEach(btn => {
+        btn.onclick = () => {
+          state.pf.operatorLinkSettle = { ...(PF_DEFAULTS.operatorLinkSettle || { monthFrom: "2026-05", monthTo: "2026-10", channelId: "全部", settleType: "全部" }) };
+          state.linkSettlePage = 1;
+          render();
+        };
+      });
       root.querySelectorAll("[data-register-offline-settle]").forEach(btn => {
         btn.onclick = () => {
           const [channelId, month] = String(btn.dataset.registerOfflineSettle || "").split("|");
@@ -19546,6 +19889,9 @@
       });
       root.querySelectorAll("[data-prtab]").forEach(btn => {
         btn.onclick = () => { state.pricingTab = btn.dataset.prtab; render(); };
+      });
+      root.querySelectorAll("[data-swap-range-sub]").forEach(btn => {
+        btn.onclick = () => { state.swapRangeSubTab = btn.dataset.swapRangeSub; render(); };
       });
       root.querySelectorAll("[data-pu-page]").forEach(btn => {
         btn.onclick = () => {
@@ -19915,6 +20261,15 @@
           const emp = employeeById(btn.dataset.employeeEdit);
           if (emp) openEmployeeForm("edit", emp.roleType, emp.id);
         };
+      });
+      root.querySelectorAll("[data-role-tpl-add]").forEach(btn => {
+        btn.onclick = () => openRoleTemplateForm("add");
+      });
+      root.querySelectorAll("[data-role-tpl-edit]").forEach(btn => {
+        btn.onclick = () => openRoleTemplateForm("edit", btn.dataset.roleTplEdit);
+      });
+      root.querySelectorAll("[data-role-tpl-del]").forEach(btn => {
+        btn.onclick = () => deleteRoleTemplate(btn.dataset.roleTplDel);
       });
       root.querySelectorAll("[data-open-lease]").forEach(btn => {
         btn.onclick = () => openLeaseDetail(btn.dataset.openLease);
@@ -20721,7 +21076,14 @@
         btn.onclick = () => openDepositRefundLog(btn.dataset.depositRefundLog);
       });
       root.querySelectorAll("[data-overdue-tab]").forEach(btn => {
-        btn.onclick = () => { state.overdueInnerTab = btn.dataset.overdueTab; render(); };
+        btn.onclick = () => {
+          const id = btn.dataset.overdueTab;
+          state.overdueInnerTab = id;
+          const pf = getPf();
+          if (id === "done" && pf.batStatus === "未归还") pf.batStatus = "已归还";
+          if ((id === "personal" || id === "daypool") && pf.batStatus === "已归还") pf.batStatus = "未归还";
+          render();
+        };
       });
       root.querySelectorAll("[data-flow-receipt-inner]").forEach(btn => {
         btn.onclick = () => { state.flowReceiptInner = btn.dataset.flowReceiptInner; render(); };
@@ -20755,7 +21117,7 @@
           row.paidAmount = amt;
           row.paidAt = "2026-09-15T13:40:00+08:00";
           pushOverdueReceipt(row, amt);
-          showProtoToast("已支付占用费 ¥" + amt + "，可进入还电");
+          showProtoToast("已支付占用费 ¥" + amt + "（电池仍为未归还，可进入还电）");
           render();
         };
       });
@@ -21383,7 +21745,11 @@
       updateScopeHint();
       let pageMeta = meta[state.view] || [navLabel(state.view) || "—", ""];
       if (state.view === "employees") {
-        pageMeta = [employeeModuleLabel(), isPlatformRole() ? "平台管理员维护与菜单权限配置。" : pageMeta[1]];
+        if (isPlatformRole() && state.employeeTab === "templates") {
+          pageMeta = ["角色模板", "单独维护平台管理员权限包；选用后可同步到绑定账号。"];
+        } else {
+          pageMeta = [employeeModuleLabel(), isPlatformRole() ? "平台管理员维护与菜单权限配置；角色模板可在页内 Tab 单独维护。" : pageMeta[1]];
+        }
       }
       const l2 = getNavL2(state.view);
       if (l2) {

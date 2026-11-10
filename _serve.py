@@ -8,6 +8,7 @@ import socket
 import socketserver
 import subprocess
 import sys
+import time
 import webbrowser
 from pathlib import Path
 
@@ -49,7 +50,7 @@ def port_in_use(port: int) -> bool:
 def port_owner_pid(port: int) -> str | None:
     try:
         out = subprocess.check_output(
-            ["lsof", "-ti", f":{port}"],
+            ["lsof", f"-tiTCP:{port}", "-sTCP:LISTEN"],
             stderr=subprocess.DEVNULL,
             text=True,
         ).strip()
@@ -61,17 +62,47 @@ def port_owner_pid(port: int) -> str | None:
 def existing_server_url(port: int, entry: str) -> str | None:
     import http.client
 
-    for path in (entry, "/index.html", "/"):
+    def probe(method: str, path: str) -> bool:
         try:
             conn = http.client.HTTPConnection(HOST, port, timeout=1)
-            conn.request("HEAD", path)
+            conn.request(method, path)
             resp = conn.getresponse()
             resp.read()
-            if resp.status in (200, 302):
-                return f"http://{HOST_DISPLAY}:{port}{entry}"
+            conn.close()
+            return resp.status in (200, 302)
         except (OSError, TimeoutError, ConnectionResetError):
-            continue
+            return False
+
+    for path in (entry, "/index.html", "/"):
+        if probe("HEAD", path) or probe("GET", path):
+            return f"http://{HOST_DISPLAY}:{port}{entry}"
     return None
+
+
+def reclaim_stale_port(port: int) -> None:
+    pid = port_owner_pid(port)
+    if not pid:
+        if port_in_use(port):
+            raise SystemExit(
+                f"端口 {port} 已被占用，但找不到 LISTEN 进程。"
+                f"请手动执行：lsof -nP -iTCP:{port} -sTCP:LISTEN"
+            )
+        return
+    print(f"端口 {port} 已被占用（PID {pid}），但无法访问原型页面，正在结束占用进程…")
+    subprocess.run(["kill", pid], check=False)
+    for _ in range(20):
+        time.sleep(0.1)
+        if not port_in_use(port):
+            return
+    subprocess.run(["kill", "-9", pid], check=False)
+    for _ in range(20):
+        time.sleep(0.1)
+        if not port_in_use(port):
+            return
+    raise SystemExit(
+        f"无法释放端口 {port}（PID {pid}）。请手动执行："
+        f"lsof -tiTCP:{port} -sTCP:LISTEN | xargs kill"
+    )
 
 
 def make_handler(*, entry: str, no_cache: bool = False) -> type[http.server.SimpleHTTPRequestHandler]:
@@ -147,10 +178,7 @@ def run_static_server(
                 except Exception:
                     pass
             return
-        print(f"端口 {port} 已被占用" + (f"（PID {pid}）" if pid else "") + "，但无法访问原型页面。")
-        print(f"请先结束占用进程：lsof -ti :{port} | xargs kill")
-        print("然后重新执行：python3 main.py")
-        raise SystemExit(1)
+        reclaim_stale_port(port)
 
     handler = make_handler(entry=entry, no_cache=no_cache)
     with ReusableTCPServer((HOST, port), handler) as httpd:

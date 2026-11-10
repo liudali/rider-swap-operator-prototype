@@ -249,7 +249,7 @@
       orderUserDeposit: ["用户押金", "已并入「订单与服务」；用户购套餐同笔实付押金与信用免押明细；筛选+分页；退押走退款管理。"],
       orderFreeze: ["服务冻结", "已并入「订单与服务」；个人套餐冻结/解冻记录；满足条件时系统自动生效。"],
       refundManage: ["退款管理", "已并入「订单与服务」；C 端退订/中途完结退款：申请队列与审核确认。自动/手动规则在「平台设置 → 退款设置」。"],
-      orderOverdue: ["逾期管理", "持电但权益已结束：个人套餐按日收占用费；人天剩余 0 从渠道额度池扣人天。"],
+      orderOverdue: ["逾期管理", "持电但权益已结束。列表同时看电池（未归还/已归还）与逾期费（未支付/已支付；人天无需支付）。"],
       orderAudit: ["变更记录", "已并入「订单与服务」（运营商）；订单/服务生命周期审计时间线（C-02）。"],
       flows: ["我的流水", "C 端支付成功实时清分；提现须平台审核；本页展示资金实收、清分明细与提现申请。"],
       employees: ["员工", "运营员工维护与功能权限配置。"],
@@ -264,7 +264,7 @@
       accounts: ["收款账户管理", "在线分账须招行开户。平台仅托管已签协议的运营商；渠道商自行维护，不受平台限制。"],
       dayPool: ["人天额度池", "渠道商向签约运营商购买人天额度，登记骑手并分配/收回；按个人剩余闸门，换电或日终持电确认消耗（decision-126）。"],
       pricing: ["平台设置", "含个人套餐价、押金设置、退款设置、人天批发价、渠道分销价、换电范围。"],
-      channelSales: ["渠道管理", "签约渠道商、渠道订单、链接结算与渠道权益；维护各渠道权益与定价。"],
+      channelSales: ["渠道管理", "签约渠道商、渠道订单、推广结算与渠道权益；维护各渠道权益与定价。"],
       interOp: ["运营商往来账", "已并入「平台服务 → 运营商往来」页内 Tab：概况 / 跨网服务费明细 / 日清账单 / 周月汇总。"],
       depositAccount: ["服务保证金账户", "页内 Tab：账户概况 / 充值申请 / 变动明细。"],
       platformService: ["平台服务", "二级：服务保证金账户 / 平台服务费 / 运营商往来（页内：概况/明细/日清/周月）。"],
@@ -299,8 +299,9 @@
       scope: { title: "数据范围", content: "运营商、资金方可持有自有或租赁设备；渠道商不持设备。各主体仅管理本人数据。员工登录时数据范围限定在所属主体及授权范围。<br><br><strong>说明按钮规则</strong>：凡展示统计结果的字段/KPI，「说明」中须写清<strong>字段定义</strong>、<strong>计算公式或聚合口径</strong>、<strong>数据来源</strong>（及演示缩放规则，如有）。" },
       asset_owner: { title: "设备归属", content: "柜机/电池归属运营商或资金方（租赁时产权在出租方）。后台仅展示当前登录主体名下设备；订单按 device_owner_id 过滤。" },
       own_data: { title: "自有经营数据", content: "「我的设备 / 套餐·换电·服务订单 / 我的流水」仅含本运营商自有（或承租）设备相关数据。" },
-      employees_panel: { title: "员工管理", content: "渠道商可添加运营员工并分配功能权限。" },
-      employees_perms: { title: "员工权限", content: "按功能模块勾选可见/可操作范围；未授权菜单对员工账号不可见（演示为配置说明）。" },
+      employees_panel: { title: "员工管理", content: "渠道商可添加运营员工并分配功能权限。平台侧为「管理员」：人员与菜单权限。" },
+      employees_perms: { title: "菜单权限", content: "按平台菜单勾选可见范围；未授权菜单对管理员账号不可见。" },
+      role_templates: { title: "角色模板", content: "独立维护权限包：系统预置（超管/运营/财务）可改权限与启停（超管受保护）；可新增业务模板。管理员表单选用模板初始化菜单权限；改勾选后与模板不一致则记为「自定义」。保存模板时同步到仍绑定该模板且未受保护的账号。" },
       employee_login: { title: "员工登录", content: "员工使用独立账号登录；侧栏仅展示其权限内的菜单；数据范围限定在所属主体。" },
       employee_login_scope: { title: "权限与数据范围", content: "运营员工按勾选权限看到对应模块，数据与所属主体一致。" },
       overview_sites: { title: "在营站点", content: "统计范围：当前主体授权站点中，status=在营 且至少 1 台柜机 online=true 的站点数。" },
@@ -330,7 +331,7 @@
       platform_no_share: { title: "平台运营分成", content: "骑手套餐/换电应分台账记录运营商本站经营应得。平台收取 1% 技术服务费（C 端支付分账 + B 端确认消耗计提），见「平台服务费」。" },
       pricing_pkg: { title: "个人套餐定价", content: "唯一键=<strong>运营商×城市×电池型号×SKU</strong>（decision-085/088/117）。电池型号取自平台「设备管理 → 电池型号管理」启用字典。<strong>无一单通兑</strong>。<strong>开通方式</strong>：购买立即生效 / 首次领电生效。<strong>有效期</strong>为自然日，默认等于套餐天数；按次默认几次=几天，可改时长。1 天/单次按 1 个自然日（不再滚动 24h）。改 SKU 不追溯已购。一期可选套餐名（暂定）：包月30天、7天套餐、1天套餐、次卡10次、单次换电。<strong>价格分区</strong>为<strong>二期</strong>。" },
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
-      channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>（人天/月租/激活码）、<strong>链接结算</strong>（链接类佣金）与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
+      channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>（人天/月租/激活码）、<strong>推广结算</strong>（链接类佣金，原「链接结算」）与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
       channel_partner_manage: { title: "渠道商主体管理", content: "由运营商在「渠道管理 → 签约渠道」维护。<strong>登录账号为手机号</strong>，渠道商在登录页选「渠道商登录」凭手机号+密码进入，默认密码 123456；可在登录页/账号菜单通过<strong>短信验证码</strong>改密（演示码 888888）。<strong>不采集合同有效期、不设签约状态</strong>（decision-103）；停服用渠道主体「状态」（在营/已停用）。<strong>人天池批发单价/最低起购</strong>不在签约档案填写，统一在「平台设置 → 人天批发价」维护；新建签约继承默认批发价（decision-104）。<strong>分销商·链接类</strong>（结算模式=链接类）：授权套餐与专享价在「平台设置 → 渠道分销价」维护；可开启<strong>佣金及时到付</strong>（须渠道绑定对公银行卡，字段同运营商）。设备租赁：统一月租与专属站。<strong>分销商·激活码</strong>为二期。平台不新增渠道主体；链接类收款账户可代添加/代改。" },
       login_portal: { title: "登录分流与改密", content: "登录页区分<strong>运营商登录</strong>与<strong>渠道商登录</strong>。账号均为手机号+密码。修改密码页：手机号 → 获取验证码 → 新密码（≥6 位）→ 返回登录；演示验证码固定 888888。" },
@@ -347,8 +348,9 @@
       deposit_recharge: { title: "对公充值流程", content: "① 运营商在「保证金账户」提交充值申请（金额、转账日期、银行流水号）；② 对公转账至平台清分专户（<strong>附言含运营商 ID</strong>，这是来账对上主体的键）；③ 平台核对金额+附言+付款户，流水号作回单证据（付款回单号与来账号往往不同）；④ 确认后保证金入账。" },
       day_pool_offline_recon: { title: "人天采购对公认款", content: "与保证金同一套「对公认款包」（decision-114）。<strong>附言填采购单号</strong>才是收款方对上哪一笔的键；银行流水号是付款回单证据，系统内防重复，不能单独认人认单。建议填付款账户。<strong>不填转账日</strong>（付款日≠到账日，不是对账键，decision-115）。" },
       deposit_manage: { title: "平台保证金管理", content: "平台维护清分收款专户；审核运营商对公充值；可手工调整保证金余额、设置信用额度上限。所有变动写入保证金账本。" },
-      swap_policy: { title: "换电范围设置", content: "跨网须<strong>平台开关</strong>与<strong>运营商开关同时开启</strong>才生效（双向封闭）。变更须确认，避免误触。同运营商内任意站点可购可换；不设用户绑定站点。" },
+      swap_policy: { title: "换电范围设置", content: "跨网须<strong>平台开关</strong>与<strong>运营商开关同时开启</strong>才生效（双向封闭）。变更须确认，避免误触。同运营商内任意站点可购可换；不设用户绑定站点。页内「跨网看板」看四类混持/混库存量（decision-147）。" },
       swap_policy_cross_net: { title: "跨网换电双开关", content: "平台按运营商配置「是否允许跨网」；运营商在换电范围自行开关。仅两者都开，且信用额度未停跨网，才可跨网。关闭任一侧即双向封闭。" },
+      swap_policy_board: { title: "跨网看板", content: "关停跨网前看清四类存量：<strong>本网用户持异网电</strong>、<strong>异网用户持本网电</strong>、<strong>本柜异网电</strong>、<strong>他柜本网电</strong>。用于排空引导，不替代开关本身。" },
       platform_fee: { title: "平台服务费", content: "平台按<strong>运营商维度</strong>配置抽成比例（默认 1%）。<strong>C 端</strong>：支付成功分账至平台商户（已确认）。<strong>B 端渠道人天</strong>：确认消耗时按平台标准人天价 × 该运营商 B 端费率向额度售卖方 U 计提（与批发价无关）。运营商后台只读查看本主体适用比例；优先划扣保证金，保证金为 0 才占用信用额度。" },
       platform_operator_fee_rate: { title: "运营商平台服务费", content: "在<strong>运营商管理 → 运营商平台服务费</strong>维护各运营商 C 端 / B 端抽成比例（可不同）。新订单、新消耗按生效配置计算；历史已清分不回溯。运营商在「平台服务费」页只读查看。" },
       platform_fee_trigger: { title: "计费触发", content: "C 端：支付成功分账（费率=该运营商 C 端比例）。B 端人天池：<strong>确认消耗</strong>分两场景——<strong>确认消耗-换电</strong>（关联换电单）与<strong>确认消耗-持有电池</strong>（当日无换电但持电池，无关联单）；费率=该运营商 B 端比例，计提基数=平台标准人天价。B 端激活码：<strong>码核销成功</strong>（同 B 端费率）。计提主体均为额度售卖方 U。" },
@@ -415,7 +417,7 @@
       orders_freeze: { title: "服务冻结", content: "<strong>个人套餐</strong>用户在<strong>套餐有效期内</strong>且<strong>未持有电池</strong>时可申请冻结/解除冻结，<strong>满足条件即系统自动生效</strong>，无需运营商审核。冻结期间不可换电；解冻后 <code>valid_to</code> 按冻结天数顺延，骑手端首次服务为领取电池。<strong>服务中</strong>套餐详情<strong>不展示</strong>解冻/首服信息块（decision-070）。渠道人天用户不适用。" },
       orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>押金方式（全站统一）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）；不单列「无需押金」<br>· <strong>套餐购买订单</strong>：押金方式与<strong>收款状态</strong>（已收 / 待付 / ——）分列；仅实付有收款状态（decision-067）<br>· <strong>实付</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用达标免实付（仍须还电规则；已移除微信支付分，decision-100）" },
       orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：<strong>仅实付押金</strong>流水（decision-086）。<br>· 与套餐无关联；列含支付时间/退款时间<br>· 操作列「<strong>退款日志</strong>」：抽屉展示各节点动作与时间（入账、申请、还电校验、审核、原路退等）<br>· 信用免押、渠道担保不在本页" },
-      orders_overdue: { title: "逾期管理", content: "持电但权益已结束（decision-136 / 143）。<strong>个人套餐</strong>：按日收占用费，<strong>须先付清才能还电</strong>；运营商可改本单应付（含 0）并写减免日志。占用费全额进运营商，不分润。<strong>人天池</strong>：剩余 0 仍持电，从渠道额度池扣人天，不向骑手收现金。" },
+      orders_overdue: { title: "逾期管理", content: "持电但权益已结束（decision-136 / 143 / 145）。列表同时展示<strong>电池</strong>（未归还 / 已归还）与<strong>逾期费</strong>（未支付 / 已支付；人天为无需支付）。<strong>个人套餐</strong>须先付清才能还电；减免为 0 记已支付。占用费全额进运营商，不分润。<strong>人天池</strong>从渠道额度池扣人天，不向骑手收现金。" },
       flows_receipt: { title: "资金实收", content: "骑手套餐/自费支付进入<strong>运营商</strong>进件商户的实收流水；<strong>退款亦由运营商子商户原路出款</strong>。含类型「电池占用费」（decision-143）。" },
       flows_receipt_overdue: { title: "逾期占用费", content: "个人套餐逾期支付的电池占用费。<strong>全额进运营商</strong>，不抽平台 1%、不切站点合伙人、不进清分明细。减免为 0 不产生流水。" },
       orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>芝麻信用免押（≥500）</strong>（运营商押金设置页只读展示，不可改；decision-100）。详情页与实付押金分开展示。" },
@@ -480,8 +482,8 @@
       accounts: { title: "收款账户", content: "<strong>运营商</strong>与<strong>链接类渠道</strong>：唯一招行对公银行卡。<strong>平台</strong>仅对已签托管协议的运营商可代维护；渠道商详情只读（decision-138）。<br><strong>设备租赁/资方</strong>：进件子商户 + 对公绑定仍在「收款账户」菜单维护。" },
       device_ownership: { title: "设备权属", content: "<strong>自有</strong>：产权归本运营主体。<br><strong>融资</strong>（原「设备租赁」权属，<span class='badge-p2'>二期</span>）：设备融资/还款并入「融资管理」；运营商<strong>我的设备</strong>不再打开「租赁协议」抽屉，仅展示融资标签与资方摘要。<br>渠道商「设备租赁」结算模式（白名单）仍为独立二期渠道模式，与运营商设备融资不是同一需求。" },
 
-      channel_settlement_card: { title: "渠道分销（骑士卡）", content: "渠道为<strong>推广销售渠道</strong>：用户经推广链接/二维码进入<strong>运营商小程序</strong>，24h 内<strong>新客首笔</strong>购套餐享<strong>渠道专享价</strong>（获客价，一次）。续费/再次购卡正式零售价；复购折扣走营销券。<br><strong>本月成交</strong>=筛选月 channelLinkOrders 笔数；<strong>本月应结佣</strong>=Σ commission；<strong>推广链接</strong>点击/成交=各 link 累计 clicks/conversions。SKU 概况在「渠道权益 → 渠道分销」；付款方对账在「渠道管理 → 链接结算」。" },
-      operator_link_settle: { title: "链接结算", content: "运营商与<strong>链接类</strong>渠道的佣金结算台账（付款/确认方），<strong>不</strong>并入渠道订单（人天 PO / 月租 MO / 激活码 AC）。<br>· <strong>即时分账</strong>：用户支付时已分到渠道子商户，本页只读，状态=已即时分账<br>· <strong>线下结算</strong>：运营商对公打款后「登记线下结清」（流水号+日期）；状态=待线下结清 / 已线下结清<br>· 渠道侧「佣金对账」线下状态仍为 ——（decision-074）<br>· 用户退套餐费：渠道不向骑手退款；冲正=round(原佣金×退套餐费÷原套餐实付, 2)，即时当场冲回，线下从未结净额扣（decision-137）" },
+      channel_settlement_card: { title: "渠道分销（骑士卡）", content: "渠道为<strong>推广销售渠道</strong>：用户经推广链接/二维码进入<strong>运营商小程序</strong>，24h 内<strong>新客首笔</strong>购套餐享<strong>渠道专享价</strong>（获客价，一次）。续费/再次购卡正式零售价；复购折扣走营销券。<br><strong>本月成交</strong>=筛选月 channelLinkOrders 笔数；<strong>本月应结佣</strong>=Σ commission；<strong>推广链接</strong>点击/成交=各 link 累计 clicks/conversions。SKU 概况在「渠道权益 → 渠道分销」；付款方对账在「渠道管理 → 推广结算」。" },
+      operator_link_settle: { title: "推广结算", content: "运营商与<strong>链接类 / 推广渠道</strong>的佣金结算台账（付款/确认方；对外名「推广结算」，decision-148），<strong>不</strong>并入渠道订单。<br>· <strong>即时分账</strong>：用户支付时已完成，本页只读<br>· <strong>线下结算</strong>：运营商人工登记流水号+日期，不代表银行权威到账；状态=待线下结算 / 已线下结算<br>· 渠道侧「佣金对账」线下状态仍为 ——（decision-074）<br>· 退款冲正：渠道不向骑手退款；冲正=round(原佣金×退套餐费÷原套餐实付, 2)（decision-137）" },
       channel_settlement_rent: { title: "设备租赁", content: "运营商维护<strong>租赁设备清单</strong>与<strong>专属站点</strong>；签约<strong>统一月租</strong>（MO→运营商）。渠道视为<strong>小型运营商</strong>：设备为租赁资产，可配置<strong>跨网换电</strong>（须向平台缴纳保证金）。白名单分<strong>免费</strong>（B2B 覆盖）与<strong>付费</strong>（须购白名单套餐）。" },
       lease_whitelist_pkg: { title: "白名单套餐", content: "仅<strong>白名单付费</strong>类型用户须购买。渠道在「白名单套餐」维护 SKU，口径与运营商<strong>个人套餐</strong>一致：固定套餐名 × 电池型号 × 开通方式 × 有效期（天） × 零售价；「白名单订单」查流水。支付进<strong>渠道收款账户</strong>。无一单通兑。" },
       lease_whitelist: { title: "白名单用户", content: "渠道自行维护扁平名单。<strong>白名单免费</strong>：入名单即可换电（月租 B2B 覆盖）。<strong>白名单付费</strong>：须购有效白名单套餐方可换电。添加时选择类型。" },
@@ -742,35 +744,66 @@
       { id: "platform.admins", label: "管理员管理" }
     ];
 
-    const PLATFORM_ADMIN_TEMPLATES = {
-      super: { label: "超级管理员", permissions: PLATFORM_ADMIN_PERMISSIONS.map(p => p.id) },
-      operations: {
-        label: "运营管理员",
-        permissions: ["platform.overview", "platform.users", "platform.orders", "platform.devices", "platform.channels", "platform.operators", "platform.audit", "platform.pricing"]
+    /** 平台角色模板库（可在「管理员 → 角色模板」单独维护；custom 为账号级覆盖，不入库） */
+    const platformAdminTemplateStore = [
+      {
+        id: "super", label: "超级管理员",
+        permissions: PLATFORM_ADMIN_PERMISSIONS.map(p => p.id),
+        system: true, protected: true, status: "启用", updatedAt: "2026-07-17 10:00"
       },
-      finance: {
-        label: "财务管理员",
-        permissions: ["platform.overview", "platform.flows", "platform.accounts", "platform.operator_withdraw", "platform.operator_fee", "platform.deposit"]
+      {
+        id: "operations", label: "运营管理员",
+        permissions: ["platform.overview", "platform.users", "platform.orders", "platform.devices", "platform.channels", "platform.operators", "platform.audit", "platform.pricing"],
+        system: true, protected: false, status: "启用", updatedAt: "2026-07-17 10:00"
       },
-      custom: { label: "自定义", permissions: [] }
-    };
+      {
+        id: "finance", label: "财务管理员",
+        permissions: ["platform.overview", "platform.flows", "platform.accounts", "platform.operator_withdraw", "platform.operator_fee", "platform.deposit"],
+        system: true, protected: false, status: "启用", updatedAt: "2026-07-17 10:00"
+      },
+      {
+        id: "TPL-CS", label: "客服管理员",
+        permissions: ["platform.overview", "platform.users", "platform.orders", "platform.audit"],
+        system: false, protected: false, status: "启用", updatedAt: "2026-11-10 11:00"
+      }
+    ];
+
+    function platformAdminTemplateById(id) {
+      if (id === "custom") return { id: "custom", label: "自定义", permissions: [], system: false, protected: false, status: "启用" };
+      return platformAdminTemplateStore.find(t => t.id === id) || null;
+    }
+
+    /** 兼容旧引用：按 id 取模板（含 custom） */
+    const PLATFORM_ADMIN_TEMPLATES = new Proxy({}, {
+      get(_t, key) {
+        if (typeof key !== "string") return undefined;
+        return platformAdminTemplateById(key) || undefined;
+      },
+      ownKeys() {
+        return [...platformAdminTemplateStore.map(t => t.id), "custom"];
+      },
+      getOwnPropertyDescriptor(_t, key) {
+        if (platformAdminTemplateById(key)) return { configurable: true, enumerable: true, value: platformAdminTemplateById(key) };
+        return undefined;
+      }
+    });
 
     const employeeStore = {
       [ENT.platform.id]: [
         {
           id: "ADM-PLAT-001", roleType: "staff", name: "平台超级管理员", phone: "138****0001",
           jobTitle: "超级管理员", adminTemplate: "super", status: "启用",
-          permissions: PLATFORM_ADMIN_TEMPLATES.super.permissions, lastLoginAt: "2026-07-17 10:00", protected: true
+          permissions: platformAdminTemplateById("super").permissions.slice(), lastLoginAt: "2026-07-17 10:00", protected: true
         },
         {
           id: "ADM-PLAT-002", roleType: "staff", name: "平台运营管理员", phone: "138****0002",
           jobTitle: "运营管理员", adminTemplate: "operations", status: "启用",
-          permissions: PLATFORM_ADMIN_TEMPLATES.operations.permissions, lastLoginAt: "2026-07-16 18:20", protected: false
+          permissions: platformAdminTemplateById("operations").permissions.slice(), lastLoginAt: "2026-07-16 18:20", protected: false
         },
         {
           id: "ADM-PLAT-003", roleType: "staff", name: "平台财务管理员", phone: "138****0003",
           jobTitle: "财务管理员", adminTemplate: "finance", status: "启用",
-          permissions: PLATFORM_ADMIN_TEMPLATES.finance.permissions, lastLoginAt: "2026-07-17 08:45", protected: false
+          permissions: platformAdminTemplateById("finance").permissions.slice(), lastLoginAt: "2026-07-17 08:45", protected: false
         }
       ],
       "OP-SX": [
@@ -851,6 +884,9 @@
       { sn: "BAT-SH-1021", site: "世博换电服务点", city: "上海", soc: 88, soh: 98, health: "正常", inCab: "CAB-22021", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行" },
       { sn: "BAT-SH-0901", site: "浦东骑手驿站", city: "上海", soc: 96, soh: 99, health: "正常", inCab: "CAB-22018", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
       { sn: "BAT-BJ-1001", site: "滨江换电站", city: "上海", soc: 94, soh: 99, health: "正常", inCab: "CAB-BJ-01", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
+      { sn: "BAT-CROSS-H1", site: "浦东骑手驿站", city: "上海", soc: 88, soh: 97, health: "正常", inCab: "柜外-用户", heldByUser: true, holderUserId: "U1028", holderName: "张骑手", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
+      { sn: "BAT-CROSS-H2", site: "陆家嘴分站", city: "上海", soc: 76, soh: 95, health: "正常", inCab: "柜外-用户", heldByUser: true, holderUserId: "U3321", holderName: "刘骑手", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行" },
+      { sn: "BAT-CROSS-H3", site: "世博换电服务点", city: "上海", soc: 64, soh: 96, health: "正常", inCab: "柜外-用户", heldByUser: true, holderUserId: "U1055", holderName: "钱骑手", deviceOwnerId: "OP-LJZ", deviceOwnerName: "陆家嘴联营" },
       { sn: "BAT-IMP-01", site: "未分配站点", city: "上海", soc: 100, soh: 100, health: "正常", inCab: "待入柜", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", boundAt: "2026-08-31", importedAt: "2026-08-31" },
       { sn: "BAT-IMP-02", site: "未分配站点", city: "上海", soc: 100, soh: 100, health: "正常", inCab: "待入柜", deviceOwnerId: "OP-SX", deviceOwnerName: "绿色出行", boundAt: "2026-08-31", importedAt: "2026-08-31" }
     ];
@@ -1242,6 +1278,7 @@
     const overdueCases = [
       { id: "OD-P-01", operatorId: "OP-SX", type: "personal", status: "open", userId: "U1028", user: "张骑手", phone: "138****1028", sku: "包月30天", orderId: "SUB260524001", reason: "到期", startAt: "2026-09-12T23:59:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-8831", model: "48V30AH", lastSwap: "2026-09-12 18:22", site: "浦东骑手驿站", payStatus: "unpaid", adjLogs: [] },
       { id: "OD-P-02", operatorId: "OP-SX", type: "personal", status: "open", userId: "U1055", user: "钱骑手", phone: "136****1055", sku: "次卡10次", orderId: "SUB260525088", reason: "次数耗尽", startAt: "2026-09-14T18:05:00+08:00", deposit: "信用免押", batSn: "BAT-HZ-2207", model: "30V30AH", lastSwap: "2026-09-14 17:40", site: "世博换电服务点", payStatus: "unpaid", adjLogs: [] },
+      { id: "OD-P-03", operatorId: "OP-SX", type: "personal", status: "open", userId: "U1188", user: "孙骑手", phone: "137****1188", sku: "包月7天", orderId: "SUB260910044", reason: "到期", startAt: "2026-09-14T23:59:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-4410", model: "48V30AH", lastSwap: "2026-09-14 20:01", site: "浦东骑手驿站", payStatus: "paid", paidAmount: 10, paidAt: "2026-09-15T10:20:00+08:00", adjLogs: [] },
       { id: "OD-D-01", operatorId: "OP-SX", type: "daypool", status: "open", userId: "U-SF-01", user: "丁舒洋", phone: "176****3868", channel: "顺丰同城", team: "浦东站", startAt: "2026-09-13T00:00:00+08:00", poolAfter: -2, batSn: "BAT-SF-0199", model: "48V30AH", lastSwap: "2026-09-12 21:03", site: "浦东骑手驿站" },
       { id: "OD-D-02", operatorId: "OP-SX", type: "daypool", status: "open", userId: "U-SF-06", user: "赵六", phone: "186****3666", channel: "顺丰同城", team: "默认团队", startAt: "2026-09-15T09:10:00+08:00", poolAfter: 9, batSn: "BAT-SF-0044", model: "30V30AH", lastSwap: "2026-09-14 20:18", site: "陆家嘴分站" },
       { id: "OD-P-09", operatorId: "OP-SX", type: "personal", status: "done", userId: "U2201", user: "周骑手", phone: "138****2201", sku: "包月30天", orderId: "SUB260610088", reason: "到期", startAt: "2026-09-08T23:59:00+08:00", returnedAt: "2026-09-10T08:12:00+08:00", deposit: "实付在押 ¥99", batSn: "BAT-HZ-1102", model: "48V30AH", lastSwap: "2026-09-08 11:00", site: "浦东骑手驿站", days: 2, sysDue: 20, feePaid: 20, payStatus: "paid", paidAmount: 20, adjLogs: [{ at: "2026-09-10 08:00", actor: "运营·王客服", from: 20, to: 20, reason: "按系统计费收取（无减免）" }] }
@@ -1667,6 +1704,7 @@
       { id: "RC260606001", type: "套餐支付", order: "SUB260606001", site: "浦东骑手驿站", city: "上海", user: "U2107", pkg: "1天套餐", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 29, fee: 0.29, net: 28.71, channel: "微信支付", time: "2026-06-06 06:30", status: "成功" },
       { id: "RC260615033D", type: "押金退还", order: "SUB260615033", site: "浦东骑手驿站", city: "上海", user: "U1066", pkg: "包月30天", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: -99, fee: 0, net: -99, channel: "原路退回", time: "—", status: "待审核", note: "订单完结后用户自行申请退押" },
       { id: "RC260606BJ", type: "套餐支付", order: "SUB260606BJ", site: "滨江换电站", city: "上海", user: "U-LJZ-01", pkg: "包月30天", payee: "滨江联营", deviceOwnerId: "OP-BJ", mch: "1900000789***", amount: 299, fee: 5.38, net: 293.62, channel: "微信支付", time: "2026-06-05 10:00", status: "成功" },
+      { id: "RC-OD-P03", type: "电池占用费", order: "OD-P-03", site: "浦东骑手驿站", city: "上海", user: "U1188", pkg: "电池占用费", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 10, fee: 0, net: 10, channel: "微信支付", time: "2026-09-15 10:20", status: "成功", note: "全额进运营商 · 不分润" },
       { id: "RC-OD-P09", type: "电池占用费", order: "OD-P-09", site: "浦东骑手驿站", city: "上海", user: "U2201", pkg: "电池占用费", payee: "绿色出行", deviceOwnerId: "OP-SX", mch: PAYEE_MCH.wx, amount: 20, fee: 0, net: 20, channel: "微信支付", time: "2026-09-10 08:05", status: "成功", note: "全额进运营商 · 不分润" }
     ];
 
@@ -2996,9 +3034,9 @@
       platformFlows_platformFee: { operatorId: "全部", trigger: "全部", dateFrom: "", dateTo: "" },
       platformAccounts: { month: "2026-06" },
       refundManage: { refundId: "", orderId: "", phone: "", type: "全部", status: "全部", applyFrom: "", applyTo: "" },
-      orderOverdue: { keyword: "", reason: "全部" },
+      orderOverdue: { keyword: "", reason: "全部", batStatus: "未归还", feeStatus: "全部" },
       orderAudit: { keyword: "", eventType: "全部", dateFrom: "", dateTo: "" },
       commissionStatement: { month: "last6" },
-      operatorLinkSettle: { month: "last6", channelId: "全部", settleType: "全部" }
+      operatorLinkSettle: { monthFrom: "2026-05", monthTo: "2026-10", channelId: "全部", settleType: "全部" }
     };
 

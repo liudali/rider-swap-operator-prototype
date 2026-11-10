@@ -447,21 +447,23 @@ def main():
             if mode in ("all", "platform"):
                 pick_subject(page, report, "平台", "02_platform_home")
                 crawl_role(page, report, "platform", "P")
-                try:
-                    try_write_platform(page, report)
-                except Exception as e:
-                    report["errors"].append({"platform_writes": str(e), "url": page.url})
-                    close_overlays(page)
+                if os.environ.get("QA_WRITE", "0") == "1":
+                    try:
+                        try_write_platform(page, report)
+                    except Exception as e:
+                        report["errors"].append({"platform_writes": str(e), "url": page.url})
+                        close_overlays(page)
             if mode == "all":
                 switch_to_subjects(page, report)
             if mode in ("all", "operator"):
                 pick_subject(page, report, "运营商", "51_operator_home")
                 crawl_role(page, report, "operator", "O")
-                try:
-                    try_write_operator(page, report)
-                except Exception as e:
-                    report["errors"].append({"operator_writes": str(e), "url": page.url})
-                    close_overlays(page)
+                if os.environ.get("QA_WRITE", "0") == "1":
+                    try:
+                        try_write_operator(page, report)
+                    except Exception as e:
+                        report["errors"].append({"operator_writes": str(e), "url": page.url})
+                        close_overlays(page)
         except Exception as e:
             report["errors"].append({"fatal": str(e), "url": page.url})
             try:
