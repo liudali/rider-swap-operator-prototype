@@ -1775,15 +1775,99 @@
       return packageOrders.some(p => p.user === u.id);
     }
 
+    function cloneFreezeRuleFields(src) {
+      return {
+        maxSingleFreezeDays: Number(src.maxSingleFreezeDays) || 0,
+        unlimitedSingleDays: !!src.unlimitedSingleDays,
+        maxFreezeTimesPerCycle: Number(src.maxFreezeTimesPerCycle) || 0
+      };
+    }
+
+    function deriveFreezeAutoUnfreeze(rule) {
+      return !rule.unlimitedSingleDays && rule.maxSingleFreezeDays > 0;
+    }
+
+    function freezeRuleAllowed(rule) {
+      return !!(rule && (rule.unlimitedSingleDays || rule.maxSingleFreezeDays > 0));
+    }
+
+    function formatFreezeRuleSummary(rule) {
+      if (!freezeRuleAllowed(rule)) return "不允许冻结";
+      const days = rule.unlimitedSingleDays ? "单次不限时长" : ("单次最长 " + rule.maxSingleFreezeDays + " 天");
+      const times = rule.maxFreezeTimesPerCycle === 0 ? "周期不限次数" : ("周期最多 " + rule.maxFreezeTimesPerCycle + " 次");
+      const auto = deriveFreezeAutoUnfreeze(rule) ? "到期自动解冻" : "不自动解冻";
+      return days + " · " + times + " · " + auto;
+    }
+
+    function resolveFreezeRules(operatorId) {
+      const plat = cloneFreezeRuleFields(platformFreezeRules || { maxSingleFreezeDays: 10, unlimitedSingleDays: false, maxFreezeTimesPerCycle: 1 });
+      const oid = operatorId || currentEntity()?.id;
+      const op = (typeof operatorFreezeSettings !== "undefined" && oid) ? operatorFreezeSettings[oid] : null;
+      if (!op || op.inheritPlatform) {
+        return {
+          ...plat,
+          autoUnfreezeOnExpire: deriveFreezeAutoUnfreeze(plat),
+          source: "platform",
+          inheritPlatform: true
+        };
+      }
+      const own = cloneFreezeRuleFields(op);
+      return {
+        ...own,
+        autoUnfreezeOnExpire: deriveFreezeAutoUnfreeze(own),
+        source: "operator",
+        inheritPlatform: false
+      };
+    }
+
+    function ensureOperatorFreezeSettings(operatorId) {
+      const oid = operatorId || currentEntity().id;
+      if (!operatorFreezeSettings[oid]) {
+        const plat = cloneFreezeRuleFields(platformFreezeRules);
+        operatorFreezeSettings[oid] = {
+          inheritPlatform: true,
+          ...plat,
+          updatedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+          updatedBy: currentEntity()?.name || "运营商"
+        };
+      }
+      return operatorFreezeSettings[oid];
+    }
+
+    function packageFreezeTimesUsed(pkg) {
+      if (!pkg) return 0;
+      if (pkg.freezeTimesUsed != null) return Number(pkg.freezeTimesUsed) || 0;
+      const fromLogs = (typeof serviceChangeRequests !== "undefined" ? serviceChangeRequests : [])
+        .filter(r => r.type === "冻结" && (r.orderId === pkg.id || r.packageId === pkg.id)).length;
+      return fromLogs || (pkg.freezeInfo ? 1 : 0);
+    }
+
+    function userIsHoldingBattery(u) {
+      if (!u) return false;
+      if (u.resumePendingPickup) return false;
+      if ((typeof batteries !== "undefined") && batteries.some(b => b.heldByUser && b.holderUserId === u.id)) return true;
+      const poolRider = dayPoolRiders.find(r => r.id === u.id);
+      if (poolRider && Number(poolRider.batteryHeld) > 0) return true;
+      const pkg = packageOrders.find(p => p.user === u.id && (p.serviceState === "服务中" || p.status === "服务中"));
+      if (pkg?.resumePendingPickup) return false;
+      const held = userLiveHeldBattery(u, poolRider);
+      return !!(held && held.text !== "未持有");
+    }
+
     function userCanApplyFreeze(u) {
       if (!isPersonalPackageUser(u)) return { ok: false, msg: "仅个人套餐用户可申请冻结" };
-      const poolRider = dayPoolRiders.find(r => r.id === u.id);
       if ((u.serviceState || "") === "已冻结") return { ok: false, msg: "服务已冻结" };
-      const held = userLiveHeldBattery(u, poolRider);
-      if (held.hint === null && held.text !== "未持有") return { ok: false, msg: "请先归还电池后再申请冻结" };
+      if (userIsHoldingBattery(u)) return { ok: false, msg: "请先归还电池后再申请冻结" };
       const pkg = activePersonalPackage(u);
       if (!pkg) return { ok: false, msg: "套餐不在有效期内，无法申请冻结" };
-      return { ok: true, pkg };
+      const opId = pkg.deviceOwnerId || u.deviceOwnerId || currentEntity()?.id;
+      const rule = resolveFreezeRules(opId);
+      if (!freezeRuleAllowed(rule)) return { ok: false, msg: "当前运营商未开放服务冻结", rule };
+      const used = packageFreezeTimesUsed(pkg);
+      if (rule.maxFreezeTimesPerCycle > 0 && used >= rule.maxFreezeTimesPerCycle) {
+        return { ok: false, msg: "本套餐周期冻结次数已用尽（最多 " + rule.maxFreezeTimesPerCycle + " 次）", rule, used };
+      }
+      return { ok: true, pkg, rule, used };
     }
 
     function userCanApplyUnfreeze(u) {
@@ -1793,6 +1877,103 @@
       if (!pkg) return { ok: false, msg: "未找到冻结中的套餐" };
       const today = new Date().toISOString().slice(0, 10);
       if (pkg.validTo < today) return { ok: false, msg: "套餐已过期，请申请退订" };
+      return { ok: true, pkg };
+    }
+
+    function findUserById(userId) {
+      return (typeof users !== "undefined" ? users : []).find(x => x.id === userId) || null;
+    }
+
+    /** 申请冻结：校验通过即生效，规则写入 freezeInfo 快照（decision-152） */
+    function applyUserFreeze(userId, reason) {
+      const u = findUserById(userId);
+      if (!u) return { ok: false, msg: "用户不存在" };
+      const gate = userCanApplyFreeze(u);
+      if (!gate.ok) return gate;
+      const { pkg, rule, used } = gate;
+      const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+      const nextUsed = (used || 0) + 1;
+      const snap = cloneFreezeRuleFields(rule);
+      const auto = deriveFreezeAutoUnfreeze(snap);
+      pkg.serviceState = "已冻结";
+      pkg.status = "已冻结";
+      pkg.freezeTimesUsed = nextUsed;
+      pkg.freezeInfo = {
+        applyTime: now,
+        reason: reason || "骑手申请",
+        frozenDays: 0,
+        maxFreezeDays: snap.maxSingleFreezeDays,
+        freezeTimesUsed: nextUsed,
+        maxFreezeTimes: snap.maxFreezeTimesPerCycle,
+        unlimitedSingleDays: snap.unlimitedSingleDays,
+        autoUnfreezeOnExpire: auto,
+        ruleSource: rule.source || "platform",
+        resumeNote: auto
+          ? ("最长 " + snap.maxSingleFreezeDays + " 天，到期自动解冻；解冻后有效期顺延；首次服务为领取电池")
+          : "不限时长 / 不自动解冻；须自行解冻；解冻后有效期顺延；首次服务为领取电池"
+      };
+      u.serviceState = "已冻结";
+      u.pkg = (u.pkg || "").replace(/剩\d+天|服务中/, "已冻结");
+      serviceChangeRequests.unshift({
+        id: "SC" + Date.now().toString().slice(-8),
+        subId: pkg.id,
+        packageId: pkg.id,
+        orderId: pkg.id,
+        user: u.id,
+        phone: u.phone,
+        site: pkg.site || u.site || "—",
+        type: "冻结",
+        applyTime: now,
+        status: "已生效",
+        detail: (reason || "骑手申请") + " · 快照：" + formatFreezeRuleSummary(snap) + " · 系统自动生效",
+        amount: 0,
+        deviceOwnerId: pkg.deviceOwnerId || u.deviceOwnerId,
+        frozenDays: 0,
+        freezeSnapshot: snap
+      });
+      return { ok: true, pkg, rule: snap };
+    }
+
+    function applyUserUnfreeze(userId) {
+      const u = findUserById(userId);
+      if (!u) return { ok: false, msg: "用户不存在" };
+      const gate = userCanApplyUnfreeze(u);
+      if (!gate.ok) return gate;
+      const { pkg } = gate;
+      const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+      const fi = pkg.freezeInfo || {};
+      const frozenDays = Number(fi.frozenDays) || 0;
+      if (frozenDays > 0 && pkg.validTo) {
+        const d = new Date(pkg.validTo + "T00:00:00");
+        d.setDate(d.getDate() + frozenDays);
+        pkg.validTo = d.toISOString().slice(0, 10);
+      }
+      pkg.serviceState = "服务中";
+      pkg.status = "服务中";
+      pkg.resumePendingPickup = true;
+      pkg.resumePickupNote = now + " 解冻后待首次领取电池";
+      if (pkg.freezeInfo) {
+        pkg.freezeInfo.unfreezeTime = now;
+        pkg.freezeInfo.resumeNote = "已解冻；有效期已顺延；首次服务为领取电池";
+      }
+      u.serviceState = "服务中";
+      serviceChangeRequests.unshift({
+        id: "SC" + Date.now().toString().slice(-8),
+        subId: pkg.id,
+        packageId: pkg.id,
+        orderId: pkg.id,
+        user: u.id,
+        phone: u.phone,
+        site: pkg.site || u.site || "—",
+        type: "解冻",
+        applyTime: now,
+        status: "已生效",
+        detail: "冻结 " + frozenDays + " 天后自行解冻 · 有效期顺延 · 首次服务：领取电池",
+        amount: 0,
+        deviceOwnerId: pkg.deviceOwnerId || u.deviceOwnerId,
+        resumeFirstService: "领取电池",
+        frozenDays
+      });
       return { ok: true, pkg };
     }
 
@@ -2321,7 +2502,7 @@
       o.confirmedAt = now;
       o.confirmedBy = currentEntity().name;
       creditPoolFromChannelOrder(o);
-      window.alert("演示：已确认线下到账\n采购单 " + poId + "\n金额 ¥" + o.amount.toLocaleString("zh-CN") + "\n流水号 " + (o.transferRef || "—") + "\n附言应对应该采购单号");
+      window.alert("演示：已确认线下到账\n采购单 " + poId + (o.batteryModel ? " · " + o.batteryModel : "") + "\n入账池 " + (o.poolId || "新建") + "\n金额 ¥" + o.amount.toLocaleString("zh-CN") + "\n流水号 " + (o.transferRef || "—") + "\n附言应对应该采购单号");
       return true;
     }
 
@@ -3540,11 +3721,66 @@
       return (team && team.poolId) ? team.poolId : (myDayPools()[0] && myDayPools()[0].id);
     }
 
-    function poolForChannelSeller(channelId, sellerId) {
+    function normalizeDayPoolBatteryModel(model) {
+      return normalizeBatteryModel(model || "") || "";
+    }
+
+    /** 运营商台账有归属的电池型号（decision-151 口径 A） */
+    function operatorHeldBatteryModels(operatorId) {
+      const oid = operatorId || currentEntity()?.id;
+      const set = new Set();
+      (batteries || []).forEach(b => {
+        if (b.deviceOwnerId !== oid) return;
+        const m = normalizeDayPoolBatteryModel(b.batteryModel || b.specs || b.model);
+        if (m) set.add(m);
+      });
+      if (!set.size) {
+        (BATTERY_MODEL_OPTIONS || []).forEach(c => set.add(c));
+      }
+      return [...set];
+    }
+
+    function poolForChannelSeller(channelId, sellerId, batteryModel) {
+      const model = normalizeDayPoolBatteryModel(batteryModel);
+      if (model) {
+        return dayPools.find(p => p.ownerId === channelId && p.sellerId === sellerId && normalizeDayPoolBatteryModel(p.batteryModel) === model);
+      }
       return dayPools.find(p => p.ownerId === channelId && p.sellerId === sellerId);
     }
 
+    function poolsForChannelSeller(channelId, sellerId) {
+      return dayPools.filter(p => p.ownerId === channelId && p.sellerId === sellerId);
+    }
+
     function poolById(id) { return dayPools.find(p => p.id === id); }
+
+    function dayPoolQuotaPrice(operatorId, channelId, batteryModel) {
+      const model = normalizeDayPoolBatteryModel(batteryModel);
+      const rows = (operatorDayQuotaPrices || []).filter(q =>
+        q.operatorId === operatorId
+        && normalizeDayPoolBatteryModel(q.batteryModel) === model
+        && q.status !== "停用"
+      );
+      return rows.find(q => q.channelId === channelId) || rows.find(q => q.channelId === "*") || null;
+    }
+
+    /** 渠道人天领电/换电闸门（decision-151） */
+    function dayPoolEntitlementGate(rider, targetBatteryModel) {
+      if (!rider || rider.status !== "在职") {
+        return { allowedSwap: false, allowedReturn: !!rider?.batteryHeld, gateReason: "未登记渠道", batteryModel: null };
+      }
+      const model = normalizeDayPoolBatteryModel(rider.batteryModel || poolById(rider.poolId)?.batteryModel);
+      const remaining = rider.remainingDays || 0;
+      const held = !!rider.batteryHeld;
+      const target = normalizeDayPoolBatteryModel(targetBatteryModel || rider.heldBatteryModel || model);
+      if (remaining < 1) {
+        return { allowedSwap: false, allowedReturn: held, gateReason: "个人无额度", batteryModel: model, remainingDays: remaining };
+      }
+      if (target && model && target !== model) {
+        return { allowedSwap: false, allowedReturn: held, gateReason: "型号不匹配", batteryModel: model, remainingDays: remaining };
+      }
+      return { allowedSwap: true, allowedReturn: true, gateReason: null, batteryModel: model, remainingDays: remaining };
+    }
 
     /** 人天池「余额不足」唯一口径：可用 < 在职×10（decision-113） */
     const DAY_POOL_RUNWAY_DAYS = 10;
@@ -3586,29 +3822,34 @@
     }
 
     function ensurePoolForChannelOrder(o) {
-      let pool = o.poolId ? poolById(o.poolId) : poolForChannelSeller(o.channelId, o.operatorId);
+      const model = normalizeDayPoolBatteryModel(o.batteryModel);
+      let pool = o.poolId ? poolById(o.poolId) : poolForChannelSeller(o.channelId, o.operatorId, model);
       if (pool) {
         o.poolId = pool.id;
+        if (!o.batteryModel) o.batteryModel = pool.batteryModel;
         return pool;
       }
-      const contract = channelContracts.find(c => c.channelId === o.channelId && c.operatorId === o.operatorId);
       pool = createPendingPoolForChannel({
         channelId: o.channelId, channelName: o.channelName,
         operatorId: o.operatorId, operatorName: o.operatorName,
+        batteryModel: model || "48V30Ah",
         wholesalePrice: o.unitPrice, orderNo: o.id, status: "使用中"
       });
       o.poolId = pool.id;
+      o.batteryModel = pool.batteryModel;
       return pool;
     }
 
     function createPendingPoolForChannel(opts) {
       const suffix = Date.now().toString().slice(-6);
       const poolId = "QP-" + suffix;
+      const batteryModel = normalizeDayPoolBatteryModel(opts.batteryModel) || "48V30Ah";
       const pool = {
         id: poolId,
-        name: (opts.channelName || "渠道") + "·" + (opts.operatorName || "运营商").replace(/联营/g, "").slice(0, 6) + "人天池",
+        name: (opts.channelName || "渠道") + "·" + batteryModel + "人天池",
         ownerId: opts.channelId, ownerName: opts.channelName,
         sellerId: opts.operatorId, sellerName: opts.operatorName,
+        batteryModel,
         totalDays: 0, availableDays: 0, frozenDays: 0, consumedDays: 0, giftedDays: 0, refundedDays: 0, expiredDays: 0,
         validFrom: opts.validFrom || new Date().toISOString().slice(0, 10),
         validTo: opts.validTo || "2026-12-31",
@@ -3617,16 +3858,19 @@
         status: opts.status || "待配置", balancePct: 100, warnSms: false, ...POOL_CONTRACT_RULES
       };
       dayPools.push(pool);
-      dayPoolTeams.push({
-        id: "TEAM-" + suffix, channelId: opts.channelId, name: "默认团队", poolId,
-        isDefault: true, riderCount: 0, status: "启用",
-        createdAt: new Date().toISOString().slice(0, 10),
-        remark: "签约开户时自动创建"
-      });
+      const hasDefault = dayPoolTeams.some(t => t.channelId === opts.channelId && t.isDefault);
+      if (!hasDefault) {
+        dayPoolTeams.push({
+          id: "TEAM-" + suffix, channelId: opts.channelId, name: "默认团队", poolId,
+          isDefault: true, riderCount: 0, status: "启用",
+          createdAt: new Date().toISOString().slice(0, 10),
+          remark: "签约开户时自动创建"
+        });
+      }
       const ch = platformChannels.find(c => c.id === opts.channelId);
       if (ch) {
         ch.poolCount = (ch.poolCount || 0) + 1;
-        ch.teamCount = (ch.teamCount || 0) + 1;
+        if (!hasDefault) ch.teamCount = (ch.teamCount || 0) + 1;
       }
       return pool;
     }
@@ -4198,7 +4442,7 @@
 
     function eligibilityTag(el) {
       const map = {
-        "已确认消耗": "tag", "今日可用": "tag warn", "已预占": "tag warn", "个人无额度": "tag risk", "预占失败": "tag risk", "待还电": "tag risk",
+        "已确认消耗": "tag", "今日可用": "tag warn", "已预占": "tag warn", "个人无额度": "tag risk", "型号不匹配": "tag risk", "预占失败": "tag risk", "待还电": "tag risk",
         "待首换": "tag warn", "待首换开通": "tag warn", "已回池": "tag neutral", "不可用": "tag risk"
       };
       const cls = (map[el] || "tag neutral").replace("tag ", "");
@@ -4915,6 +5159,160 @@
       const s = operatorPersonalDepositSettings[operatorId] || myPersonalDepositSettings();
       if (s.enabled === false) return 0;
       return Number(s.amount) || 0;
+    }
+
+    function myCsHotlineSettings() {
+      return ensureOperatorCsHotline(currentEntity().id);
+    }
+
+    function operatorServiceCities() {
+      const oid = currentEntity().id;
+      const set = new Set();
+      sites.filter(s => s.operatorId === oid && s.city).forEach(s => set.add(s.city));
+      operatorPkgPrices.filter(r => r.operatorId === oid && r.city).forEach(r => set.add(r.city));
+      ["上海", "杭州"].forEach(c => set.add(c));
+      return [...set];
+    }
+
+    function normalizeCsPhone(raw) {
+      return String(raw || "").trim().replace(/\s+/g, "");
+    }
+
+    function isValidCsPhone(phone) {
+      const p = normalizeCsPhone(phone);
+      if (!p) return false;
+      return /^(\d{3,4}-?\d{7,8}|400-?\d{3}-?\d{4}|1\d{10}|\d{5,20})$/.test(p);
+    }
+
+    function renderCsHotlineSettings() {
+      const cfg = myCsHotlineSettings();
+      const canEdit = isEntityLogin() || employeeHasPerm("pricing.edit");
+      const overrides = cfg.cityOverrides || [];
+      const previewCity = overrides.find(r => r.status === "生效")?.city || operatorServiceCities()[0] || "上海";
+      const preview = resolveOperatorCsHotline(currentEntity().id, previewCity);
+      return `
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("pricing_cs_hotline")}
+          默认客服电话对全网生效；个别城市可单独覆盖。骑手端按<strong>当前服务城市</strong>解析：有生效覆盖用城市号，否则用默认号。
+          <br><small style="opacity:.9">最近更新 ${cfg.updatedAt || "—"} · ${cfg.updatedBy || "—"} · 解析示例：${previewCity} → <strong>${preview.phone}</strong>（${preview.source === "city" ? "城市覆盖" : "默认"}）</small>
+        </div>
+        <section class="panel">
+          ${panelHead("默认客服电话", "未配置城市覆盖时统一展示此号码", "pricing_cs_hotline")}
+          <div class="panel-body">
+            <form id="csHotlineDefaultForm" class="detail-grid" style="grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:end">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+                <span>默认电话</span>
+                <input name="defaultPhone" required value="${(cfg.defaultPhone || "").replace(/"/g, "&quot;")}" placeholder="如 400-800-6618" ${canEdit ? "" : "disabled"} style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
+              </label>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                ${canEdit ? `<button type="submit" class="btn primary" data-save-cs-default>保存默认号</button>` : `<span class="perm-banner" style="margin:0">当前账号无定价编辑权限</span>`}
+              </div>
+            </form>
+          </div>
+        </section>
+        <section class="panel">
+          ${panelHead("城市覆盖电话", "仅列出单独设置的城市；停用/删除后回退默认号", "pricing_cs_hotline", canEdit ? `<button type="button" class="btn primary" data-cs-city-add>+ 添加城市电话</button>` : "")}
+          <div class="panel-body orders-table-wrap">
+            <table>
+              <thead><tr><th>城市</th><th>客服电话</th><th>状态</th><th>备注</th><th>更新时间</th><th>操作</th></tr></thead>
+              <tbody>${overrides.length ? overrides.map(r => `<tr>
+                <td><strong>${r.city}</strong></td>
+                <td>${r.phone}</td>
+                <td>${tag(r.status)}</td>
+                <td><small>${r.remark || "—"}</small></td>
+                <td>${r.updatedAt || "—"}</td>
+                <td class="row-actions">${canEdit
+                  ? `<button type="button" class="link-btn" data-cs-city-edit="${r.id}">编辑</button> <button type="button" class="link-btn" data-cs-city-del="${r.id}">删除</button>`
+                  : "—"}</td>
+              </tr>`).join("") : `<tr><td colspan="6">暂无城市覆盖，全部城市使用默认号 ${cfg.defaultPhone || "—"}</td></tr>`}</tbody>
+            </table>
+          </div>
+        </section>`;
+    }
+
+    function saveCsHotlineDefault() {
+      const form = document.querySelector("#csHotlineDefaultForm");
+      if (!form) return;
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      if (!(isEntityLogin() || employeeHasPerm("pricing.edit"))) return showProtoToast("无定价编辑权限");
+      const phone = normalizeCsPhone(new FormData(form).get("defaultPhone"));
+      if (!isValidCsPhone(phone)) return showProtoToast("请填写有效客服电话");
+      const cfg = myCsHotlineSettings();
+      cfg.defaultPhone = phone;
+      cfg.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+      cfg.updatedBy = currentEmployee()?.name || currentEntity().name;
+      showProtoToast("默认客服电话已保存");
+      render();
+    }
+
+    function openCsCityHotlineForm(id) {
+      if (!(isEntityLogin() || employeeHasPerm("pricing.edit"))) return showProtoToast("无定价编辑权限");
+      const cfg = myCsHotlineSettings();
+      const row = id ? (cfg.cityOverrides || []).find(r => r.id === id) : null;
+      const cities = operatorServiceCities();
+      const used = new Set((cfg.cityOverrides || []).filter(r => r.id !== id).map(r => r.city));
+      const cityOpts = cities
+        .filter(c => !used.has(c) || (row && row.city === c))
+        .map(c => `<option value="${c}" ${row?.city === c ? "selected" : ""}>${c}</option>`)
+        .join("");
+      openProtoForm({
+        title: row ? "编辑城市客服电话" : "添加城市客服电话",
+        submitLabel: "保存",
+        html: `
+          ${row
+            ? `<label>城市<input name="city" value="${row.city}" readonly></label>`
+            : `<label>城市<select name="city" required>${cityOpts || "<option value=''>无可选城市</option>"}</select></label>`}
+          <label>客服电话<input name="phone" required value="${row?.phone || ""}" placeholder="如 0571-88886666"></label>
+          <label>状态<select name="status"><option ${(row?.status || "生效") === "生效" ? "selected" : ""}>生效</option><option ${row?.status === "停用" ? "selected" : ""}>停用</option></select></label>
+          <label class="form-span-2">备注（可选）<input name="remark" value="${(row?.remark || "").replace(/"/g, "&quot;")}" placeholder="如本地坐席"></label>
+          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">同一城市仅允许一条覆盖；停用后该城市回退默认号。</p>`,
+        onSubmit: (data) => {
+          const city = String(data.city || row?.city || "").trim();
+          const phone = normalizeCsPhone(data.phone);
+          if (!city) return "请选择城市";
+          if (!isValidCsPhone(phone)) return "请填写有效客服电话";
+          const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+          if (row) {
+            row.phone = phone;
+            row.status = data.status || "生效";
+            row.remark = String(data.remark || "").trim();
+            row.updatedAt = now;
+          } else {
+            if ((cfg.cityOverrides || []).some(r => r.city === city)) return "该城市已有覆盖电话，请直接编辑";
+            cfg.cityOverrides.push({
+              id: "CS-" + Date.now().toString().slice(-6),
+              city, phone, status: data.status || "生效",
+              remark: String(data.remark || "").trim(),
+              updatedAt: now
+            });
+          }
+          cfg.updatedAt = now;
+          cfg.updatedBy = currentEmployee()?.name || currentEntity().name;
+          return {
+            successMessage: `已保存「${city}」客服电话`,
+            afterClose: () => { state.pricingTab = "csHotline"; render(); }
+          };
+        }
+      });
+    }
+
+    function deleteCsCityHotline(id) {
+      if (!(isEntityLogin() || employeeHasPerm("pricing.edit"))) return showProtoToast("无定价编辑权限");
+      const cfg = myCsHotlineSettings();
+      const row = (cfg.cityOverrides || []).find(r => r.id === id);
+      if (!row) return showProtoToast("记录不存在");
+      openProtoConfirm({
+        title: "删除城市客服电话",
+        message: `确认删除「${row.city}」的覆盖电话？删除后该城市回退默认号 ${cfg.defaultPhone || "—"}。`,
+        confirmLabel: "删除",
+        onConfirm: () => {
+          cfg.cityOverrides = (cfg.cityOverrides || []).filter(r => r.id !== id);
+          cfg.updatedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+          cfg.updatedBy = currentEmployee()?.name || currentEntity().name;
+          showProtoToast("已删除城市覆盖电话");
+          state.pricingTab = "csHotline";
+          render();
+        }
+      });
     }
 
     function applyRefundApproval(rf, pkgRefund, depositRefund, note) {
@@ -6531,7 +6929,7 @@
         return n ? " (" + n + ")" : "";
       };
       const map = {
-        pricing: { stateKey: "pricingTab", tabs: [["pkg", "个人套餐价"], ["deposit", "押金设置"], ["refund", "退款设置"], ["quota", "人天批发价"], ["card", "渠道分销价"], ["swapRange", "换电范围"]] },
+        pricing: { stateKey: "pricingTab", tabs: [["pkg", "个人套餐价"], ["deposit", "押金设置"], ["refund", "退款设置"], ["quota", "人天批发价"], ["card", "渠道分销价"], ["swapRange", "换电范围"], ["csHotline", "客服电话"], ["freeze", "服务冻结"]] },
         channelSales: {
           stateKey: "channelSalesTab",
           tabs: () => {
@@ -6600,7 +6998,7 @@
         },
         l1Pricing: {
           stateKey: "l1PricingTab",
-          tabs: [["crossNet", "跨网服务费"], ["dayPrice", "人天标准日值"], ["sms", "预警短信"]]
+          tabs: [["crossNet", "跨网服务费"], ["dayPrice", "人天标准日值"], ["freeze", "服务冻结"], ["sms", "预警短信"]]
         },
         platformUsers: {
           stateKey: "platformUsersTab",
@@ -9463,11 +9861,16 @@
       document.querySelector("#channelPartnerMask").classList.remove("open");
     }
 
-    function inheritDayQuotaForOperator(opId) {
-      const def = operatorDayQuotaPrices.find(q => q.operatorId === opId && q.channelId === "*");
+    function inheritDayQuotaForOperator(opId, batteryModel) {
+      const model = normalizeDayPoolBatteryModel(batteryModel) || "48V30Ah";
+      const def = operatorDayQuotaPrices.find(q =>
+        q.operatorId === opId && q.channelId === "*"
+        && normalizeDayPoolBatteryModel(q.batteryModel) === model
+      ) || operatorDayQuotaPrices.find(q => q.operatorId === opId && q.channelId === "*");
       return {
         wholesalePrice: def?.wholesalePrice ?? platformAccrualDayPrice(),
-        minDays: def?.minDays ?? 500
+        minDays: def?.minDays ?? 500,
+        batteryModel: model
       };
     }
 
@@ -9580,14 +9983,18 @@
           instantCommissionEnabledAt: settlementMode === "链接类" && instantCommissionPayout ? new Date().toISOString().slice(0, 10) : null
         });
         if (settlementMode === "人天池") {
+          const held = operatorHeldBatteryModels(op.id);
+          const defModel = held.includes("48V30Ah") ? "48V30Ah" : (held[0] || "48V30Ah");
           operatorDayQuotaPrices.push({
             id: "OP-Q-" + Date.now().toString().slice(-4),
             operatorId: op.id, channelId, channelName: data.name.trim(),
+            batteryModel: defModel,
             wholesalePrice, minDays, status: "生效"
           });
           createPendingPoolForChannel({
             channelId, channelName: data.name.trim(),
             operatorId: op.id, operatorName: op.name,
+            batteryModel: defModel,
             wholesalePrice
           });
         }
@@ -11086,6 +11493,9 @@
       if (tab === "sms") {
         return `${ownScopeBanner()}${renderSmsAlertRecordsPanel()}`;
       }
+      if (tab === "freeze") {
+        return renderPlatformFreezeRulesPanel();
+      }
       if (tab === "dayPrice") {
         const cityRows = typeof stdDayCityOverrides !== "undefined" ? stdDayCityOverrides : [];
         platformStandardDayPrice.status = "生效";
@@ -11335,7 +11745,7 @@
               <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_channel_po")}</p>
               <table>
                 <thead><tr>
-                  <th>批发单号</th><th>渠道商</th><th>售卖运营商</th><th>人天/金额</th>
+                  <th>批发单号</th><th>渠道商</th><th>售卖运营商</th><th>电池型号</th><th>人天/金额</th>
                   <th>支付渠道</th><th>支付方式</th><th>订单状态</th><th>支付状态</th>
                   <th>下单时间</th><th>完成/确认</th><th>操作</th>
                 </tr></thead>
@@ -11343,6 +11753,7 @@
                   <td>${o.id}${o.poolId ? `<br><small style="color:var(--muted)">${o.poolId}</small>` : ""}</td>
                   <td>${o.channelName}</td>
                   <td>${o.operatorName || operatorLabel(o.operatorId)}</td>
+                  <td>${tag(o.batteryModel || "—")}</td>
                   <td>${o.days.toLocaleString("zh-CN")} 人天<br><strong>¥${o.amount.toLocaleString("zh-CN")}</strong></td>
                   <td>${channelPayChannelLabel(o)}</td>
                   <td>${channelPayMethodLabel(o)}${channelOfflineReconHtml(o)}</td>
@@ -11351,7 +11762,7 @@
                   <td>${o.createdAt || "—"}</td>
                   <td>${o.payTime || "—"}</td>
                   <td>${channelPoActionCell(o, "platform")}</td>
-                </tr>`).join("") || "<tr><td colspan='11'>暂无</td></tr>"}</tbody>
+                </tr>`).join("") || "<tr><td colspan='12'>暂无</td></tr>"}</tbody>
               </table>
             </div>
           </section>`)}`;
@@ -14292,13 +14703,20 @@
     function pkgFreezeSection(p) {
       if (!p.freezeInfo) return "";
       const f = p.freezeInfo;
+      const daysRule = f.unlimitedSingleDays ? "不限时长" : ("最长 " + (f.maxFreezeDays ?? "—") + " 天");
+      const timesRule = f.maxFreezeTimes === 0 ? "周期不限次数" : ("周期最多 " + (f.maxFreezeTimes ?? "—") + " 次");
+      const usedRule = (f.freezeTimesUsed != null) ? ("已用 " + f.freezeTimesUsed + " 次") : "—";
+      const autoRule = f.unlimitedSingleDays || f.autoUnfreezeOnExpire === false ? "不自动解冻" : "到期自动解冻";
       return `<section class="panel" style="margin:16px 0 0">
-        ${panelHead("冻结信息", "解冻后可继续使用原套餐", "orders_freeze")}
+        ${panelHead("冻结信息", "解冻后可继续使用原套餐 · 规则以申请时快照为准", "orders_freeze")}
         <div class="panel-body" style="padding-top:0">
           <div class="detail-grid">
             <div class="detail-item"><span>申请时间</span><strong>${f.applyTime}</strong></div>
             <div class="detail-item"><span>冻结原因</span><strong>${f.reason}</strong></div>
             <div class="detail-item"><span>已冻结</span><strong>${f.frozenDays} 天</strong></div>
+            <div class="detail-item"><span>单次规则</span><strong>${daysRule}</strong></div>
+            <div class="detail-item"><span>次数规则</span><strong>${timesRule} · ${usedRule}</strong></div>
+            <div class="detail-item"><span>自动解冻</span><strong>${autoRule}</strong></div>
             <div class="detail-item"><span>顺延规则</span><strong>${f.resumeNote || "解冻后有效期顺延"}</strong></div>
           </div>
         </div>
@@ -14981,7 +15399,7 @@
            <div class="detail-item"><span>还电门槛</span><strong>${payOk ? "占用费已支付，可还电" : "须先支付占用费才能还电"}</strong></div>
            <div class="detail-item"><span>资金归属</span><strong>全额进运营商 · 不分润</strong></div>`
         : `<div class="detail-item"><span>占用时间</span><strong>${fmtOverdueAt(r.startAt)}<br><small>已占用 ${r.quota} 天（不足一天按 1 人天）</small></strong></div>
-           <div class="detail-item"><span>已扣人天</span><strong>${r.quota} 人天<br><small>扣 ${r.channel} 额度池${r.poolAfter < 0 ? " · 欠人天 " + r.poolAfter : " · 扣后可用 " + r.poolAfter}</small></strong></div>
+           <div class="detail-item"><span>已扣人天</span><strong>${r.quota} 人天<br><small>扣 ${r.channel} · ${normalizeDayPoolBatteryModel(r.model) || "—"} 型号池${r.poolId ? "（" + r.poolId + "）" : ""}${r.poolAfter < 0 ? " · 欠人天 " + r.poolAfter : " · 扣后可用 " + r.poolAfter}</small></strong></div>
            <div class="detail-item"><span>逾期费</span><strong>无需支付</strong></div>
            <div class="detail-item"><span>骑手现金</span><strong>不收取占用费 · 可直接还电</strong></div>`;
       const adjBlock = r.type === "personal" && r.status === "open"
@@ -15069,7 +15487,7 @@
         ? "<th>用户</th><th>类型</th><th>逾期时间</th><th>电池</th><th>逾期费</th><th>完结时间</th><th>操作</th>"
         : isP
           ? "<th>用户</th><th>套餐</th><th>结束原因</th><th>逾期时间</th><th>电池</th><th>逾期费</th><th>操作</th>"
-          : "<th>骑手</th><th>渠道 / 团队</th><th>占用时间</th><th>已扣人天</th><th>池可用（扣后）</th><th>电池</th><th>逾期费</th><th>操作</th>";
+          : "<th>骑手</th><th>渠道 / 团队</th><th>电池型号</th><th>占用时间</th><th>已扣人天</th><th>池可用（扣后）</th><th>电池</th><th>逾期费</th><th>操作</th>";
       const body = rows.length ? rows.map(r => {
         if (inner === "done") {
           return `<tr><td>${r.user}<br><small>${r.phone}</small></td><td>${r.type === "personal" ? "个人套餐逾期" : "人天池占用"}</td><td>${fmtOverdueAt(r.startAt)}<br><small>${r.days} 天</small></td><td>${overdueBatCell(r)}</td><td>${overdueFeeCell(r)}</td><td>${fmtOverdueAt(r.returnedAt)}</td><td><button type="button" class="link-btn" data-overdue-detail="${r.id}">详情</button></td></tr>`;
@@ -15093,6 +15511,7 @@
         return `<tr>
           <td>${r.user}<br><small>${r.phone}</small></td>
           <td>${r.channel}<br><small>${r.team}</small></td>
+          <td>${tag(normalizeDayPoolBatteryModel(r.model) || "—")}${r.poolId ? `<br><small>${r.poolId}</small>` : ""}</td>
           <td>${fmtOverdueAt(r.startAt)}<br><small>已占用 ${r.days} 天</small></td>
           <td>${r.quota} 人天</td>
           <td${r.poolAfter < 0 ? " style='color:var(--red);font-weight:600'" : ""}>${r.poolAfter}${r.poolAfter < 0 ? " 欠人天" : ""}</td>
@@ -15100,11 +15519,11 @@
           <td>${overdueFeeCell(r)}</td>
           <td class="row-actions">${ops}</td>
         </tr>`;
-      }).join("") : `<tr><td colspan="8">暂无符合筛选的逾期订单</td></tr>`;
+      }).join("") : `<tr><td colspan="${isD ? 9 : 8}">暂无符合筛选的逾期订单</td></tr>`;
       const hint = isP
         ? "电池（未归还 / 已归还）与逾期费（未支付 / 已支付）分开看。个人须先支付才能还电；减免为 0 记已支付。占用费全额进运营商，不分润。"
         : isD
-          ? "人天占用不向骑手收现金，逾期费为「无需支付」。电池仍区分未归还 / 已归还。"
+          ? "人天占用从对应电池型号池扣人天，不向骑手收现金；逾期费为「无需支付」。电池仍区分未归还 / 已归还。"
           : "已完结 = 电池已归还。个人逾期费为已支付；人天为无需支付。占用费 / 已扣人天不退。";
       return `${ownScopeBanner()}<section class="panel">
           ${panelHead("逾期管理", `未归还 ${personalHold.length + dayHold.length} 人 · 日费 ¥${state.overdueFee || 10}/天`, "orders_overdue")}
@@ -15166,7 +15585,8 @@
         return `${ownScopeBanner()}${wrapOrderPage(`<section class="panel">
             ${panelHead("服务冻结", `共 ${rows.length} 条 · 冻结/解冻记录`, "orders_freeze")}
             <div class="panel-body orders-table-wrap">
-              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_freeze")} 个人套餐用户在套餐有效期内且未持电池时，冻结/解冻<strong>满足条件即系统自动生效</strong>（无需运营商审核）。解冻后有效期顺延，<strong>首次服务为领取电池</strong>。本页只读查询。</p>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("orders_freeze")} 个人套餐用户在套餐有效期内且未持电池时，冻结/解冻<strong>满足条件即系统自动生效</strong>（无需运营商审核）。解冻后有效期顺延，<strong>首次服务为领取电池</strong>。规则：平台默认可被运营商覆盖（单次天数 0=禁冻；可关天数限制；周期次数 0=不限）。本页只读查询。</p>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">本运营商生效：<strong>${formatFreezeRuleSummary(resolveFreezeRules(currentEntity().id))}</strong>（${resolveFreezeRules(currentEntity().id).source === "platform" ? "继承平台" : "本运营商覆盖"}）· 配置入口「平台设置 → 服务冻结」</p>
               <table>
                 <thead><tr>
                   <th>记录单</th><th>类型</th><th>套餐单</th><th>用户</th><th>站点</th>
@@ -15887,12 +16307,13 @@
       };
     }
 
-    function appendChannelPurchaseOrder(poolId, days, unitPrice, orderNo) {
+    function appendChannelPurchaseOrder(poolId, days, unitPrice, orderNo, batteryModel) {
       const contract = myChannelContracts()[0];
       const sellerId = contract?.operatorId || "OP-SX";
       const channelId = currentEntity().id;
-      const existing = poolForChannelSeller(channelId, sellerId);
-      const resolvedPoolId = poolId || existing?.id || null;
+      const model = normalizeDayPoolBatteryModel(batteryModel);
+      const existing = poolId ? poolById(poolId) : poolForChannelSeller(channelId, sellerId, model);
+      const resolvedPoolId = existing?.id || poolId || null;
       const pay = readPoolPurchasePaymentFromForm();
       const amount = Math.round(days * unitPrice * 100) / 100;
       channelSalesOrders.unshift({
@@ -15902,6 +16323,7 @@
         operatorId: sellerId,
         operatorName: contract?.operatorName || PAYEE_OPERATOR,
         poolId: resolvedPoolId,
+        batteryModel: model || existing?.batteryModel || "",
         days, unitPrice, amount,
         ...pay,
         createdAt: new Date().toISOString().slice(0, 19).replace("T", " "),
@@ -15925,6 +16347,7 @@
       const titles = {
         purchase: "购买人天额度", renew: "续费额度池",
         register: "登记骑手", batchRegister: "批量登记骑手", allocate: "分配人天额度", recover: "收回人天额度", adjust: "额度调整",
+        switchModel: "更换电池型号",
         team: "新增骑手团队", editTeam: "编辑骑手团队", teamPool: "设置团队消耗池", leaveTeam: "移除团队",
         changeTeam: "变更团队", joinTeam: "加入团队"
       };
@@ -15935,19 +16358,24 @@
         const contract = myChannelContracts()[0];
         const seller = contract ? contract.operatorName : PAYEE_OPERATOR;
         const sellerId = contract?.operatorId || "OP-SX";
-        const price = contract ? contract.wholesalePrice : platformAccrualDayPrice();
+        const heldModels = operatorHeldBatteryModels(sellerId);
+        const prefModel = normalizeDayPoolBatteryModel(pool?.batteryModel) || heldModels[0] || "48V30Ah";
+        const qPrice = dayPoolQuotaPrice(sellerId, currentEntity().id, prefModel);
+        const price = qPrice?.wholesalePrice ?? platformAccrualDayPrice();
         const existingPool = isChannelRole()
-          ? poolForChannelSeller(currentEntity().id, sellerId)
+          ? poolForChannelSeller(currentEntity().id, sellerId, prefModel)
           : pool;
-        const targetPool = existingPool || pool;
         html = `
-          ${targetPool ? `<label>入账额度池<input value="${targetPool.id} · ${targetPool.name}（唯一池）" readonly></label>` : `<p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">首单到账后将自动创建额度池，后续增购均入账同一池。</p>`}
           <label>渠道商<input value="${currentEntity().name}" readonly></label>
           <label>售卖方（运营商）<input value="${seller}" readonly></label>
-          <label>购买人天数<input type="number" name="totalDays" value="1000" min="1"></label>
+          <label>电池型号 *<select name="batteryModel" id="poolPurchaseBatteryModel" required>
+            ${heldModels.map(m => `<option value="${m}" ${m === prefModel ? "selected" : ""}>${m}</option>`).join("") || `<option value="${prefModel}">${prefModel}</option>`}
+          </select></label>
+          <label>入账额度池<input id="poolPurchaseTarget" value="${existingPool ? (existingPool.id + " · " + existingPool.name + "（续购）") : "首单到账后新建该型号池"}" readonly></label>
+          <label>购买人天数<input type="number" name="totalDays" value="${qPrice?.minDays || 1000}" min="1"></label>
           <label>生效日期<input type="date" name="validFrom" value="2026-07-01"></label>
           <label>失效日期<input type="date" name="validTo" value="2027-06-30"></label>
-          <label>批发单价（元/人天）<input type="number" name="wholesalePrice" value="${price}" step="0.1" readonly></label>
+          <label>批发单价（元/人天）<input type="number" name="wholesalePrice" id="poolPurchasePrice" value="${price}" step="0.1" readonly></label>
           <label>采购单号<input name="orderNo" value="PO-202607-NEW"></label>
           <label>支付渠道<select name="payChannel" id="poolPayChannel"><option value="online">在线支付</option><option value="offline">线下打款</option></select></label>
           <label id="poolOnlinePayWrap">在线方式<select name="onlinePayMethod"><option>微信扫码</option><option>支付宝扫码</option></select></label>
@@ -15959,7 +16387,7 @@
               <label>付款账户（建议）<input name="payerAccount" placeholder="对公户名或账号后四位"></label>
             </div>
           </div>
-          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("day_pool_one_per_operator")} ${noteBtn("day_pool_b2b_settlement")} ${noteBtn("channel_no_receipt")} 多次采购只增加<strong>批发订单</strong>与<strong>额度变动记录</strong>，不新建第二池。</p>
+          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("day_pool_one_per_operator")} ${noteBtn("day_pool_b2b_settlement")} 按<strong>电池型号</strong>入账：有该型号池则续购，无则新建池。可选型号=运营商台账有归属。</p>
           <label>备注<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">向签约运营商增购人天</textarea></label>`;
       } else if (mode === "renew") {
         html = `
@@ -16025,11 +16453,31 @@
           <label>${mode === "joinTeam" ? "加入团队" : "变更至"}<select name="teamId">${opts || "<option value=\"\">暂无可用团队</option>"}</select></label>
           ${rehireHint}`;
       } else if (mode === "allocate") {
+        const sellerId = pool?.sellerId || myChannelContracts()[0]?.operatorId || "OP-SX";
+        const channelId = currentEntity().id;
+        const modelPools = poolsForChannelSeller(channelId, sellerId);
+        const curModel = normalizeDayPoolBatteryModel(rider?.batteryModel || pool?.batteryModel);
         html = `
-          <label>额度池<input value="${pool ? pool.id + " · 可用 " + pool.availableDays + " 人天" : ""}" readonly></label>
-          <label>骑手<input value="${rider ? rider.name + " · " + rider.id : ""}" readonly></label>
-          <label>分配人天数<input type="number" name="days" value="30" min="1" max="${pool ? pool.availableDays : 999}"></label>
+          <label>骑手<input value="${rider ? rider.name + " · " + rider.id + (rider.batteryModel ? " · 当前 " + rider.batteryModel : "") : ""}" readonly></label>
+          <label>电池型号 / 额度池 *<select name="poolId" id="allocPoolSelect" required>
+            ${modelPools.map(p => `<option value="${p.id}" ${p.id === (pool?.id) || normalizeDayPoolBatteryModel(p.batteryModel) === curModel ? "selected" : ""}>${p.batteryModel || "—"} · ${p.name} · 可用 ${p.availableDays}</option>`).join("") || "<option value=\"\">暂无型号池，请先采购</option>"}
+          </select></label>
+          <p style="font-size:12px;color:var(--muted);margin:0;grid-column:1/-1">${noteBtn("day_pool_one_per_operator")} 分配绑定该型号额度。若要换型号且骑手仍有旧额度或持电，请用「更换电池型号」。</p>
+          <label>分配人天数<input type="number" name="days" value="30" min="1"></label>
           <label>备注<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">分配给骑手换电使用</textarea></label>`;
+      } else if (mode === "switchModel") {
+        const sellerId = pool?.sellerId || myChannelContracts()[0]?.operatorId || "OP-SX";
+        const channelId = currentEntity().id;
+        const modelPools = poolsForChannelSeller(channelId, sellerId)
+          .filter(p => normalizeDayPoolBatteryModel(p.batteryModel) !== normalizeDayPoolBatteryModel(rider?.batteryModel));
+        html = `
+          <label>骑手<input value="${rider ? rider.name + " · 当前型号 " + (rider.batteryModel || "—") + " · 剩余 " + (rider.remainingDays || 0) + " · 持电 " + (rider.batteryHeld ? "是" : "否") : ""}" readonly></label>
+          <p style="font-size:12px;color:var(--warn);margin:0;grid-column:1/-1">${noteBtn("day_pool_one_per_operator")} 强制顺序：①收回原型号额度 ②须已还电 ③分配新型号 ④再领电。未还电不可换。</p>
+          <label>目标电池型号池 *<select name="poolId" required>
+            ${modelPools.map(p => `<option value="${p.id}">${p.batteryModel} · 可用 ${p.availableDays}</option>`).join("") || "<option value=\"\">无其他型号池</option>"}
+          </select></label>
+          <label>分配新型号人天数<input type="number" name="days" value="30" min="1"></label>
+          <label>备注<textarea name="remark" rows="2" style="padding:8px;border:1px solid var(--line);border-radius:var(--radius)">更换电池型号迁移</textarea></label>`;
       } else if (mode === "recover") {
         html = `
           <label>额度池<input value="${pool ? pool.id : ""}" readonly></label>
@@ -16076,6 +16524,22 @@
         if (reconWrap) reconWrap.style.display = online ? "none" : "";
       };
       if (paySel) { paySel.onchange = syncPoolPayFields; syncPoolPayFields(); }
+      const batSel = document.querySelector("#poolPurchaseBatteryModel");
+      if (batSel) {
+        const contract = myChannelContracts()[0];
+        const sellerId = contract?.operatorId || "OP-SX";
+        const syncPurchaseModel = () => {
+          const model = batSel.value;
+          const q = dayPoolQuotaPrice(sellerId, currentEntity().id, model);
+          const priceEl = document.querySelector("#poolPurchasePrice");
+          if (priceEl) priceEl.value = q?.wholesalePrice ?? platformAccrualDayPrice();
+          const existing = poolForChannelSeller(currentEntity().id, sellerId, model);
+          const targetEl = document.querySelector("#poolPurchaseTarget");
+          if (targetEl) targetEl.value = existing ? (existing.id + " · " + existing.name + "（续购）") : "首单到账后新建该型号池";
+        };
+        batSel.onchange = syncPurchaseModel;
+        syncPurchaseModel();
+      }
       document.querySelector("#poolModal").classList.add("open");
       document.querySelector("#poolMask").classList.add("open");
     }
@@ -16110,8 +16574,17 @@
         const orderNo = document.querySelector("#poolForm [name=orderNo]")?.value || "PO-NEW";
         const contract = myChannelContracts()[0];
         const sellerId = contract?.operatorId || "OP-SX";
+        const batteryModel = normalizeDayPoolBatteryModel(document.querySelector("#poolForm [name=batteryModel]")?.value);
+        if (!batteryModel) {
+          showProtoToast("请选择电池型号");
+          return;
+        }
+        if (!operatorHeldBatteryModels(sellerId).includes(batteryModel)) {
+          showProtoToast("该型号不在运营商台账持有范围内");
+          return;
+        }
         const existingPool = isChannelRole()
-          ? poolForChannelSeller(currentEntity().id, sellerId)
+          ? poolForChannelSeller(currentEntity().id, sellerId, batteryModel)
           : (form.poolId ? poolById(form.poolId) : null);
         const price = parseFloat(document.querySelector("#poolForm [name=wholesalePrice]")?.value || String(platformAccrualDayPrice()));
         const payPreview = readPoolPurchasePaymentFromForm();
@@ -16131,10 +16604,10 @@
             return;
           }
         }
-        const pay = appendChannelPurchaseOrder(existingPool?.id || null, days, price, orderNo);
+        const pay = appendChannelPurchaseOrder(existingPool?.id || null, days, price, orderNo, batteryModel);
         window.alert(pay.payChannel === "online"
-          ? "采购单 " + orderNo + " 已创建，支付成功后入账" + (existingPool ? "池 " + existingPool.id : "（首单将创建唯一额度池）")
-          : "采购单 " + orderNo + " 已创建。请对公转账并将附言填写为 " + orderNo + "，运营商按金额+附言+流水号确认后入账");
+          ? "采购单 " + orderNo + " 已创建（" + batteryModel + "），支付成功后入账" + (existingPool ? "池 " + existingPool.id : "（将新建该型号额度池）")
+          : "采购单 " + orderNo + " 已创建（" + batteryModel + "）。请对公转账并将附言填写为 " + orderNo + "，运营商确认后入账");
       } else if (mode === "register") {
         const teamId = document.querySelector("#poolForm [name=teamId]")?.value || "TEAM-DEFAULT";
         const team = dayPoolTeams.find(t => t.id === teamId);
@@ -16259,24 +16732,85 @@
         }
         syncTeamRiderCounts();
         if (prevTeam && prevTeam.id !== team.id) syncTeamRiderCounts();
-      } else if (mode === "allocate" && pool && rider) {
+      } else if (mode === "allocate" && rider) {
+        const allocPool = poolById(document.querySelector("#poolForm [name=poolId]")?.value) || pool;
+        if (!allocPool) { showProtoToast("请选择型号额度池"); return; }
+        const allocModel = normalizeDayPoolBatteryModel(allocPool.batteryModel);
+        const riderModel = normalizeDayPoolBatteryModel(rider.batteryModel);
+        if (riderModel && allocModel && riderModel !== allocModel && ((rider.remainingDays || 0) > 0 || rider.batteryHeld)) {
+          showProtoToast("骑手仍有旧型号额度或未还电，请使用「更换电池型号」");
+          return;
+        }
         const days = parseInt(document.querySelector("#poolForm [name=days]")?.value || "0", 10);
-        if (days > 0 && days <= pool.availableDays) {
-          pool.availableDays -= days;
-          pool.balancePct = Math.round(pool.availableDays / pool.totalDays * 1000) / 10;
-          syncDayPoolDerived(pool);
+        if (days > 0 && days <= allocPool.availableDays) {
+          allocPool.availableDays -= days;
+          allocPool.balancePct = Math.round(allocPool.availableDays / allocPool.totalDays * 1000) / 10;
+          syncDayPoolDerived(allocPool);
+          rider.poolId = allocPool.id;
+          rider.batteryModel = allocModel;
           rider.allocatedDays = (rider.allocatedDays || 0) + days;
           rider.remainingDays = (rider.remainingDays || 0) + days;
           rider.quotaStatus = "使用中";
           rider.todayEligibility = (rider.remainingDays > 0) ? "今日可用" : (rider.todayEligibility === "待还电" ? "待还电" : "个人无额度");
-          appendPoolLedger(pool, "分配出账", -days, rider.id, document.querySelector("#poolForm [name=remark]")?.value || "分配给骑手");
+          appendPoolLedger(allocPool, "分配出账", -days, rider.id, document.querySelector("#poolForm [name=remark]")?.value || "分配给骑手");
           dayPoolAllocationLogs.unshift({
-            id: "AL-" + Date.now().toString().slice(-4), poolId: pool.id, riderId: rider.id, riderName: rider.name,
-            type: "分配", days, time: new Date().toISOString().slice(0, 16).replace("T", " "),
-            operator: "渠道商管理员", poolBalanceAfter: pool.availableDays,
+            id: "AL-" + Date.now().toString().slice(-4), poolId: allocPool.id, riderId: rider.id, riderName: rider.name,
+            type: "分配", days, batteryModel: allocModel, time: new Date().toISOString().slice(0, 16).replace("T", " "),
+            operator: "渠道商管理员", poolBalanceAfter: allocPool.availableDays,
             remark: document.querySelector("#poolForm [name=remark]")?.value || ""
           });
+        } else {
+          showProtoToast("分配天数无效或超过池可用余额");
+          return;
         }
+      } else if (mode === "switchModel" && rider) {
+        if (rider.batteryHeld) {
+          showProtoToast("请先归还电池后再更换型号");
+          return;
+        }
+        const newPool = poolById(document.querySelector("#poolForm [name=poolId]")?.value);
+        if (!newPool) { showProtoToast("请选择目标型号池"); return; }
+        const newModel = normalizeDayPoolBatteryModel(newPool.batteryModel);
+        const oldPool = poolById(rider.poolId) || pool;
+        const recoverDays = rider.remainingDays || 0;
+        if (recoverDays > 0 && oldPool) {
+          oldPool.availableDays += recoverDays;
+          oldPool.balancePct = Math.round(oldPool.availableDays / oldPool.totalDays * 1000) / 10;
+          syncDayPoolDerived(oldPool);
+          appendPoolLedger(oldPool, "收回入账", recoverDays, rider.id, "换型号收回原额度");
+          dayPoolAllocationLogs.unshift({
+            id: "AL-" + Date.now().toString().slice(-4), poolId: oldPool.id, riderId: rider.id, riderName: rider.name,
+            type: "收回", days: recoverDays, batteryModel: oldPool.batteryModel,
+            time: new Date().toISOString().slice(0, 16).replace("T", " "),
+            operator: "渠道商管理员", poolBalanceAfter: oldPool.availableDays, remark: "换型号收回"
+          });
+          rider.remainingDays = 0;
+          rider.allocatedDays = Math.max(0, (rider.allocatedDays || 0) - recoverDays);
+        }
+        const days = parseInt(document.querySelector("#poolForm [name=days]")?.value || "0", 10);
+        if (!(days > 0 && days <= newPool.availableDays)) {
+          showProtoToast("新型号分配天数无效或超过可用余额");
+          return;
+        }
+        newPool.availableDays -= days;
+        newPool.balancePct = Math.round(newPool.availableDays / newPool.totalDays * 1000) / 10;
+        syncDayPoolDerived(newPool);
+        rider.poolId = newPool.id;
+        rider.batteryModel = newModel;
+        rider.heldBatteryModel = null;
+        rider.allocatedDays = days;
+        rider.usedDays = 0;
+        rider.remainingDays = days;
+        rider.quotaStatus = "使用中";
+        rider.todayEligibility = "今日可用";
+        appendPoolLedger(newPool, "分配出账", -days, rider.id, document.querySelector("#poolForm [name=remark]")?.value || "换型号分配");
+        dayPoolAllocationLogs.unshift({
+          id: "AL-" + Date.now().toString().slice(-4), poolId: newPool.id, riderId: rider.id, riderName: rider.name,
+          type: "分配", days, batteryModel: newModel, time: new Date().toISOString().slice(0, 16).replace("T", " "),
+          operator: "渠道商管理员", poolBalanceAfter: newPool.availableDays,
+          remark: document.querySelector("#poolForm [name=remark]")?.value || "换型号"
+        });
+        showProtoToast("已迁移至 " + newModel + "，请骑手重新领取该型号电池");
       } else if (mode === "recover" && pool && rider) {
         const days = Math.min(parseInt(document.querySelector("#poolForm [name=days]")?.value || "0", 10), rider.remainingDays || 0);
         if (days > 0) {
@@ -17007,33 +17541,61 @@
         .filter(r => r.operatorId === currentEntity().id)
         .slice()
         .sort((a, b) => {
-          if (a.channelId === "*") return -1;
-          if (b.channelId === "*") return 1;
-          return String(a.channelName || "").localeCompare(String(b.channelName || ""), "zh");
+          if (a.channelId === "*" && b.channelId !== "*") return -1;
+          if (b.channelId === "*" && a.channelId !== "*") return 1;
+          const cn = String(a.channelName || "").localeCompare(String(b.channelName || ""), "zh");
+          if (cn) return cn;
+          return String(normalizeDayPoolBatteryModel(a.batteryModel) || "").localeCompare(
+            String(normalizeDayPoolBatteryModel(b.batteryModel) || "")
+          );
         });
     }
 
-    function defaultQuotaRow() {
-      return operatorQuotaRows().find(r => r.channelId === "*");
+    function defaultQuotaRows() {
+      return operatorQuotaRows().filter(r => r.channelId === "*");
     }
 
-    function dayPoolContractsWithoutQuota() {
-      return dayPoolContractsForQuota().filter(c => !quotaPriceForChannel(c.channelId));
+    function defaultQuotaRow() {
+      return defaultQuotaRows()[0] || null;
     }
 
     function dayPoolContractsForQuota() {
       return myChannelContracts().filter(c => contractSettlementMode(c) === "人天池");
     }
 
-    function quotaPriceForChannel(channelId) {
-      return operatorDayQuotaPrices.find(q => q.operatorId === currentEntity().id && q.channelId === channelId);
+    function quotaPriceForChannel(channelId, batteryModel) {
+      const model = normalizeDayPoolBatteryModel(batteryModel);
+      return operatorDayQuotaPrices.find(q =>
+        q.operatorId === currentEntity().id
+        && q.channelId === channelId
+        && (!model || normalizeDayPoolBatteryModel(q.batteryModel) === model)
+      );
+    }
+
+    /** 待配置：签约渠道 × 持有型号 中尚未定价的组合 */
+    function pendingQuotaPairs() {
+      const models = operatorHeldBatteryModels(currentEntity().id);
+      const pairs = [];
+      dayPoolContractsForQuota().forEach(c => {
+        models.forEach(m => {
+          if (!quotaPriceForChannel(c.channelId, m)) {
+            pairs.push({ channelId: c.channelId, channelName: c.channelName, batteryModel: m, minDays: c.minDays || 500 });
+          }
+        });
+      });
+      return pairs;
+    }
+
+    function pendingDefaultModels() {
+      const models = operatorHeldBatteryModels(currentEntity().id);
+      return models.filter(m => !quotaPriceForChannel("*", m));
     }
 
     function syncQuotaNewFormState() {
       const form = document.querySelector("#quotaPricingForm");
       const saveBtn = document.querySelector("#saveQuotaPricingForm");
       if (!form) return;
-      const sel = form.querySelector("[name=channelId]");
+      const sel = form.querySelector("[name=pairKey]");
       const canSave = sel && sel.selectedOptions[0] && sel.selectedOptions[0].dataset.configured !== "1";
       form.querySelectorAll("[name=wholesalePrice],[name=minDays],[name=status]").forEach(el => {
         el.disabled = !canSave;
@@ -17043,7 +17605,7 @@
 
     function bindQuotaNewFormHandlers() {
       const form = document.querySelector("#quotaPricingForm");
-      const sel = form?.querySelector("[name=channelId]");
+      const sel = form?.querySelector("[name=pairKey]");
       if (!sel) return;
       sel.onchange = () => {
         const opt = sel.selectedOptions[0];
@@ -17053,8 +17615,9 @@
           if (wp) wp.value = opt.dataset.price || platformAccrualDayPrice();
           if (md) md.value = opt.dataset.mindays || "500";
         } else if (opt) {
-          if (wp) wp.value = platformAccrualDayPrice();
-          if (md) md.value = opt.dataset.mindays || "500";
+          const inh = inheritDayQuotaForOperator(currentEntity().id, opt.dataset.model);
+          if (wp) wp.value = inh.wholesalePrice;
+          if (md) md.value = opt.dataset.mindays || inh.minDays || "500";
         }
         syncQuotaNewFormState();
       };
@@ -17062,60 +17625,83 @@
 
     function openQuotaPricingForm(id) {
       const isNew = !id || id === "new";
-      const row = isNew ? null : operatorDayQuotaPrices.find(r => r.id === id);
-      if (!isNew && !row) return;
-      state.quotaPricingEditId = isNew ? "new" : id;
+      const isNewDefault = id === "new-default";
+      const row = (!isNew && !isNewDefault) ? operatorDayQuotaPrices.find(r => r.id === id) : null;
+      if (!isNew && !isNewDefault && !row) return;
+      state.quotaPricingEditId = isNewDefault ? "new-default" : (isNew ? "new" : id);
       const std = platformAccrualDayPrice();
       const saveBtn = document.querySelector("#saveQuotaPricingForm");
-      if (isNew) {
-        const contracts = dayPoolContractsForQuota();
-        const pending = dayPoolContractsWithoutQuota();
-        document.querySelector("#quotaPricingFormTitle").textContent = "新增渠道批发价";
-        if (!contracts.length) {
+      const heldModels = operatorHeldBatteryModels(currentEntity().id);
+      if (isNewDefault) {
+        const pendingModels = pendingDefaultModels();
+        document.querySelector("#quotaPricingFormTitle").textContent = "设置默认批发价（按型号）";
+        if (!pendingModels.length) {
           document.querySelector("#quotaPricingForm").innerHTML = `
-            <p style="grid-column:1/-1;font-size:13px;color:var(--muted);margin:0">暂无人天池签约渠道。请先在「渠道管理 → 签约渠道」新增<strong>人天池</strong>签约后再配置批发价。</p>
-            <p style="grid-column:1/-1;font-size:12px;color:var(--muted);margin:8px 0 0">签约完成后，可在此为人天池渠道单独设定批发单价与最低起购量；未单独定价时继承「默认批发价」。</p>`;
+            <p style="grid-column:1/-1;font-size:13px;color:var(--muted);margin:0">各持有型号的默认批发价均已配置，请在列表中编辑。</p>`;
           if (saveBtn) saveBtn.disabled = true;
         } else {
-          const options = contracts.map(c => {
-            const q = quotaPriceForChannel(c.channelId);
+          if (saveBtn) saveBtn.disabled = false;
+          document.querySelector("#quotaPricingForm").innerHTML = `
+            <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0"><strong>无渠道默认价</strong>：按电池型号维护；新建签约未单独定价时按型号继承。平台标准日值不分型号（只读）。</p>
+            <label>电池型号<select name="batteryModel">${pendingModels.map(m => `<option value="${m}">${m}</option>`).join("")}</select></label>
+            <label>平台标准价（只读）<input value="¥${std}/人天" readonly /></label>
+            <label>我的批发价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${std}" required /></label>
+            <label>最低起购（人天）<input name="minDays" type="number" min="1" step="1" value="500" required /></label>
+            <label>状态<select name="status"><option selected>生效</option><option>停用</option></select></label>`;
+        }
+      } else if (isNew) {
+        const contracts = dayPoolContractsForQuota();
+        const pending = pendingQuotaPairs();
+        document.querySelector("#quotaPricingFormTitle").textContent = "新增渠道×型号批发价";
+        if (!contracts.length) {
+          document.querySelector("#quotaPricingForm").innerHTML = `
+            <p style="grid-column:1/-1;font-size:13px;color:var(--muted);margin:0">暂无人天池签约渠道。请先在「渠道管理 → 签约渠道」新增<strong>人天池</strong>签约后再配置批发价。</p>`;
+          if (saveBtn) saveBtn.disabled = true;
+        } else {
+          const models = heldModels.length ? heldModels : ["48V30Ah"];
+          const options = contracts.flatMap(c => models.map(m => {
+            const q = quotaPriceForChannel(c.channelId, m);
+            const key = c.channelId + "|" + m;
             if (q) {
-              return `<option value="${c.channelId}" disabled data-configured="1" data-name="${c.channelName}" data-price="${q.wholesalePrice}" data-mindays="${q.minDays}">${c.channelName}（已配置 · ¥${q.wholesalePrice}/人天）</option>`;
+              return `<option value="${key}" disabled data-configured="1" data-name="${c.channelName}" data-model="${m}" data-price="${q.wholesalePrice}" data-mindays="${q.minDays}">${c.channelName} · ${m}（已配置 · ¥${q.wholesalePrice}）</option>`;
             }
-            return `<option value="${c.channelId}" data-configured="0" data-name="${c.channelName}" data-mindays="${c.minDays || 500}">${c.channelName}（待配置）</option>`;
-          }).join("");
+            return `<option value="${key}" data-configured="0" data-name="${c.channelName}" data-model="${m}" data-mindays="${c.minDays || 500}">${c.channelName} · ${m}（待配置）</option>`;
+          })).join("");
           const hint = pending.length
-            ? `共 ${contracts.length} 家人天池签约渠道，<strong>${pending.length}</strong> 家待配置批发价。`
-            : `<span style="color:var(--warn)">所有人天池签约渠道均已配置批发价</span>；可在列表中「编辑」修改，或至「渠道管理」新增签约后再配置。`;
-          const firstPending = pending[0];
+            ? `共 ${contracts.length} 家人天池签约 × ${models.length} 型号；<strong>${pending.length}</strong> 组待配置。`
+            : `<span style="color:var(--warn)">各签约×型号均已配置</span>；可在列表「编辑」修改。`;
+          const first = pending[0];
+          const inh = first ? inheritDayQuotaForOperator(currentEntity().id, first.batteryModel) : { wholesalePrice: std, minDays: 500 };
           document.querySelector("#quotaPricingForm").innerHTML = `
             <p style="grid-column:1/-1;font-size:12px;color:var(--muted);margin:0">${hint}</p>
-            <label style="grid-column:1/-1">渠道商<select name="channelId">${options}</select></label>
-            <label>平台标准价（只读）<input value="¥${std}/人天" readonly /></label>
-            <label>我的批发价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${firstPending ? std : (quotaPriceForChannel(contracts[0].channelId)?.wholesalePrice || std)}" required /></label>
-            <label>最低起购（人天）<input name="minDays" type="number" min="1" step="1" value="${firstPending?.minDays || contracts[0]?.minDays || 500}" required /></label>
+            <label style="grid-column:1/-1">渠道 × 型号<select name="pairKey">${options}</select></label>
+            <label>平台标准价（只读）<input value="¥${std}/人天 · 不分型号" readonly /></label>
+            <label>我的批发价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${inh.wholesalePrice}" required /></label>
+            <label>最低起购（人天）<input name="minDays" type="number" min="1" step="1" value="${first?.minDays || 500}" required /></label>
             <label>状态<select name="status"><option selected>生效</option><option>停用</option></select></label>`;
-          const sel = document.querySelector("#quotaPricingForm [name=channelId]");
-          if (firstPending) sel.value = firstPending.channelId;
+          const sel = document.querySelector("#quotaPricingForm [name=pairKey]");
+          if (first) sel.value = first.channelId + "|" + first.batteryModel;
           bindQuotaNewFormHandlers();
           syncQuotaNewFormState();
         }
       } else if (row.channelId === "*") {
         if (saveBtn) saveBtn.disabled = false;
-        document.querySelector("#quotaPricingFormTitle").textContent = "设置默认批发价（无渠道）";
+        document.querySelector("#quotaPricingFormTitle").textContent = "设置默认批发价 · " + (row.batteryModel || "—");
         document.querySelector("#quotaPricingForm").innerHTML = `
-          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0"><strong>无渠道默认价</strong>：新建人天池签约未单独定价时继承此批发价与最低起购；已有签约渠道以各自合同价为准。</p>
-          <label>适用范围<input value="默认批发价（无指定渠道）" readonly /></label>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0"><strong>无渠道默认价</strong>：按型号继承；平台标准日值不分型号。</p>
+          <label>适用范围<input value="默认批发价 · ${row.batteryModel || "—"}" readonly /></label>
+          <label>电池型号<input value="${row.batteryModel || "—"}" readonly /></label>
           <label>平台标准价（只读）<input value="¥${std}/人天" readonly /></label>
           <label>我的批发价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${row.wholesalePrice}" required /></label>
           <label>最低起购（人天）<input name="minDays" type="number" min="1" step="1" value="${row.minDays}" required /></label>
           <label>状态<select name="status"><option ${row.status === "生效" ? "selected" : ""}>生效</option><option ${row.status === "停用" ? "selected" : ""}>停用</option></select></label>`;
       } else {
         if (saveBtn) saveBtn.disabled = false;
-        document.querySelector("#quotaPricingFormTitle").textContent = "编辑渠道批发价 · " + row.channelName;
+        document.querySelector("#quotaPricingFormTitle").textContent = "编辑 · " + row.channelName + " · " + (row.batteryModel || "—");
         document.querySelector("#quotaPricingForm").innerHTML = `
           <label>渠道商<input value="${row.channelName}" readonly /></label>
-          <label>平台标准价（只读）<input value="¥${std}/人天" readonly /></label>
+          <label>电池型号<input value="${row.batteryModel || "—"}" readonly /></label>
+          <label>平台标准价（只读）<input value="¥${std}/人天 · 不分型号" readonly /></label>
           <label>我的批发价（元/人天）<input name="wholesalePrice" type="number" min="0.1" step="0.1" value="${row.wholesalePrice}" required /></label>
           <label>最低起购（人天）<input name="minDays" type="number" min="1" step="1" value="${row.minDays}" required /></label>
           <label>状态<select name="status"><option ${row.status === "生效" ? "selected" : ""}>生效</option><option ${row.status === "停用" ? "selected" : ""}>停用</option></select></label>`;
@@ -17142,23 +17728,46 @@
         return;
       }
       const opId = currentEntity().id;
+      if (state.quotaPricingEditId === "new-default") {
+        const batteryModel = normalizeDayPoolBatteryModel(form.querySelector("[name=batteryModel]")?.value);
+        if (!batteryModel) {
+          window.alert("请选择电池型号");
+          return;
+        }
+        if (quotaPriceForChannel("*", batteryModel)) {
+          window.alert("该型号默认价已存在，请在列表中编辑");
+          return;
+        }
+        operatorDayQuotaPrices.push({
+          id: "OP-Q-" + String(Date.now()).slice(-6),
+          operatorId: opId, channelId: "*", channelName: "默认批发价",
+          batteryModel, wholesalePrice, minDays, status
+        });
+        closeQuotaPricingForm();
+        state.view = "pricing";
+        state.pricingTab = "quota";
+        render();
+        window.alert("演示：默认批发价（" + batteryModel + "）已新增");
+        return;
+      }
       if (state.quotaPricingEditId === "new") {
-        const channelSel = form.querySelector("[name=channelId]");
-        const opt = channelSel?.selectedOptions[0];
-        if (!channelSel) {
+        const pairSel = form.querySelector("[name=pairKey]");
+        const opt = pairSel?.selectedOptions[0];
+        if (!pairSel) {
           window.alert("暂无人天池签约渠道");
           return;
         }
         if (opt?.dataset.configured === "1" || opt?.disabled) {
-          window.alert("该渠道已配置批发价，请关闭弹窗后在列表中点击「编辑」修改");
+          window.alert("该渠道×型号已配置，请关闭后点「编辑」");
           return;
         }
-        const channelId = channelSel.value;
+        const [channelId, batteryModelRaw] = (pairSel.value || "").split("|");
+        const batteryModel = normalizeDayPoolBatteryModel(batteryModelRaw || opt?.dataset.model);
         const channelName = opt?.dataset.name || channelId;
-        if (!channelId) return;
+        if (!channelId || !batteryModel) return;
         operatorDayQuotaPrices.push({
           id: "OP-Q-" + String(Date.now()).slice(-6),
-          operatorId: opId, channelId, channelName,
+          operatorId: opId, channelId, channelName, batteryModel,
           wholesalePrice, minDays, status
         });
         const contract = channelContracts.find(c => c.operatorId === opId && c.channelId === channelId);
@@ -17170,7 +17779,7 @@
         state.view = "pricing";
         state.pricingTab = "quota";
         render();
-        window.alert("演示：渠道批发价已新增（仅本地 Mock）");
+        window.alert("演示：渠道批发价已新增（" + channelName + " · " + batteryModel + "）");
         return;
       }
       const row = operatorDayQuotaPrices.find(r => r.id === state.quotaPricingEditId);
@@ -17189,7 +17798,7 @@
       state.view = "pricing";
       state.pricingTab = "quota";
       render();
-      window.alert(row.channelId === "*" ? "演示：默认批发价已更新（仅本地 Mock）" : "演示：渠道批发价已更新（仅本地 Mock）");
+      window.alert(row.channelId === "*" ? "演示：默认批发价已更新（" + (row.batteryModel || "") + "）" : "演示：渠道批发价已更新（" + (row.batteryModel || "") + "）");
     }
 
     function renderPricing() {
@@ -17373,26 +17982,28 @@
       } else if (tab === "quota") {
         const rows = operatorQuotaRows();
         const std = platformAccrualDayPrice();
-        const def = defaultQuotaRow();
-        const quotaActions = def
-          ? `<button type="button" class="btn" data-edit-quota-pricing="${def.id}">设置默认批发价</button><button type="button" class="btn primary" data-new-quota-pricing>+ 新增渠道批发价</button>`
-          : `<button type="button" class="btn primary" data-new-quota-default>+ 设置默认批发价</button><button type="button" class="btn primary" data-new-quota-pricing>+ 新增渠道批发价</button>`;
+        const needDefault = pendingDefaultModels().length > 0;
+        const quotaActions = `${needDefault
+          ? `<button type="button" class="btn primary" data-new-quota-default>+ 设置默认批发价</button>`
+          : `<button type="button" class="btn" data-new-quota-default>补默认型号价</button>`}
+          <button type="button" class="btn primary" data-new-quota-pricing>+ 新增渠道×型号价</button>`;
         body = `<section class="panel">
-          ${panelHead("人天批发价", "默认价供无渠道/新建签约继承；各渠道可单独覆盖", "pricing_quota", quotaActions)}
+          ${panelHead("人天批发价", "按渠道(含默认)×电池型号；平台标准日值不分型号", "pricing_quota", quotaActions)}
           <div class="panel-body orders-table-wrap">
-            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_quota")} 平台标准人天价（只读）：<strong class="fee-platform">¥${std}/人天</strong> — B 端 1% 平台费按此计提。</p>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_quota")} 平台标准人天价（只读、<strong>不分型号</strong>）：<strong class="fee-platform">¥${std}/人天</strong> — B 端 1% 平台费按此计提。可选型号=台账有归属（decision-151）。</p>
             <table class="quota-price-table">
-              <thead><tr><th>渠道商</th><th>平台标准价</th><th>我的批发价</th><th>最低起购</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>渠道商</th><th>电池型号</th><th>平台标准价</th><th>我的批发价</th><th>最低起购</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>${rows.map(r => {
                 const isDef = r.channelId === "*";
                 return `<tr class="${isDef ? "quota-row-default" : ""}">
-                <td>${isDef ? `<span class="quota-default-badge">默认</span> ` : ""}<strong>${r.channelName}</strong>${isDef ? `<br><small style="color:var(--muted)">无渠道 · 新建签约继承</small>` : ""}</td>
+                <td>${isDef ? `<span class="quota-default-badge">默认</span> ` : ""}<strong>${r.channelName}</strong>${isDef ? `<br><small style="color:var(--muted)">无渠道 · 按型号继承</small>` : ""}</td>
+                <td>${tag(r.batteryModel || "—")}</td>
                 <td><span class="fee-platform">¥${std}/人天</span> <small style="color:var(--muted)">只读</small></td>
                 <td>¥${r.wholesalePrice}/人天${r.wholesalePrice !== std ? ` <small style="color:var(--warn)">已调整</small>` : ""}</td>
                 <td>${r.minDays} 人天</td><td>${tag(r.status)}</td>
                 <td><button type="button" class="link-btn" data-edit-quota-pricing="${r.id}">${isDef ? "设置" : "编辑"}</button></td>
               </tr>`;
-              }).join("") || "<tr><td colspan='6'>暂无批发价，请先设置默认批发价</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='7'>暂无批发价，请先设置默认批发价</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -17424,8 +18035,146 @@
         body = renderRefundSettingsBody();
       } else if (tab === "swapRange") {
         body = renderSwapRangeSettings();
+      } else if (tab === "csHotline") {
+        body = renderCsHotlineSettings();
+      } else if (tab === "freeze") {
+        body = renderOperatorFreezeSettings();
       }
       return body;
+    }
+
+    function renderFreezeRuleFieldsHtml(prefix, rule, opts = {}) {
+      const disabled = opts.disabled ? "disabled" : "";
+      const days = rule.maxSingleFreezeDays;
+      const unlimited = !!rule.unlimitedSingleDays;
+      const times = rule.maxFreezeTimesPerCycle;
+      return `
+        <label>单次最长天数
+          <input name="${prefix}_maxDays" type="number" min="0" step="1" value="${days}" ${disabled} ${unlimited ? "disabled" : ""} style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
+          <small style="color:var(--muted)">0 = 不允许冻结；≥1 = 最长 N 天</small>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <input name="${prefix}_unlimited" type="checkbox" ${unlimited ? "checked" : ""} ${disabled} data-freeze-unlimited="${prefix}">
+          <span>关闭单次天数限制（不限时长，且不自动解冻）</span>
+        </label>
+        <label style="margin-top:12px">每套餐周期可冻结次数
+          <input name="${prefix}_maxTimes" type="number" min="0" step="1" value="${times}" ${disabled} style="height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
+          <small style="color:var(--muted)">0 = 不限次数；≥1 = 本周期最多 N 次</small>
+        </label>
+        <p style="font-size:12px;color:var(--muted);margin:12px 0 0">生效摘要：<strong>${formatFreezeRuleSummary({ maxSingleFreezeDays: unlimited ? 1 : days, unlimitedSingleDays: unlimited, maxFreezeTimesPerCycle: times })}</strong></p>`;
+    }
+
+    function readFreezeRuleFieldsFromForm(prefix, root) {
+      const scope = root || document;
+      const unlimited = !!scope.querySelector(`[name="${prefix}_unlimited"]`)?.checked;
+      let maxDays = parseInt(scope.querySelector(`[name="${prefix}_maxDays"]`)?.value, 10);
+      let maxTimes = parseInt(scope.querySelector(`[name="${prefix}_maxTimes"]`)?.value, 10);
+      if (!Number.isFinite(maxDays) || maxDays < 0) maxDays = 0;
+      if (!Number.isFinite(maxTimes) || maxTimes < 0) maxTimes = 0;
+      if (unlimited && maxDays === 0) maxDays = 1;
+      return { maxSingleFreezeDays: maxDays, unlimitedSingleDays: unlimited, maxFreezeTimesPerCycle: maxTimes };
+    }
+
+    function renderOperatorFreezeSettings() {
+      const canEdit = isEntityLogin() || employeeHasPerm("pricing.edit");
+      const platSummary = formatFreezeRuleSummary(cloneFreezeRuleFields(platformFreezeRules));
+      const cfg = ensureOperatorFreezeSettings(currentEntity().id);
+      const inherit = !!cfg.inheritPlatform;
+      const effective = resolveFreezeRules(currentEntity().id);
+      return `
+        <div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("pricing_freeze")}
+          平台全局默认：<strong>${platSummary}</strong>。本运营商可覆盖；未覆盖则继承平台。仅<strong>个人套餐</strong>适用（decision-152）。
+          <br><small>当前生效：${formatFreezeRuleSummary(effective)} · 来源 ${effective.source === "platform" ? "平台默认" : "本运营商覆盖"}</small>
+        </div>
+        <section class="panel">
+          ${panelHead("服务冻结规则", "覆盖平台默认；改规则不回溯进行中的冻结单", "pricing_freeze")}
+          <div class="panel-body">
+            <form id="operatorFreezeForm" class="form-grid" style="max-width:560px">
+              <label style="display:flex;align-items:center;gap:8px;grid-column:1/-1">
+                <input name="inheritPlatform" type="checkbox" ${inherit ? "checked" : ""} ${canEdit ? "" : "disabled"} data-freeze-inherit>
+                <span>继承平台默认（勾选后不可改下方字段）</span>
+              </label>
+              <div id="operatorFreezeFields" style="grid-column:1/-1;${inherit ? "opacity:.55;pointer-events:none" : ""}">
+                ${renderFreezeRuleFieldsHtml("opFreeze", inherit ? cloneFreezeRuleFields(platformFreezeRules) : cloneFreezeRuleFields(cfg), { disabled: !canEdit || inherit })}
+              </div>
+              <div style="grid-column:1/-1;margin-top:8px">
+                ${canEdit ? `<button type="submit" class="btn primary" data-save-op-freeze>保存</button>` : `<span class="perm-banner" style="margin:0">当前账号无定价编辑权限</span>`}
+                <small style="margin-left:10px;color:var(--muted)">最近更新 ${cfg.updatedAt || "—"} · ${cfg.updatedBy || "—"}</small>
+              </div>
+            </form>
+            <div style="margin-top:16px;padding-top:12px;border-top:1px dashed var(--line)">
+              <p style="font-size:12px;color:var(--muted);margin:0 0 8px">${noteBtn("platform_users_freeze")} 闸门演示（会改内存 Mock）：</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <button type="button" class="btn" data-demo-freeze="U1028">U1028 申请冻结（持电应拒）</button>
+                <button type="button" class="btn" data-demo-freeze="U1055">U1055 申请冻结（未持电）</button>
+                <button type="button" class="btn" data-demo-unfreeze="U1041">U1041 解除冻结</button>
+              </div>
+            </div>
+          </div>
+        </section>`;
+    }
+
+    function renderPlatformFreezeRulesPanel() {
+      const rule = cloneFreezeRuleFields(platformFreezeRules);
+      return `
+        ${ownScopeBanner()}
+        <section class="panel">
+          ${panelHead("服务冻结 · 平台全局默认", "全体运营商继承；运营商可在「平台设置 → 服务冻结」覆盖", "platform_freeze_rules")}
+          <div class="panel-body">
+            <p style="font-size:13px;color:var(--muted);margin:0 0 12px">${noteBtn("platform_freeze_rules")} 现行口径升格为平台默认：单次 10 天、周期 1 次、到期自动解冻。天数 <strong>0=不允许冻结</strong>；次数 <strong>0=不限次数</strong>；可关闭单次天数限制（decision-152）。</p>
+            <form id="platformFreezeForm" class="form-grid" style="max-width:560px">
+              ${renderFreezeRuleFieldsHtml("platFreeze", rule)}
+              <div style="grid-column:1/-1;margin-top:8px">
+                <button type="submit" class="btn primary" data-save-plat-freeze>发布平台默认（演示）</button>
+                <small style="margin-left:10px;color:var(--muted)">最近更新 ${platformFreezeRules.updatedAt || "—"} · ${platformFreezeRules.updatedBy || "—"}</small>
+              </div>
+            </form>
+            <p style="font-size:12px;color:var(--muted);margin:12px 0 0">改规则<strong>不回溯</strong>已申请的冻结单；仅影响新申请解析。</p>
+          </div>
+        </section>`;
+    }
+
+    function savePlatformFreezeRules() {
+      const form = document.querySelector("#platformFreezeForm");
+      if (!form) return;
+      const data = readFreezeRuleFieldsFromForm("platFreeze", form);
+      if (data.unlimitedSingleDays && data.maxSingleFreezeDays === 0) {
+        return showProtoToast("关闭天数限制时不可将天数设为 0（0 表示不允许冻结）");
+      }
+      Object.assign(platformFreezeRules, data, {
+        updatedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+        updatedBy: "平台管理员"
+      });
+      showProtoToast("平台冻结默认已更新：" + formatFreezeRuleSummary(data));
+      state.l1PricingTab = "freeze";
+      render();
+    }
+
+    function saveOperatorFreezeSettings() {
+      if (!(isEntityLogin() || employeeHasPerm("pricing.edit"))) return showProtoToast("无定价编辑权限");
+      const form = document.querySelector("#operatorFreezeForm");
+      if (!form) return;
+      const inherit = !!form.querySelector("[name=inheritPlatform]")?.checked;
+      const cfg = ensureOperatorFreezeSettings(currentEntity().id);
+      const now = new Date().toISOString().slice(0, 16).replace("T", " ");
+      if (inherit) {
+        cfg.inheritPlatform = true;
+        Object.assign(cfg, cloneFreezeRuleFields(platformFreezeRules));
+      } else {
+        const data = readFreezeRuleFieldsFromForm("opFreeze", form);
+        if (!data.unlimitedSingleDays && data.maxSingleFreezeDays === 0) {
+          /* allowed: 明确禁冻 */
+        } else if (data.unlimitedSingleDays && data.maxSingleFreezeDays === 0) {
+          return showProtoToast("关闭天数限制时请将天数设为 ≥1（或保持勾选不限）");
+        }
+        cfg.inheritPlatform = false;
+        Object.assign(cfg, data);
+      }
+      cfg.updatedAt = now;
+      cfg.updatedBy = currentEmployee()?.name || currentEntity().name;
+      showProtoToast(inherit ? "已改回继承平台默认" : ("已保存运营商冻结规则：" + formatFreezeRuleSummary(cfg)));
+      state.pricingTab = "freeze";
+      render();
     }
 
     function renderOperatorLinkSettle() {
@@ -17709,10 +18458,12 @@
         } else {
           pg = paginateList(dayOrders, state.channelOrdersPage, pageSize);
           state.channelOrdersPage = pg.page;
-          thead = `<tr><th>采购单</th><th>渠道商</th><th>人天/金额</th><th>支付</th><th>订单状态</th><th>支付状态</th><th>完成</th><th>操作</th></tr>`;
+          thead = `<tr><th>采购单</th><th>渠道商</th><th>电池型号</th><th>人天/金额</th><th>支付</th><th>订单状态</th><th>支付状态</th><th>完成</th><th>操作</th></tr>`;
+          emptyCol = 9;
           tbody = pg.slice.map(o => `<tr>
                   <td>${o.id}${o.poolId ? `<br><small>${o.poolId}</small>` : ""}</td>
                   <td>${o.channelName}</td>
+                  <td>${tag(o.batteryModel || "—")}</td>
                   <td>${o.days} 人天<br>¥${o.amount.toLocaleString("zh-CN")}</td>
                   <td>${channelPayChannelLabel(o)} · ${channelPayMethodLabel(o)}${channelOfflineReconHtml(o)}</td>
                   <td>${tag(o.orderStatus)}</td><td>${tag(o.payStatus)}</td>
@@ -17879,12 +18630,13 @@
             .sort((a, b) => String(b.time).localeCompare(String(a.time)));
           const ledgerPg = paginateList(ledgerFiltered, state.channelAssetsLedgerPage, state.channelAssetsLedgerPageSize || 8);
           state.channelAssetsLedgerPage = ledgerPg.page;
-          content = `${panelHead("已售额度池（人天池）", `一运营商一池；采购款到账即结清 · 共 ${pg.total} 个`, "channel_sales", `${noteBtn("day_pool_one_per_operator")}${noteBtn("day_pool_b2b_settlement")}`)}
+          content = `${panelHead("已售额度池（人天池）", `按电池型号拆池；采购款到账即结清 · 共 ${pg.total} 个`, "channel_sales", `${noteBtn("day_pool_one_per_operator")}${noteBtn("day_pool_b2b_settlement")}`)}
             <div class="panel-body orders-table-wrap">
               <table>
-                <thead><tr><th>额度池</th><th>渠道商</th><th>总量</th><th>可用</th><th>已消耗</th><th>批发单价</th><th>状态</th><th>操作</th></tr></thead>
+                <thead><tr><th>额度池</th><th>电池型号</th><th>渠道商</th><th>总量</th><th>可用</th><th>已消耗</th><th>批发单价</th><th>状态</th><th>操作</th></tr></thead>
                 <tbody>${pg.slice.map(p => `<tr>
                   <td><strong>${p.name}</strong><br><small>${p.id}</small></td>
+                  <td>${tag(p.batteryModel || "—")}</td>
                   <td>${p.ownerName}</td><td>${p.totalDays} 人天</td>
                   <td>${p.availableDays}</td><td>${p.consumedDays}</td>
                   <td>¥${p.wholesalePrice}/人天</td><td>${poolStatusTag(dayPoolDisplayStatus(p))}</td>
@@ -17892,7 +18644,7 @@
                     <button type="button" class="link-btn" data-pool-adjust="${p.id}">额度调整</button>
                     · <button type="button" class="link-btn" data-csasset-ledger-ch="${p.ownerId}">查看变动</button>
                   </td>
-                </tr>`).join("") || "<tr><td colspan='8'>暂无人天池额度池</td></tr>"}</tbody>
+                </tr>`).join("") || "<tr><td colspan='9'>暂无人天池额度池</td></tr>"}</tbody>
               </table>
               ${renderTablePager(pg, "csasset-page")}
             </div>
@@ -19064,16 +19816,17 @@
           body = `<section class="panel panel-with-top-tabs">
           ${poolSubTabs}
           ${inlinePfBarHtml("dayPool_pools")}
-          ${panelHead("额度池列表", "一运营商一池；增购入账同一池，见额度明细", "day_pool_panel", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="purchase">增购人天额度</button>` : "")}
+          ${panelHead("额度池列表", "按电池型号拆池；增购选型号续购或新建", "day_pool_panel", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="purchase">增购人天额度</button>` : "")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr>
-                <th>额度池</th><th>${isSeller ? "购买方" : "售卖方"}</th><th>总购买</th><th>赠送</th>
+                <th>额度池</th><th>电池型号</th><th>${isSeller ? "购买方" : "售卖方"}</th><th>总购买</th><th>赠送</th>
                 <th>冻结</th><th>已消耗</th><th>可用余额</th><th>余额比例</th>
                 <th>有效期</th><th>状态</th><th>操作</th>
               </tr></thead>
               <tbody>${pools.map(p => `<tr class="${p.id === (sel && sel.id) ? "site-stats-total" : ""}">
                 <td><strong>${p.name}</strong><br><small style="color:var(--muted)">${p.id}</small></td>
+                <td>${tag(p.batteryModel || "—")}</td>
                 <td>${isSeller ? p.ownerName : p.sellerName}</td>
                 <td>${p.totalDays - p.giftedDays} 人天</td>
                 <td>${p.giftedDays || "—"}</td>
@@ -19087,7 +19840,7 @@
                   <button type="button" class="link-btn" data-open-pool-detail="${p.id}">详情</button>
                   ${canEditDayPool() ? `<button type="button" class="link-btn" data-pool-form="renew" data-pool-id="${p.id}">续费</button>` : ""}
                 </td>
-              </tr>`).join("") || "<tr><td colspan='11'>暂无额度池</td></tr>"}</tbody>
+              </tr>`).join("") || "<tr><td colspan='12'>暂无额度池</td></tr>"}</tbody>
             </table>
           </div>
         </section>`;
@@ -19113,11 +19866,11 @@
           });
           const teamsPg = paginateList(teams, state.dayPoolTeamsPage, state.dayPoolTeamsPageSize || 8);
           state.dayPoolTeamsPage = teamsPg.page;
-          const poolHint = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} 一个渠道商<strong>仅一个人天额度池</strong>；所有团队与骑手均从该池扣减。默认团队不可改名/停用/删除；其它团队无在职成员时可停用或删除。</div>`;
+          const poolHint = `<div class="platform-price-banner" style="margin-bottom:14px">${noteBtn("day_pool_team")} ${noteBtn("day_pool_one_per_operator")} 团队只做编排；人天按<strong>电池型号池</strong>分配与扣减（decision-151）。默认团队不可改名/停用/删除；其它团队无在职成员时可停用或删除。</div>`;
           body = `${poolHint}<section class="panel panel-with-top-tabs">
           ${ridersTopTabs}
           ${inlinePfBarHtml("dayPool_teams")}
-          ${panelHead("骑手团队", "创建与管理团队；扣减统一走渠道唯一额度池", "day_pool_team", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="team">新增团队</button>` : "")}
+          ${panelHead("骑手团队", "创建与管理团队；扣减按分配的型号池", "day_pool_team", canEditDayPool() ? `<button type="button" class="btn primary" data-pool-form="team">新增团队</button>` : "")}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>团队</th><th>消耗额度池</th><th>在职骑手</th><th>默认</th><th>创建时间</th><th>备注</th><th>状态</th><th>操作</th></tr></thead>
@@ -19178,23 +19931,27 @@
           <div class="panel-body orders-table-wrap">
             ${focusBanner}
             <table>
-              <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>在职状态</th><th>已分配</th><th>已消耗</th><th>剩余额度</th><th>额度状态</th><th>今日权益</th><th>持电池</th><th>操作</th></tr></thead>
+              <thead><tr><th>骑手</th><th>团队</th><th>电池型号</th><th>消耗池</th><th>在职状态</th><th>已分配</th><th>已消耗</th><th>剩余额度</th><th>额度状态</th><th>今日权益</th><th>持电池</th><th>操作</th></tr></thead>
               <tbody>${ridersPg.slice.map(r => {
                 const p = poolById(r.poolId);
-                const gateHint = r.gateReason || r.failReason || "";
+                const model = r.batteryModel || p?.batteryModel || "—";
+                const gate = dayPoolEntitlementGate(r, r.heldBatteryModel || model);
+                const gateHint = gate.gateReason || r.gateReason || r.failReason || "";
+                const eligShow = gate.gateReason === "型号不匹配" ? "型号不匹配" : r.todayEligibility;
                 return `<tr>
                 <td>${r.name}<br><small>${r.id} · ${r.phone}</small></td>
                 <td>${r.team || "—"}</td>
+                <td>${tag(model)}</td>
                 <td><small>${p ? p.name : r.poolId}</small></td>
                 <td>${tag(r.status)}</td>
                 <td>${r.allocatedDays || 0} 人天</td><td>${r.usedDays || 0} 人天</td>
                 <td><strong>${r.remainingDays || 0}</strong> 人天</td>
                 <td>${tag(r.quotaStatus || "未分配")}</td>
-                <td>${eligibilityTag(r.todayEligibility)}${gateHint ? `<br><small style="color:var(--red)">${gateHint}${(r.batteryHeld || 0) > 0 || r.todayEligibility === "待还电" ? " · 不可换电 · 仅可还电" : (r.remainingDays === 0 || r.gateReason || r.failReason ? " · 不可换电 · 须渠道续配" : "")}</small>` : ""}</td>
-                <td>${(r.batteryHeld || 0) > 0 ? tag("持有") : "—"}</td>
+                <td>${eligibilityTag(eligShow)}${gateHint ? `<br><small style="color:var(--red)">${gateHint}${!gate.allowedSwap && gate.allowedReturn ? " · 不可换电 · 仅可还电" : (!gate.allowedSwap ? " · 不可换电 · 须渠道续配/换型号" : "")}</small>` : ""}</td>
+                <td>${(r.batteryHeld || 0) > 0 ? tag("持有" + (r.heldBatteryModel ? "·" + r.heldBatteryModel : "")) : "—"}</td>
                 <td class="row-actions">${riderOps(r)}</td>
               </tr>`;
-              }).join("") || "<tr><td colspan='11'>暂无登记骑手</td></tr>"}</tbody>
+              }).join("") || "<tr><td colspan='12'>暂无登记骑手</td></tr>"}</tbody>
             </table>
             ${renderTablePager(ridersPg, "dpriders-list-page")}
           </div>
@@ -19239,22 +19996,27 @@
             if (f.keyword && !matchKw(r.id, f.keyword) && !matchKw(r.name, f.keyword) && !matchKw(r.phone, f.keyword)) return false;
             return true;
           });
-          allocInner = `${panelHead("骑手额度分配", "从额度池分配给骑手；未使用额度可收回至池", "day_pool_allocate")}
+          allocInner = `${panelHead("骑手额度分配", "按型号池分配；换型号须收回→还电→再分配", "day_pool_allocate")}
             <div class="panel-body orders-table-wrap">
               <table>
-                <thead><tr><th>骑手</th><th>团队</th><th>消耗池</th><th>已分配</th><th>已消耗</th><th>剩余可收回</th><th>额度状态</th><th>操作</th></tr></thead>
-                <tbody>${riders.map(r => `<tr>
+                <thead><tr><th>骑手</th><th>团队</th><th>电池型号</th><th>消耗池</th><th>已分配</th><th>已消耗</th><th>剩余可收回</th><th>额度状态</th><th>操作</th></tr></thead>
+                <tbody>${riders.map(r => {
+                  const rp = poolById(r.poolId) || {};
+                  return `<tr>
                   <td>${r.name}<br><small>${r.id}</small></td>
                   <td>${r.team || "—"}</td>
-                  <td><small>${(poolById(r.poolId) || {}).name || r.poolId}</small></td>
+                  <td>${tag(r.batteryModel || rp.batteryModel || "—")}</td>
+                  <td><small>${rp.name || r.poolId}</small></td>
                   <td>${r.allocatedDays || 0} 人天</td><td>${r.usedDays || 0} 人天</td>
                   <td><strong>${r.remainingDays || 0}</strong> 人天</td>
                   <td>${tag(r.quotaStatus || "未分配")}</td>
                   <td class="row-actions">
                     ${canEditDayPool() && r.status === "在职" ? `<button type="button" class="link-btn" data-pool-form="allocate" data-pool-id="${r.poolId}" data-rider-id="${r.id}">分配</button>` : ""}
+                    ${canEditDayPool() && r.status === "在职" && !r.batteryHeld ? `<button type="button" class="link-btn" data-pool-form="switchModel" data-pool-id="${r.poolId}" data-rider-id="${r.id}">换型号</button>` : ""}
                     ${canEditDayPool() && (r.remainingDays || 0) > 0 ? `<button type="button" class="link-btn" data-pool-form="recover" data-pool-id="${r.poolId}" data-rider-id="${r.id}">收回</button>` : ""}
                   </td>
-                </tr>`).join("") || "<tr><td colspan='8'>暂无骑手</td></tr>"}</tbody>
+                </tr>`;
+                }).join("") || "<tr><td colspan='9'>暂无骑手</td></tr>"}</tbody>
               </table>
             </div>`;
         }
@@ -20216,18 +20978,7 @@
         btn.onclick = () => openQuotaPricingForm("new");
       });
       root.querySelectorAll("[data-new-quota-default]").forEach(btn => {
-        btn.onclick = () => {
-          const opId = currentEntity().id;
-          if (!defaultQuotaRow()) {
-            const std = platformAccrualDayPrice();
-            operatorDayQuotaPrices.push({
-              id: "OP-Q-DEF-" + String(Date.now()).slice(-4),
-              operatorId: opId, channelId: "*", channelName: "默认批发价",
-              wholesalePrice: std, minDays: 500, status: "生效"
-            });
-          }
-          openQuotaPricingForm(defaultQuotaRow().id);
-        };
+        btn.onclick = () => openQuotaPricingForm("new-default");
       });
       root.querySelectorAll("[data-pool-form]").forEach(btn => {
         btn.onclick = e => {
@@ -20252,6 +21003,68 @@
       if (exportOrgBtn) exportOrgBtn.onclick = () => exportOrgConsumeCsv();
       root.querySelectorAll("[data-retry-ex]").forEach(btn => {
         btn.onclick = () => retryPoolException(btn.dataset.retryEx);
+      });
+      root.querySelectorAll("[data-save-cs-default]").forEach(btn => {
+        btn.onclick = (e) => { e.preventDefault(); saveCsHotlineDefault(); };
+      });
+      const csDefaultForm = document.querySelector("#csHotlineDefaultForm");
+      if (csDefaultForm) {
+        csDefaultForm.onsubmit = (e) => { e.preventDefault(); saveCsHotlineDefault(); };
+      }
+      const platFreezeForm = document.querySelector("#platformFreezeForm");
+      if (platFreezeForm) {
+        platFreezeForm.onsubmit = (e) => { e.preventDefault(); savePlatformFreezeRules(); };
+      }
+      const opFreezeForm = document.querySelector("#operatorFreezeForm");
+      if (opFreezeForm) {
+        opFreezeForm.onsubmit = (e) => { e.preventDefault(); saveOperatorFreezeSettings(); };
+        const inheritCb = opFreezeForm.querySelector("[data-freeze-inherit]");
+        if (inheritCb) {
+          inheritCb.onchange = () => {
+            const fields = document.querySelector("#operatorFreezeFields");
+            if (!fields) return;
+            const on = inheritCb.checked;
+            fields.style.opacity = on ? ".55" : "";
+            fields.style.pointerEvents = on ? "none" : "";
+            fields.querySelectorAll("input").forEach(el => {
+              if (el.name === "inheritPlatform") return;
+              el.disabled = on;
+            });
+          };
+        }
+      }
+      root.querySelectorAll("[data-freeze-unlimited]").forEach(cb => {
+        cb.onchange = () => {
+          const prefix = cb.dataset.freezeUnlimited;
+          const daysInput = document.querySelector(`[name="${prefix}_maxDays"]`);
+          if (!daysInput) return;
+          const inheritLocked = daysInput.closest("#operatorFreezeFields")?.style.pointerEvents === "none";
+          daysInput.disabled = cb.checked || inheritLocked;
+          if (cb.checked && Number(daysInput.value) === 0) daysInput.value = "1";
+        };
+      });
+      root.querySelectorAll("[data-demo-freeze]").forEach(btn => {
+        btn.onclick = () => {
+          const r = applyUserFreeze(btn.dataset.demoFreeze, "演示申请");
+          showProtoToast(r.ok ? ("已冻结 " + btn.dataset.demoFreeze) : r.msg);
+          if (r.ok) render();
+        };
+      });
+      root.querySelectorAll("[data-demo-unfreeze]").forEach(btn => {
+        btn.onclick = () => {
+          const r = applyUserUnfreeze(btn.dataset.demoUnfreeze);
+          showProtoToast(r.ok ? ("已解冻 " + btn.dataset.demoUnfreeze) : r.msg);
+          if (r.ok) render();
+        };
+      });
+      root.querySelectorAll("[data-cs-city-add]").forEach(btn => {
+        btn.onclick = () => openCsCityHotlineForm(null);
+      });
+      root.querySelectorAll("[data-cs-city-edit]").forEach(btn => {
+        btn.onclick = () => openCsCityHotlineForm(btn.dataset.csCityEdit);
+      });
+      root.querySelectorAll("[data-cs-city-del]").forEach(btn => {
+        btn.onclick = () => deleteCsCityHotline(btn.dataset.csCityDel);
       });
       root.querySelectorAll("[data-employee-add-staff]").forEach(btn => {
         btn.onclick = () => openEmployeeForm("add", "staff");

@@ -304,19 +304,33 @@
         <div class="deposit-status-card"><div class="ds-title">电池押金 · 实付 ¥99</div>状态 在押 · 实缴</div>
         <div class="section-card"><div class="section-title">常用功能</div><div class="grid-4">
           <div class="grid-item"><span class="gi">⊞</span>扫码换电</div><div class="grid-item"><span class="gi">🛒</span>购买套餐</div>
-          <div class="grid-item"><span class="gi">🔋</span>电池退还</div><div class="grid-item"><span class="gi">❄</span>申请冻结</div></div></div>`),
+          <div class="grid-item"><span class="gi">🔋</span>电池退还</div><div class="grid-item"><span class="gi">❄</span>申请冻结</div></div>
+          <p style="font-size:9px;color:var(--muted);margin:8px 0 0">冻结规则：单次最长 10 天 · 本周期还可冻 1 次 · 须先还电</p></div>`),
+      mineFreezeApply: () => phoneShell("申请冻结", "mine", `
+        <div class="sheet-page">
+          <p style="font-size:10px;color:var(--muted);margin:0 0 10px">仅个人套餐 · 未持电池时可申请 · 满足条件即时生效</p>
+          <div class="service-card"><h4>规则说明</h4><p>单次最长 10 天 · 到期自动解冻<br>本套餐周期还可冻结 1 次</p></div>
+          <div class="form-row"><label>原因</label><input value="短期离岗" /></div>
+          <button class="btn-block">确认冻结</button>
+          <p style="font-size:9px;color:#c45;margin-top:10px">若仍持有电池：请先归还电池后再申请冻结</p>
+        </div>`, { hideTab: true }),
+      mineFreezeDenied: () => phoneShell("申请冻结", "mine", `
+        <div class="sheet-page">
+          <div class="service-card warn"><h4>暂不可申请冻结</h4><p>当前运营商未开放服务冻结<br>（单次最长天数 = 0）</p></div>
+          <button class="btn-block" style="opacity:.5">不可申请</button>
+        </div>`, { hideTab: true }),
       minePendingPickup: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****1055</span><span class="tag-sm ok">已认证</span></div></div>
         <div class="service-card warn"><h4>待领取电池</h4><p>30天畅换 · 剩余 26 天 · 解冻后首次服务</p><span class="btn-gold">扫码领取</span></div>`),
       mineFrozen: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">139****1041</span><span class="tag-sm ok">已认证</span></div></div>
-        <div class="service-card warn"><h4>服务已冻结</h4><p>30天畅换 · 剩余 21 天 · 未持有电池</p><span class="btn-gold">解除冻结</span></div>`),
+        <div class="service-card warn"><h4>服务已冻结</h4><p>30天畅换 · 已冻 7 / 最长 10 天 · 到期自动解冻<br>剩余 21 天 · 未持有电池</p><span class="btn-gold">解除冻结</span></div>`),
       mineCooling: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****2188</span><span class="tag-sm ok">已认证</span></div></div>
         <div class="service-card warn"><h4>30天畅换</h4><p>剩余 28 天 · 冷静期剩余 1 天 · 未持电池</p><span class="btn-gold">申请退款</span></div>`),
       mineChannel: (opts = {}) => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****2110</span><span class="tag-sm ok">已认证</span></div></div>
-        <div class="service-card channel"><h4>渠道人天额度</h4><p>顺丰同城 · 世博车队<br>剩余人天 13 · ${opts.today || "今日可用"}${opts.depositPending ? " · 押金待办理" : ""}${opts.confirmed ? " · 换电 1 次" : ""}</p>
+        <div class="service-card channel"><h4>渠道人天额度</h4><p>顺丰同城 · 世博车队 · 60V30Ah<br>剩余人天 13 · ${opts.today || "今日可用"}${opts.depositPending ? " · 押金待办理" : ""}${opts.confirmed ? " · 换电 1 次" : ""}</p>
           ${opts.depositPending ? `<span class="btn-gold">办理押金</span>` : opts.pickup ? `<span class="btn-gold">扫码领取</span>` : ""}</div>
         ${opts.depositPending ? `<div class="deposit-status-card"><div class="ds-title">电池押金 · 待办理</div>首次领电前须免押或实缴</div>` : ""}`),
       minePersonalOverdue: () => phoneShell("我的", "mine", `
@@ -339,6 +353,14 @@
       mineChannelNoQuota: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">134****2112</span><span class="tag-sm ok">已认证</span></div></div>
         <div class="service-card warn"><h4>渠道人天 · 今日不可用</h4><p>个人剩余 0 · 分配人天已用尽<br>已从渠道额度扣除 1 人天<br><strong>你无需支付占用费</strong></p><span class="btn-gold">扫码还电</span></div>`),
+      mineChannelModelMismatch: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">133****2113</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>渠道人天 · 型号不匹配</h4><p>额度型号 48V30Ah · 持电 60V30Ah<br>不可换电 · 请先还电，联系渠道换型号后重领</p><span class="btn-gold">扫码还电</span></div>`),
+      failModelMismatch: () => phoneShell("扫码换电", "home", `
+        <div class="sheet-page"><p style="margin-bottom:8px;color:#b91c1c">取电失败 · 型号不匹配</p>
+          <p style="font-size:9px">柜机可取 60V30Ah，你的人天额度为 48V30Ah</p>
+          <p style="font-size:9px;margin-top:8px">请联系渠道：收回→还电→再分配→再领电</p>
+        </div>`, { hideTab: true }),
       mineResigned: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">136****2110</span><span class="tag-sm ok">已认证</span></div></div>
         <div class="service-card done"><h4>服务已终止（离职）</h4><p>请还电入柜后完结 · 仅可还电</p><span class="btn-gold">扫码还电</span></div>`),
@@ -501,8 +523,10 @@
         connector(""), flowCell("P05c", "领取成功", SCREENS.resultPickup(), "● 持电池"),
         connector(""), flowCell("P06", "日常换电", SCREENS.resultSwap(false), "● 写换电单"),
         connector(""), flowCell("P07", "续费", SCREENS.purchaseRenew(), "● 正式零售价"),
-        connector(""), flowCell("P08a", "已冻结", SCREENS.mineFrozen(), "● 须先还电"),
+        connector(""), flowCell("P07b", "申请冻结", SCREENS.mineFreezeApply(), "◆ 10天/1次快照"),
+        connector(""), flowCell("P08a", "已冻结", SCREENS.mineFrozen(), "● 到期自动解冻"),
         connector("解除冻结"), flowCell("P08b", "解冻待领电", SCREENS.minePendingPickup(), "◆ 顺延有效期"),
+        connector(""), flowCell("P08c", "禁冻提示", SCREENS.mineFreezeDenied(), "◆ 天数=0"),
         connector(""), flowCell("P09", "冷静期退款", SCREENS.mineCooling(), "● 须还电"),
         connector(""), flowCell("P10a", "套餐结束待还电", SCREENS.minePersonalOverdue(), "! 先付费"),
         connector(""), flowCell("P10pay", "支付占用费", SCREENS.payOccupancy(), "● 付清才还电"),
@@ -561,7 +585,9 @@
       { id: "SC-02", title: "个人无额度·待还电", key: "channel_fail", fn: () => SCREENS.mineChannelFail() },
       { id: "SC-03", title: "个人无额度·待还电", key: "channel_no_quota", fn: () => SCREENS.mineChannelNoQuota() },
       { id: "SC-04", title: "渠道跨网·案例3", key: "channel_cross3", fn: () => SCREENS.failCrossNet() },
-      { id: "SC-05", title: "离职还电回池", key: "channel_resign", fn: () => SCREENS.mineResigned() }
+      { id: "SC-05", title: "离职还电回池", key: "channel_resign", fn: () => SCREENS.mineResigned() },
+      { id: "SC-06", title: "型号不匹配·仅还电", key: "channel_model_mismatch", fn: () => SCREENS.mineChannelModelMismatch() },
+      { id: "SC-07", title: "扫码·型号不匹配", key: "channel_model_fail", fn: () => SCREENS.failModelMismatch() }
     ];
     const SUPPLEMENT_PHASE2 = [
       { id: "S2-01", title: "设备租赁·付费已购", key: "lease_whitelist", fn: () => SCREENS.mineLeasePaid() },
