@@ -356,7 +356,7 @@
       data_drill_panel: { title: "换电订单数", content: "紧凑卡片：按日换电订单数（含当日）。<br>· <strong>平台总览</strong>：先筛运营商，再筛该运营商下站点（切换运营商时站点重置为全部）<br>· 时间范围默认近 7 天，可选近 30 天或自定义（最多 31 天）" },
       data_drill_spark: { title: "换电订单折线图", content: "按所选站点与日期区间生成每日 Mock 换电订单数；右侧合计为区间之和；最高/最低取自序列。正式环境对接按日聚合 API（含当日）。" },
       platform_no_share: { title: "平台运营分成", content: "骑手套餐/换电应分台账记录运营商本站经营应得。平台收取 1% 技术服务费（C 端支付分账 + B 端确认消耗计提），见「平台服务费」。" },
-      pricing_pkg: { title: "个人套餐定价", content: "唯一键=<strong>运营商×城市×电池型号×SKU</strong>（decision-085/088/117）。电池型号取自平台「设备管理 → 电池型号管理」启用字典。<strong>无一单通兑</strong>。<strong>开通方式</strong>：购买立即生效 / 首次领电生效。<strong>有效期</strong>为自然日，默认等于套餐天数；按次默认几次=几天，可改时长。1 天/单次按 1 个自然日（不再滚动 24h）。改 SKU 不追溯已购。一期可选套餐名（暂定）：包月30天、7天套餐、1天套餐、次卡10次、单次换电。<strong>价格分区</strong>为<strong>二期</strong>。" },
+      pricing_pkg: { title: "个人套餐定价", content: "唯一键=<strong>运营商×城市×电池型号×SKU</strong>（decision-085/088/117/155）。电池型号取自平台型号字典启用项。<strong>无一单通兑</strong>。<strong>状态三态</strong>：生效（全员可购可续）/ 仅允许续费（合格老客续费：有效期内或逾期持电且业务规则允许）/ 停用（不可购不可续；已购仍履约）。渠道分销新开仅可关联「生效」。开通方式与有效期见既有口径；改价/改状态不追溯已购快照。" },
       pricing_zone: { title: "价格分区（二期）", content: "<strong>二期</strong>：运营商在同城创建分区，勾选挂接站点并按 SKU 配置区价。<strong>一站仅可属一个分区</strong>；未挂区用城市底价。解析：区价 ?? 城市底价。<strong>移除分区</strong>即恢复城市底价。已购订单沿用下单快照。一期验收不测。" },
       channel_sales: { title: "渠道管理", content: "运营商维护<strong>签约渠道</strong>、<strong>渠道订单</strong>（人天/月租/激活码）、<strong>推广结算</strong>（链接类佣金，原「链接结算」）与渠道权益。已售额度池：每渠道×运营商<strong>仅一个</strong>实例。" },
       channel_partner_rights: { title: "渠道商权益", content: "按结算模式区分：<strong>人天池</strong>—批发人天/额度池/团队/信用；<strong>渠道分销</strong>—授权 SKU 专享价+佣金+推广链接；<strong>设备租赁</strong>—统一月租/专属站/白名单/<strong>白名单套餐+收款账户</strong>/电池持有；<strong>激活码</strong>—申请批发/确认造码/标记发放/作废审批/核销记录。" },
@@ -447,7 +447,7 @@
       platform_freeze_rules: { title: "平台服务冻结默认", content: "平台统一定价区维护全局默认冻结规则，全体运营商继承；运营商可在各自「平台设置 → 服务冻结」覆盖（decision-152）。" },
       orders_deposit: { title: "电池押金", content: "换电需绑定电池时收取押金；归还电池并完结服务后退还。<br>· <strong>押金方式（全站统一）</strong>：仅 <strong>实付 / 信用免押 / 渠道担保 / ——</strong>（decision-068）；不单列「无需押金」<br>· <strong>套餐购买订单</strong>：押金方式与<strong>收款状态</strong>（已收 / 待付 / ——）分列；仅实付有收款状态（decision-067）<br>· <strong>实付</strong>：购套餐同笔支付，全额进运营商子商户，<strong>不参与</strong>平台/合伙人清分<br>· <strong>信用免押</strong>：芝麻信用达标免实付（仍须还电规则；已移除微信支付分，decision-100）" },
       orders_user_deposit: { title: "用户押金", content: "运营商「订单与服务 → 用户押金」：<strong>仅实付押金</strong>流水（decision-086）。<br>· 与套餐无关联；列含支付时间/退款时间<br>· 操作列「<strong>退款日志</strong>」：抽屉展示各节点动作与时间（入账、申请、还电校验、审核、原路退等）<br>· 信用免押、渠道担保不在本页" },
-      orders_overdue: { title: "逾期管理", content: "持电但权益已结束（decision-136 / 143 / 145）。列表同时展示<strong>电池</strong>（未归还 / 已归还）与<strong>逾期费</strong>（未支付 / 已支付；人天为无需支付）。<strong>个人套餐</strong>须先付清才能还电；减免为 0 记已支付。占用费全额进运营商，不分润。<strong>人天池</strong>从渠道额度池扣人天，不向骑手收现金。" },
+      orders_overdue: { title: "逾期管理", content: "持电但权益已结束（decision-136 / 143 / 145 / 153 / 154）。列表同时展示<strong>电池</strong>与<strong>逾期费</strong>两维。<strong>包月</strong>可续费：逾期天数扣进新套餐、不计占用费；或付占用费后还电。<strong>次卡/单次</strong>禁续费，须付占用费并还电后再购。占用费全额进运营商，不分润。<strong>人天池</strong>从渠道额度池扣人天，不向骑手收现金。" },
       flows_receipt: { title: "资金实收", content: "骑手套餐/自费支付进入<strong>运营商</strong>进件商户的实收流水；<strong>退款亦由运营商子商户原路出款</strong>。含类型「电池占用费」（decision-143）。" },
       flows_receipt_overdue: { title: "逾期占用费", content: "个人套餐逾期支付的电池占用费。<strong>全额进运营商</strong>，不抽平台 1%、不切站点合伙人、不进清分明细。减免为 0 不产生流水。" },
       orders_deposit_waiver: { title: "信用免押", content: "满足平台统一门槛即可免实付押金：<strong>芝麻信用免押（≥500）</strong>（运营商押金设置页只读展示，不可改；decision-100）。详情页与实付押金分开展示。" },
@@ -2354,10 +2354,11 @@
     ];
 
     const channelSalePackages = [
-      { id: "PKG-30D", channelId: "CH-CARD", skuId: "SKU-30D", name: "包月30天卡", batteryModel: "48V30Ah", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25, validityDays: 30, status: "启用" },
-      { id: "PKG-7D", channelId: "CH-CARD", skuId: "SKU-7D", name: "7天卡", batteryModel: "48V30Ah", officialPrice: 89, channelPrice: 79, commissionPerOrder: 8, validityDays: 7, status: "启用" },
-      { id: "PKG-DEL-30D", channelId: "CH-DELIV", skuId: "SKU-DEL-30D", name: "包月30天卡", batteryModel: "48V30Ah", officialPrice: 299, channelPrice: 269, commissionPerOrder: 30, validityDays: 30, status: "启用" },
-      { id: "PKG-DEL-7D", channelId: "CH-DELIV", skuId: "SKU-DEL-7D", name: "7天卡", batteryModel: "48V30Ah", officialPrice: 89, channelPrice: 75, commissionPerOrder: 7, validityDays: 7, status: "启用" }
+      { id: "PKG-30D", channelId: "CH-CARD", basePkgId: "OP-P-01", operatorId: "OP-SX", skuId: "SKU-30D", name: "包月30天卡", batteryModel: "48V30Ah", officialPrice: 299, channelPrice: 279, commissionPerOrder: 25, validityDays: 30, status: "启用" },
+      { id: "PKG-7D", channelId: "CH-CARD", basePkgId: "OP-P-03", operatorId: "OP-SX", skuId: "SKU-7D", name: "7天卡", batteryModel: "48V30Ah", officialPrice: 89, channelPrice: 79, commissionPerOrder: 8, validityDays: 7, status: "启用" },
+      { id: "PKG-60D-RO", channelId: "CH-CARD", basePkgId: "OP-P-01B", operatorId: "OP-SX", skuId: "SKU-60D", name: "包月30天卡", batteryModel: "60V30Ah", officialPrice: 349, channelPrice: 329, commissionPerOrder: 28, validityDays: 30, status: "不可销售", autoUnsellableBySku: true },
+      { id: "PKG-DEL-30D", channelId: "CH-DELIV", basePkgId: "OP-P-01", operatorId: "OP-SX", skuId: "SKU-DEL-30D", name: "包月30天卡", batteryModel: "48V30Ah", officialPrice: 299, channelPrice: 269, commissionPerOrder: 30, validityDays: 30, status: "启用" },
+      { id: "PKG-DEL-7D", channelId: "CH-DELIV", basePkgId: "OP-P-03", operatorId: "OP-SX", skuId: "SKU-DEL-7D", name: "7天卡", batteryModel: "48V30Ah", officialPrice: 89, channelPrice: 75, commissionPerOrder: 7, validityDays: 7, status: "启用" }
     ];
     const channelLinkSkus = channelSalePackages;
 
@@ -2592,7 +2593,7 @@
 
     const operatorPkgPrices = [
       { id: "OP-P-01", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "包月30天", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 299, status: "生效", updatedAt: "2026-05-01" },
-      { id: "OP-P-01B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "包月30天", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 349, status: "生效", updatedAt: "2026-07-27" },
+      { id: "OP-P-01B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "包月30天", pkgType: "monthly", validityDays: 30, startMode: "pay", retailPrice: 349, status: "仅允许续费", updatedAt: "2026-11-27" },
       { id: "OP-P-03", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "7天套餐", pkgType: "weekly", validityDays: 7, startMode: "pay", retailPrice: 89, status: "生效", updatedAt: "2026-05-10" },
       { id: "OP-P-03B", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "7天套餐", pkgType: "weekly", validityDays: 7, startMode: "first_pickup", retailPrice: 109, status: "生效", updatedAt: "2026-07-27" },
       { id: "OP-P-04", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "1天套餐", pkgType: "daily", validityDays: 1, startMode: "pay", retailPrice: 29, status: "生效", updatedAt: "2026-06-01" },
@@ -2613,11 +2614,12 @@
     ];
 
     const operatorZonePkgPrices = [
-      { id: "OZ-P-01", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", pkg: "包月30天", retailPrice: 259, status: "生效", updatedAt: "2026-07-16" },
-      { id: "OZ-P-02", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", pkg: "7天套餐", retailPrice: 69, status: "生效", updatedAt: "2026-07-16" },
-      { id: "OZ-P-03", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", pkg: "1天套餐", retailPrice: 19, status: "生效", updatedAt: "2026-07-16" },
-      { id: "OZ-P-04", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", pkg: "单次换电", retailPrice: 6.9, status: "生效", updatedAt: "2026-07-16" },
-      { id: "OZ-P-05", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", pkg: "30天畅换", retailPrice: 349, status: "生效", updatedAt: "2026-07-16" }
+      { id: "OZ-P-01", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "包月30天", retailPrice: 259, status: "生效", updatedAt: "2026-07-16" },
+      { id: "OZ-P-01B", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", batteryModel: "60V30Ah", pkg: "包月30天", retailPrice: 319, status: "生效", updatedAt: "2026-11-27" },
+      { id: "OZ-P-02", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "7天套餐", retailPrice: 69, status: "生效", updatedAt: "2026-07-16" },
+      { id: "OZ-P-03", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "1天套餐", retailPrice: 19, status: "生效", updatedAt: "2026-07-16" },
+      { id: "OZ-P-04", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "单次换电", retailPrice: 6.9, status: "生效", updatedAt: "2026-07-16" },
+      { id: "OZ-P-05", zoneId: "PZ-SH-REMOTE", operatorId: "OP-SX", city: "上海", batteryModel: "48V30Ah", pkg: "30天畅换", retailPrice: 349, status: "生效", updatedAt: "2026-07-16" }
     ];
 
     const operatorDayQuotaPrices = [

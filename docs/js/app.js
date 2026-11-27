@@ -844,6 +844,10 @@
       const pkg = channelSalePackages.find(p => p.id === packageId && p.channelId === channelId);
       const label = (purpose || "").trim();
       if (!pkg || !label) return false;
+      if (!channelPackageSellable(pkg)) {
+        window.alert("该套餐当前不可销售（底价非「生效」或已停用），不可新建推广链接");
+        return false;
+      }
       const id = "LNK-" + Date.now().toString(36).slice(-6).toUpperCase();
       channelPromoLinks.push({
         id, channelId, packageId, skuId: pkg.skuId, purpose: label,
@@ -7632,9 +7636,175 @@
 
     function tag(s) {
       const risk = ["退款", "故障", "离线", "建设", "预警", "冻结", "失败", "中途", "完结"];
-      const warn = ["待", "处理", "结转", "可打", "注销"];
+      const warn = ["待", "处理", "结转", "可打", "注销", "仅允许续费"];
       const cls = risk.some(k => s.includes(k)) ? "risk" : warn.some(k => s.includes(k)) ? "warn" : s.includes("已打") || s.includes("完结") ? "neutral" : "";
       return `<span class="tag ${cls}">${s}</span>`;
+    }
+
+    /** 个人套餐 SKU 状态三态（decision-155） */
+    const SKU_STATUS_OPTIONS = ["生效", "仅允许续费", "停用"];
+    function skuAllowsNewPurchase(row) {
+      return !!(row && row.status === "生效");
+    }
+    function skuAllowsRenew(row) {
+      return !!(row && (row.status === "生效" || row.status === "仅允许续费"));
+    }
+    function skuStatusSelectHtml(selected) {
+      const cur = selected || "生效";
+      return SKU_STATUS_OPTIONS.map(s => `<option value="${s}" ${cur === s ? "selected" : ""}>${s}</option>`).join("");
+    }
+    function findOperatorPkgSku(opId, city, batteryModel, pkg) {
+      const model = normalizeBatteryModel(batteryModel);
+      return (typeof operatorPkgPrices !== "undefined" ? operatorPkgPrices : []).find(r =>
+        r.operatorId === opId
+        && (!city || r.city === city)
+        && normalizeBatteryModel(r.batteryModel) === model
+        && r.pkg === pkg
+      ) || null;
+    }
+    function channelPkgNameMatchesBase(channelName, basePkg) {
+      const a = String(channelName || "");
+      const b = String(basePkg || "");
+      if (!a || !b) return false;
+      if (a === b || a === b + "卡" || a.replace(/卡$/, "") === b) return true;
+      const norm = s => String(s || "").replace(/卡$/, "").replace(/套餐$/, "").replace(/天卡/, "天");
+      return norm(a) === norm(b);
+    }
+    function findBaseOperatorSkuForChannelPkg(p) {
+      if (!p) return null;
+      if (p.basePkgId) {
+        const byId = operatorPkgPrices.find(r => r.id === p.basePkgId);
+        if (byId) return byId;
+      }
+      const contract = (typeof channelContracts !== "undefined" ? channelContracts : []).find(c => c.channelId === p.channelId)
+        || (typeof myChannelContracts === "function" ? myChannelContracts().find(c => c.channelId === p.channelId) : null);
+      const opId = p.operatorId || contract?.operatorId || contract?.deviceOwnerId || "OP-SX";
+      const model = normalizeBatteryModel(p.batteryModel);
+      return operatorPkgPrices.find(r =>
+        r.operatorId === opId
+        && normalizeBatteryModel(r.batteryModel) === model
+        && channelPkgNameMatchesBase(p.name, r.pkg)
+      ) || null;
+    }
+    function channelPackageSellable(p) {
+      if (!p || p.status === "停用") return false;
+      const base = findBaseOperatorSkuForChannelPkg(p);
+      if (!base) return p.status === "启用";
+      return skuAllowsNewPurchase(base);
+    }
+    function channelPackageDisplayStatus(p) {
+      if (!p) return "—";
+      if (p.status === "停用") return "停用";
+      if (!channelPackageSellable(p)) {
+        const base = findBaseOperatorSkuForChannelPkg(p);
+        return base?.status === "仅允许续费" ? "当前不可销售（仅续费）" : "当前不可销售";
+      }
+      return "启用";
+    }
+    function syncChannelSellablesForOperatorSku(skuRow) {
+      if (!skuRow) return { packages: 0, links: 0 };
+      let pkgN = 0;
+      let linkN = 0;
+      const allowNew = skuAllowsNewPurchase(skuRow);
+      channelSalePackages.forEach(p => {
+        const base = findBaseOperatorSkuForChannelPkg(p);
+        if (!base || base.id !== skuRow.id) return;
+        if (!p.basePkgId) p.basePkgId = skuRow.id;
+        if (!allowNew) {
+          if (p.status === "启用") {
+            p.status = "不可销售";
+            p.autoUnsellableBySku = true;
+            pkgN++;
+          }
+        } else if (p.autoUnsellableBySku && p.status === "不可销售") {
+          p.status = "启用";
+          p.autoUnsellableBySku = false;
+          pkgN++;
+        }
+      });
+      channelPromoLinks.forEach(l => {
+        const pkg = channelSalePackages.find(x => x.id === l.packageId);
+        if (!pkg) return;
+        const base = findBaseOperatorSkuForChannelPkg(pkg);
+        if (!base || base.id !== skuRow.id) return;
+        if (!allowNew) {
+          if (l.status === "启用") {
+            l.status = "停用";
+            l.autoDisabledBySku = true;
+            linkN++;
+          }
+        } else if (l.autoDisabledBySku && l.status === "停用") {
+          l.status = "启用";
+          l.autoDisabledBySku = false;
+          linkN++;
+        }
+      });
+      return { packages: pkgN, links: linkN };
+    }
+    function packageOrdersForUserSku(userId, skuRow) {
+      if (!userId || !skuRow) return [];
+      return packageOrders.filter(p =>
+        p.user === userId
+        && (p.deviceOwnerId || "") === (skuRow.operatorId || "")
+        && (!p.batteryModel || normalizeBatteryModel(p.batteryModel) === normalizeBatteryModel(skuRow.batteryModel))
+        && (p.pkg === skuRow.pkg || String(p.pkg || "").includes(String(skuRow.pkg || "").replace(/天.*/, "天")))
+      );
+    }
+    function userHasInServiceSkuEntitlement(userId, skuRow) {
+      const today = new Date().toISOString().slice(0, 10);
+      return packageOrdersForUserSku(userId, skuRow).some(p => {
+        const st = p.serviceState || p.status;
+        if (!["服务中", "已冻结", "待激活"].includes(st)) return false;
+        if (st === "待激活") return true;
+        return !p.validTo || p.validTo >= today;
+      });
+    }
+    function userHasOverdueHoldForSku(userId, skuRow) {
+      const u = (typeof users !== "undefined" ? users : []).find(x => x.id === userId);
+      if (!u || !userIsHoldingBattery(u)) return false;
+      const pkgs = packageOrdersForUserSku(userId, skuRow);
+      const ended = pkgs.find(p => {
+        const st = p.serviceState || p.status;
+        if (["服务中", "已冻结", "待激活"].includes(st)) return false;
+        return true;
+      });
+      /* 有效期已过或次数耗尽仍持电 → 逾期持电 */
+      const today = new Date().toISOString().slice(0, 10);
+      const expiredHold = pkgs.some(p => p.validTo && p.validTo < today && userIsHoldingBattery(u));
+      const timesOut = pkgs.some(p => p.pkgType === "times" || p.pkgType === "single"
+        ? (p.swapLimit != null && (p.swapUsed || 0) >= p.swapLimit)
+        : false);
+      return !!(ended || expiredHold || (timesOut && userIsHoldingBattery(u)));
+    }
+    /** 新购门禁：仅状态=生效；再次购卡（已还电、无有效权益）按新购 */
+    function userCanBuySkuAsNew(skuRow) {
+      if (!skuRow) return { ok: false, msg: "套餐不存在" };
+      if (skuAllowsNewPurchase(skuRow)) return { ok: true, sku: skuRow };
+      if (skuRow.status === "仅允许续费") return { ok: false, msg: "该套餐仅老客续费，新客不可购买", code: "renew_only" };
+      return { ok: false, msg: "该套餐已停用，暂不可购买", code: "disabled" };
+    }
+    /** 续费门禁：SKU 允许续费 + 有效期内或逾期持电；次卡逾期仍禁（153） */
+    function userCanRenewSku(userId, skuRow) {
+      if (!skuRow) return { ok: false, msg: "套餐不存在" };
+      if (!skuAllowsRenew(skuRow)) return { ok: false, msg: "该套餐已停用，暂不可续费", code: "disabled" };
+      if (!userId) return { ok: false, msg: "请先登录", code: "need_login" };
+      if (userHasInServiceSkuEntitlement(userId, skuRow)) return { ok: true, sku: skuRow, reason: "in_service" };
+      if (userHasOverdueHoldForSku(userId, skuRow)) {
+        const isTimes = skuRow.pkgType === "times" || skuRow.pkgType === "single"
+          || /次卡|单次/.test(String(skuRow.pkg || ""));
+        if (isTimes) return { ok: false, msg: "次卡/单次逾期不可续费，请先支付占用费并还电", code: "times_overdue_block" };
+        return { ok: true, sku: skuRow, reason: "overdue_hold" };
+      }
+      return { ok: false, msg: "仅限本套餐有效期内或逾期持电用户续费（已还电的再次购卡按新购，当前不可售）", code: "not_eligible" };
+    }
+    function marketingSkuSellableOnOperator(operatorId, skuName, batteryModel) {
+      const rows = operatorPkgPrices.filter(r => r.operatorId === operatorId && skuAllowsNewPurchase(r));
+      if (!skuName) return rows.length > 0;
+      const nameCore = String(skuName).replace(/卡$/, "");
+      return rows.some(r =>
+        (r.pkg === skuName || r.pkg === nameCore || String(skuName).includes(r.pkg))
+        && (!batteryModel || normalizeBatteryModel(r.batteryModel) === normalizeBatteryModel(batteryModel))
+      );
     }
 
     function scale(n) {
@@ -10202,6 +10372,10 @@
     function confirmPlatformMarketingAgreement(agreementId) {
       const a = platformMarketingAgreements.find(x => x.id === agreementId);
       if (!a || a.status !== "待确认") return;
+      if (!marketingSkuSellableOnOperator(a.operatorId, a.skuName)) {
+        window.alert("对应底价 SKU 非「生效」，不可启用营销协议（仅允许续费/停用不可拉新）");
+        return;
+      }
       a.status = "已启用";
       a.confirmedAt = new Date().toISOString().slice(0, 10);
     }
@@ -16908,27 +17082,58 @@
       ) || null;
     }
 
-    /** 售价解析：区价 ?? 城市底价（同型号）；价格不限高低 */
-    function resolvePkgRetailPrice(pkg, siteId, city, batteryModel) {
-      const opId = currentEntity().id;
+    /**
+     * 售价解析：区价 ?? 城市底价（同型号）；门禁跟随底价三态
+     * opts.forRenew=true → 可用「生效/仅允许续费」；否则仅「生效」可新购
+     */
+    function resolvePkgRetailPrice(pkg, siteId, city, batteryModel, opts) {
+      const forRenew = !!(opts && opts.forRenew);
+      const opId = (opts && opts.operatorId) || currentEntity().id;
       const c = city || "上海";
       const model = normalizeBatteryModel(batteryModel);
       const cityRow = operatorPkgPrices.find(r =>
-        r.operatorId === opId && r.city === c && normalizeBatteryModel(r.batteryModel) === model && r.pkg === pkg && r.status === "生效"
+        r.operatorId === opId && r.city === c && normalizeBatteryModel(r.batteryModel) === model && r.pkg === pkg
+        && (forRenew ? skuAllowsRenew(r) : skuAllowsNewPurchase(r))
+      );
+      const anyRow = cityRow || operatorPkgPrices.find(r =>
+        r.operatorId === opId && r.city === c && normalizeBatteryModel(r.batteryModel) === model && r.pkg === pkg
       );
       const cityPrice = cityRow?.retailPrice;
-      if (!siteId) return { price: cityPrice, source: "city", cityPrice, zone: null, batteryModel: model };
+      if (!cityRow) {
+        return {
+          price: undefined,
+          source: "none",
+          cityPrice: anyRow?.retailPrice,
+          zone: null,
+          batteryModel: model,
+          skuId: anyRow?.id || null,
+          skuStatus: anyRow?.status || null,
+          blocked: true,
+          blockCode: anyRow?.status === "仅允许续费" && !forRenew ? "renew_only" : (anyRow ? "disabled" : "missing")
+        };
+      }
+      const baseMeta = {
+        skuId: cityRow.id,
+        skuStatus: cityRow.status,
+        blocked: false,
+        blockCode: null
+      };
+      if (!siteId) return { price: cityPrice, source: "city", cityPrice, zone: null, batteryModel: model, ...baseMeta };
       const zone = zoneBySiteId(siteId);
-      if (!zone) return { price: cityPrice, source: "city", cityPrice, zone: null, batteryModel: model };
-      const zp = operatorZonePkgPrices.find(p => p.zoneId === zone.id && p.pkg === pkg && p.status === "生效");
-      if (zp) return { price: zp.retailPrice, source: "zone", cityPrice, zone, zonePrice: zp.retailPrice, batteryModel: model };
-      return { price: cityPrice, source: "city", cityPrice, zone, zonePrice: null, batteryModel: model };
+      if (!zone) return { price: cityPrice, source: "city", cityPrice, zone: null, batteryModel: model, ...baseMeta };
+      const zp = operatorZonePkgPrices.find(p =>
+        p.zoneId === zone.id && p.pkg === pkg && p.status === "生效"
+        && (!p.batteryModel || normalizeBatteryModel(p.batteryModel) === model)
+      );
+      /* 分区价不可突破底价三态：底价不可新购时，区价同样不可新购（已在 cityRow 筛选） */
+      if (zp) return { price: zp.retailPrice, source: "zone", cityPrice, zone, zonePrice: zp.retailPrice, batteryModel: model, ...baseMeta };
+      return { price: cityPrice, source: "city", cityPrice, zone, zonePrice: null, batteryModel: model, ...baseMeta };
     }
 
     function activeBatteryModelsForOperator(opId, city) {
       const set = new Set();
       operatorPkgPrices.forEach(r => {
-        if (r.operatorId === opId && r.city === city && r.status === "生效") {
+        if (r.operatorId === opId && r.city === city && skuAllowsNewPurchase(r)) {
           set.add(normalizeBatteryModel(r.batteryModel));
         }
       });
@@ -17036,7 +17241,7 @@
           { name: "startMode", label: "开通方式", type: "select", options: ["pay", "first_pickup"], optionLabels: { pay: "购买立即生效", first_pickup: "首次领电生效" }, value: pkgStartMode(row) },
           { name: "validityDays", label: "有效期（天）", type: "number", value: pkgValidityDays(row) },
           { name: "retailPrice", label: "零售价（元）", type: "number", value: row.retailPrice },
-          { name: "status", label: "状态", type: "select", options: ["生效", "停用"], value: row.status || "生效" }
+          { name: "status", label: "状态", type: "select", options: SKU_STATUS_OPTIONS, value: row.status || "生效" }
         ],
         submitLabel: "保存",
         onSubmit: (data) => {
@@ -17045,7 +17250,7 @@
           const validity = resolveValidityDays(data.validityDays, row);
           if (validity.error) return validity.error;
           row.retailPrice = retailPrice;
-          row.status = data.status || row.status;
+          row.status = SKU_STATUS_OPTIONS.includes(data.status) ? data.status : (row.status || "生效");
           row.startMode = data.startMode === "first_pickup" ? "first_pickup" : "pay";
           row.validityDays = validity.days;
           row.updatedAt = new Date().toISOString().slice(0, 10);
@@ -17179,17 +17384,28 @@
       const zone = operatorPriceZones.find(z => z.id === zoneId);
       if (!zone) return;
       const cityRow = operatorPkgPrices.find(r =>
-        r.operatorId === currentEntity().id && r.city === zone.city && r.pkg === pkg && r.status === "生效"
+        r.operatorId === currentEntity().id && r.city === zone.city && r.pkg === pkg && r.status !== "停用"
+      ) || operatorPkgPrices.find(r =>
+        r.operatorId === currentEntity().id && r.city === zone.city && r.pkg === pkg
       );
       const zp = operatorZonePkgPrices.find(p => p.zoneId === zoneId && p.pkg === pkg);
+      if (!cityRow) {
+        window.alert("该城市尚无此套餐底价，请先在「个人套餐定价」维护");
+        return;
+      }
+      if (cityRow.status === "停用") {
+        window.alert("城市底价已停用：分区价不可单独售卖，请先恢复底价为「生效」或「仅允许续费」");
+        return;
+      }
       openProtoForm({
         title: "区价 · " + pkg,
         submitLabel: "保存区价",
         fields: [
           { name: "zone", label: "分区", value: zone.name, readonly: true },
           { name: "pkg", label: "套餐", value: pkg, readonly: true },
-          { name: "cityPrice", label: "城市底价（参考）", value: cityRow ? "¥" + cityRow.retailPrice : "—", readonly: true },
-          { name: "retailPrice", label: "分区零售价（元，可高于/低于底价）", value: zp ? String(zp.retailPrice) : (cityRow ? String(cityRow.retailPrice) : ""), required: true }
+          { name: "cityPrice", label: "城市底价（参考）", value: "¥" + cityRow.retailPrice + " · " + cityRow.status, readonly: true },
+          { name: "gateHint", label: "售卖门禁", value: cityRow.status === "仅允许续费" ? "底价=仅允许续费 → 分区价同样仅老客续费，不可新购" : "底价=生效 → 分区价可新购/续费", readonly: true },
+          { name: "retailPrice", label: "分区零售价（元，可高于/低于底价）", value: zp ? String(zp.retailPrice) : String(cityRow.retailPrice), required: true }
         ],
         onSubmit: (data) => {
           const price = parseFloat(data.retailPrice);
@@ -17199,14 +17415,16 @@
             zp.retailPrice = price;
             zp.updatedAt = now;
             zp.status = "生效";
+            zp.batteryModel = normalizeBatteryModel(cityRow.batteryModel);
           } else {
             operatorZonePkgPrices.push({
               id: "OZ-P-" + Date.now().toString(36).slice(-5).toUpperCase(),
               zoneId, operatorId: currentEntity().id, city: zone.city, pkg,
+              batteryModel: normalizeBatteryModel(cityRow.batteryModel),
               retailPrice: price, status: "生效", updatedAt: now
             });
           }
-          return { successMessage: "区价已保存 ¥" + price, afterClose: () => render() };
+          return { successMessage: "区价已保存 ¥" + price + "（门禁跟随底价）", afterClose: () => render() };
         }
       });
     }
@@ -17293,7 +17511,8 @@
           <label>开通方式${startModeSelectHtml("pay")}</label>
           <label>有效期（天）<input name="validityDays" type="number" min="1" step="1" value="${skuDefaultValidityDays(PERSONAL_PKG_SKU_PRESETS[0])}" required /></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="299" required /></label>
-          <label>状态<select name="status"><option selected>生效</option><option>停用</option></select></label>`;
+          <label>状态<select name="status">${skuStatusSelectHtml("生效")}</select></label>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">生效=全员可购可续；仅允许续费=仅合格老客续费；停用=不可购不可续（已购仍履约）。decision-155</p>`;
         const syncPreset = () => {
           const city = document.querySelector("#pricingForm [name=city]")?.value || "上海";
           const model = document.querySelector("#pricingForm [name=batteryModel]")?.value || BATTERY_MODEL_OPTIONS[1];
@@ -17336,7 +17555,8 @@
           <label>开通方式${startModeSelectHtml(pkgStartMode(row))}</label>
           <label>有效期（天）<input name="validityDays" type="number" min="1" step="1" value="${pkgValidityDays(row)}" required /></label>
           <label>零售价（元）<input name="retailPrice" type="number" min="0.1" step="0.1" value="${row.retailPrice}" required /></label>
-          <label>状态<select name="status"><option ${row.status === "生效" ? "selected" : ""}>生效</option><option ${row.status === "停用" ? "selected" : ""}>停用</option></select></label>`;
+          <label>状态<select name="status">${skuStatusSelectHtml(row.status || "生效")}</select></label>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">生效=全员可购可续；仅允许续费=仅合格老客续费；停用=不可购不可续（已购仍履约）。decision-155</p>`;
       }
       document.querySelector("#pricingModal").classList.add("open");
       document.querySelector("#pricingMask").classList.add("open");
@@ -17416,10 +17636,15 @@
       row.startMode = startMode;
       row.validityDays = validity.days;
       row.updatedAt = new Date().toISOString().slice(0, 10);
+      const synced = syncChannelSellablesForOperatorSku(row);
       closePricingForm();
       state.view = "pricing";
+      state.pricingTab = "pkg";
       render();
-      window.alert("演示：SKU 已更新（仅本地 Mock）");
+      const syncTip = (!skuAllowsNewPurchase(row) || synced.packages || synced.links)
+        ? `；渠道可售 ${synced.packages} 条、推广链接 ${synced.links} 条已按底价三态联动`
+        : "";
+      window.alert("演示：SKU 已更新（仅本地 Mock）" + syncTip);
     }
 
     function cardPricingContracts() {
@@ -17432,7 +17657,7 @@
       if (!isNew && !sku) return;
       state.cardPricingEditId = isNew ? "new" : id;
       const contracts = cardPricingContracts();
-      const pkgRows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id && r.status === "生效");
+      const pkgRows = operatorPkgPrices.filter(r => r.operatorId === currentEntity().id && skuAllowsNewPurchase(r));
       if (isNew) {
         if (!contracts.length) {
           window.alert("请先在「渠道管理 → 签约渠道」新增链接类签约");
@@ -17440,7 +17665,7 @@
         }
         document.querySelector("#cardPricingFormTitle").textContent = "新增渠道分销价";
         document.querySelector("#cardPricingForm").innerHTML = `
-          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">基于个人套餐 SKU 为分销渠道配置正式价、专享价与佣金；专享价须 ≤ 正式价。</p>
+          <p class="form-span-2" style="font-size:12px;color:var(--muted);margin:0">基于个人套餐 SKU 为分销渠道配置正式价、专享价与佣金；专享价须 ≤ 正式价。仅可关联状态为<strong>生效</strong>的底价（仅允许续费/停用不可新开分销）。</p>
           <label>渠道商<select name="channelId" required>${contracts.map(c => `<option value="${c.channelId}">${c.channelName}</option>`).join("")}</select></label>
           <label>关联 SKU<select name="basePkg" id="cardPricingBasePkg">${pkgRows.map(p => `<option value="${p.id}" data-price="${p.retailPrice}" data-name="${p.pkg}" data-model="${normalizeBatteryModel(p.batteryModel)}">${p.city} · ${normalizeBatteryModel(p.batteryModel)} · ${p.pkg}（¥${p.retailPrice}）</option>`).join("")}</select></label>
           <label>正式零售价（元）<input name="officialPrice" type="number" min="0.1" step="0.1" value="${pkgRows[0]?.retailPrice ?? 299}" required /></label>
@@ -17507,6 +17732,8 @@
         channelSalePackages.push({
           id: "PKG-" + channelId.replace(/-/g, "") + suffix,
           channelId,
+          basePkgId: base.id,
+          operatorId: base.operatorId,
           skuId: "SKU-" + channelId.slice(-4) + "-" + suffix,
           name: base.pkg,
           batteryModel: normalizeBatteryModel(base.batteryModel),
@@ -17529,6 +17756,18 @@
       sku.channelPrice = channelPrice;
       sku.commissionPerOrder = commissionPerOrder;
       sku.status = status;
+      if (status === "启用") sku.autoUnsellableBySku = false;
+      const base = findBaseOperatorSkuForChannelPkg(sku);
+      if (status === "启用" && base && !skuAllowsNewPurchase(base)) {
+        sku.status = "不可销售";
+        sku.autoUnsellableBySku = true;
+        closeCardPricingForm();
+        state.view = "pricing";
+        state.pricingTab = "card";
+        render();
+        window.alert("演示：底价非「生效」，渠道套餐无法启用为可售（已回落为不可销售）");
+        return;
+      }
       closeCardPricingForm();
       state.view = "pricing";
       state.pricingTab = "card";
@@ -17899,7 +18138,7 @@
             ${topTabs}
             ${panelHead("城市底价（个人套餐）", "运营商×城市×电池型号×SKU · 未挂分区的站点用此价", "pricing_pkg", `<button type="button" class="btn primary" data-new-pricing-sku>+ 新增 SKU</button>`)}
             <div class="panel-body orders-table-wrap">
-              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg")}${noteBtn("pricing_deposit")} 套餐须绑定电池型号，<strong>无一单通兑</strong>；无生效 SKU 的型号不对骑手展示。同城差异价请到「价格分区」。</p>
+              <p style="font-size:12px;color:var(--muted);margin:0 0 12px">${noteBtn("pricing_pkg")}${noteBtn("pricing_deposit")} 套餐须绑定电池型号，<strong>无一单通兑</strong>。状态三态（decision-155）：<strong>生效</strong>全员可购可续；<strong>仅允许续费</strong>仅合格老客续；<strong>停用</strong>不可购不可续。无「生效」SKU 的型号不对新客展示。改状态自动联动渠道可售/推广链接；区价跟随底价门禁。 <button type="button" class="link-btn" data-demo-sku-gate>门禁自检</button></p>
               <div class="filter-row" style="display:flex;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px;align-items:center">
                 <label style="font-size:13px">城市<select data-pricing-pkg-pf="city" style="margin-left:6px">
                   <option value="全部" ${pf.city === "全部" ? "selected" : ""}>全部</option>
@@ -17912,6 +18151,7 @@
                 <label style="font-size:13px">状态<select data-pricing-pkg-pf="status" style="margin-left:6px">
                   <option value="全部" ${pf.status === "全部" ? "selected" : ""}>全部</option>
                   <option value="生效" ${pf.status === "生效" ? "selected" : ""}>生效</option>
+                  <option value="仅允许续费" ${pf.status === "仅允许续费" ? "selected" : ""}>仅允许续费</option>
                   <option value="停用" ${pf.status === "停用" ? "selected" : ""}>停用</option>
                 </select></label>
               </div>
@@ -19235,13 +19475,15 @@
       const sub = state.channelLinksSubTab || "packages";
       const topTabs = panelTopTabs([["packages", "可销售套餐"], ["links", "推广链接"]], sub, "chlinks-sub");
       const form = state.channelLinkForm;
+      const sellablePkgs = packages.filter(channelPackageSellable);
       const newLinkForm = form ? `
         <div class="field-card" style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:8px">
           <p style="font-size:13px;font-weight:600;margin:0 0 12px">新建推广链接</p>
+          <p style="font-size:12px;color:var(--muted);margin:0 0 10px">仅列出当前可销售套餐（底价须为「生效」）；仅允许续费/停用底价不可拉新</p>
           <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end">
             <label style="font-size:12px">所属套餐
               <select id="newLinkPackage" style="width:100%;margin-top:4px">
-                ${packages.map(p => `<option value="${p.id}"${p.id === form.packageId ? " selected" : ""}>${channelPkgLabel(p)}</option>`).join("")}
+                ${sellablePkgs.map(p => `<option value="${p.id}"${p.id === form.packageId ? " selected" : ""}>${channelPkgLabel(p)}</option>`).join("") || "<option value=\"\">暂无可售套餐</option>"}
               </select>
             </label>
             <label style="font-size:12px">链接用途
@@ -19299,7 +19541,7 @@
         ${ownScopeBanner()}
         <section class="panel panel-with-top-tabs">
           ${topTabs}
-          ${panelHead("可销售套餐", "价格由运营商签约配置 · 渠道可为本套餐生成多条推广链接", "channel_settlement_card", `<button type="button" class="btn" data-goto-promo-links>+ 新建链接</button>`)}
+          ${panelHead("可销售套餐", "价格由运营商签约配置 · 底价非「生效」时展示「当前不可销售」并禁新建链接 · decision-155", "channel_settlement_card", `<button type="button" class="btn" data-goto-promo-links>+ 新建链接</button>`)}
           <div class="panel-body orders-table-wrap">
             <table>
               <thead><tr><th>电池型号</th><th>套餐</th><th>正式价</th><th>渠道专享价</th><th>佣金/单</th><th>推广链接数</th><th>累计点击</th><th>累计成交</th><th>状态</th></tr></thead>
@@ -19314,7 +19556,7 @@
                   <td>${st.linkCount} 条</td>
                   <td>${st.clicks}</td>
                   <td>${st.conversions}</td>
-                  <td>${tag(p.status)}</td>
+                  <td>${tag(channelPackageDisplayStatus(p))}</td>
                 </tr>`;
               }).join("") || "<tr><td colspan='9'>暂无可售套餐</td></tr>"}</tbody>
             </table>
@@ -20549,7 +20791,17 @@
         btn.onclick = () => {
           const link = channelPromoLinks.find(l => l.id === btn.dataset.togglePromoLink);
           if (!link) return;
-          link.status = link.status === "启用" ? "停用" : "启用";
+          if (link.status !== "启用") {
+            const pkg = channelSalePackages.find(p => p.id === link.packageId);
+            if (!channelPackageSellable(pkg)) {
+              window.alert("底价 SKU 非「生效」，推广链接不可启用");
+              return;
+            }
+            link.status = "启用";
+            link.autoDisabledBySku = false;
+          } else {
+            link.status = "停用";
+          }
           render();
         };
       });
@@ -20915,6 +21167,23 @@
       });
       root.querySelectorAll("[data-new-pricing-sku]").forEach(btn => {
         btn.onclick = () => openPricingForm("new");
+      });
+      root.querySelectorAll("[data-demo-sku-gate]").forEach(btn => {
+        btn.onclick = () => {
+          const renewOnly = operatorPkgPrices.find(r => r.id === "OP-P-01B");
+          const disabled = operatorPkgPrices.find(r => r.id === "OP-P-08");
+          const active = operatorPkgPrices.find(r => r.id === "OP-P-01");
+          const lines = [
+            "【新购】" + (active?.pkg || "") + " 48V → " + JSON.stringify(userCanBuySkuAsNew(active)),
+            "【新购】" + (renewOnly?.pkg || "") + " 60V 仅续费 → " + JSON.stringify(userCanBuySkuAsNew(renewOnly)),
+            "【新购】" + (disabled?.pkg || "") + " 停用 → " + JSON.stringify(userCanBuySkuAsNew(disabled)),
+            "【续费·无用户】仅续费 SKU → " + JSON.stringify(userCanRenewSku(null, renewOnly)),
+            "【区价新购】60V 包月 → " + JSON.stringify(resolvePkgRetailPrice("包月30天", "ST-SH-LG", "上海", "60V30Ah")),
+            "【区价续费】60V 包月 → " + JSON.stringify(resolvePkgRetailPrice("包月30天", "ST-SH-LG", "上海", "60V30Ah", { forRenew: true })),
+            "【渠道】PKG-60D-RO → " + channelPackageDisplayStatus(channelSalePackages.find(p => p.id === "PKG-60D-RO"))
+          ];
+          window.alert("SKU 三态门禁自检（decision-155）\n\n" + lines.join("\n"));
+        };
       });
       root.querySelectorAll("[data-pricing-pkg-sub]").forEach(btn => {
         btn.onclick = () => {

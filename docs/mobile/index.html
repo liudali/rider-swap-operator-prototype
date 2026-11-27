@@ -335,8 +335,30 @@
         ${opts.depositPending ? `<div class="deposit-status-card"><div class="ds-title">电池押金 · 待办理</div>首次领电前须免押或实缴</div>` : ""}`),
       minePersonalOverdue: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">138****1028</span><span class="tag-sm ok">已认证</span></div></div>
-        <div class="service-card warn"><h4>套餐已结束 · 请还电</h4><p>已逾期 3 天 · 电池占用费 ¥30<br>须先支付占用费才能还电 · 暂不封顶</p><span class="btn-gold">支付占用费 ¥30</span></div>
+        <div class="service-card warn"><h4>套餐已结束 · 可续费或还电</h4><p>包月30天 · 已逾期 3 天<br>续费：3 天从新套餐扣除，生效 27 天，不收占用费<br>或支付占用费 ¥30 后还电</p>
+          <span class="btn-gold">续费（扣 3 天）</span>
+          <span class="btn-gold" style="margin-left:6px;background:#64748b">支付占用费 ¥30</span></div>
+        <div class="deposit-status-card"><div class="ds-title">电池押金 · 实付 ¥99 · 在押</div>续费不重复收押 · 走还电则押金不抵占用费</div>`),
+      purchaseRenewOverdue: () => phoneShell("服务购买 · 逾期续费", "mine", `
+        <div class="sheet-page">
+          <div class="service-scope-banner" style="margin:0 0 8px">续费原运营商 · <strong>${OP["OP-SX"]}</strong></div>
+          <div class="service-card warn"><h4>逾期抵扣说明</h4><p>已逾期 <strong>3</strong> 天将从新套餐扣除<br>30 天 − 3 天 = <strong>生效 27 天</strong><br><strong>不收取</strong>电池占用费 · 可继续持电换电</p></div>
+          <div class="form-row"><label>套餐</label><input value="30天畅换 · ¥299" readonly /></div>
+          <p style="font-size:9px;color:var(--muted);margin:0 0 10px">按正式价全额支付，不按扣除天数折价</p>
+          <button class="btn-block">支付 ¥299 并恢复服务</button>
+        </div>`, { hideTab: true }),
+      mineRenewedFromOverdue: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">138****1028</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card"><h4>30天畅换</h4><p>生效 27 天（已抵扣逾期 3 天）· 持有电池 · 可换电<br><small>本次续费未收占用费</small></p><span class="btn-gold">扫码换电</span></div>`),
+      mineTimesOverdue: () => phoneShell("我的", "mine", `
+        <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">137****3321</span><span class="tag-sm ok">已认证</span></div></div>
+        <div class="service-card warn"><h4>次数已用尽 · 请还电</h4><p>次卡10次 · 已逾期 2 天 · 电池占用费 ¥20<br>须先支付占用费才能还电<br><strong>不可续费顶逾期</strong> · 还电后再购</p><span class="btn-gold">支付占用费 ¥20</span></div>
         <div class="deposit-status-card"><div class="ds-title">电池押金 · 实付 ¥99 · 在押</div>押金不抵占用费 · 还电后按规则退押</div>`),
+      purchaseBlockedOverdue: () => phoneShell("服务购买", "mine", `
+        <div class="sheet-page">
+          <div class="service-card warn"><h4>暂不可购买</h4><p>次卡已用尽且仍持电池<br>不可续费顶逾期<br>请先支付占用费并还电后再购</p></div>
+          <button class="btn-block" style="opacity:.5">不可购买</button>
+        </div>`, { hideTab: true }),
       minePersonalOverduePaid: () => phoneShell("我的", "mine", `
         <div class="profile-head"><div class="avatar">👤</div><div><span class="phone">138****1028</span><span class="tag-sm ok">已认证</span></div></div>
         <div class="service-card warn"><h4>占用费已付清 · 请还电</h4><p>已逾期 3 天 · 占用费 ¥30 已支付<br>可进入还电</p><span class="btn-gold">扫码还电</span></div>`),
@@ -404,6 +426,23 @@
           <div class="pkg-card"><h5>30天畅换</h5><div class="price">¥299</div><div class="desc">正式零售价 · 押金已办结</div></div>
           <div class="pay-summary"><span class="total">应付 ¥299</span></div>
           <button class="btn-block" style="margin-top:8px">确认支付</button></div>`, { hideTab: true }),
+      purchaseShelfRenewOnly: () => phoneShell("服务购买", "mine", `
+        <div class="sheet-page"><div class="service-scope-banner" style="margin:0 0 8px">收款方：<strong>${OP["OP-SX"]}</strong> · 新客货架</div>
+          <p style="font-size:9px;margin-bottom:6px">电池型号：48V30Ah · <strong>60V30Ah（该型号暂无可新购套餐）</strong></p>
+          <div class="pkg-card"><h5>30天畅换</h5><div class="price">¥299</div><div class="desc">48V30Ah · 可购买</div></div>
+          <div class="pkg-card" style="opacity:.55"><h5>60V · 包月30天</h5><div class="price">—</div><div class="desc">仅老客续费 · 新客不可购买</div></div>
+          <p style="font-size:9px;color:#c45;margin-top:8px">点击「仅老客续费」SKU → Toast：该套餐仅老客续费，新客不可购买</p>
+        </div>`, { hideTab: true }),
+      purchaseBlockedRenewOnly: () => phoneShell("服务购买", "mine", `
+        <div class="sheet-page">
+          <div class="service-card warn"><h4>该套餐仅老客续费</h4><p>60V30Ah · 包月30天<br>库存紧俏，暂不面向新客<br>已购用户可在有效期内续费</p></div>
+          <button class="btn-block" style="opacity:.5">不可购买</button>
+        </div>`, { hideTab: true }),
+      purchaseBlockedSkuOff: () => phoneShell("服务购买 · 续费", "mine", `
+        <div class="sheet-page"><div class="service-scope-banner" style="margin:0 0 8px">续费原运营商 · <strong>${OP["OP-SX"]}</strong></div>
+          <div class="service-card warn"><h4>该套餐已停用</h4><p>48V20Ah · 包月30天已停售<br>不可新购、不可续费<br>已购订单仍照常履约至到期</p></div>
+          <button class="btn-block" style="opacity:.5">暂不可续费</button>
+        </div>`, { hideTab: true }),
       purchaseCardAttr: () => phoneShell("服务购买", "mine", `
         <div class="sheet-page"><div class="channel-attr-banner" style="margin:0 0 8px">🟡 骑士卡 · 新客首笔专享价 · 剩余 18h</div>
           <div class="pkg-card"><h5>30天畅换</h5><div class="price"><span style="text-decoration:line-through;color:var(--muted);font-size:11px">¥299</span> ¥279</div><div class="desc">本链接仅新客专享价</div></div>
@@ -528,7 +567,11 @@
         connector("解除冻结"), flowCell("P08b", "解冻待领电", SCREENS.minePendingPickup(), "◆ 顺延有效期"),
         connector(""), flowCell("P08c", "禁冻提示", SCREENS.mineFreezeDenied(), "◆ 天数=0"),
         connector(""), flowCell("P09", "冷静期退款", SCREENS.mineCooling(), "● 须还电"),
-        connector(""), flowCell("P10a", "套餐结束待还电", SCREENS.minePersonalOverdue(), "! 先付费"),
+        connector(""), flowCell("P10a", "包月逾期", SCREENS.minePersonalOverdue(), "◆ 续费或付费还电"),
+        connector(""), flowCell("P10r", "逾期续费", SCREENS.purchaseRenewOverdue(), "◆ 扣天数·不计占用费"),
+        connector(""), flowCell("P10ok", "续费恢复", SCREENS.mineRenewedFromOverdue(), "● 可换电"),
+        connector(""), flowCell("P10t", "次卡次数耗尽", SCREENS.mineTimesOverdue(), "! 禁续费"),
+        connector(""), flowCell("P10block", "次卡禁购", SCREENS.purchaseBlockedOverdue(), "◆ decision-153"),
         connector(""), flowCell("P10pay", "支付占用费", SCREENS.payOccupancy(), "● 付清才还电"),
         connector(""), flowCell("P10b", "已付清·仅还电", SCREENS.scanReturnOverduePersonal(), "! 可还电"),
         connector(""), flowCell("P10c", "还电成功", SCREENS.resultReturnSettle(), "◆ 占用费不退")
@@ -541,7 +584,10 @@
           <div><div class="branch-v-connector"><div class="arrow-v"></div><span class="connector-label">申请免押</span></div>
             ${flowCell("P04b", "信用免押", SCREENS.depositWaiver(), "芝麻信用")}</div>
           <div><div class="branch-v-connector"><div class="arrow-v"></div><span class="connector-label">实缴押金</span></div>
-            ${flowCell("P04c", "实缴购套餐", SCREENS.purchasePaidDeposit(), "实付·在押")}</div>
+            ${flowCell("P04c", "实缴购套餐", SCREENS.purchasePaidDeposit(), "实付·在押")}
+            ${flowCell("P04r", "仅续费货架", SCREENS.purchaseShelfRenewOnly(), "◆ decision-155")}
+            ${flowCell("P04rb", "仅续费拦截", SCREENS.purchaseBlockedRenewOnly(), "新客不可购")}
+            ${flowCell("P04off", "停用禁续", SCREENS.purchaseBlockedSkuOff(), "不可购不可续")}</div>
         </div>
         <div class="flow-note"><h4>押金相关 · 业务规则</h4>
           <ul><li>信用免押：芝麻信用达标 → 方式「信用免押」、状态 ——</li>
@@ -578,7 +624,14 @@
       { id: "SP-10", title: "免押·待付占用费", key: "personal_overdue_waiver", fn: () => SCREENS.minePersonalOverdueWaiver() },
       { id: "SP-11", title: "未付清拦截还电", key: "personal_overdue_block", fn: () => SCREENS.scanReturnOverdueWaiver() },
       { id: "SP-12", title: "未付清扫码失败", key: "personal_overdue_unpaid", fn: () => SCREENS.resultReturnPay() },
-      { id: "SP-13", title: "运营减免为0", key: "personal_overdue_waived", fn: () => SCREENS.minePersonalOverdueWaived() }
+      { id: "SP-13", title: "运营减免为0", key: "personal_overdue_waived", fn: () => SCREENS.minePersonalOverdueWaived() },
+      { id: "SP-14", title: "次卡次数耗尽·禁续费", key: "times_overdue", fn: () => SCREENS.mineTimesOverdue() },
+      { id: "SP-15", title: "次卡逾期禁购", key: "overdue_purchase_block", fn: () => SCREENS.purchaseBlockedOverdue() },
+      { id: "SP-16", title: "包月逾期续费页", key: "monthly_renew_overdue", fn: () => SCREENS.purchaseRenewOverdue() },
+      { id: "SP-17", title: "续费后恢复服务", key: "monthly_renewed", fn: () => SCREENS.mineRenewedFromOverdue() },
+      { id: "SP-18", title: "仅续费货架", key: "sku_renew_only_shelf", fn: () => SCREENS.purchaseShelfRenewOnly() },
+      { id: "SP-19", title: "仅续费拦截", key: "sku_renew_only_block", fn: () => SCREENS.purchaseBlockedRenewOnly() },
+      { id: "SP-20", title: "停用禁续费", key: "sku_disabled_renew", fn: () => SCREENS.purchaseBlockedSkuOff() }
     ];
     const SUPPLEMENT_CHANNEL = [
       { id: "SC-01", title: "押金已办·持电池", key: "channel_deposit_done", fn: () => SCREENS.mineChannel({ confirmed: true, today: "今日已确认消耗" }) },
